@@ -1,5 +1,7 @@
 package io.github.iampopovich.eculense.feature.sessions
 
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -41,4 +43,33 @@ class SessionsScreenTest {
         assertEquals(listOf(7L), opened)
         assertEquals(listOf(7L), deleted)
     }
+
+    @Test
+    fun importButtonIsAvailableEvenWithoutRecordings() {
+        var clicks = 0
+        rule.setContent { SessionsScreen(emptyList(), onOpen = {}, onDelete = {}, onImport = { clicks++ }) }
+        rule.onNodeWithText("Импорт из Car Scanner").performClick()
+        assertEquals(1, clicks)
+    }
+
+    @Test
+    fun importStatusIsShownAndButtonDisabledWhileRunning() {
+        rule.setContent {
+            SessionsScreen(listOf(imported), onOpen = {}, onDelete = {}, onImport = {}, importState = ImportState.Running(processed = 12))
+        }
+        rule.onNodeWithText("Импорт… обработано записей: 12").assertExists()
+        rule.onNodeWithText("Импорт из Car Scanner").assertIsNotEnabled()
+        rule.onNodeWithText("импорт из Car Scanner", substring = true).assertExists()
+    }
+
+    @Test
+    fun importResultIsSummarised() {
+        rule.setContent {
+            SessionsScreen(emptyList(), onOpen = {}, onDelete = {}, onImport = {}, importState = ImportState.Done(imported = 73, duplicates = 0, failed = 1))
+        }
+        rule.onNodeWithText("Импортировано 73, пропущено дублей 0, ошибок 1").assertExists()
+        rule.onNodeWithText("Импорт из Car Scanner").assertIsEnabled()
+    }
+
+    private val imported = Session(8, "Car Scanner · 2026-01-02 12-00-00", 1_700_000_000_000, 1_700_000_060_000, SessionSource.IMPORT_CARSCANNER)
 }

@@ -2,13 +2,16 @@ package io.github.iampopovich.eculense.feature.sessions
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.iampopovich.eculense.core.data.CarScannerImporter
 import io.github.iampopovich.eculense.core.data.SessionCsv
 import io.github.iampopovich.eculense.core.data.SessionRepository
 import io.github.iampopovich.eculense.core.model.SensorReading
 import io.github.iampopovich.eculense.core.model.Session
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,12 +22,48 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-internal class SessionsViewModel(private val repository: SessionRepository) : ViewModel() {
+/** Состояние импорта бэкапа Car Scanner для строки статуса над списком. */
+internal sealed interface ImportState {
+    data object Idle : ImportState
+    data class Running(val processed: Int) : ImportState
+    data class Done(val imported: Int, val duplicates: Int, val failed: Int) : ImportState
+    data class Failed(val message: String) : ImportState
+}
+
+internal class SessionsViewModel(
+    private val repository: SessionRepository,
+    private val importer: CarScannerImporter,
+) : ViewModel() {
     val sessions: StateFlow<List<Session>> =
         repository.observeSessions().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    private val _importState = MutableStateFlow<ImportState>(ImportState.Idle)
+    val importState: StateFlow<ImportState> = _importState.asStateFlow()
+
     fun delete(id: Long) {
         viewModelScope.launch { repository.delete(id) }
+    }
+
+    fun import(uri: Uri, fileName: String) {
+        if (_importState.value is ImportState.Running) return
+        _importState.value = ImportState.Running(processed = 0)
+        viewModelScope.launch {
+            val started = System.currentTimeMillis()
+            _importState.value = try {
+                val report = importer.import(uri, fileName) { _importState.value = ImportState.Running(it) }
+                report.failed.forEach { Log.w(TAG, "Car Scanner import: $it") }
+                ImportState.Done(report.imported, report.skippedDuplicates, report.failed.size)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ImportState.Failed(e.message ?: e.javaClass.simpleName)
+            }
+            Log.i(TAG, "Car Scanner import finished in ${System.currentTimeMillis() - started} ms: ${_importState.value}")
+        }
+    }
+
+    private companion object {
+        const val TAG = "SessionsImport"
     }
 }
 
