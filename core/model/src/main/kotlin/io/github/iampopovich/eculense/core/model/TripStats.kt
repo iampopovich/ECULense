@@ -4,7 +4,10 @@ import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
 
-/** Итоги поездок за период. Средний расход = всё топливо / весь путь (так же считает Car Scanner). */
+/**
+ * Итоги поездок за период. Средний расход = всё топливо / весь путь (так же считает Car Scanner);
+ * путь поездок без оценки топлива ([Trip.fuelKnown] = false) в знаменатель не входит.
+ */
 data class TripStats(
     val trips: Int,
     val distanceKm: Double,
@@ -12,9 +15,11 @@ data class TripStats(
     val drivingMs: Long,
     val standingMs: Long,
     val fuelCost: Double,
+    /** Путь поездок, у которых топливо известно. */
+    val fuelDistanceKm: Double = distanceKm,
 ) {
     /** null, когда пути нет: деление на ноль не должно превращаться в «бесконечный расход». */
-    val avgLPer100Km: Double? get() = if (distanceKm > 0.0) fuelL / distanceKm * 100.0 else null
+    val avgLPer100Km: Double? get() = if (fuelDistanceKm > 0.0) fuelL / fuelDistanceKm * 100.0 else null
 
     companion object {
         val EMPTY = TripStats(0, 0.0, 0.0, 0, 0, 0.0)
@@ -27,6 +32,7 @@ data class TripStats(
                 drivingMs = acc.drivingMs + t.drivingMs,
                 standingMs = acc.standingMs + t.standingMs,
                 fuelCost = acc.fuelCost + t.fuelL * (t.fuelPricePerL ?: 0.0),
+                fuelDistanceKm = acc.fuelDistanceKm + if (t.fuelKnown) t.distanceKm else 0.0,
             )
         }
     }

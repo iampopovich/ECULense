@@ -58,7 +58,20 @@ data class ServiceIntervals(
     val fuelFilterKm: Int? = null,
 )
 
+/** LIVE — посчитана ECULense по записи (своей или импортированной без поездки Car Scanner). */
 enum class TripSource { LIVE, IMPORT_CARSCANNER }
+
+/** Откуда взято топливо поездки, посчитанной по записи. null — поездка из Car Scanner (там своё). */
+enum class FuelMethod {
+    /** PID 01.5E — расход топлива двигателя, л/ч. */
+    OBD_FUEL_RATE,
+
+    /** Оценка по MAF: стехиометрия бензина 14,7 и плотность 0,745 кг/л. */
+    MAF_ESTIMATE,
+
+    /** Нечем посчитать (дизель/газ, нет MAF и 01.5E) — fuelL = 0, в расход не идёт. */
+    NOT_AVAILABLE,
+}
 
 /** Поездка как в Car Scanner (таблица trips): итоги без трека. */
 data class Trip(
@@ -73,4 +86,33 @@ data class Trip(
     val standingMs: Long,
     val source: TripSource,
     val externalId: String? = null,
+    val fuelMethod: FuelMethod? = null,
+) {
+    val fuelKnown: Boolean get() = fuelMethod != FuelMethod.NOT_AVAILABLE
+}
+
+/** Пробег: MANUAL — ввёл пользователь (или перенесён из профиля/Car Scanner); ESTIMATED — оценка по поездкам. */
+enum class OdometerSource { MANUAL, ESTIMATED }
+
+data class OdometerEntry(
+    val id: Long = 0,
+    val carId: Long,
+    val km: Long,
+    val atMs: Long,
+    val source: OdometerSource = OdometerSource.MANUAL,
+)
+
+/**
+ * Работа ТО. Интервалы — по пробегу и/или времени (null — не задан). lastDone* — когда делали в последний раз
+ * (null — неизвестно: статус «отметьте, когда делали»).
+ */
+data class MaintenanceItem(
+    val id: Long = 0,
+    val carId: Long,
+    val title: String,
+    val intervalKm: Int? = null,
+    val intervalMonths: Int? = null,
+    val lastDoneKm: Long? = null,
+    val lastDoneAtMs: Long? = null,
+    val note: String? = null,
 )

@@ -17,6 +17,16 @@ class TripStatsTest {
             fuelPricePerL = price, drivingMs = drive, standingMs = stand, source = TripSource.IMPORT_CARSCANNER)
 
     @Test
+    fun `trips without a fuel estimate do not dilute the average consumption`() {
+        val known = trip(now, 10.0, 1.0)
+        val unknown = trip(now, 30.0, 0.0).copy(source = TripSource.LIVE, fuelMethod = FuelMethod.NOT_AVAILABLE)
+        val stats = TripStats.of(listOf(known, unknown))
+        assertEquals(40.0, stats.distanceKm, 1e-9)
+        assertEquals(10.0, stats.avgLPer100Km!!, 1e-9)
+        assertNull(TripStats.of(listOf(unknown)).avgLPer100Km)
+    }
+
+    @Test
     fun `totals and average consumption over all trips`() {
         val stats = TripStats.of(listOf(trip(now, 10.0, 1.2), trip(now, 30.0, 3.0, price = null), trip(now, 0.0, 0.1)))
         assertEquals(3, stats.trips)

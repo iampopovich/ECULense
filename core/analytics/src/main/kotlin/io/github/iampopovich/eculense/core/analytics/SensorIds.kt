@@ -16,6 +16,8 @@ object SensorIds {
     const val IAT = "01.0F"
     const val MAF = "01.10"
     const val MIL_DISTANCE = "01.21"
+    /** Расход топлива двигателя, л/ч (PID 0x5E) — есть не у всех машин. */
+    const val FUEL_RATE = "01.5E"
     /** Напряжение блока управления (PID 0x42) — точнее, чем у адаптера. */
     const val MODULE_VOLTAGE = "01.42"
     /** Напряжение на разъёме OBD по ATRV — есть почти в каждой записи. */
