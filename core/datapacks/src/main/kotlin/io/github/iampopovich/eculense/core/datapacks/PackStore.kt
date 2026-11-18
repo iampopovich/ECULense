@@ -26,12 +26,17 @@ class PackStore(val root: File) {
     /** Файл активной версии или null, если пакет не скачан. */
     fun file(id: String, name: String): File? = installed(id)?.file(name)?.takeIf { it.isFile }
 
-    /** Чистый каталог для сборки версии. */
-    fun staging(id: String, version: String): File =
+    /** Каталог для сборки версии. keep = true — докачка: содержимое прошлой попытки (`.part`) остаётся. */
+    fun staging(id: String, version: String, keep: Boolean = false): File =
         File(packDir(id), ".staging-${versionDir(version)}").apply {
-            deleteRecursively()
+            if (!keep) deleteRecursively()
             mkdirs()
         }
+
+    /** Сколько байт уже лежит в staging (докачка после обрыва); 0 — ничего. */
+    fun partialBytes(id: String): Long =
+        packDir(id).listFiles().orEmpty().filter { it.isDirectory && it.name.startsWith(".staging-") }
+            .sumOf { d -> d.walkTopDown().filter { it.isFile }.sumOf { it.length() } }
 
     @Synchronized
     fun commit(id: String, version: String, staged: File): Installed {

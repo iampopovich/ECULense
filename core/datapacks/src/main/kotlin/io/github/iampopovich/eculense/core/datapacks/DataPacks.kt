@@ -1,12 +1,18 @@
 package io.github.iampopovich.eculense.core.datapacks
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.net.ConnectivityManager
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
@@ -18,7 +24,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
@@ -31,6 +36,10 @@ data class PackState(
     val progress: Int? = null,
     val updateVersion: String? = null,
     val error: String? = null,
+    /** Сколько байт уже скачано (идёт загрузка или лежит недокачанный файл — «Продолжить»). */
+    val downloadedBytes: Long = 0,
+    /** Загрузка ждёт повтора после обрыва (WorkManager повторит сам). */
+    val retrying: Boolean = false,
 ) {
     val downloading: Boolean get() = progress != null
 }
@@ -40,7 +49,9 @@ data class PackState(
  * тестировались без WorkManager.
  */
 interface DataPackService {
+    /** Справочники ([PackGroup.REFERENCE]). */
     fun observe(): Flow<List<PackState>>
+    fun observe(group: PackGroup): Flow<List<PackState>> = observe()
     fun download(id: String, version: String? = null)
     fun cancel(id: String)
     fun delete(id: String)
@@ -51,16 +62,19 @@ interface DataPackService {
 /**
  * Пакеты данных по запросу: скачивание через WorkManager (переживает уход с экрана), атомарная установка версии,
  * удаление, еженедельная проверка обновлений только по безлимитной сети. Подтверждение на мобильной сети — на экране
- * ([isMeteredNetwork] до вызова [download]).
+ * ([isMeteredNetwork] до вызова [download]). [sources] — каталоги, меняющиеся на ходу (модели ИИ из :core:ailocal).
  */
 class DataPacks(
     private val context: Context,
     val store: PackStore,
     val installer: PackInstaller,
-    val catalog: List<PackManifest> = PackCatalog.all,
+    private val base: List<PackManifest> = PackCatalog.all,
+    private val sources: List<PackSource> = emptyList(),
 ) : DataPackService {
     private val changes = MutableStateFlow(0)
     private val work get() = WorkManager.getInstance(context)
+
+    val catalog: List<PackManifest> get() = base + sources.flatMap { it.manifests() }
 
     fun manifest(id: String): PackManifest? = catalog.firstOrNull { it.id == id }
 
@@ -71,23 +85,31 @@ class DataPacks(
     /** Любое изменение пакета (установка, удаление) — читатели переоткрывают файлы. */
     val revisions: Flow<Int> get() = changes
 
-    override fun observe(): Flow<List<PackState>> =
+    override fun observe(): Flow<List<PackState>> = observe(PackGroup.REFERENCE)
+
+    override fun observe(group: PackGroup): Flow<List<PackState>> =
         combine(changes, work.getWorkInfosByTagFlow(TAG)) { _, infos ->
-            catalog.map { m -> state(m, infos.filter { "$TAG:${m.id}" in it.tags }) }
+            catalog.filter { it.group == group }.map { m -> state(m, infos.filter { "$TAG:${m.id}" in it.tags }) }
         }
 
-    fun observe(id: String): Flow<PackState?> = observe().map { list -> list.firstOrNull { it.manifest.id == id } }
+    fun observe(id: String): Flow<PackState?> =
+        combine(changes, work.getWorkInfosByTagFlow(TAG)) { _, infos ->
+            manifest(id)?.let { m -> state(m, infos.filter { "$TAG:${m.id}" in it.tags }) }
+        }
 
     private fun state(m: PackManifest, infos: List<WorkInfo>): PackState {
         val running = infos.firstOrNull { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED }
         val failed = infos.firstOrNull { it.state == WorkInfo.State.FAILED }
         val installed = store.installed(m.id)
+        val done = running?.progress?.getLong(KEY_DONE, -1L)?.takeIf { it >= 0 }
         return PackState(
             manifest = m,
             installed = installed,
             progress = running?.let { it.progress.getInt(KEY_PROGRESS, -1) },
             updateVersion = store.availableUpdate(m.id)?.takeIf { it != installed?.version },
             error = if (running == null) failed?.outputData?.getString(KEY_ERROR) else null,
+            downloadedBytes = done ?: if (m.resumable && installed == null) store.partialBytes(m.id) else 0L,
+            retrying = running != null && running.state == WorkInfo.State.ENQUEUED && running.runAttemptCount > 0,
         )
     }
 
@@ -146,6 +168,7 @@ class DataPacks(
         internal const val KEY_ID = "id"
         internal const val KEY_VERSION = "version"
         internal const val KEY_PROGRESS = "progress"
+        internal const val KEY_DONE = "done"
         internal const val KEY_ERROR = "error"
         internal const val LOG = "EcuDataPacks"
     }
@@ -160,13 +183,21 @@ class PackDownloadWorker(context: Context, params: WorkerParameters) : Coroutine
         val manifest = packs.manifest(id) ?: return Result.failure(workDataOf(DataPacks.KEY_ERROR to "неизвестный пакет $id"))
         val started = System.currentTimeMillis()
         var lastPct = -2
+        var lastDone = 0L
         return try {
+            // Многогигабайтный файл: foreground-задача (обычной WorkManager даёт 10 минут) с уведомлением о прогрессе.
+            if (manifest.resumable) runCatching { setForeground(foregroundInfo(manifest.title, -1)) }
+                .onFailure { Log.w(DataPacks.LOG, "foreground not allowed: ${it.message}") }
             setProgress(workDataOf(DataPacks.KEY_PROGRESS to -1))
             val installed = packs.installer.install(manifest, inputData.getString(DataPacks.KEY_VERSION)) { done, total ->
                 val pct = total?.takeIf { it > 0 }?.let { (done * 100 / it).toInt().coerceIn(0, 100) } ?: -1
-                if (pct != lastPct) {
+                // байты — для «1,2 из 2,6 ГБ»; не чаще чем раз в 4 МБ, чтобы не дёргать базу WorkManager
+                if (pct != lastPct || done - lastDone >= 4L shl 20) {
+                    val pctChanged = pct != lastPct
                     lastPct = pct
-                    setProgressAsync(workDataOf(DataPacks.KEY_PROGRESS to pct))
+                    lastDone = done
+                    setProgressAsync(workDataOf(DataPacks.KEY_PROGRESS to pct, DataPacks.KEY_DONE to done))
+                    if (manifest.resumable && pctChanged) runCatching { setForegroundAsync(foregroundInfo(manifest.title, pct)) }
                 }
             }
             Log.i(DataPacks.LOG, "pack $id ${installed.version} installed: ${installed.sizeBytes} bytes in ${System.currentTimeMillis() - started} ms")
@@ -175,10 +206,36 @@ class PackDownloadWorker(context: Context, params: WorkerParameters) : Coroutine
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.w(DataPacks.LOG, "pack $id failed: ${e.message}")
+            Log.w(DataPacks.LOG, "pack $id failed after ${System.currentTimeMillis() - started} ms (attempt $runAttemptCount): ${e.message}")
             packs.changed()
-            Result.failure(workDataOf(DataPacks.KEY_ERROR to (e.message ?: e.javaClass.simpleName)))
+            // Обрыв сети на многогигабайтном файле: повтор с докачкой (WorkManager, экспоненциальная пауза).
+            val transient = e is java.io.IOException && e !is PackIntegrityException && (e as? HttpStatusException)?.code.let { it == null || it >= 500 || it == 429 }
+            if (manifest.resumable && transient && runAttemptCount < MAX_RETRIES) Result.retry()
+            else Result.failure(workDataOf(DataPacks.KEY_ERROR to (e.message ?: e.javaClass.simpleName)))
         }
+    }
+
+    private fun foregroundInfo(title: String, pct: Int): ForegroundInfo {
+        val nm = applicationContext.getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CHANNEL) == null) {
+            nm.createNotificationChannel(NotificationChannel(CHANNEL, "Загрузки", NotificationManager.IMPORTANCE_LOW))
+        }
+        val notification = NotificationCompat.Builder(applicationContext, CHANNEL)
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentTitle("Загрузка: $title")
+            .setContentText(if (pct >= 0) "$pct %" else "подготовка…")
+            .setProgress(100, pct.coerceAtLeast(0), pct < 0)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .build()
+        return if (Build.VERSION.SDK_INT >= 29) ForegroundInfo(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        else ForegroundInfo(NOTIFICATION_ID, notification)
+    }
+
+    private companion object {
+        const val MAX_RETRIES = 6
+        const val CHANNEL = "downloads"
+        const val NOTIFICATION_ID = 4201
     }
 }
 

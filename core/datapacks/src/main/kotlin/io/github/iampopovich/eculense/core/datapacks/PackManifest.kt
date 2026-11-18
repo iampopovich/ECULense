@@ -41,6 +41,13 @@ data class PackManifest(
     /** Строка атрибуции для «О приложении». */
     val attribution: String,
     val update: UpdateSource = UpdateSource.None,
+    /** Справочники показывает экран «Данные и справочники»; модели ИИ — свой экран (:core:ailocal). */
+    val group: PackGroup = PackGroup.REFERENCE,
+    /**
+     * Многогигабайтные файлы: `.part` переживает обрыв/остановку и докачивается с места (HTTP Range), воркер работает
+     * как foreground-задача и повторяет попытки. У справочников — false: при ошибке всё начинается заново.
+     */
+    val resumable: Boolean = false,
 ) {
     val sizeBytes: Long? get() = files.map { it.sizeBytes ?: return null }.sum()
 
@@ -50,6 +57,21 @@ data class PackManifest(
         update is UpdateSource.GithubRelease -> update.files.keys.map { PackFile(it, update.fileUrl(version, it)) }
         else -> files.map { it.copy(sizeBytes = null, sha256 = null) }
     }
+}
+
+enum class PackGroup { REFERENCE, MODEL }
+
+/**
+ * Заголовки авторизации для URL (токен Hugging Face для gated-моделей). Отдаются только исходному хосту запроса:
+ * после редиректа на CDN токен не уходит. Токен не хранится в манифесте и не попадает в WorkManager.
+ */
+fun interface PackAuth {
+    fun headersFor(url: String): Map<String, String>
+}
+
+/** Каталог пакетов, который меняется во время работы (модели пользователя по ссылке). */
+fun interface PackSource {
+    fun manifests(): List<PackManifest>
 }
 
 /** Имя каталога версии: теги и даты ISO содержат «:», которые в путях лучше не держать. */
