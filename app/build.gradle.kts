@@ -45,6 +45,7 @@ dependencies {
     implementation(project(":feature:pitstop"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:dtc"))
+    implementation(project(":feature:sessions"))
     implementation(project(":core:obd"))
     implementation(project(":core:bluetooth"))
     implementation(project(":core:usb"))

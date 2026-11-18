@@ -54,6 +54,7 @@ class AppShellTest {
     fun pitstopTabShowsHub() {
         tab("Пит-стоп").performClick()
         rule.onNodeWithText("Ошибки (DTC)").assertIsDisplayed()
+        rule.onNodeWithText("Поездки").assertIsDisplayed()
         rule.onNodeWithText("ИИ-помощник появится позже").assertIsDisplayed()
     }
 
