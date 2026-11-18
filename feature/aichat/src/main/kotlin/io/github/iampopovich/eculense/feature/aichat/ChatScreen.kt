@@ -23,11 +23,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -62,7 +70,7 @@ internal fun ChatScreen(
         val count = listState.layoutInfo.totalItemsCount
         if (count > 0) listState.scrollToItem(count - 1)
     }
-    Column(modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    Column(modifier.fillMaxSize().aboveKeyboard().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("ИИ-помощник", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
             IconButton(onClick = onOpenSettings) {
@@ -118,6 +126,22 @@ internal fun ChatScreen(
             ) { Text("Отправить") }
         }
     }
+}
+
+/**
+ * Поле ввода над клавиатурой. Экран живёт внутри Scaffold над нижним меню (edge-to-edge, adjustResize не сжимает окно),
+ * поэтому imePadding() не подходит: отступ = на сколько клавиатура перекрывает нижний край самого экрана.
+ */
+@Composable
+private fun Modifier.aboveKeyboard(): Modifier {
+    val density = LocalDensity.current
+    val windowHeight = LocalWindowInfo.current.containerSize.height
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    var gapBelow by remember { mutableIntStateOf(0) }
+    val overlap = (imeBottom - gapBelow).coerceAtLeast(0)
+    return this
+        .onGloballyPositioned { gapBelow = windowHeight - it.boundsInWindow().bottom.toInt() }
+        .padding(bottom = with(density) { overlap.toDp() })
 }
 
 @Composable
