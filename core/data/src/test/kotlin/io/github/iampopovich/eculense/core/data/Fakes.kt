@@ -41,13 +41,28 @@ internal class FakeCars(withDefault: Boolean = true) : CarRepository {
 
 internal class FakeTrips : TripRepository {
     val all = MutableStateFlow<List<Trip>>(emptyList())
+    private var nextId = 1L
     override fun observeTrips(carId: Long): Flow<List<Trip>> = all.map { list -> list.filter { it.carId == carId } }
     override suspend fun trips(carId: Long): List<Trip> = all.value.filter { it.carId == carId }
     override suspend fun addAll(trips: List<Trip>): Int {
         val known = all.value.mapNotNull { it.externalId }.toSet()
         val fresh = trips.filter { it.externalId == null || it.externalId !in known }
-        all.value = all.value + fresh
+        all.value = all.value + fresh.map { it.copy(id = nextId++) }
         return fresh.size
+    }
+    override suspend fun mergeImported(trips: List<Trip>): TripMerge {
+        var added = 0
+        var updated = 0
+        var same = 0
+        for (t in trips) {
+            val old = all.value.firstOrNull { it.externalId != null && it.externalId == t.externalId }
+            when {
+                old == null -> { all.value = all.value + t.copy(id = nextId++); added++ }
+                old.toEntity().sameTotalsAs(t.toEntity()) -> same++
+                else -> { all.value = all.value.map { if (it.id == old.id) t.copy(id = old.id, carId = old.carId) else it }; updated++ }
+            }
+        }
+        return TripMerge(added, updated, same)
     }
 }
 

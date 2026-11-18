@@ -47,7 +47,22 @@ interface TripRepository {
     suspend fun trips(carId: Long): List<Trip> = observeTrips(carId).first()
     /** Возвращает, сколько поездок добавлено (повторы по externalId пропускаются). */
     suspend fun addAll(trips: List<Trip>): Int
+    /**
+     * Поездки из бэкапа (1.27): новые добавляются, уже известные (тот же externalId) обновляются, только если в бэкапе
+     * изменились итоги (Car Scanner дописал поездку); машина и id существующей поездки сохраняются.
+     */
+    suspend fun mergeImported(trips: List<Trip>): TripMerge {
+        val added = addAll(trips)
+        return TripMerge(added = added, updated = 0, unchanged = trips.size - added)
+    }
 }
+
+data class TripMerge(val added: Int, val updated: Int, val unchanged: Int)
+
+/** Итоги поездки совпадают (в единицах хранения: мм, мкл, мс). */
+internal fun TripEntity.sameTotalsAs(o: TripEntity): Boolean =
+    endedAtMs == o.endedAtMs && distanceMm == o.distanceMm && fuelUl == o.fuelUl && fuelPricePerL == o.fuelPricePerL &&
+        drivingMs == o.drivingMs && standingMs == o.standingMs
 
 /** Флаг «типовой список ТО уже предлагался»: удалённые пользователем работы не возвращаются сами. */
 interface MaintenancePrefs {
@@ -187,6 +202,19 @@ internal class RoomTripRepository(private val dao: TripDao) : TripRepository {
     override suspend fun trips(carId: Long): List<Trip> = dao.forCar(carId).map { it.toModel() }
 
     override suspend fun addAll(trips: List<Trip>): Int = dao.insertAll(trips.map { it.toEntity() }).count { it > 0 }
+
+    override suspend fun mergeImported(trips: List<Trip>): TripMerge {
+        val incoming = trips.map { it.toEntity() }
+        val existing = incoming.mapNotNull { it.externalId }.chunked(500).flatMap { dao.byExternalIds(it) }.associateBy { it.externalId }
+        val fresh = incoming.filter { it.externalId == null || it.externalId !in existing }
+        val changed = incoming.mapNotNull { t ->
+            val old = existing[t.externalId] ?: return@mapNotNull null
+            if (old.sameTotalsAs(t)) null else t.copy(id = old.id, carId = old.carId, source = old.source, fuelMethod = old.fuelMethod)
+        }
+        val added = if (fresh.isEmpty()) 0 else dao.insertAll(fresh).count { it > 0 }
+        if (changed.isNotEmpty()) dao.updateAll(changed)
+        return TripMerge(added = added, updated = changed.size, unchanged = trips.size - added - changed.size)
+    }
 }
 
 internal fun CarEntity.toModel() = CarProfile(

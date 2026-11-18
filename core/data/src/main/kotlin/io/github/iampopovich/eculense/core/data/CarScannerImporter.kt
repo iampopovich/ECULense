@@ -7,8 +7,7 @@ import io.github.iampopovich.eculense.core.carscanner.BrcRecord
 import io.github.iampopovich.eculense.core.carscanner.CarScannerBackupMeta
 import io.github.iampopovich.eculense.core.carscanner.CarScannerSensors
 import io.github.iampopovich.eculense.core.carscanner.CarScannerSettings
-import io.github.iampopovich.eculense.core.carscanner.CbzBackup
-import io.github.iampopovich.eculense.core.carscanner.CbzSettingsReader
+import io.github.iampopovich.eculense.core.carscanner.CbzArchive
 import io.github.iampopovich.eculense.core.carscanner.SqliteOpener
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.Dtc
@@ -21,21 +20,42 @@ import io.github.iampopovich.eculense.core.model.UnitsSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import java.io.File
 import java.io.InputStream
 
-/** Что перенесено из бэкапа: записи (как в 1.21) + машина, единицы, цена топлива, поездки (1.25). */
+/** Что перенесено из бэкапа: записи (1.21), машина, единицы, цена топлива, поездки (1.25), обновления (1.27). */
 data class ImportReport(
     val imported: Int,
     val skippedDuplicates: Int,
     val failed: List<String>,
     val car: ImportedCar? = null,
     val tripsImported: Int = 0,
+    /** Уже известные поездки без изменений. */
     val tripsSkipped: Int = 0,
+    /** true — единицы измерения взяты из бэкапа (пользователь их не менял). */
     val unitsImported: Boolean = false,
     /** Новые события DTC, в т. ч. дозаписанные в уже импортированные записи. */
     val dtcEventsAdded: Int = 0,
+    /** Поездки, которые Car Scanner дописал/изменил после прошлого бэкапа. */
+    val tripsUpdated: Int = 0,
+    /** Из [skippedDuplicates]: .brc, импортированные целиком раньше (имя+размер+CRC) — пропущены без распаковки. */
+    val recordingsUnchanged: Int = 0,
+    /** Поля профиля уже известной машины, обновлённые из бэкапа (пользователь их не правил): «год», «цена топлива»… */
+    val carFieldsUpdated: List<String> = emptyList(),
 )
 
 /** created = false — машина уже была (повторный импорт) или заполнена машина по умолчанию. */
@@ -48,9 +68,18 @@ data class ImportedCar(
     val created: Boolean,
 )
 
+/** Прогресс импорта: done из total записей .brc. */
+data class ImportProgress(val done: Int, val total: Int)
+
 /**
  * open — как открыть выбранный пользователем Uri; вынесено в параметр, чтобы юнит-тесты обходились без Context.
- * .cbz читается дважды: сначала настройки и drivecyclesv2.db (машина нужна до записей), потом записи .brc.
+ * .cbz копируется на диск и читается как zip с произвольным доступом ([CbzArchive]): сначала настройки и
+ * drivecyclesv2.db (машина нужна до записей), потом записи .brc.
+ *
+ * Повторный импорт инкрементален (1.27): записи — по externalId, целиком импортированные .brc (имя+размер+CRC в
+ * [ImportLedger]) даже не распаковываются; поездки — по externalId «carscanner:<машина>:<начало>», изменённые
+ * обновляются; DTC — правило близнеца 5 с; профиль машины и единицы — поле меняется, только если пусто или
+ * пользователь не трогал его после прошлого импорта (текущее значение == снимок прошлого импорта).
  */
 class CarScannerImporter internal constructor(
     private val open: (Uri) -> InputStream?,
@@ -61,6 +90,7 @@ class CarScannerImporter internal constructor(
     private val units: UnitsRepository,
     private val sqlite: SqliteOpener,
     private val tempDir: File,
+    private val ledger: ImportLedger = InMemoryImportLedger(),
     /** После импорта (пересчёт аналитики); не блокирует результат. */
     private val afterImport: (ImportReport) -> Unit = {},
 ) {
@@ -71,96 +101,169 @@ class CarScannerImporter internal constructor(
         cars: CarRepository,
         trips: TripRepository,
         units: UnitsRepository,
+        ledger: ImportLedger,
         afterImport: (ImportReport) -> Unit = {},
     ) : this(
         { uri: Uri -> context.contentResolver.openInputStream(uri) },
-        sessions, dtcHistory, cars, trips, units, AndroidSqlite, context.cacheDir, afterImport,
+        sessions, dtcHistory, cars, trips, units, AndroidSqlite, context.cacheDir, ledger, afterImport,
     )
 
     private val dtcCode = Regex("\"Code\":\"([A-Z0-9]{5})\"")
     private val dtcRequest = Regex("\"RequestCommand\":\"([0-9A-F]{2})\"")
 
     /**
-     * uri — полный бэкап .cbz или одиночная запись .brc.
-     * onRecording(n) вызывается после каждой обработанной записи (n — сколько записей уже обработано).
+     * uri — полный бэкап .cbz или одиночная запись .brc (content:// из SAF). Файл копируется во временный кэш:
+     * права на хранилище не нужны, zip читается с произвольным доступом.
      */
-    suspend fun import(uri: Uri, fileName: String, onRecording: (Int) -> Unit = {}): ImportReport = withContext(Dispatchers.IO) {
-        importStream({ open(uri) ?: error("Не удалось открыть файл") }, fileName, onRecording).also(afterImport)
+    suspend fun import(uri: Uri, fileName: String, onProgress: (ImportProgress) -> Unit = {}): ImportReport = withContext(Dispatchers.IO) {
+        val copy = File.createTempFile("import-", if (fileName.endsWith(".brc", true)) ".brc" else ".cbz", tempDir)
+        val report = try {
+            (open(uri) ?: error("Не удалось открыть файл")).use { input -> copy.outputStream().use { input.copyTo(it) } }
+            importFile(copy, fileName, onProgress)
+        } finally {
+            copy.delete()
+        }
+        afterImport(report)
+        report
     }
 
+    /** Поток → временный файл → [importFile]. onRecording(n) — сколько записей уже обработано. */
     internal suspend fun importStream(input: () -> InputStream, fileName: String, onRecording: (Int) -> Unit = {}): ImportReport {
-        val isBrc = fileName.endsWith(".brc", ignoreCase = true)
+        val copy = File.createTempFile("import-", ".tmp", tempDir)
+        try {
+            input().use { i -> copy.outputStream().use { i.copyTo(it) } }
+            return importFile(copy, fileName) { if (it.done > 0) onRecording(it.done) }
+        } finally {
+            copy.delete()
+        }
+    }
+
+    suspend fun importFile(file: File, fileName: String, onProgress: (ImportProgress) -> Unit = {}): ImportReport {
+        if (fileName.endsWith(".brc", ignoreCase = true)) return importSingleBrc(file, fileName, onProgress)
         val failed = mutableListOf<String>()
-        var meta: CarScannerBackupMeta? = null
-        if (!isBrc) {
-            try {
-                meta = input().buffered().use { CbzSettingsReader.readMeta(it, tempDir, sqlite) }
+        CbzArchive(file).use { cbz ->
+            val meta = try {
+                cbz.meta(tempDir, sqlite)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 failed += "настройки и поездки: ${e.message}"
+                null
             }
-        }
-        val carMapping = meta?.let { importCars(it) } ?: CarMapping.EMPTY
-        val unitsImported = meta?.settings?.takeIf { it.hasUnits }?.let { units.save(it.toUnits()); true } ?: false
-        var imported = 0
-        var duplicates = 0
-        var dtcAdded = 0
-        suspend fun one(name: String, bytes: ByteArray) {
-            try {
-                val result = importRecording(name, bytes, carMapping)
-                dtcAdded += result.dtcAdded
-                if (result.created) imported++ else duplicates++
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                failed += "$name: ${e.message}"
+            val carMapping = meta?.let { importCars(it) } ?: CarMapping.EMPTY
+            val unitsImported = meta?.settings?.takeIf { it.hasUnits }?.let { mergeUnits(it.toUnits()) } ?: false
+            val total = cbz.recordings.size
+            var imported = 0
+            var duplicates = 0
+            var unchanged = 0
+            var dtcAdded = 0
+            var processed = 0
+            onProgress(ImportProgress(0, total))
+            for (entry in cbz.recordings) {
+                currentCoroutineContext().ensureActive()
+                val mark = ledger.importedFile(entry.fileName)
+                if (mark != null && mark.size == entry.size && mark.crc == entry.crc && sessions.hasExternal(externalId(entry.fileName))) {
+                    duplicates++
+                    unchanged++
+                } else {
+                    try {
+                        val result = importRecording(entry.fileName, cbz.read(entry), carMapping)
+                        dtcAdded += result.dtcAdded
+                        if (result.created) imported++ else duplicates++
+                        ledger.markFile(ImportedFileMark(entry.fileName, entry.size, entry.crc))
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        failed += "${entry.fileName}: ${e.message}"
+                    }
+                }
+                onProgress(ImportProgress(++processed, total))
             }
-            onRecording(imported + duplicates + failed.size)
-        }
-        input().buffered().use { stream ->
-            if (isBrc) one(fileName, stream.readBytes())
-            else CbzBackup.forEachRecording(stream) { name, bytes -> one(name, bytes) }
-        }
-        val tripList = meta?.trips.orEmpty().mapNotNull { t ->
-            val carId = carMapping.byExternal[t.carId] ?: carMapping.first ?: return@mapNotNull null
-            Trip(
-                carId = carId,
-                startedAtMs = t.startedUtcMs,
-                endedAtMs = t.finishedUtcMs,
-                distanceKm = t.distanceKm,
-                fuelL = t.fuelL,
-                fuelPricePerL = t.fuelPricePerL,
-                drivingMs = t.drivingMs,
-                standingMs = t.standingMs,
-                source = TripSource.IMPORT_CARSCANNER,
-                externalId = "carscanner:${t.carId ?: 0}:${t.startedUtcMs}",
+            val tripList = meta?.trips.orEmpty().mapNotNull { t ->
+                val carId = carMapping.byExternal[t.carId] ?: carMapping.first ?: return@mapNotNull null
+                Trip(
+                    carId = carId,
+                    startedAtMs = t.startedUtcMs,
+                    endedAtMs = t.finishedUtcMs,
+                    distanceKm = t.distanceKm,
+                    fuelL = t.fuelL,
+                    fuelPricePerL = t.fuelPricePerL,
+                    drivingMs = t.drivingMs,
+                    standingMs = t.standingMs,
+                    source = TripSource.IMPORT_CARSCANNER,
+                    // ключ поездки — машина Car Scanner + время начала: стабилен между бэкапами (id поездки в
+                    // drivecyclesv2 — autoincrement, после переустановки Car Scanner начинается заново)
+                    externalId = "carscanner:${t.carId ?: 0}:${t.startedUtcMs}",
+                )
+            }
+            val merge = if (tripList.isEmpty()) TripMerge(0, 0, 0) else trips.mergeImported(tripList)
+            return ImportReport(
+                imported = imported,
+                skippedDuplicates = duplicates,
+                failed = failed,
+                car = carMapping.report,
+                tripsImported = merge.added,
+                tripsSkipped = merge.unchanged,
+                unitsImported = unitsImported,
+                dtcEventsAdded = dtcAdded,
+                tripsUpdated = merge.updated,
+                recordingsUnchanged = unchanged,
+                carFieldsUpdated = carMapping.updatedFields,
             )
         }
-        val tripsAdded = if (tripList.isEmpty()) 0 else trips.addAll(tripList)
-        return ImportReport(
-            imported = imported,
-            skippedDuplicates = duplicates,
-            failed = failed,
-            car = carMapping.report,
-            tripsImported = tripsAdded,
-            tripsSkipped = tripList.size - tripsAdded,
-            unitsImported = unitsImported,
-            dtcEventsAdded = dtcAdded,
-        )
     }
+
+    private suspend fun importSingleBrc(file: File, fileName: String, onProgress: (ImportProgress) -> Unit): ImportReport {
+        onProgress(ImportProgress(0, 1))
+        val report = try {
+            val result = importRecording(fileName, file.readBytes(), CarMapping.EMPTY)
+            ImportReport(if (result.created) 1 else 0, if (result.created) 0 else 1, emptyList(), dtcEventsAdded = result.dtcAdded)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            ImportReport(0, 0, listOf("$fileName: ${e.message}"))
+        }
+        onProgress(ImportProgress(1, 1))
+        return report
+    }
+
+    private fun externalId(fileName: String) = "carscanner:$fileName"
 
     private data class RecordingResult(val created: Boolean, val dtcAdded: Int)
 
-    private class CarMapping(val byExternal: Map<Long, Long>, val byName: Map<String, Long>, val first: Long?, val report: ImportedCar?) {
+    private class CarMapping(
+        val byExternal: Map<Long, Long>,
+        val byName: Map<String, Long>,
+        val first: Long?,
+        val report: ImportedCar?,
+        val updatedFields: List<String> = emptyList(),
+    ) {
         companion object {
             val EMPTY = CarMapping(emptyMap(), emptyMap(), null, null)
         }
     }
 
+    /** Значения машины, которые приносит бэкап; снимок прошлого импорта хранится в [ImportLedger] как JSON. */
+    private data class CarValues(
+        val name: String?, val brand: String?, val year: Int?, val diagProfile: String?, val fuelPrice: Double?, val currency: String?,
+    ) {
+        fun toJson(): String = buildJsonObject {
+            put("name", name); put("brand", brand); put("year", year); put("diagProfile", diagProfile)
+            put("fuelPrice", fuelPrice); put("currency", currency)
+        }.toString()
+
+        companion object {
+            fun parse(json: String?): CarValues? = json?.let { runCatching { Json.parseToJsonElement(it).jsonObject }.getOrNull() }?.let { o ->
+                fun s(k: String) = (o[k] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                CarValues(s("name"), s("brand"), o["year"]?.jsonPrimitive?.intOrNull, s("diagProfile"), o["fuelPrice"]?.jsonPrimitive?.doubleOrNull, s("currency"))
+            }
+        }
+    }
+
     /**
-     * Машины Car Scanner → наши. Уже импортированная (тот же externalId) только дополняется пустыми полями — правки
-     * пользователя не перетираем. Нетронутая машина по умолчанию (единственная) заполняется данными из бэкапа.
+     * Машины Car Scanner → наши. Новая или нетронутая машина по умолчанию заполняется из бэкапа целиком. Уже
+     * импортированная (тот же externalId): пустое поле заполняется, а заполненное меняется, только если пользователь
+     * не правил его после прошлого импорта (значение == снимок прошлого импорта). Ручные правки всегда выигрывают.
      */
     private suspend fun importCars(meta: CarScannerBackupMeta): CarMapping {
         if (meta.cars.isEmpty()) return CarMapping.EMPTY
@@ -168,6 +271,7 @@ class CarScannerImporter internal constructor(
         val byExternal = mutableMapOf<Long, Long>()
         val byName = mutableMapOf<String, Long>()
         var report: ImportedCar? = null
+        var updatedFields = emptyList<String>()
         meta.cars.forEachIndexed { index, cs ->
             val externalId = "carscanner:${cs.id}"
             val existing = cars.byExternalId(externalId)
@@ -175,34 +279,69 @@ class CarScannerImporter internal constructor(
             val adopt = all.singleOrNull()?.takeIf { existing == null && index == 0 && it.isUntouchedDefault }
             val base = existing ?: adopt
             val name = cs.name.ifBlank { listOfNotNull(s.brand, cs.year?.toString()).joinToString(" ").ifBlank { "Car Scanner" } }
-            val merged = (base ?: CarProfile(name = name)).let { car ->
-                car.copy(
-                    name = if (existing != null) car.name else name,
-                    externalId = externalId,
-                    year = car.year ?: cs.year,
-                    // настройки Car Scanner общие для приложения — относим их к первой машине
-                    brand = car.brand ?: s.brand.takeIf { index == 0 },
-                    diagProfile = car.diagProfile ?: s.diagProfile.takeIf { index == 0 },
-                    fuelPrice = car.fuelPrice ?: s.fuelPricePerL.takeIf { index == 0 },
-                    currency = car.currency ?: s.currency.takeIf { index == 0 },
+            // настройки Car Scanner общие для приложения — относим их к первой машине
+            val incoming = CarValues(
+                name = name, brand = s.brand.takeIf { index == 0 }, year = cs.year, diagProfile = s.diagProfile.takeIf { index == 0 },
+                fuelPrice = s.fuelPricePerL.takeIf { index == 0 }, currency = s.currency.takeIf { index == 0 },
+            )
+            val changed = mutableListOf<String>()
+            val merged = if (existing == null) {
+                (base ?: CarProfile(name = name)).let { car ->
+                    car.copy(
+                        name = name, externalId = externalId, year = car.year ?: incoming.year, brand = car.brand ?: incoming.brand,
+                        diagProfile = car.diagProfile ?: incoming.diagProfile, fuelPrice = car.fuelPrice ?: incoming.fuelPrice,
+                        currency = car.currency ?: incoming.currency,
+                    )
+                }
+            } else {
+                val previous = CarValues.parse(ledger.snapshot(snapshotKey(existing.id)))
+                fun <T> field(label: String, current: T?, new: T?, old: T?): T? {
+                    val value = mergeField(current, new, old, previous != null)
+                    if (value != current) changed += label
+                    return value
+                }
+                existing.copy(
+                    name = field("имя", existing.name, incoming.name, previous?.name) ?: existing.name,
+                    brand = field("марка", existing.brand, incoming.brand, previous?.brand),
+                    year = field("год", existing.year, incoming.year, previous?.year),
+                    diagProfile = field("профиль диагностики", existing.diagProfile, incoming.diagProfile, previous?.diagProfile),
+                    fuelPrice = field("цена топлива", existing.fuelPrice, incoming.fuelPrice, previous?.fuelPrice),
+                    currency = field("валюта", existing.currency, incoming.currency, previous?.currency),
                 )
             }
-            val id = cars.save(merged)
+            val id = if (existing != null && changed.isEmpty()) existing.id else cars.save(merged)
+            ledger.putSnapshot(snapshotKey(id), incoming.toJson())
             if (adopt != null) cars.setActive(id)
             byExternal[cs.id] = id
             byName.putIfAbsent(merged.name, id)
+            byName.putIfAbsent(name, id)
             if (index == 0) {
                 report = ImportedCar(merged.name, merged.brand, merged.year, merged.fuelPrice, merged.currency, created = base == null)
+                updatedFields = changed.toList()
             }
         }
-        return CarMapping(byExternal, byName, byExternal[meta.cars.first().id], report)
+        return CarMapping(byExternal, byName, byExternal[meta.cars.first().id], report, updatedFields)
+    }
+
+    /**
+     * Единицы — целиком: берём из бэкапа, если пользователь их не менял (текущие == снимок прошлого импорта, а до
+     * первого импорта — значения по умолчанию). Возвращает true, если единицы изменились.
+     */
+    private suspend fun mergeUnits(incoming: UnitsSettings): Boolean {
+        val current = units.units.first()
+        val previous = ledger.snapshot(UNITS_KEY)?.let(::parseUnits)
+        val untouched = if (previous != null) current == previous else current == UnitsSettings()
+        val apply = current != incoming && untouched
+        if (apply) units.save(incoming)
+        ledger.putSnapshot(UNITS_KEY, unitsJson(incoming))
+        return apply
     }
 
     /** false — запись уже импортирована раньше. Битая запись не оставляет полусессию: её externalId не должен блокировать повторный импорт. */
     internal suspend fun importRecording(fileName: String, bytes: ByteArray): Boolean = importRecording(fileName, bytes, CarMapping.EMPTY).created
 
     private suspend fun importRecording(fileName: String, bytes: ByteArray, mapping: CarMapping): RecordingResult {
-        val externalId = "carscanner:$fileName"
+        val externalId = externalId(fileName)
         val reader = BrcReader(bytes)
         val header = reader.header
         // имя машины в заголовке записи совпадает с cars.name бэкапа
@@ -296,8 +435,34 @@ class CarScannerImporter internal constructor(
         const val BATCH = 2_000
         /** Близнецы «без заголовков / с заголовками» пишутся в пределах долей секунды; отдельные чтения в бэкапе — от 9 с. */
         const val DTC_TWIN_WINDOW_MS = 5_000L
+        const val UNITS_KEY = "units"
+        fun snapshotKey(carId: Long) = "car:$carId"
     }
 }
+
+/**
+ * Слияние одного поля: пустое заполняется; совпадающее не меняется; заполненное меняется на значение бэкапа, только
+ * если есть снимок прошлого импорта и текущее значение с ним совпадает (пользователь поле не трогал).
+ */
+internal fun <T> mergeField(current: T?, incoming: T?, previous: T?, hasSnapshot: Boolean): T? = when {
+    incoming == null -> current
+    current == null || (current is String && current.isBlank()) -> incoming
+    current == incoming -> current
+    hasSnapshot && current == previous -> incoming
+    else -> current
+}
+
+private fun unitsJson(u: UnitsSettings): String = buildJsonObject {
+    put("km", u.metricDistance); put("celsius", u.celsius); put("l100", u.litersPer100Km); put("liters", u.liters)
+    put("usGallon", u.usGallon); put("kpa", u.pressureKpa); put("hp", u.horsePower); put("nm", u.newtonMeters)
+    put("gs", u.flowGramsPerSecond); put("g", u.accelerationG)
+}.toString()
+
+private fun parseUnits(json: String): UnitsSettings? = runCatching {
+    val o: JsonObject = Json.parseToJsonElement(json).jsonObject
+    fun b(k: String) = o[k]?.jsonPrimitive?.booleanOrNull ?: error("нет $k")
+    UnitsSettings(b("km"), b("celsius"), b("l100"), b("liters"), b("usGallon"), b("kpa"), b("hp"), b("nm"), b("gs"), b("g"))
+}.getOrNull()
 
 /** Флаги Car Scanner → наши единицы; ключа нет в бэкапе — остаётся значение по умолчанию. */
 internal fun CarScannerSettings.toUnits(): UnitsSettings {

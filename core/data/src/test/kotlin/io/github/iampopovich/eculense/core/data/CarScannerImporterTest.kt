@@ -206,6 +206,6 @@ class CarScannerImporterTest {
         assertEquals(0, first.skippedDuplicates)
         assertEquals(1, first.failed.size)
         assertEquals(listOf(1, 2, 3), progress)
-        assertEquals(ImportReport(imported = 0, skippedDuplicates = 2, failed = first.failed, unitsImported = true), second)
+        assertEquals(ImportReport(imported = 0, skippedDuplicates = 2, failed = first.failed, recordingsUnchanged = 2), second)
     }
 }

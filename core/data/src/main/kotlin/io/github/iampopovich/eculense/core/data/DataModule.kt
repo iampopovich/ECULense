@@ -52,13 +52,14 @@ val dataModule = module {
         }
     }
     single<AnalyticsRepository> { RoomAnalyticsRepository(get(), get(), get(), get()) }
+    single { RoomImportLedger(get()) } binds arrayOf(ImportLedger::class, ImportHistoryRepository::class)
     single {
         val scope = get<CoroutineScope>(AppScope)
         val koin = getKoin()
         val trips = get<RecordingTrips>()
         // Новые записи и коды → поездки по записям без поездки Car Scanner, затем находки (в фоне, для всех машин).
-        CarScannerImporter(androidContext(), get(), get(), get(), get(), get()) { report ->
-            if (report.imported > 0 || report.tripsImported > 0 || report.dtcEventsAdded > 0) {
+        CarScannerImporter(androidContext(), get(), get(), get(), get(), get(), get()) { report ->
+            if (report.imported > 0 || report.tripsImported > 0 || report.tripsUpdated > 0 || report.dtcEventsAdded > 0) {
                 scope.launch {
                     runCatching { trips.backfill() }
                     val events = koin.dataEvents()
