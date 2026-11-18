@@ -12,6 +12,8 @@ import io.github.iampopovich.eculense.core.data.SessionReport
 import io.github.iampopovich.eculense.core.data.SessionSummary
 import io.github.iampopovich.eculense.core.data.StoredFinding
 import io.github.iampopovich.eculense.core.data.TripRepository
+import io.github.iampopovich.eculense.core.dtcdb.DtcInfo
+import io.github.iampopovich.eculense.core.dtcdb.DtcSource
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.DtcKind
 import io.github.iampopovich.eculense.core.model.SessionSource
@@ -191,6 +193,45 @@ class VehicleDataToolsTest {
         assertEquals(listOf("P0101", "P0102", "P0103"), codes.map { it.getValue("code").jsonPrimitive.content })
         assertEquals(2, codes.first().getValue("events").jsonPrimitive.content.toInt())
         assertEquals(80, d.getValue("total_events").jsonPrimitive.content.toInt())
+    }
+
+    private val describer: suspend (Collection<String>, String?) -> Map<String, DtcInfo> = { codes, make ->
+        codes.associateWith { code ->
+            if (code == "P0101") {
+                DtcInfo(code, null, DtcSource.OEM_UNKNOWN)
+            } else {
+                DtcInfo(
+                    code, "Mass or Volume Air Flow Sensor Circuit Range/Performance for make $make", DtcSource.OBDEX,
+                    causes = listOf("Dirty or contaminated MAF sensor element after an oiled air filter", "Air leak between the sensor and the throttle body", "Third"),
+                    symptoms = listOf("Hesitation or stumbling on acceleration under load", "Second"),
+                )
+            }
+        }
+    }
+    private val described = ToolContext(analytics, Cars(car), Trips(trips), clock = { NOW }, zone = { ZoneOffset.UTC }, log = { _, _, _ -> }, describeDtc = describer)
+
+    @Test
+    fun `dtc history carries title, causes and symptoms when few codes, within 2 KB`() = runBlocking {
+        val raw = DtcHistoryTool(described).execute(LimitArgs(3))
+        assertTrue(raw.toByteArray().size <= Compact.MAX_BYTES)
+        val codes = obj(raw).getValue("codes").jsonArray.map { it.jsonObject }
+        assertEquals(3, codes.size)
+        val p0102 = codes.single { it.getValue("code").jsonPrimitive.content == "P0102" }
+        assertEquals("generic", p0102.getValue("source").jsonPrimitive.content)
+        assertEquals("Mass or Volume Air Flow Sensor Circuit Range/Performance for make Kia", p0102.getValue("title").jsonPrimitive.content)
+        assertEquals(2, p0102.getValue("causes").jsonArray.size)
+        assertEquals(1, p0102.getValue("symptoms").jsonArray.size)
+        val p0101 = codes.single { it.getValue("code").jsonPrimitive.content == "P0101" }
+        assertEquals("oem_unknown", p0101.getValue("source").jsonPrimitive.content)
+        assertFalse(p0101.containsKey("title"))
+    }
+
+    @Test
+    fun `dtc history drops details before dropping codes`() = runBlocking {
+        val raw = DtcHistoryTool(described).execute(LimitArgs(30))
+        assertTrue(raw.toByteArray().size <= Compact.MAX_BYTES)
+        val codes = obj(raw).getValue("codes").jsonArray.map { it.jsonObject }
+        assertTrue(codes.none { it.containsKey("symptoms") })
     }
 
     @Test

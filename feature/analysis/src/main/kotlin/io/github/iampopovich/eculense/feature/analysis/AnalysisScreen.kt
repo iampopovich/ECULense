@@ -188,6 +188,12 @@ internal fun FindingScreen(
                 Column {
                     Text(e.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(e.value, style = MaterialTheme.typography.bodyLarge)
+                    state.dtc[e.label]?.let { note ->
+                        Text(note.text, style = MaterialTheme.typography.bodyMedium)
+                        if (note.causes.isNotEmpty()) {
+                            Text("Частые причины: " + note.causes.joinToString("; "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
         }

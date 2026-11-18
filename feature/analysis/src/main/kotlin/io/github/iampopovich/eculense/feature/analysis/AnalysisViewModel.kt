@@ -73,12 +73,18 @@ internal data class FindingUiState(
     val finding: StoredFinding? = null,
     val sessions: List<SessionSummary> = emptyList(),
     val canAskAi: Boolean = false,
+    /** Расшифровки кодов из доказательств (метка доказательства = код DTC). */
+    val dtc: Map<String, DtcNote> = emptyMap(),
 )
+
+/** Что показать под кодом: название (или «заводской код, расшифровка неизвестна») и пара частых причин. */
+internal data class DtcNote(val text: String, val causes: List<String> = emptyList())
 
 internal class FindingViewModel(
     private val findingId: Long,
     private val analytics: AnalyticsRepository,
     routeHandlers: List<RouteHandler>,
+    private val describeDtc: suspend (Collection<String>) -> Map<String, DtcNote> = { emptyMap() },
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(FindingUiState(canAskAi = routeHandlers.any { it.routeClass == AiChatDestination::class }))
     val uiState: StateFlow<FindingUiState> = _uiState.asStateFlow()
@@ -88,8 +94,14 @@ internal class FindingViewModel(
             val f = analytics.finding(findingId)
             val ids = f?.finding?.sessionIds.orEmpty().toSet()
             val sessions = if (f == null || ids.isEmpty()) emptyList() else analytics.sessions(f.carId, limit = 10_000).filter { it.id in ids }
-            _uiState.value = _uiState.value.copy(loading = false, finding = f, sessions = sessions)
+            val codes = f?.finding?.evidence.orEmpty().map { it.label }.filter { DTC_CODE.matches(it) }
+            val dtc = if (codes.isEmpty()) emptyMap() else runCatching { describeDtc(codes) }.getOrDefault(emptyMap())
+            _uiState.value = _uiState.value.copy(loading = false, finding = f, sessions = sessions, dtc = dtc)
         }
+    }
+
+    private companion object {
+        val DTC_CODE = Regex("^[PBCU][0-3][0-9A-F]{3}$")
     }
 }
 

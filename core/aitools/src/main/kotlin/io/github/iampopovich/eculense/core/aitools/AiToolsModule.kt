@@ -5,11 +5,13 @@ import io.github.iampopovich.eculense.core.ai.VehicleToolbox
 import io.github.iampopovich.eculense.core.data.AnalyticsRepository
 import io.github.iampopovich.eculense.core.data.CarRepository
 import io.github.iampopovich.eculense.core.data.TripRepository
+import io.github.iampopovich.eculense.core.dtcdb.DtcDescriptions
 import org.koin.dsl.module
 
 /** Набор инструментов на один ход диалога; все только на чтение. */
 internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox {
-    constructor(analytics: AnalyticsRepository, cars: CarRepository, trips: TripRepository) : this(ToolContext(analytics, cars, trips))
+    constructor(analytics: AnalyticsRepository, cars: CarRepository, trips: TripRepository, dtc: DtcDescriptions?) :
+        this(ToolContext(analytics, cars, trips, describeDtc = { codes, make -> dtc?.describeAll(codes, make).orEmpty() }))
 
     override fun registry(): ToolRegistry = ToolRegistry {
         tool(CarProfileTool(ctx))
@@ -38,5 +40,5 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
 
 /** Подключение: строка в AppModules. Без этого модуля чат работает, но без данных машины. */
 val aiToolsModule = module {
-    single<VehicleToolbox> { VehicleDataToolbox(get(), get(), get()) }
+    single<VehicleToolbox> { VehicleDataToolbox(get(), get(), get(), getOrNull()) }
 }

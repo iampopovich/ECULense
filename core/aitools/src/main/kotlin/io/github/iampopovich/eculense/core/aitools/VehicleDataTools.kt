@@ -11,6 +11,8 @@ import io.github.iampopovich.eculense.core.data.AnalyticsRepository
 import io.github.iampopovich.eculense.core.data.CarRepository
 import io.github.iampopovich.eculense.core.data.StoredFinding
 import io.github.iampopovich.eculense.core.data.TripRepository
+import io.github.iampopovich.eculense.core.dtcdb.DtcInfo
+import io.github.iampopovich.eculense.core.dtcdb.DtcSource
 import io.github.iampopovich.eculense.core.model.StatsPeriod
 import io.github.iampopovich.eculense.core.model.TripStatistics
 import io.github.iampopovich.eculense.core.model.TripStats
@@ -41,6 +43,8 @@ internal class ToolContext(
     val clock: () -> Long = System::currentTimeMillis,
     val zone: () -> ZoneId = ZoneId::systemDefault,
     val log: (tool: String, bytes: Int, json: String) -> Unit = ::logcat,
+    /** Расшифровки DTC с учётом марки (OBDex/заводская база); без пакетов — встроенный CSV. */
+    val describeDtc: suspend (codes: Collection<String>, make: String?) -> Map<String, DtcInfo> = { _, _ -> emptyMap() },
 )
 
 private fun logcat(tool: String, bytes: Int, json: String) {
@@ -378,7 +382,9 @@ internal class FindingsTool(ctx: ToolContext) : VehicleTool<LimitArgs>(
 
 internal class DtcHistoryTool(ctx: ToolContext) : VehicleTool<LimitArgs>(
     typeToken<LimitArgs>(), "dtcHistory",
-    "History of diagnostic trouble codes: live reads in the app and DTC events imported from Car Scanner. Per code: kind (stored/pending), number of events, first and last date.",
+    "History of diagnostic trouble codes: live reads in the app and DTC events imported from Car Scanner. Per code: kind (stored/pending), " +
+        "number of events, first and last date, title, and (when known) the most likely causes and symptoms from the OBDex database. " +
+        "source=oem_unknown means a manufacturer-specific code whose meaning for this make is unknown — do not guess it from other makes.",
     ctx,
 ) {
     override suspend fun answer(args: LimitArgs, carId: Long): JsonObject {
@@ -387,7 +393,10 @@ internal class DtcHistoryTool(ctx: ToolContext) : VehicleTool<LimitArgs>(
         val zone = ctx.zone()
         val codes = events.groupBy { it.code }.map { (code, list) -> code to list.sortedBy { it.atMs } }
             .sortedByDescending { (_, l) -> l.last().atMs }.take(args.limit.coerceIn(1, 30))
-        return Compact.fit(
+        val make = ctx.cars.cars().firstOrNull { it.id == carId }?.brand
+        val info = runCatching { ctx.describeDtc(codes.map { it.first }, make) }.getOrDefault(emptyMap())
+        // Сначала с причинами и симптомами; не влезло в 2 КБ — без симптомов, затем без причин, затем режем список.
+        fun answer(detail: Int) = Compact.fit(
             codes,
             { (code, list) ->
                 buildJsonObject {
@@ -396,6 +405,12 @@ internal class DtcHistoryTool(ctx: ToolContext) : VehicleTool<LimitArgs>(
                     put("events", list.map { it.atMs }.distinct().size)
                     put("first", Dates.date(list.first().atMs, zone))
                     put("last", Dates.date(list.last().atMs, zone))
+                    info[code]?.let { i ->
+                        i.title?.let { put("title", short(it, 70)) }
+                        put("source", i.source.json)
+                        if (detail >= 1 && i.causes.isNotEmpty()) put("causes", JsonArray(i.causes.take(2).map { JsonPrimitive(short(it, 60)) }))
+                        if (detail >= 2 && i.symptoms.isNotEmpty()) put("symptoms", JsonArray(i.symptoms.take(1).map { JsonPrimitive(short(it, 60)) }))
+                    }
                 }
             },
         ) { items, truncated ->
@@ -405,5 +420,15 @@ internal class DtcHistoryTool(ctx: ToolContext) : VehicleTool<LimitArgs>(
                 put("total_events", events.size)
             }
         }
+        return (2 downTo 1).asSequence().map(::answer).firstOrNull { !it.containsKey("truncated") } ?: answer(0)
     }
+
+    private fun short(s: String, max: Int) = if (s.length <= max) s else s.take(max - 1).trimEnd() + "…"
+
+    private val DtcSource.json: String
+        get() = when (this) {
+            DtcSource.OBDEX, DtcSource.BUILTIN, DtcSource.UNKNOWN -> "generic"
+            DtcSource.OEM -> "oem"
+            DtcSource.OEM_UNKNOWN -> "oem_unknown"
+        }
 }

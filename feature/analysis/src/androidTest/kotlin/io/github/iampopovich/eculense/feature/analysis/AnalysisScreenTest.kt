@@ -100,6 +100,20 @@ class AnalysisScreenTest {
     }
 
     @Test
+    fun dtcEvidenceShowsDescriptionAndCauses() {
+        val f = sf(3, "dtc-mixture", Severity.WARNING, "Смесь (P0171/P0174)", "P0171×3", listOf(Evidence("P0171", "3 раза")))
+        rule.setContent {
+            FindingScreen(
+                FindingUiState(loading = false, finding = f, dtc = mapOf("P0171" to DtcNote("System Too Lean Bank 1", listOf("Air leak after the MAF")))),
+                onAskAi = {},
+                onOpenSession = {},
+            )
+        }
+        rule.onNodeWithText("System Too Lean Bank 1").assertExists()
+        rule.onNodeWithText("Частые причины: Air leak after the MAF").assertExists()
+    }
+
+    @Test
     fun noAskAiWithoutChatModule() {
         val f = sf(2, "fuel-trim-long", Severity.WARNING, "Долгосрочная коррекция топлива")
         rule.setContent { FindingScreen(FindingUiState(loading = false, finding = f, canAskAi = false), onAskAi = {}, onOpenSession = {}) }

@@ -106,6 +106,17 @@ class AnalysisViewModelTest {
     }
 
     @Test
+    fun `dtc evidence of a finding gets descriptions, other labels are not looked up`() = runTest {
+        val f = Finding("dtc-other", Severity.INFO, "Прочие коды", "P1847×1", listOf(Evidence("P1847", "1 раз"), Evidence("Период", "1 день")))
+        val analytics = FakeAnalytics(listOf(StoredFinding(3, 1, f, 10)))
+        val asked = mutableListOf<Collection<String>>()
+        val vm = FindingViewModel(3, analytics, emptyList()) { codes -> asked += codes; codes.associateWith { DtcNote("Заводской код производителя, расшифровка неизвестна") } }
+        assertEquals(listOf(listOf("P1847")), asked.map { it.toList() })
+        assertEquals("Заводской код производителя, расшифровка неизвестна", vm.uiState.value.dtc["P1847"]?.text)
+        assertEquals(null, vm.uiState.value.dtc["Период"])
+    }
+
+    @Test
     fun `ask ai prompt carries the computed numbers`() {
         val f = StoredFinding(1, 1, Finding("fuel-trim-long", Severity.WARNING, "Долгосрочная коррекция топлива", "Банк 1 +12,5 %.", listOf(Evidence("LTFT банк 1", "+12,5 %"))), 1)
         val text = askAiPrompt(f)

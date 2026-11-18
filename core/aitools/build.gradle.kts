@@ -7,6 +7,7 @@ plugins {
 dependencies {
     implementation(project(":core:ai"))
     implementation(project(":core:data"))
+    implementation(project(":core:dtcdb"))
     implementation(libs.koog.agents)
     implementation(libs.kotlinx.serialization.json)
     implementation(platform(libs.koin.bom))
