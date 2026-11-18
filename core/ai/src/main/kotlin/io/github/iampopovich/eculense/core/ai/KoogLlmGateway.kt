@@ -1,5 +1,10 @@
 package io.github.iampopovich.eculense.core.ai
 
+import ai.koog.agents.chatMemory.feature.ChatHistoryProvider
+import ai.koog.agents.chatMemory.feature.ChatMemory
+import ai.koog.agents.chatMemory.feature.InMemoryChatHistoryProvider
+import ai.koog.agents.core.agent.AIAgent
+import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.http.client.KoogHttpClient
 import ai.koog.http.client.KoogHttpClientException
 import ai.koog.http.client.ktor.KtorKoogHttpClient
@@ -30,6 +35,7 @@ import io.ktor.client.engine.okhttp.OkHttp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
@@ -224,8 +230,51 @@ internal object LlmErrors {
 
 internal class KoogLlmGateway(
     private val store: LlmSettingsStore,
+    private val toolbox: VehicleToolbox? = null,
+    private val historyProvider: ChatHistoryProvider = InMemoryChatHistoryProvider(),
     private val executorFactory: (LlmSettings, String?) -> PromptExecutor = { s, key -> KoogClients.executor(s, key) },
 ) : LlmGateway {
+    override val hasVehicleTools: Boolean get() = toolbox != null
+
+    override suspend fun provider(): ProviderInfo? =
+        store.settings.first()?.takeIf { it.model.isNotBlank() }?.let { ProviderInfo(it.provider.title, it.model) }
+
+    override fun chat(conversationId: String, userText: String, useCarData: Boolean): Flow<ChatEvent> = channelFlow {
+        val settings = store.settings.first()?.takeIf { it.model.isNotBlank() } ?: throw LlmException(NOT_CONFIGURED)
+        val apiKey = store.apiKey()
+        val tools = toolbox?.takeIf { useCarData }
+        val executor = try {
+            executorFactory(settings, apiKey)
+        } catch (e: Exception) {
+            throw LlmErrors.describe(e, apiKey)
+        }
+        try {
+            val agent = AIAgent(
+                promptExecutor = executor,
+                llmModel = KoogClients.model(settings),
+                strategy = VehicleChatStrategy.create(
+                    system = SystemPrompts.chat(withTools = tools != null),
+                    emit = { send(it) },
+                    label = { name -> tools?.progressLabel(name) ?: name },
+                ),
+                toolRegistry = tools?.registry() ?: ToolRegistry.EMPTY,
+                systemPrompt = SystemPrompts.chat(withTools = tools != null),
+            ) {
+                install(ChatMemory) {
+                    chatHistoryProvider = historyProvider
+                    addPreProcessor(TextOnlyHistory)
+                }
+            }
+            agent.run(userText, conversationId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw LlmErrors.describe(e, apiKey)
+        } finally {
+            executor.close()
+        }
+    }
+
     override fun stream(system: String, history: List<ChatMessage>): Flow<String> = flow {
         val settings = store.settings.first()?.takeIf { it.model.isNotBlank() } ?: throw LlmException(NOT_CONFIGURED)
         val apiKey = store.apiKey()

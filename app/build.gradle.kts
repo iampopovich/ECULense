@@ -57,6 +57,7 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:demo"))
     implementation(project(":core:ai"))
+    implementation(project(":core:aitools"))
     implementation(project(":feature:aisettings"))
     implementation(project(":feature:aichat"))
     implementation(platform(libs.koin.bom))

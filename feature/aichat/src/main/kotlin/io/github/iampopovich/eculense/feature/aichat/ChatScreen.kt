@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -28,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -44,6 +47,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -74,6 +78,7 @@ internal fun ChatRoute(prefill: String?, viewModel: ChatViewModel = koinViewMode
         onOpenSettings = { navigator.navigate(AiSettingsDestination) },
         onStop = viewModel::stop,
         onRetry = viewModel::retry,
+        onUseCarData = viewModel::setUseCarData,
     )
 }
 
@@ -86,6 +91,7 @@ internal fun ChatScreen(
     modifier: Modifier = Modifier,
     onStop: () -> Unit = {},
     onRetry: () -> Unit = {},
+    onUseCarData: (Boolean) -> Unit = {},
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -114,6 +120,17 @@ internal fun ChatScreen(
                 Icon(painterResource(R.drawable.ic_tune), contentDescription = "Настройки ИИ")
             }
         }
+        if (state.carDataAvailable) {
+            // Вся строка — одна зона касания (48 dp), подпись читается вместе с переключателем.
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    .toggleable(value = state.useCarData, enabled = !state.streaming, role = Role.Switch, onValueChange = onUseCarData),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Использовать данные моей машины", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                Switch(checked = state.useCarData, onCheckedChange = null, enabled = !state.streaming)
+            }
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -123,7 +140,12 @@ internal fun ChatScreen(
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(vertical = 8.dp)) {
                         Text(
-                            "Спросите о машине или коде ошибки. ИИ не видит VIN и координаты; ответы — подсказка, а не диагноз.",
+                            if (state.useCarData) {
+                                "Спросите о машине или коде ошибки. ИИ смотрит профиль, поездки, записи датчиков, находки анализа " +
+                                    "и коды ошибок этой машины — без VIN и координат. Ответы — подсказка, а не диагноз."
+                            } else {
+                                "Спросите о машине или коде ошибки. ИИ не видит VIN и координаты; ответы — подсказка, а не диагноз."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -137,10 +159,12 @@ internal fun ChatScreen(
                 val last = index == state.messages.lastIndex
                 when {
                     message.role == ChatMessage.Role.USER -> UserBubble(message.text)
-                    last && state.awaitingFirstToken -> TypingIndicator()
+                    last && state.awaitingFirstToken -> TypingIndicator(state.toolStatus)
                     else -> AssistantMessage(message.text, streaming = state.streaming && last, stopped = state.stoppedIndex == index)
                 }
             }
+            // Инструменты между кругами ответа: текст уже есть, ИИ снова смотрит данные.
+            if (state.toolStatus != null && !state.awaitingFirstToken) item { TypingIndicator(state.toolStatus) }
             state.error?.let { error ->
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
@@ -203,13 +227,14 @@ private fun AssistantMessage(text: String, streaming: Boolean, stopped: Boolean)
     }
 }
 
-/** Индикатор «печатает» до первого куска ответа: три точки с бегущей прозрачностью. */
+/** Индикатор «печатает» до первого куска ответа: три точки с бегущей прозрачностью; при вызове инструмента — что смотрит ИИ. */
 @Composable
-private fun TypingIndicator() {
+private fun TypingIndicator(status: String? = null) {
     val transition = rememberInfiniteTransition(label = "typing")
     Row(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.padding(vertical = 12.dp).semantics { contentDescription = "ИИ печатает" },
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 12.dp).semantics { contentDescription = status ?: "ИИ печатает" },
     ) {
         repeat(3) { i ->
             val alpha by transition.animateFloat(
@@ -219,6 +244,9 @@ private fun TypingIndicator() {
                 label = "dot$i",
             )
             Box(Modifier.size(8.dp).alpha(alpha).background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape))
+        }
+        if (status != null) {
+            Text(status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 6.dp))
         }
     }
 }

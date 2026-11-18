@@ -8,6 +8,6 @@ import org.koin.dsl.module
 val aiModule = module {
     single<SecretCipher> { KeystoreCipher() }
     single { LlmSettingsStore(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("llm_settings") }, get()) }
-    single<LlmGateway> { KoogLlmGateway(get()) }
+    single<LlmGateway> { KoogLlmGateway(get(), toolbox = getOrNull()) }
     single<ConnectionChecker> { KoogConnectionChecker() }
 }

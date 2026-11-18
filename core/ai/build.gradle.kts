@@ -1,5 +1,6 @@
 plugins {
     id("ecu.android.library")
+    alias(libs.plugins.kotlin.serialization)
 }
 
 dependencies {

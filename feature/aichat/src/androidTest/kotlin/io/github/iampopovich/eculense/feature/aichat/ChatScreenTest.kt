@@ -97,6 +97,26 @@ class ChatScreenTest {
     }
 
     @Test
+    fun carDataToggleAndToolProgress() {
+        val toggles = mutableListOf<Boolean>()
+        val state = mutableStateOf(ChatUiState(carDataAvailable = true, useCarData = true))
+        rule.setContent { ChatScreen(state.value, onSend = {}, onOpenSettings = {}, onUseCarData = { toggles += it }) }
+        rule.onNodeWithText("без VIN и координат", substring = true).assertExists()
+        rule.onNodeWithText("Использовать данные моей машины").performClick()
+        assertEquals(listOf(false), toggles)
+
+        state.value = ChatUiState(listOf(user("Объясни мои ошибки"), assistant("")), streaming = true, carDataAvailable = true, useCarData = true, toolStatus = "ИИ смотрит ошибки…")
+        rule.onNodeWithText("ИИ смотрит ошибки…").assertExists()
+        rule.onNodeWithContentDescription("ИИ смотрит ошибки…").assertExists()
+    }
+
+    @Test
+    fun noToggleWithoutToolsModule() {
+        rule.setContent { ChatScreen(ChatUiState(carDataAvailable = false), onSend = {}, onOpenSettings = {}) }
+        rule.onNodeWithText("Использовать данные моей машины").assertDoesNotExist()
+    }
+
+    @Test
     fun streamingAnswerGrowsAndGetsCopyButtonWhenDone() {
         val state = mutableStateOf(ChatUiState(listOf(user("hi"), assistant("# Заго")), streaming = true))
         rule.setContent { ChatScreen(state.value, onSend = {}, onOpenSettings = {}) }

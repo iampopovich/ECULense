@@ -1,6 +1,7 @@
 package io.github.iampopovich.eculense
 
 import io.github.iampopovich.eculense.core.ai.aiModule
+import io.github.iampopovich.eculense.core.aitools.aiToolsModule
 import io.github.iampopovich.eculense.core.bluetooth.bluetoothModule
 import io.github.iampopovich.eculense.core.data.dataModule
 import io.github.iampopovich.eculense.core.database.databaseModule
@@ -42,6 +43,8 @@ val appModules: List<Module> = listOf(
     demoModule,
     // ИИ (этап 2): убрать эти строки + модули в settings.gradle.kts/app → приложение работает без ИИ.
     aiModule,
+    // Инструменты данных машины для ИИ (этап 3): без них чат работает, но без данных.
+    aiToolsModule,
     aiSettingsModule,
     aiChatModule,
 )
