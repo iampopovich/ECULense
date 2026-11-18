@@ -3,6 +3,7 @@ package io.github.iampopovich.eculense
 import io.github.iampopovich.eculense.core.bluetooth.bluetoothModule
 import io.github.iampopovich.eculense.core.data.dataModule
 import io.github.iampopovich.eculense.core.database.databaseModule
+import io.github.iampopovich.eculense.core.demo.demoModule
 import io.github.iampopovich.eculense.core.obd.obdModule
 import io.github.iampopovich.eculense.core.service.serviceModule
 import io.github.iampopovich.eculense.core.usb.usbModule
@@ -20,4 +21,6 @@ val appModules: List<Module> = listOf(
     dataModule,
     connectModule,
     dashboardModule,
+    // Демо-режим (виртуальный ELM327) — последним в списке транспортов, во всех сборках.
+    demoModule,
 )

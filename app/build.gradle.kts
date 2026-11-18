@@ -48,6 +48,7 @@ dependencies {
     implementation(project(":core:service"))
     implementation(project(":core:database"))
     implementation(project(":core:data"))
+    implementation(project(":core:demo"))
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
