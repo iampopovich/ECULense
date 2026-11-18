@@ -72,12 +72,12 @@ class CbzWriter {
             }
             c.prepareStatement(
                 "INSERT INTO trips(car_id, started_utc_ms, finished_utc_ms, distance_total_mm, fuel_used_ul, fuel_price_per_l_real, " +
-                    "driving_ticks, standing_ticks, total_ticks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "driving_ticks, standing_ticks, total_ticks, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             ).use { ps ->
                 trips.forEach { t ->
                     ps.setObject(1, t.carId); ps.setLong(2, t.startedUtcMs); ps.setLong(3, t.finishedUtcMs)
                     ps.setLong(4, t.distanceMm); ps.setLong(5, t.fuelUl); ps.setObject(6, t.fuelPricePerL)
-                    ps.setLong(7, t.drivingTicks); ps.setLong(8, t.standingTicks); ps.setLong(9, t.totalTicks)
+                    ps.setLong(7, t.drivingTicks); ps.setLong(8, t.standingTicks); ps.setLong(9, t.totalTicks); ps.setObject(10, t.id)
                     ps.executeUpdate()
                 }
             }

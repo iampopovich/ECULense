@@ -285,6 +285,12 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE carId = :carId ORDER BY startedAtMs")
     suspend fun forCar(carId: Long): List<TripEntity>
 
+    @Query("SELECT * FROM trips WHERE externalId IN (:externalIds)")
+    suspend fun byExternalIds(externalIds: List<String>): List<TripEntity>
+
+    /** Поездка Car Scanner, дописанная/изменённая в новом бэкапе (тот же externalId). */
+    @Update suspend fun updateAll(trips: List<TripEntity>)
+
     /**
      * Законченные записи без своей поездки ("session:<id>"). Импортированные записи, которые по времени
      * перекрываются с поездкой Car Scanner, пропускаются: эта поездка уже есть в таблице, дубль не нужен.
@@ -380,12 +386,75 @@ interface OdometerDao {
     suspend fun delete(id: Long)
 }
 
+/**
+ * v6 (1.27): строка истории импорта — что принёс один бэкап. status: DONE / FAILED / CANCELLED.
+ * fileName — имя выбранного файла (только локально, в логи не пишется).
+ */
+@Entity(tableName = "import_history")
+data class ImportHistoryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val source: String,
+    val fileName: String,
+    val startedAtMs: Long,
+    val finishedAtMs: Long,
+    val status: String,
+    val recordingsAdded: Int,
+    val recordingsSkipped: Int,
+    val tripsAdded: Int,
+    val tripsUpdated: Int,
+    val tripsSkipped: Int,
+    val dtcAdded: Int,
+    val carFieldsUpdated: Int,
+    val unitsUpdated: Boolean,
+    val errors: Int,
+    val message: String?,
+)
+
+/** v6: запись .brc, импортированная целиком (имя + размер + CRC из zip) — повторный бэкап пропускает её без распаковки. */
+@Entity(tableName = "import_files")
+data class ImportedFileEntity(
+    @PrimaryKey val name: String,
+    val size: Long,
+    val crc: Long,
+    val importedAtMs: Long,
+)
+
+/**
+ * v6: значения, принесённые прошлым импортом (JSON), по ключу «car:<id>» / «units». Поле обновляется из нового
+ * бэкапа, только если пользователь его не менял после прошлого импорта (текущее значение == снимок).
+ */
+@Entity(tableName = "import_snapshots")
+data class ImportSnapshotEntity(
+    @PrimaryKey val key: String,
+    val json: String,
+)
+
+@Dao
+interface ImportDao {
+    @Insert suspend fun insertHistory(row: ImportHistoryEntity): Long
+
+    @Query("SELECT * FROM import_history ORDER BY startedAtMs DESC, id DESC LIMIT :limit")
+    fun observeHistory(limit: Int = 50): Flow<List<ImportHistoryEntity>>
+
+    @Query("SELECT * FROM import_files WHERE name = :name")
+    suspend fun file(name: String): ImportedFileEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putFile(file: ImportedFileEntity)
+
+    @Query("SELECT json FROM import_snapshots WHERE `key` = :key")
+    suspend fun snapshot(key: String): String?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putSnapshot(snapshot: ImportSnapshotEntity)
+}
+
 @Database(
     entities = [
         SessionEntity::class, ReadingEntity::class, DtcSnapshotEntity::class, CarEntity::class, TripEntity::class, FindingEntity::class,
-        MaintenanceItemEntity::class, OdometerEntity::class,
+        MaintenanceItemEntity::class, OdometerEntity::class, ImportHistoryEntity::class, ImportedFileEntity::class, ImportSnapshotEntity::class,
     ],
-    version = 5,
+    version = EcuDatabase.VERSION,
 )
 abstract class EcuDatabase : RoomDatabase() {
     abstract fun sessionDao(): SessionDao
@@ -396,8 +465,14 @@ abstract class EcuDatabase : RoomDatabase() {
     abstract fun findingDao(): FindingDao
     abstract fun maintenanceDao(): MaintenanceDao
     abstract fun odometerDao(): OdometerDao
+    abstract fun importDao(): ImportDao
 
     companion object {
+        /** Версия схемы; резервная копия ECULense со старшей версией не восстанавливается. */
+        const val VERSION = 6
+        const val FILE_NAME = "ecu.db"
+        val MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+
         const val DEFAULT_CAR_ID = 1L
         const val DEFAULT_CAR_NAME = "Мой автомобиль"
 
@@ -537,10 +612,28 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+/** 5 → 6: история импортов, отметки импортированных .brc и снимки прошлого импорта (1.27). Только CREATE. */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `import_history` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `source` TEXT NOT NULL, " +
+                "`fileName` TEXT NOT NULL, `startedAtMs` INTEGER NOT NULL, `finishedAtMs` INTEGER NOT NULL, `status` TEXT NOT NULL, " +
+                "`recordingsAdded` INTEGER NOT NULL, `recordingsSkipped` INTEGER NOT NULL, `tripsAdded` INTEGER NOT NULL, " +
+                "`tripsUpdated` INTEGER NOT NULL, `tripsSkipped` INTEGER NOT NULL, `dtcAdded` INTEGER NOT NULL, " +
+                "`carFieldsUpdated` INTEGER NOT NULL, `unitsUpdated` INTEGER NOT NULL, `errors` INTEGER NOT NULL, `message` TEXT)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `import_files` (`name` TEXT NOT NULL, `size` INTEGER NOT NULL, `crc` INTEGER NOT NULL, " +
+                "`importedAtMs` INTEGER NOT NULL, PRIMARY KEY(`name`))",
+        )
+        db.execSQL("CREATE TABLE IF NOT EXISTS `import_snapshots` (`key` TEXT NOT NULL, `json` TEXT NOT NULL, PRIMARY KEY(`key`))")
+    }
+}
+
 val databaseModule = module {
     single {
-        Room.databaseBuilder(androidContext(), EcuDatabase::class.java, "ecu.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        Room.databaseBuilder(androidContext(), EcuDatabase::class.java, EcuDatabase.FILE_NAME)
+            .addMigrations(*EcuDatabase.MIGRATIONS)
             .addCallback(EcuDatabase.defaultCar)
             .build()
     }
@@ -552,4 +645,5 @@ val databaseModule = module {
     single { get<EcuDatabase>().findingDao() }
     single { get<EcuDatabase>().maintenanceDao() }
     single { get<EcuDatabase>().odometerDao() }
+    single { get<EcuDatabase>().importDao() }
 }

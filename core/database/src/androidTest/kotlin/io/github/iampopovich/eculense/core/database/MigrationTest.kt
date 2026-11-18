@@ -44,7 +44,7 @@ class MigrationTest {
 
         // Room открывает мигрированную базу без ошибок схемы, DAO видят данные
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+            .addMigrations(*EcuDatabase.MIGRATIONS).build()
         try {
             assertEquals(2, room.sessionDao().observeSessions().first().size)
             assertEquals(listOf(EcuDatabase.DEFAULT_CAR_NAME), room.carDao().all().map { it.name })
@@ -79,7 +79,7 @@ class MigrationTest {
         }
 
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+            .addMigrations(*EcuDatabase.MIGRATIONS).build()
         try {
             val f = FindingEntity(carId = 1, ruleId = "r", severity = "WARNING", title = "t", message = "m", evidenceJson = "{}", periodFromMs = null, periodToMs = null, createdAtMs = 1)
             room.findingDao().replaceForCar(1, listOf(f, f.copy(ruleId = "r2")))
@@ -108,7 +108,7 @@ class MigrationTest {
             assertEquals(1, count("SELECT COUNT(*) FROM cars WHERE drive IS NULL AND curbWeightKg IS NULL AND brand = 'Kia'"))
         }
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+            .addMigrations(*EcuDatabase.MIGRATIONS).build()
         try {
             val car = room.carDao().all().single()
             room.carDao().update(car.copy(drive = "ALL", curbWeightKg = 1917))
@@ -145,7 +145,7 @@ class MigrationTest {
             assertEquals(0, count("SELECT COUNT(*) FROM cars WHERE odometerKm IS NOT NULL OR odometerAtMs IS NOT NULL"))
         }
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+            .addMigrations(*EcuDatabase.MIGRATIONS).build()
         try {
             assertEquals(listOf(120000L, 5000L), room.odometerDao().observeLatestManual().first().sortedBy { it.carId }.map { it.km })
             val id = room.maintenanceDao().insert(MaintenanceItemEntity(carId = 1, title = "Масло", intervalKm = 10000, intervalMonths = 12, lastDoneKm = null, lastDoneAtMs = null, note = null))
@@ -157,6 +157,50 @@ class MigrationTest {
             room.carDao().delete(1)
             assertEquals(0, room.maintenanceDao().forCar(1).size)
             assertEquals(0, room.odometerDao().forCar(1).size)
+        } finally {
+            room.close()
+        }
+    }
+
+    @Test
+    fun v5DataSurvivesAndImportTablesAppear() = runTest {
+        helper.createDatabase(dbName, 5).use { db ->
+            db.execSQL("INSERT INTO cars (id, name, brand, externalId) VALUES (1, 'Тестовая', 'Lada', 'carscanner:7')")
+            db.execSQL("INSERT INTO sessions (id, name, startedAtMs, endedAtMs, source, vin, externalId, carId) VALUES (1, 'cs', 30, 40, 'IMPORT_CARSCANNER', NULL, 'carscanner:a.brc', 1)")
+            db.execSQL("INSERT INTO readings (sessionId, sensorId, value, unit, timestampMs) VALUES (1, '01.05', 90.0, '°C', 31)")
+            db.execSQL(
+                "INSERT INTO trips (carId, startedAtMs, endedAtMs, distanceMm, fuelUl, fuelPricePerL, drivingMs, standingMs, source, externalId) " +
+                    "VALUES (1, 1, 2, 3, 4, NULL, 1, 0, 'IMPORT_CARSCANNER', 'carscanner:7:1')",
+            )
+        }
+        helper.runMigrationsAndValidate(dbName, 6, true, MIGRATION_5_6).use { db ->
+            fun count(sql: String) = db.query(sql).use { c -> c.moveToFirst(); c.getLong(0) }
+            assertEquals(1, count("SELECT COUNT(*) FROM readings"))
+            assertEquals(1, count("SELECT COUNT(*) FROM trips"))
+            assertEquals(0, count("SELECT COUNT(*) FROM import_history"))
+            assertEquals(0, count("SELECT COUNT(*) FROM import_files"))
+            assertEquals(0, count("SELECT COUNT(*) FROM import_snapshots"))
+        }
+        val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
+            .addMigrations(*EcuDatabase.MIGRATIONS).build()
+        try {
+            val dao = room.importDao()
+            dao.putFile(ImportedFileEntity("a.brc", 10, 20, 30))
+            dao.putFile(ImportedFileEntity("a.brc", 11, 21, 31))
+            assertEquals(11L, dao.file("a.brc")!!.size)
+            dao.putSnapshot(ImportSnapshotEntity("car:1", "{}"))
+            assertEquals("{}", dao.snapshot("car:1"))
+            dao.insertHistory(
+                ImportHistoryEntity(
+                    source = "CARSCANNER", fileName = "b.cbz", startedAtMs = 1, finishedAtMs = 2, status = "DONE", recordingsAdded = 1,
+                    recordingsSkipped = 0, tripsAdded = 2, tripsUpdated = 0, tripsSkipped = 0, dtcAdded = 0, carFieldsUpdated = 0,
+                    unitsUpdated = false, errors = 0, message = null,
+                ),
+            )
+            assertEquals(listOf(2), dao.observeHistory().first().map { it.tripsAdded })
+            val trip = room.tripDao().byExternalIds(listOf("carscanner:7:1")).single()
+            room.tripDao().updateAll(listOf(trip.copy(endedAtMs = 5)))
+            assertEquals(5L, room.tripDao().forCar(1).single().endedAtMs)
         } finally {
             room.close()
         }

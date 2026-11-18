@@ -52,6 +52,8 @@ data class CarScannerTrip(
     val drivingTicks: Long,
     val standingTicks: Long,
     val totalTicks: Long,
+    /** trips.id в drivecyclesv2.db (autoincrement Car Scanner); null — синтетика без id. Только для отчёта/диагностики. */
+    val id: Long? = null,
 ) {
     val distanceKm: Double get() = distanceMm / 1_000_000.0
     val fuelL: Double get() = fuelUl / 1_000_000.0
@@ -121,7 +123,7 @@ object CbzSettingsReader {
     fun readTrips(db: SqliteSource): List<CarScannerTrip> = runCatching {
         db.rows(
             "SELECT car_id, started_utc_ms, finished_utc_ms, distance_total_mm, fuel_used_ul, fuel_price_per_l_real, " +
-                "driving_ticks, standing_ticks, total_ticks FROM trips WHERE started_utc_ms IS NOT NULL ORDER BY started_utc_ms",
+                "driving_ticks, standing_ticks, total_ticks, id FROM trips WHERE started_utc_ms IS NOT NULL ORDER BY started_utc_ms",
         ).map { r ->
             fun long(i: Int) = (r[i] as? Number)?.toLong() ?: 0L
             CarScannerTrip(
@@ -134,6 +136,7 @@ object CbzSettingsReader {
                 drivingTicks = long(6),
                 standingTicks = long(7),
                 totalTicks = long(8),
+                id = (r[9] as? Number)?.toLong(),
             )
         }
     }.getOrDefault(emptyList())
