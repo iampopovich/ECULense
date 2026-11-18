@@ -122,10 +122,15 @@ internal abstract class VehicleTool<A>(
     protected abstract suspend fun answer(args: A, carId: Long): JsonObject
 
     final override suspend fun execute(args: A): String {
-        val carId = ctx.cars.activeCarId()
-        val json = (if (carId == null) Compact.noData("no car profile") else answer(args, carId)).toString()
+        val json = json(args).toString()
         ctx.log(name, json.toByteArray().size, json)
         return json
+    }
+
+    /** Ответ без сериализации — для текстовой сводки модели на телефоне ([DigestText]). */
+    internal suspend fun json(args: A): JsonObject {
+        val carId = ctx.cars.activeCarId()
+        return if (carId == null) Compact.noData("no car profile") else answer(args, carId)
     }
 }
 

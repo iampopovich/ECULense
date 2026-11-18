@@ -57,6 +57,7 @@ private class Trips(val list: List<Trip>) : TripRepository {
 private class Analytics : AnalyticsRepository {
     var stored = emptyList<StoredFinding>()
     var recomputes = 0
+    var noDtc = false
     val requests = mutableListOf<String>()
     override val state = MutableStateFlow<AnalysisState>(AnalysisState.Idle)
     override fun observeFindings(carId: Long) = flowOf(stored)
@@ -85,7 +86,7 @@ private class Analytics : AnalyticsRepository {
         requests += "sensor $sensorId $fromMs $warmOnly"
         return if (sensorId == "01.07") SensorSummary("01.07", "%", 4, 2, -8.59375, 12.5, 7.03125, 12.5, 12.5) else null
     }
-    override suspend fun dtcEvents(carId: Long) = (1..40).flatMap { i ->
+    override suspend fun dtcEvents(carId: Long) = if (noDtc) emptyList() else (1..40).flatMap { i ->
         listOf(DtcEvent("P0%03d".format(100 + i), DtcKind.STORED, NOW - i * DAY), DtcEvent("P0%03d".format(100 + i), DtcKind.STORED, NOW - i * DAY + 5 * DAY))
     }
 }
@@ -251,5 +252,36 @@ class VehicleDataToolsTest {
         assertEquals(listOf("sessionId"), session.requiredParameters.map { it.name })
         val sensor = tools.single { it.name == "sensorSummary" }.descriptor
         assertTrue(sensor.optionalParameters.map { it.name }.containsAll(listOf("period", "warmOnly")))
+    }
+
+    /** Признаки JSON в тексте для модели на телефоне: скобки объектов/массивов, кавычки ключей, ключи вида snake_case. */
+    private fun assertNoJson(text: String) {
+        listOf("{", "}", "[", "]", "\"").forEach { assertFalse("«$it» в дайджесте:\n$text", text.contains(it)) }
+        assertFalse(text, Regex("\\b[a-z]+_[a-z_]+\\b").containsMatchIn(text))
+        assertFalse(text, Regex("\\b(title|code|kind|source|events|severity|evidence|start|readings)\\b").containsMatchIn(text))
+    }
+
+    @Test
+    fun `digest for the on-device model is plain Russian lines with the DTC codes`() = runBlocking {
+        val text = VehicleDataToolbox(described).digest()!!
+        println(text)
+        assertNoJson(text)
+        val lines = text.lines()
+        assertTrue(text, lines.first().startsWith("Машина: "))
+        assertTrue(text, lines.first().contains("Kia") && lines.first().contains("2005"))
+        assertTrue(text, lines.any { it.startsWith("Коды ошибок") })
+        assertTrue(text, lines.any { it.startsWith("- P0101") })
+        assertTrue(text, text.contains("P0102") && text.contains("Mass or Volume Air Flow"))
+        assertTrue(text, text.contains("сохранённый"))
+        assertTrue(text, lines.any { it.startsWith("Находки анализа") })
+        assertFalse(text, text.contains(VIN) || text.contains("Тестовая"))
+    }
+
+    @Test
+    fun `digest without DTC events says so in Russian`() = runBlocking {
+        analytics.noDtc = true
+        val text = VehicleDataToolbox(ctx).digest()!!
+        assertNoJson(text)
+        assertTrue(text, text.lines().any { it == "Коды ошибок: в истории нет ни одного кода" })
     }
 }

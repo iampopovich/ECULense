@@ -32,14 +32,15 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
 
     override fun progressLabel(toolName: String): String = LABELS[toolName] ?: "ИИ смотрит данные машины…"
 
+    /** Модель на телефоне инструменты не вызывает: та же информация обычным текстом (без JSON — его она пересказывала). */
     override suspend fun digest(): String? {
         val parts = listOf(
-            "carProfile" to suspend { CarProfileTool(ctx).execute(NoArgs()) },
-            "dtcHistory" to suspend { DtcHistoryTool(ctx).execute(LimitArgs(15)) },
-            "findings" to suspend { FindingsTool(ctx).execute(LimitArgs(8)) },
-            "maintenanceDue" to suspend { MaintenanceDueTool(ctx).execute(NoArgs()) },
-            "listSessions" to suspend { ListSessionsTool(ctx).execute(ListSessionsArgs(limit = 1)) },
-        ).mapNotNull { (name, call) -> runCatching { call() }.getOrNull()?.let { "$name: $it" } }
+            "carProfile" to suspend { CarProfileTool(ctx).json(NoArgs()) },
+            "dtcHistory" to suspend { DtcHistoryTool(ctx).json(LimitArgs(15)) },
+            "findings" to suspend { FindingsTool(ctx).json(LimitArgs(8)) },
+            "maintenanceDue" to suspend { MaintenanceDueTool(ctx).json(NoArgs()) },
+            "listSessions" to suspend { ListSessionsTool(ctx).json(ListSessionsArgs(limit = 1)) },
+        ).mapNotNull { (name, call) -> runCatching { DigestText.section(name, call()) }.getOrNull() }
         return parts.takeIf { it.isNotEmpty() }?.joinToString("\n")
     }
 
