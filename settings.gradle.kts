@@ -20,6 +20,9 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven("https://jitpack.io") {
+            content { includeGroup("com.github.mik3y") }
+        }
     }
 }
 
@@ -30,4 +33,5 @@ include(":core:ui")
 include(":core:navigation")
 include(":core:obd")
 include(":core:bluetooth")
+include(":core:usb")
 include(":feature:dashboard")

@@ -1,0 +1,7 @@
+<resources>
+    <!-- FTDI 0x0403, WCH CH340/CH341 0x1A86, Prolific PL2303 0x067B, Silicon Labs CP210x 0x10C4 -->
+    <usb-device vendor-id="1027" />
+    <usb-device vendor-id="6790" />
+    <usb-device vendor-id="1659" />
+    <usb-device vendor-id="4292" />
+</resources>

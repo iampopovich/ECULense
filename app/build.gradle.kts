@@ -43,6 +43,7 @@ dependencies {
     implementation(project(":feature:dashboard"))
     implementation(project(":core:obd"))
     implementation(project(":core:bluetooth"))
+    implementation(project(":core:usb"))
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
