@@ -53,6 +53,7 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:data"))
     implementation(project(":core:demo"))
+    implementation(project(":core:ai"))
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)

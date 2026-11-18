@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense
 
+import io.github.iampopovich.eculense.core.ai.aiModule
 import io.github.iampopovich.eculense.core.bluetooth.bluetoothModule
 import io.github.iampopovich.eculense.core.data.dataModule
 import io.github.iampopovich.eculense.core.database.databaseModule
@@ -31,4 +32,6 @@ val appModules: List<Module> = listOf(
     sessionsModule,
     // Демо-режим (виртуальный ELM327) — последним в списке транспортов, во всех сборках.
     demoModule,
+    // ИИ (этап 2): убрать эти строки + модули в settings.gradle.kts/app → приложение работает без ИИ.
+    aiModule,
 )
