@@ -16,10 +16,14 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.ECULense">
+        <!-- singleTask: тап по иконке возвращает в существующую задачу с её back stack (а не кладёт новый
+             MainActivity на «Панель», если задачу открыли из уведомления/am start или MIUI добавил extras).
+             Повторные запуски и deep links из уведомлений приходят в onNewIntent. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.ECULense"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
