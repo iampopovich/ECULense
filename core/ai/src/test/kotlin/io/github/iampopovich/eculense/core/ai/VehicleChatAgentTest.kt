@@ -178,6 +178,79 @@ class VehicleChatAgentTest {
         assertEquals(listOf("q", "смотрю", "ответ"), TextOnlyHistory.preprocess(msgs).map { it.textContent() })
     }
 
+    // --- Модель на телефоне (:core:ailocal): без стриминга, свой исполнитель, облачные настройки не нужны.
+    private class WholeAnswerExecutor(private val script: List<Message.Assistant>) : PromptExecutor() {
+        val prompts = mutableListOf<Prompt>()
+        val toolNames = mutableListOf<List<String>>()
+        var closed = false
+        override suspend fun execute(prompt: Prompt, model: LLModel, tools: List<ToolDescriptor>): Message.Assistant {
+            prompts += prompt
+            toolNames += tools.map { it.name }
+            return script[(prompts.size - 1).coerceAtMost(script.lastIndex)]
+        }
+        override fun executeStreaming(prompt: Prompt, model: LLModel, tools: List<ToolDescriptor>): Flow<StreamFrame> = error("модель на телефоне не стримит")
+        override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult = error("not used")
+        override fun close() {
+            closed = true
+        }
+    }
+
+    private class FakeOnDevice(val session: OnDeviceSession?) : OnDeviceLlm {
+        override suspend fun session() = session
+        override val summary = kotlinx.coroutines.flow.flowOf<OnDeviceSummary?>(null)
+        override suspend fun deactivate() = Unit
+    }
+
+    private val localInfo = ProviderInfo("on-device", "На устройстве", "Тестовая модель", onDevice = true)
+    private val localModel = LLModel(ai.koog.prompt.llm.LLMProvider.OpenAI, "test.litertlm", listOf(ai.koog.prompt.llm.LLMCapability.Tools, ai.koog.prompt.llm.LLMCapability.Completion), contextLength = 4096)
+    private val rmeta = ai.koog.prompt.message.ResponseMetaInfo.Empty
+
+    @Test
+    fun `on-device model answers whole with a thinking status, runs tools and is not closed`() = runBlocking {
+        val exec = WholeAnswerExecutor(
+            listOf(
+                Message.Assistant(listOf(MessagePart.Tool.Call("1", "dtcHistory", """{"limit":2}""")), rmeta),
+                Message.Assistant("P0171 — бедная смесь", rmeta),
+            ),
+        )
+        val toolbox = Toolbox()
+        // облачный провайдер тоже сохранён — но выбран локальный, облако не вызывается
+        val gateway = KoogLlmGateway(store(), toolbox = toolbox, onDevice = FakeOnDevice(OnDeviceSession(localInfo, localModel, exec, streaming = false, supportsTools = true))) { _, _ ->
+            error("облачный исполнитель не должен создаваться")
+        }
+        val events = gateway.chat("c1", "Объясни мои ошибки", useCarData = true).toList()
+        assertEquals(
+            listOf(
+                ChatEvent.Status(VehicleChatStrategy.THINKING),
+                ChatEvent.ToolCall("dtcHistory", "ИИ смотрит ошибки…"),
+                ChatEvent.Status(VehicleChatStrategy.THINKING),
+                ChatEvent.Text("P0171 — бедная смесь"),
+            ),
+            events,
+        )
+        assertEquals(listOf(2), toolbox.calls)
+        assertEquals(listOf("dtcHistory"), exec.toolNames.first())
+        assertFalse("движок модели держится между вопросами", exec.closed)
+        assertEquals(localInfo, gateway.provider())
+        assertEquals("P0171 — бедная смесь", gateway.history("c1").last().text)
+    }
+
+    @Test
+    fun `on-device model without tool support gets no tools even with car data on`() = runBlocking {
+        val exec = WholeAnswerExecutor(listOf(Message.Assistant("Ответ", rmeta)))
+        val gateway = KoogLlmGateway(store(), toolbox = Toolbox(), onDevice = FakeOnDevice(OnDeviceSession(localInfo, localModel, exec, streaming = false, supportsTools = false)))
+        gateway.chat("c1", "?", useCarData = true).toList()
+        assertEquals(emptyList<String>(), exec.toolNames.single())
+    }
+
+    @Test
+    fun `without an on-device selection the cloud provider is used`() = runBlocking {
+        val exec = ScriptedExecutor(listOf(textRound("Облако")))
+        val gateway = KoogLlmGateway(store(), onDevice = FakeOnDevice(null)) { _, _ -> exec }
+        assertEquals(listOf(ChatEvent.Text("Облако")), gateway.chat("c1", "?", useCarData = false).toList())
+        assertEquals("DEEPSEEK", gateway.provider()?.key)
+    }
+
     // --- Spike (план 3.4): Koog 1.3.0 поддерживает suspend-методы @Tool в ToolSet (ToolFromCallable → callSuspendBy).
     @LLMDescription("spike")
     class SpikeSet : ToolSet {

@@ -31,6 +31,8 @@ internal data class ChatUiState(
     val useCarData: Boolean = false,
     /** Что сейчас смотрит ИИ («ИИ смотрит ошибки…») — пока идёт вызов инструмента. */
     val toolStatus: String? = null,
+    /** Чат идёт через модель на телефоне — честная пометка о качестве и скорости. */
+    val onDevice: Boolean = false,
     /** Ждём согласия на отправку данных машины этому провайдеру. */
     val consent: ConsentRequest? = null,
     /** Текст, который надо вернуть в поле ввода (диалог согласия закрыли). */
@@ -66,7 +68,8 @@ internal class ChatViewModel(
             // Диалог переживает перезапуск: id — в настройках, тексты — в ai_chat.db (ChatMemory).
             conversationId = prefs.conversationId() ?: conversationId.also { prefs.setConversationId(it) }
             val history = runCatching { gateway.history(conversationId) }.getOrDefault(emptyList())
-            _uiState.update { it.copy(useCarData = (saved ?: true) && it.carDataAvailable, messages = history + it.messages) }
+            val onDevice = runCatching { gateway.provider()?.onDevice == true }.getOrDefault(false)
+            _uiState.update { it.copy(useCarData = (saved ?: true) && it.carDataAvailable, messages = history + it.messages, onDevice = onDevice) }
             if (!prefill.isNullOrBlank()) send(prefill)
         }
     }
@@ -93,7 +96,8 @@ internal class ChatViewModel(
         viewModelScope.launch {
             if (_uiState.value.useCarData) {
                 val provider = gateway.provider()
-                if (provider != null && !prefs.hasConsent(provider.key)) {
+                // модель на телефоне: данные не покидают устройство — согласие не нужно
+                if (provider != null && !provider.onDevice && !prefs.hasConsent(provider.key)) {
                     _uiState.update { it.copy(consent = ConsentRequest(provider, question)) }
                     return@launch
                 }
@@ -170,6 +174,7 @@ internal class ChatViewModel(
                     _uiState.update { s ->
                         when (event) {
                             is ChatEvent.ToolCall -> s.copy(toolStatus = event.label)
+                            is ChatEvent.Status -> s.copy(toolStatus = event.label)
                             is ChatEvent.Text -> {
                                 val last = s.messages.last()
                                 s.copy(messages = s.messages.dropLast(1) + last.copy(text = last.text + event.delta), toolStatus = null)

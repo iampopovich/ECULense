@@ -21,10 +21,14 @@ internal object VehicleChatStrategy {
     /** Сколько кругов с инструментами максимум; последний круг — без инструментов, чтобы модель ответила текстом. */
     const val MAX_TOOL_ROUNDS = 5
 
+    const val THINKING = "Модель на телефоне думает…"
+
     fun create(
         system: String,
         emit: suspend (ChatEvent) -> Unit,
         label: (String) -> String,
+        streaming: Boolean = true,
+        thinkingLabel: String = THINKING,
     ): AIAgentFunctionalStrategy<String, String> = functionalStrategy("ecu-chat") { input ->
         llm.writeSession {
             // ChatMemory подставляет сохранённую историю без системного сообщения — задаём актуальное заново
@@ -38,12 +42,21 @@ internal object VehicleChatStrategy {
         for (round in 0..MAX_TOOL_ROUNDS) {
             val response = llm.writeSession {
                 if (round == MAX_TOOL_ROUNDS) tools = emptyList()
-                val frames = mutableListOf<StreamFrame>()
-                requestLLMStreaming().collect { frame ->
-                    frames += frame
-                    if (frame is StreamFrame.TextDelta && frame.text.isNotEmpty()) emit(ChatEvent.Text(frame.text))
+                if (streaming) {
+                    val frames = mutableListOf<StreamFrame>()
+                    requestLLMStreaming().collect { frame ->
+                        frames += frame
+                        if (frame is StreamFrame.TextDelta && frame.text.isNotEmpty()) emit(ChatEvent.Text(frame.text))
+                    }
+                    assistantOf(frames).also { appendPrompt { message(it) } }
+                } else {
+                    // Модель на телефоне (клиент Koog LiteRT) не стримит: ответ целиком, до него — «Модель думает…».
+                    emit(ChatEvent.Status(thinkingLabel))
+                    val whole = requestLLM() // write-сессия сама добавляет ответ в промпт
+                    val text = whole.parts.filterIsInstance<MessagePart.Text>().joinToString("") { it.text }
+                    if (text.isNotEmpty()) emit(ChatEvent.Text(text))
+                    whole
                 }
-                assistantOf(frames).also { appendPrompt { message(it) } }
             }
             val text = response.parts.filterIsInstance<MessagePart.Text>().joinToString("") { it.text }
             answer.append(text)

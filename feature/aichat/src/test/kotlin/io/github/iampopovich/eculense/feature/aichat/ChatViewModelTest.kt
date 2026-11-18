@@ -65,6 +65,24 @@ class ChatViewModelTest {
     @After fun tearDown() = Dispatchers.resetMain()
 
     @Test
+    fun `on-device model needs no consent and shows its thinking status`() = runTest {
+        val events = kotlinx.coroutines.channels.Channel<ChatEvent>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+        val local = ProviderInfo("on-device", "На устройстве", "Тестовая", onDevice = true)
+        val gateway = FakeGateway(provider = local) { events.consumeAsFlow() }
+        val vm = ChatViewModel(gateway, FakePrefs(), prefill = null)
+        vm.send("Объясни мои ошибки")
+        assertNull(vm.uiState.value.consent)
+        assertTrue(vm.uiState.value.onDevice)
+        assertTrue(gateway.calls.single().useCarData)
+        events.trySend(ChatEvent.Status("Модель на телефоне думает…"))
+        assertEquals("Модель на телефоне думает…", vm.uiState.value.toolStatus)
+        events.trySend(ChatEvent.Text("Ответ целиком"))
+        events.close()
+        assertNull(vm.uiState.value.toolStatus)
+        assertEquals("Ответ целиком", vm.uiState.value.messages.last().text)
+    }
+
+    @Test
     fun `streamed chunks build one assistant message`() = runTest {
         val vm = ChatViewModel(FakeGateway { texts("Про", "верьте ", "датчик") }, FakePrefs(), prefill = null)
         vm.send("P0133?")

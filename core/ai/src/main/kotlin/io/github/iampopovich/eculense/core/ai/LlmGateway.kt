@@ -10,11 +10,17 @@ data class ChatMessage(val role: Role, val text: String) {
 sealed interface ChatEvent {
     data class Text(val delta: String) : ChatEvent
     data class ToolCall(val toolName: String, val label: String) : ChatEvent
+
+    /** Подпись ожидания без инструмента: модель на телефоне отвечает целиком, без потока («Модель думает…»). */
+    data class Status(val label: String) : ChatEvent
 }
 
-/** Кому уходят данные — для диалога согласия (без API-ключа). */
-/** key — для согласия (провайдер); title и model — показать пользователю, куда уйдут данные. */
-data class ProviderInfo(val key: String, val title: String, val model: String)
+/**
+ * Кому уходят данные — для диалога согласия (без API-ключа).
+ * key — для согласия (провайдер); title и model — показать пользователю, куда уйдут данные.
+ * [onDevice] — модель на телефоне: данные никуда не уходят, согласие не нужно.
+ */
+data class ProviderInfo(val key: String, val title: String, val model: String, val onDevice: Boolean = false)
 
 interface LlmGateway {
     /** Ответ модели кусками по мере генерации. Ошибки — [LlmException] с понятным текстом. */

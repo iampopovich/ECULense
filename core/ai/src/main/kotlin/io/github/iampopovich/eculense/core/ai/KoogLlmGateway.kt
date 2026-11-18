@@ -230,6 +230,8 @@ internal class KoogLlmGateway(
     private val store: LlmSettingsStore,
     private val toolbox: VehicleToolbox? = null,
     private val historyProvider: ChatHistoryStore = InMemoryChatHistory(),
+    /** Модель на телефоне (:core:ailocal); если выбрана — чат идёт через неё, облачные настройки не трогаются. */
+    private val onDevice: OnDeviceLlm? = null,
     private val executorFactory: (LlmSettings, String?) -> PromptExecutor = { s, key -> KoogClients.executor(s, key) },
 ) : LlmGateway {
     override val hasVehicleTools: Boolean get() = toolbox != null
@@ -239,9 +241,29 @@ internal class KoogLlmGateway(
     override suspend fun deleteConversation(conversationId: String) = historyProvider.delete(conversationId)
 
     override suspend fun provider(): ProviderInfo? =
-        store.settings.first()?.takeIf { it.model.isNotBlank() }?.let { ProviderInfo(it.provider.name, it.provider.title, it.model) }
+        onDevice?.session()?.info
+            ?: store.settings.first()?.takeIf { it.model.isNotBlank() }?.let { ProviderInfo(it.provider.name, it.provider.title, it.model) }
 
     override fun chat(conversationId: String, userText: String, useCarData: Boolean): Flow<ChatEvent> = channelFlow {
+        val local = try {
+            onDevice?.session()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw LlmException("Модель на телефоне не загрузилась: ${e.message ?: e::class.simpleName}", cause = e)
+        }
+        if (local != null) {
+            val tools = toolbox?.takeIf { useCarData && local.supportsTools }
+            try {
+                runAgent(local.executor, local.model, tools, conversationId, userText, streaming = local.streaming)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                throw LlmException("Модель на телефоне не ответила: ${e.message ?: e::class.simpleName}", cause = e)
+            }
+            // исполнитель принадлежит :core:ailocal (движок держится между вопросами) — не закрываем
+            return@channelFlow
+        }
         val settings = store.settings.first()?.takeIf { it.model.isNotBlank() } ?: throw LlmException(NOT_CONFIGURED)
         val apiKey = store.apiKey()
         val tools = toolbox?.takeIf { useCarData }
@@ -251,23 +273,7 @@ internal class KoogLlmGateway(
             throw LlmErrors.describe(e, apiKey)
         }
         try {
-            val agent = AIAgent(
-                promptExecutor = executor,
-                llmModel = KoogClients.model(settings),
-                strategy = VehicleChatStrategy.create(
-                    system = SystemPrompts.chat(withTools = tools != null),
-                    emit = { send(it) },
-                    label = { name -> tools?.progressLabel(name) ?: name },
-                ),
-                toolRegistry = tools?.registry() ?: ToolRegistry.EMPTY,
-                systemPrompt = SystemPrompts.chat(withTools = tools != null),
-            ) {
-                install(ChatMemory) {
-                    chatHistoryProvider = historyProvider
-                    addPreProcessor(TextOnlyHistory)
-                }
-            }
-            agent.run(userText, conversationId)
+            runAgent(executor, KoogClients.model(settings), tools, conversationId, userText, streaming = true)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -275,6 +281,34 @@ internal class KoogLlmGateway(
         } finally {
             executor.close()
         }
+    }
+
+    private suspend fun kotlinx.coroutines.channels.ProducerScope<ChatEvent>.runAgent(
+        executor: PromptExecutor,
+        model: LLModel,
+        tools: VehicleToolbox?,
+        conversationId: String,
+        userText: String,
+        streaming: Boolean,
+    ) {
+        val agent = AIAgent(
+            promptExecutor = executor,
+            llmModel = model,
+            strategy = VehicleChatStrategy.create(
+                system = SystemPrompts.chat(withTools = tools != null),
+                emit = { send(it) },
+                label = { name -> tools?.progressLabel(name) ?: name },
+                streaming = streaming,
+            ),
+            toolRegistry = tools?.registry() ?: ToolRegistry.EMPTY,
+            systemPrompt = SystemPrompts.chat(withTools = tools != null),
+        ) {
+            install(ChatMemory) {
+                chatHistoryProvider = historyProvider
+                addPreProcessor(TextOnlyHistory)
+            }
+        }
+        agent.run(userText, conversationId)
     }
 
     override fun stream(system: String, history: List<ChatMessage>): Flow<String> = flow {

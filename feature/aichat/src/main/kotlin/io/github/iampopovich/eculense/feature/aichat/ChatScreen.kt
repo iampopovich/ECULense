@@ -167,6 +167,14 @@ internal fun ChatScreen(
                 Switch(checked = state.useCarData, onCheckedChange = null, enabled = !state.streaming)
             }
         }
+        if (state.onDevice) {
+            Text(
+                "Модель на телефоне: работает без интернета, но отвечает медленнее и ошибается чаще облачных моделей — перепроверяйте советы.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
