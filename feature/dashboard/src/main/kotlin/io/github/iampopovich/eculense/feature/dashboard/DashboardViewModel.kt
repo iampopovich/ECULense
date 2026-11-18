@@ -3,6 +3,7 @@ package io.github.iampopovich.eculense.feature.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.iampopovich.eculense.core.data.SessionRecorder
+import io.github.iampopovich.eculense.core.data.UnitsRepository
 import io.github.iampopovich.eculense.core.obd.ConnectionController
 import io.github.iampopovich.eculense.core.obd.ConnectionState
 import io.github.iampopovich.eculense.core.obd.Pid
@@ -19,7 +20,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-internal data class LiveValue(val pid: Pid, val value: Double?)
+internal data class LiveValue(val pid: Pid, val value: Double?, val unit: String = pid.unit)
 
 internal data class DashboardUiState(
     val connected: Boolean = false,
@@ -38,6 +39,7 @@ internal fun ConnectionState.statusLine(): String? {
 internal class DashboardViewModel(
     private val controller: ConnectionController,
     private val recorder: SessionRecorder,
+    units: UnitsRepository,
 ) : ViewModel() {
     private val latest = MutableStateFlow<Map<String, Double>>(emptyMap())
 
@@ -49,11 +51,16 @@ internal class DashboardViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** Значения хранятся метрическими; км/ч → mph, °C → °F и т. п. — только при показе. */
     val uiState: StateFlow<DashboardUiState> =
-        combine(controller.state, selected, latest, recorder.activeSessionId) { state, pids, values, sessionId ->
+        combine(controller.state, selected, latest, recorder.activeSessionId, units.units) { state, pids, values, sessionId, u ->
             DashboardUiState(
                 connected = state is ConnectionState.Connected,
-                values = pids.map { LiveValue(it, values[it.sensorId]) },
+                values = pids.map { pid ->
+                    val raw = values[pid.sensorId]
+                    val (shown, unit) = raw?.let { u.display(it, pid.unit) } ?: (null to u.display(0.0, pid.unit).second)
+                    LiveValue(pid, shown, unit)
+                },
                 recording = sessionId != null,
                 status = state.statusLine(),
             )

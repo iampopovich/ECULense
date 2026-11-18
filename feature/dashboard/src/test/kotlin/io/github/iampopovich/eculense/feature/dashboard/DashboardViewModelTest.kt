@@ -1,6 +1,8 @@
 package io.github.iampopovich.eculense.feature.dashboard
 
 import io.github.iampopovich.eculense.core.data.SessionRecorder
+import io.github.iampopovich.eculense.core.data.UnitsRepository
+import io.github.iampopovich.eculense.core.model.UnitsSettings
 import io.github.iampopovich.eculense.core.model.SensorReading
 import io.github.iampopovich.eculense.core.obd.FakeConnectionController
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +33,7 @@ class DashboardViewModelTest {
     @Test
     fun `polls supported default pids and shows latest values`() = runTest {
         val controller = FakeConnectionController(initial = FakeConnectionController.connected(setOf(0x0C, 0x0D, 0x99)))
-        val vm = DashboardViewModel(controller, FakeRecorder())
+        val vm = DashboardViewModel(controller, FakeRecorder(), FakeUnits())
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
 
         assertEquals(listOf(0x0C, 0x0D), controller.polled.value.map { it.code })
@@ -42,7 +44,7 @@ class DashboardViewModelTest {
     @Test
     fun `toggle recording`() = runTest {
         val recorder = FakeRecorder()
-        val vm = DashboardViewModel(FakeConnectionController(initial = FakeConnectionController.connected(setOf(0x0C))), recorder)
+        val vm = DashboardViewModel(FakeConnectionController(initial = FakeConnectionController.connected(setOf(0x0C))), recorder, FakeUnits())
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
         vm.toggleRecording()
         assertTrue(vm.uiState.value.recording)
@@ -51,10 +53,31 @@ class DashboardViewModelTest {
     @Test
     fun `connected state shows a compact adapter status line`() = runTest {
         val controller = FakeConnectionController(initial = FakeConnectionController.connected(setOf(0x0C)))
-        val vm = DashboardViewModel(controller, FakeRecorder())
+        val vm = DashboardViewModel(controller, FakeRecorder(), FakeUnits())
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
         assertEquals("Fake ELM · протокол 6 · 12.6 В", vm.uiState.value.status)
         controller.disconnect()
         assertEquals(null, vm.uiState.value.status)
+    }
+
+    @Test
+    fun `values are shown in the user's units`() = runTest {
+        val controller = FakeConnectionController(initial = FakeConnectionController.connected(setOf(0x0D)))
+        val units = FakeUnits()
+        val vm = DashboardViewModel(controller, FakeRecorder(), units)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
+        controller.readingsFlow.emit(SensorReading("01.0D", 100.0, "km/h", 0))
+        assertEquals("km/h", vm.uiState.value.values.single().unit)
+        units.units.value = UnitsSettings(metricDistance = false)
+        val speed = vm.uiState.value.values.single()
+        assertEquals("mph", speed.unit)
+        assertEquals(62.14, speed.value!!, 0.01)
+    }
+}
+
+private class FakeUnits : UnitsRepository {
+    override val units = MutableStateFlow(UnitsSettings())
+    override suspend fun save(units: UnitsSettings) {
+        this.units.value = units
     }
 }

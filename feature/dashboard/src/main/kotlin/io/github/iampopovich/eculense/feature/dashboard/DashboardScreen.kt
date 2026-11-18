@@ -62,7 +62,7 @@ internal fun DashboardScreen(
                             item.value?.let { "%.1f".format(it) } ?: "—",
                             style = MaterialTheme.typography.headlineMedium,
                         )
-                        Text(item.pid.unit, style = MaterialTheme.typography.labelSmall)
+                        Text(item.unit, style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
