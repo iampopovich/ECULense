@@ -64,5 +64,12 @@ class DtcScreenTest {
     fun clearDisabledWhenNoCodes() {
         rule.setContent { DtcScreen(DtcUiState(), onRead = {}, onClear = {}, onAskAi = {}) }
         rule.onNodeWithText("Сбросить").assertIsNotEnabled()
+        rule.onNodeWithText("Ошибок нет", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun emptyCheckedListSaysNoErrors() {
+        rule.setContent { DtcScreen(DtcUiState(checked = true), onRead = {}, onClear = {}, onAskAi = {}) }
+        rule.onNodeWithText("Ошибок нет", substring = true).assertExists()
     }
 }

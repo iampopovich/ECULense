@@ -21,6 +21,8 @@ internal data class DtcUiState(
     val items: List<DtcItem> = emptyList(),
     val error: String? = null,
     val canAskAi: Boolean = false,
+    /** Коды хотя бы раз успешно прочитаны: пустой список тогда значит «ошибок нет», а не «ещё не читали». */
+    val checked: Boolean = false,
 )
 
 internal class DtcViewModel(
@@ -37,7 +39,7 @@ internal class DtcViewModel(
         if (dtcs == null) {
             _uiState.update { it.copy(error = "Нет подключения к адаптеру") }
         } else {
-            _uiState.update { it.copy(items = dtcs.map { d -> DtcItem(d, descriptions.describe(d.code)) }, error = null) }
+            _uiState.update { it.copy(items = dtcs.map { d -> DtcItem(d, descriptions.describe(d.code)) }, error = null, checked = true) }
         }
     }
 
@@ -47,7 +49,7 @@ internal class DtcViewModel(
         val cleared = controller.withSession { it.clearDtcs() }
         if (cleared != true) _uiState.update { it.copy(error = "ЭБУ не подтвердил сброс") }
         val dtcs = controller.withSession { session -> DtcKind.entries.flatMap { session.readDtcs(it) } }.orEmpty()
-        _uiState.update { it.copy(items = dtcs.map { d -> DtcItem(d, descriptions.describe(d.code)) }) }
+        _uiState.update { it.copy(items = dtcs.map { d -> DtcItem(d, descriptions.describe(d.code)) }, checked = true) }
     }
 
     private fun launchGuarded(block: suspend () -> Unit) {

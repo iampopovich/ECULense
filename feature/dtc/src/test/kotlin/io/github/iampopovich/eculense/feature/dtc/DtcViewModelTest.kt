@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -56,9 +57,19 @@ class DtcViewModelTest {
     }
 
     @Test
+    fun `empty read is reported as no errors`() = runTest {
+        val vm = DtcViewModel(FakeConnectionController(session = FakeSession()), descriptions, FakeDtcRepository(), emptyList())
+        assertFalse(vm.uiState.value.checked)
+        vm.read()
+        assertTrue(vm.uiState.value.checked)
+        assertEquals(emptyList<Any>(), vm.uiState.value.items)
+    }
+
+    @Test
     fun `not connected gives an error message`() = runTest {
         val vm = DtcViewModel(FakeConnectionController(session = null), descriptions, FakeDtcRepository(), emptyList())
         vm.read()
         assertEquals("Нет подключения к адаптеру", vm.uiState.value.error)
+        assertFalse(vm.uiState.value.checked)
     }
 }

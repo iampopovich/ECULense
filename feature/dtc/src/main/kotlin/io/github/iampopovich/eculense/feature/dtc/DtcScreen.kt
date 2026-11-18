@@ -58,6 +58,9 @@ internal fun DtcScreen(
         }
         if (state.loading) LinearProgressIndicator()
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        if (state.checked && state.items.isEmpty() && !state.loading) {
+            Text("Ошибок нет: ЭБУ не сообщил ни одного кода.")
+        }
         LazyColumn {
             items(state.items, key = { it.dtc.code + it.dtc.kind }) { item ->
                 ListItem(
