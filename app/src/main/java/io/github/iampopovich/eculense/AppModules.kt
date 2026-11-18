@@ -1,6 +1,7 @@
 package io.github.iampopovich.eculense
 
 import io.github.iampopovich.eculense.core.ai.aiModule
+import io.github.iampopovich.eculense.core.ailocal.aiLocalModule
 import io.github.iampopovich.eculense.core.aitools.aiToolsModule
 import io.github.iampopovich.eculense.core.background.backgroundModule
 import io.github.iampopovich.eculense.core.bluetooth.bluetoothModule
@@ -61,4 +62,6 @@ val appModules: List<Module> = listOf(
     aiToolsModule,
     aiSettingsModule,
     aiChatModule,
+    // Модель на телефоне (3.10): провайдер «На устройстве», скачивание моделей, тест скорости. Удаляемый.
+    aiLocalModule,
 )

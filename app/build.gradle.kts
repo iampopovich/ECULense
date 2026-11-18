@@ -35,6 +35,13 @@ android {
         compose = true
         buildConfig = true
     }
+    packaging {
+        jniLibs {
+            // LiteRT-LM (модель на телефоне, :core:ailocal) — ~25 МБ нативных библиотек на ABI. Рантайм работает только
+            // на arm64 (телефоны); x86_64-копии (эмулятор) в APK не кладём.
+            excludes += setOf("lib/x86_64/libLiteRt.so", "lib/x86_64/libLiteRtClGlAccelerator.so", "lib/x86_64/liblitertlm_jni.so")
+        }
+    }
 }
 
 dependencies {
@@ -66,6 +73,8 @@ dependencies {
     implementation(project(":feature:datapacks"))
     implementation(project(":feature:aisettings"))
     implementation(project(":feature:aichat"))
+    // 3.10 модель на телефоне (LiteRT-LM через Koog); убрать строку + include + aiLocalModule → без локальной модели.
+    implementation(project(":core:ailocal"))
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
