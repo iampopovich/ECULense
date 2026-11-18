@@ -38,10 +38,12 @@ object TripStatistics {
     private const val DAY_MS = 86_400_000L
 
     /** Поездки, начавшиеся в последние period.days суток до now (ALL — все). */
-    fun forPeriod(trips: List<Trip>, period: StatsPeriod, nowMs: Long): TripStats {
+    fun inPeriod(trips: List<Trip>, period: StatsPeriod, nowMs: Long): List<Trip> {
         val from = period.days?.let { nowMs - it * DAY_MS } ?: Long.MIN_VALUE
-        return TripStats.of(trips.filter { it.startedAtMs in from..nowMs })
+        return trips.filter { it.startedAtMs in from..nowMs }
     }
+
+    fun forPeriod(trips: List<Trip>, period: StatsPeriod, nowMs: Long): TripStats = TripStats.of(inPeriod(trips, period, nowMs))
 
     /** Помесячно по местному времени, от новых к старым. */
     fun byMonth(trips: List<Trip>, zone: ZoneId = ZoneId.systemDefault()): List<Pair<YearMonth, TripStats>> =

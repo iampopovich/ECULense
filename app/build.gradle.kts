@@ -47,6 +47,7 @@ dependencies {
     implementation(project(":feature:dtc"))
     implementation(project(":feature:sessions"))
     implementation(project(":feature:car"))
+    implementation(project(":feature:stats"))
     implementation(project(":core:obd"))
     implementation(project(":core:bluetooth"))
     implementation(project(":core:usb"))

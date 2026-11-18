@@ -17,7 +17,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Три вкладки: «Панель» (старт), «Пит-стоп», «Настройки». Экран адаптера — пункт хаба настроек. */
+/** Четыре вкладки: «Панель» (старт), «Статистика», «Пит-стоп», «Настройки». Экран адаптера — пункт хаба настроек. */
 @RunWith(AndroidJUnit4::class)
 class AppShellTest {
     @get:Rule
@@ -38,6 +38,7 @@ class AppShellTest {
     @Test
     fun startsOnDashboard() {
         tab("Панель").assertIsSelected()
+        tab("Статистика").assertIsDisplayed()
         tab("Пит-стоп").assertIsDisplayed()
         tab("Настройки").assertIsDisplayed()
         rule.onNodeWithText("Нет подключения к адаптеру").assertIsDisplayed()

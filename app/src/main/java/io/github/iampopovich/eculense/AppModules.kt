@@ -17,6 +17,7 @@ import io.github.iampopovich.eculense.feature.dtc.dtcModule
 import io.github.iampopovich.eculense.feature.pitstop.pitstopModule
 import io.github.iampopovich.eculense.feature.sessions.sessionsModule
 import io.github.iampopovich.eculense.feature.settings.settingsModule
+import io.github.iampopovich.eculense.feature.stats.statsModule
 import org.koin.core.module.Module
 
 /** Добавить/убрать фичу = добавить/убрать строку здесь и в settings.gradle.kts. */
@@ -34,6 +35,7 @@ val appModules: List<Module> = listOf(
     dtcModule,
     sessionsModule,
     carModule,
+    statsModule,
     // Демо-режим (виртуальный ELM327) — последним в списке транспортов, во всех сборках.
     demoModule,
     // ИИ (этап 2): убрать эти строки + модули в settings.gradle.kts/app → приложение работает без ИИ.

@@ -13,5 +13,6 @@ import kotlinx.serialization.Serializable
 @Serializable data object AiSettingsDestination : NavKey
 @Serializable data class AiChatDestination(val prefill: String? = null) : NavKey
 @Serializable data object CarDestination : NavKey
+@Serializable data object StatsDestination : NavKey
 /** carId = 0 — новая машина. */
 @Serializable data class CarEditDestination(val carId: Long = 0) : NavKey

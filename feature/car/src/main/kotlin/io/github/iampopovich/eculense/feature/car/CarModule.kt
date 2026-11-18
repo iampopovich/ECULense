@@ -11,10 +11,10 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** «Автомобиль» — пункт хаба «Настройки»: профиль машины, выбор активной, статистика поездок, единицы. */
+/** «Автомобиль» — пункт хаба «Настройки»: список машин, профиль, выбор активной, единицы. Статистика — вкладка :feature:stats. */
 @OptIn(KoinExperimentalAPI::class)
 val carModule = module {
-    viewModel { CarViewModel(get(), get(), get()) }
+    viewModel { CarViewModel(get(), get()) }
     viewModel { (carId: Long) -> CarEditViewModel(carId, get()) }
     navigation<CarDestination> { CarRoute() }
     navigation<CarEditDestination> { route ->
@@ -22,6 +22,6 @@ val carModule = module {
         CarEditRoute(route.carId, onClose = { back?.onBackPressedDispatcher?.onBackPressed() })
     }
     single(named("car-hub")) {
-        HubEntry(Hub.SETTINGS, CarDestination, "Автомобиль", "Профиль, статистика поездок, единицы", R.drawable.ic_car, order = 5)
+        HubEntry(Hub.SETTINGS, CarDestination, "Автомобиль", "Профиль машины, выбор активной, единицы", R.drawable.ic_car, order = 5)
     }
 }

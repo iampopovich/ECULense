@@ -8,12 +8,10 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.iampopovich.eculense.core.model.CarProfile
-import io.github.iampopovich.eculense.core.model.TripStats
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.time.YearMonth
 
 @RunWith(AndroidJUnit4::class)
 class CarScreenTest {
@@ -23,24 +21,12 @@ class CarScreenTest {
     private val car = CarProfile(id = 1, name = "Тестовая", brand = "Lada", year = 2010, fuelPrice = 60.5, currency = "RUB")
 
     @Test
-    fun statsAreShownForTheActiveCar() {
-        val stats = TripStats(trips = 12, distanceKm = 1234.5, fuelL = 98.7, drivingMs = 7_200_000, standingMs = 1_800_000, fuelCost = 5_971.0)
-        val state = CarUiState(loading = false, cars = listOf(car), active = car, stats = stats, totalTrips = 12,
-            months = listOf(YearMonth.of(2026, 1) to stats))
-        rule.setContent { CarScreen(state, onEdit = {}, onAdd = {}, onSelect = {}, onPeriod = {}, onUnits = {}) }
-        rule.onNodeWithText("Lada · 2010").assertExists()
-        rule.onNodeWithText("1\u00A0234,5 км").assertExists()
-        rule.onNodeWithText("5\u00A0971 RUB").assertExists()
-        rule.onNodeWithText("8,0 л/100 км").assertExists()
-        rule.onNodeWithText("2 ч 00 мин").assertExists()
-        rule.onNodeWithText("Цена топлива: 60,50 RUB/л").assertExists()
-    }
-
-    @Test
-    fun emptyTripsExplainImport() {
+    fun activeCarProfileIsShown() {
         val state = CarUiState(loading = false, cars = listOf(car), active = car)
-        rule.setContent { CarScreen(state, onEdit = {}, onAdd = {}, onSelect = {}, onPeriod = {}, onUnits = {}) }
-        rule.onNodeWithText("Импорт из Car Scanner", substring = true).assertExists()
+        rule.setContent { CarScreen(state, onEdit = {}, onAdd = {}, onSelect = {}, onUnits = {}) }
+        rule.onNodeWithText("Lada · 2010").assertExists()
+        rule.onNodeWithText("Цена топлива: 60,50 RUB/л").assertExists()
+        rule.onNodeWithText("Статистика поездок").assertDoesNotExist()
     }
 
     @Test

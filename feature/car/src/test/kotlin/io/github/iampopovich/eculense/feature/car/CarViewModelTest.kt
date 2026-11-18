@@ -4,7 +4,6 @@ import io.github.iampopovich.eculense.core.data.CarRepository
 import io.github.iampopovich.eculense.core.data.TripRepository
 import io.github.iampopovich.eculense.core.data.UnitsRepository
 import io.github.iampopovich.eculense.core.model.CarProfile
-import io.github.iampopovich.eculense.core.model.StatsPeriod
 import io.github.iampopovich.eculense.core.model.Trip
 import io.github.iampopovich.eculense.core.model.TripSource
 import io.github.iampopovich.eculense.core.model.UnitsSettings
@@ -25,7 +24,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.ZoneOffset
 
 internal class MemCars : CarRepository {
     val all = MutableStateFlow(listOf(CarProfile(id = 1, name = CarProfile.DEFAULT_NAME)))
@@ -74,29 +72,20 @@ class CarViewModelTest {
             drivingMs = 3_600_000, standingMs = 600_000, source = TripSource.IMPORT_CARSCANNER)
 
     @Test
-    fun `stats follow the active car and the period`() = runTest {
+    fun `active car selection is exposed`() = runTest {
         val cars = MemCars().apply { save(CarProfile(name = "Вторая")) }
-        val trips = MemTrips(listOf(trip(1, day, 10.0, 1.0), trip(1, 100 * day, 90.0, 9.0), trip(2, day, 5.0, 2.0)))
-        val vm = CarViewModel(cars, trips, MemUnits(), clock = { now }, zone = ZoneOffset.UTC)
+        val vm = CarViewModel(cars, MemUnits())
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
-
-        assertEquals(100.0, vm.uiState.value.stats.distanceKm, 1e-9)
-        assertEquals(10.0, vm.uiState.value.stats.avgLPer100Km!!, 1e-9)
-        assertEquals(2, vm.uiState.value.months.size)
-
-        vm.selectPeriod(StatsPeriod.MONTH)
-        assertEquals(10.0, vm.uiState.value.stats.distanceKm, 1e-9)
-
+        assertEquals(CarProfile.DEFAULT_NAME, vm.uiState.value.active!!.name)
         vm.setActive(2)
         assertEquals("Вторая", vm.uiState.value.active!!.name)
-        assertEquals(5.0, vm.uiState.value.stats.distanceKm, 1e-9)
-        assertEquals(1, vm.uiState.value.totalTrips)
+        assertEquals(2, vm.uiState.value.cars.size)
     }
 
     @Test
     fun `units change is saved`() = runTest {
         val units = MemUnits()
-        val vm = CarViewModel(MemCars(), MemTrips(emptyList()), units, clock = { now })
+        val vm = CarViewModel(MemCars(), units)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
         vm.setUnits(UnitsSettings(metricDistance = false))
         assertFalse(units.units.value.metricDistance)
