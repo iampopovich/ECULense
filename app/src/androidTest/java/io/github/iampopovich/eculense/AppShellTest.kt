@@ -50,7 +50,7 @@ class AppShellTest {
         rule.onNodeWithText("Выбор и подключение ELM327").assertIsDisplayed()
         // Модуль ИИ подключён: пункт настроек ИИ в хабе.
         rule.onNodeWithText("ИИ-помощник").assertIsDisplayed()
-        rule.onNodeWithText("Провайдер, модель, ключ").assertIsDisplayed()
+        rule.onNodeWithText("Провайдер, адрес, ключ, модель").assertIsDisplayed()
     }
 
     @Test

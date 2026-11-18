@@ -2,9 +2,13 @@ package io.github.iampopovich.eculense.feature.aisettings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.iampopovich.eculense.core.ai.LlmGateway
+import io.github.iampopovich.eculense.core.ai.ConnectionCheck
+import io.github.iampopovich.eculense.core.ai.ConnectionChecker
+import io.github.iampopovich.eculense.core.ai.EndpointUrl
 import io.github.iampopovich.eculense.core.ai.LlmProviderKind
 import io.github.iampopovich.eculense.core.ai.LlmSettingsStore
+import io.github.iampopovich.eculense.core.ai.ModelInfo
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,58 +16,178 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-internal data class AiSettingsForm(
-    val provider: LlmProviderKind = LlmProviderKind.DEFAULT,
-    val model: String = "",
-    val baseUrl: String = "",
-    val apiKey: String = "",
-    val hasSavedKey: Boolean = false,
-    val status: String? = null,
-    val busy: Boolean = false,
-)
+internal sealed interface CheckState {
+    data object Idle : CheckState
+    data object Checking : CheckState
 
-internal class AiSettingsViewModel(private val store: LlmSettingsStore, private val gateway: LlmGateway) : ViewModel() {
-    private val _form = MutableStateFlow(AiSettingsForm())
-    val form: StateFlow<AiSettingsForm> = _form.asStateFlow()
+    /** [listed] = false — свой сервер не отдал список, модель вводится вручную. */
+    data class Passed(val models: List<ModelInfo>, val listed: Boolean, val message: String) : CheckState
+    data class Failed(val message: String) : CheckState
+}
+
+internal data class SavedConfig(val provider: LlmProviderKind, val model: String, val baseUrl: String, val hasKey: Boolean)
+
+/**
+ * Мастер подключения: провайдер → адрес + ключ → проверка (доказывает ключ и грузит каталог) → модель → сохранить.
+ * Шаг «Модель» открыт только после успешной проверки; любая правка адреса/ключа/провайдера её сбрасывает.
+ */
+internal data class AiSettingsUiState(
+    val loaded: Boolean = false,
+    val saved: SavedConfig? = null,
+    val editing: Boolean = true,
+    val provider: LlmProviderKind = LlmProviderKind.DEFAULT,
+    val baseUrl: String = LlmProviderKind.DEFAULT.defaultBaseUrl,
+    val apiKey: String = "",
+    val urlError: String? = null,
+    val check: CheckState = CheckState.Idle,
+    val query: String = "",
+    val model: String = "",
+    val busy: Boolean = false,
+) {
+    /** Пустое поле ключа = использовать сохранённый (только для того же провайдера). */
+    val canReuseSavedKey: Boolean get() = saved?.hasKey == true && saved.provider == provider
+    val modelStepEnabled: Boolean get() = check is CheckState.Passed
+    val manualModel: Boolean get() = (check as? CheckState.Passed)?.listed == false
+    val canSave: Boolean get() = check is CheckState.Passed && model.isNotBlank() && !busy
+
+    val visibleModels: List<ModelInfo>
+        get() {
+            val models = (check as? CheckState.Passed)?.models.orEmpty()
+            val q = query.trim().lowercase()
+            if (q.isEmpty()) return models
+            return models.filter { q in it.id.lowercase() || q in it.name.lowercase() }
+        }
+}
+
+internal class AiSettingsViewModel(
+    private val store: LlmSettingsStore,
+    private val checker: ConnectionChecker,
+) : ViewModel() {
+    private val _state = MutableStateFlow(AiSettingsUiState())
+    val state: StateFlow<AiSettingsUiState> = _state.asStateFlow()
+    private var checkJob: Job? = null
 
     init {
         viewModelScope.launch {
-            store.settings.first()?.let { s ->
-                _form.value = AiSettingsForm(s.provider, s.model, s.baseUrl.orEmpty(), "", s.hasKey)
-            }
+            val saved = store.settings.first()?.let { SavedConfig(it.provider, it.model, it.baseUrl, it.hasKey) }
+            _state.update { it.copy(loaded = true, saved = saved, editing = saved == null) }
         }
     }
 
-    fun update(transform: (AiSettingsForm) -> AiSettingsForm) = _form.update(transform)
+    /** Сброс проверки и выбора модели: всё, что было доказано, относилось к старым адресу/ключу. */
+    private fun AiSettingsUiState.invalidated() = copy(check = CheckState.Idle, model = "", query = "", urlError = null)
 
-    /** Смена провайдера сбрасывает модель и адрес: у каждого свои id и URL. */
-    fun selectProvider(provider: LlmProviderKind) = _form.update {
-        if (it.provider == provider) it else it.copy(provider = provider, model = "", baseUrl = "", status = null)
+    private fun edit(transform: AiSettingsUiState.() -> AiSettingsUiState) {
+        checkJob?.cancel()
+        _state.update { it.transform().invalidated() }
     }
 
-    fun saveAndTest() {
-        if (_form.value.busy) return
-        viewModelScope.launch {
-            val f = _form.value
-            store.save(f.provider, f.model.ifBlank { f.provider.modelHint }, f.baseUrl.ifBlank { f.provider.defaultBaseUrl }, f.apiKey)
-            _form.update {
-                it.copy(
-                    model = f.model.ifBlank { f.provider.modelHint },
-                    apiKey = "",
-                    hasSavedKey = it.hasSavedKey || f.apiKey.isNotBlank(),
-                    status = "Проверяю…",
-                    busy = true,
+    fun selectProvider(provider: LlmProviderKind) {
+        if (provider == _state.value.provider) return
+        edit { copy(provider = provider, baseUrl = provider.defaultBaseUrl, apiKey = "") }
+    }
+
+    fun setBaseUrl(value: String) = edit { copy(baseUrl = value) }
+
+    fun setApiKey(value: String) = edit { copy(apiKey = value) }
+
+    fun setQuery(value: String) = _state.update { it.copy(query = value) }
+
+    fun selectModel(id: String) = _state.update { if (it.modelStepEnabled) it.copy(model = id.trim()) else it }
+
+    fun check() {
+        val s = _state.value
+        if (s.check is CheckState.Checking) return
+        val url = when (val v = EndpointUrl.validate(s.baseUrl)) {
+            is EndpointUrl.Result.Invalid -> {
+                _state.update { it.copy(urlError = v.reason, check = CheckState.Idle) }
+                return
+            }
+            is EndpointUrl.Result.Valid -> v.url
+        }
+        // Модель, выбранная до проверки (например, сохранённая при «Изменить»), остаётся, если сервер её отдаёт.
+        val previousModel = s.model.ifBlank { s.saved?.takeIf { it.provider == s.provider }?.model.orEmpty() }
+        _state.update { it.copy(urlError = null, check = CheckState.Checking, model = "") }
+        checkJob = viewModelScope.launch {
+            val key = s.apiKey.trim().ifBlank { if (s.canReuseSavedKey) store.apiKey().orEmpty() else "" }.ifBlank { null }
+            val result = checker.check(s.provider, url, key)
+            _state.update { current ->
+                val next = result.toCheckState()
+                val keep = (next as? CheckState.Passed)?.let { p -> previousModel.takeIf { m -> m.isNotBlank() && (!p.listed || p.models.any { it.id == m }) } }
+                current.copy(
+                    check = next,
+                    model = keep.orEmpty(),
+                    urlError = (result as? ConnectionCheck.InvalidUrl)?.reason,
                 )
             }
-            val result = gateway.ping()
-            _form.update { it.copy(status = result.fold({ "Работает: $it" }, { "Ошибка: ${it.message}" }), busy = false) }
         }
+    }
+
+    fun save() {
+        val s = _state.value
+        if (!s.canSave) return
+        _state.update { it.copy(busy = true) }
+        viewModelScope.launch {
+            val url = (EndpointUrl.validate(s.baseUrl) as EndpointUrl.Result.Valid).url
+            store.save(s.provider, s.model, url, s.apiKey)
+            val saved = store.settings.first()?.let { SavedConfig(it.provider, it.model, it.baseUrl, it.hasKey) }
+            _state.update { it.copy(saved = saved, editing = false, apiKey = "", busy = false) }
+        }
+    }
+
+    /** Открыть мастер с сохранёнными провайдером и адресом; проверку нужно пройти заново. */
+    fun edit() {
+        val saved = _state.value.saved ?: return
+        checkJob?.cancel()
+        _state.update {
+            it.copy(editing = true, provider = saved.provider, baseUrl = saved.baseUrl, apiKey = "")
+                .invalidated()
+                .copy(model = saved.model)
+        }
+    }
+
+    fun cancelEdit() {
+        if (_state.value.saved == null) return
+        checkJob?.cancel()
+        _state.update { it.copy(editing = false, apiKey = "").invalidated() }
     }
 
     fun clearKey() {
         viewModelScope.launch {
             store.clearKey()
-            _form.update { it.copy(apiKey = "", hasSavedKey = false, status = "Ключ удалён") }
+            _state.update { it.copy(saved = it.saved?.copy(hasKey = false)) }
         }
+    }
+
+    /** Забыть всё и вернуться к мастеру с OpenRouter. */
+    fun reset() {
+        checkJob?.cancel()
+        viewModelScope.launch {
+            store.clear()
+            _state.value = AiSettingsUiState(loaded = true)
+        }
+    }
+
+    private fun ConnectionCheck.toCheckState(): CheckState = when (this) {
+        is ConnectionCheck.Ok ->
+            if (listed) CheckState.Passed(models, true, "Подключение работает: ${models.size} ${modelsWord(models.size)}")
+            else CheckState.Passed(emptyList(), false, "Сервер отвечает, но не отдаёт список моделей — введите id модели вручную.")
+        ConnectionCheck.NoModels -> CheckState.Failed("Сервер ответил, но список моделей пуст.")
+        ConnectionCheck.KeyMissing -> CheckState.Failed("Введите API-ключ.")
+        is ConnectionCheck.InvalidUrl -> CheckState.Failed(reason)
+        is ConnectionCheck.Unauthorized ->
+            CheckState.Failed("Неверный API-ключ (401). Проверьте, что ключ скопирован полностью.".withDetail(detail))
+        is ConnectionCheck.Blocked ->
+            CheckState.Failed("Доступ запрещён (403): провайдер блокирует запросы из этой сети или региона. Включите VPN и проверьте снова.".withDetail(detail))
+        is ConnectionCheck.Unreachable -> CheckState.Failed("Сервер недоступен: ${detail ?: "проверьте адрес и интернет"}.")
+        is ConnectionCheck.Failed -> CheckState.Failed("Сервер ответил ошибкой $status.".withDetail(detail))
+    }
+
+    private fun String.withDetail(detail: String?) = if (detail.isNullOrBlank()) this else "$this Ответ сервера: «$detail»"
+
+    private fun modelsWord(n: Int): String = when {
+        n % 10 == 1 && n % 100 != 11 -> "модель"
+        n % 10 in 2..4 && n % 100 !in 12..14 -> "модели"
+        else -> "моделей"
     }
 }

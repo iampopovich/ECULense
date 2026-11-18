@@ -15,6 +15,6 @@ val aiSettingsModule = module {
     viewModelOf(::AiSettingsViewModel)
     navigation<AiSettingsDestination> { AiSettingsRoute() }
     single(named("aisettings-hub")) {
-        HubEntry(Hub.SETTINGS, AiSettingsDestination, "ИИ-помощник", "Провайдер, модель, ключ", R.drawable.ic_ai_settings, order = 20)
+        HubEntry(Hub.SETTINGS, AiSettingsDestination, "ИИ-помощник", "Провайдер, адрес, ключ, модель", R.drawable.ic_ai_settings, order = 20)
     }
 }

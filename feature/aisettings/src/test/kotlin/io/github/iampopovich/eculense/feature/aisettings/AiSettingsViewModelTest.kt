@@ -1,20 +1,19 @@
 package io.github.iampopovich.eculense.feature.aisettings
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import io.github.iampopovich.eculense.core.ai.ChatMessage
-import io.github.iampopovich.eculense.core.ai.LlmException
-import io.github.iampopovich.eculense.core.ai.LlmGateway
+import io.github.iampopovich.eculense.core.ai.ConnectionCheck
+import io.github.iampopovich.eculense.core.ai.ConnectionChecker
 import io.github.iampopovich.eculense.core.ai.LlmProviderKind
 import io.github.iampopovich.eculense.core.ai.LlmSettings
 import io.github.iampopovich.eculense.core.ai.LlmSettingsStore
+import io.github.iampopovich.eculense.core.ai.ModelInfo
 import io.github.iampopovich.eculense.core.ai.SecretCipher
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
@@ -22,6 +21,8 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -29,11 +30,22 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 
-private class FakeGateway(private val result: Result<String>) : LlmGateway {
-    var pings = 0
-    override fun stream(system: String, history: List<ChatMessage>): Flow<String> = emptyFlow()
-    override suspend fun ping(): Result<String> = result.also { pings++ }
+/** Отвечает заданным результатом; [gate] позволяет «подвесить» проверку и увидеть состояние Checking. */
+private class FakeChecker(var result: ConnectionCheck) : ConnectionChecker {
+    val calls = mutableListOf<Triple<LlmProviderKind, String, String?>>()
+    var gate: CompletableDeferred<Unit>? = null
+    override suspend fun check(provider: LlmProviderKind, baseUrl: String, apiKey: String?): ConnectionCheck {
+        calls += Triple(provider, baseUrl, apiKey)
+        gate?.await()
+        return result
+    }
 }
+
+private val catalog = listOf(
+    ModelInfo("openai/gpt-4.1-mini", "OpenAI: GPT-4.1 Mini", 1_047_576, false, recommended = true),
+    ModelInfo("meta-llama/llama-3.3-70b-instruct:free", "Meta: Llama 3.3 70B (free)", 131_072, true),
+    ModelInfo("z-ai/glm-4.6", "Z.AI: GLM 4.6", 200_000, false),
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AiSettingsViewModelTest {
@@ -65,49 +77,194 @@ class AiSettingsViewModelTest {
         }
     }
 
-    @Test
-    fun `defaults to OpenRouter when nothing is saved`() {
-        val vm = AiSettingsViewModel(store, FakeGateway(Result.success("ок")))
-        assertEquals(LlmProviderKind.OPENROUTER, vm.form.value.provider)
-        assertFalse(vm.form.value.hasSavedKey)
+    private fun loadedVm(checker: ConnectionChecker): AiSettingsViewModel =
+        AiSettingsViewModel(store, checker).also { vm -> waitUntil { vm.state.value.loaded } }
+
+    private fun AiSettingsViewModel.checkAndWait() {
+        check()
+        waitUntil { state.value.check !is CheckState.Checking }
     }
 
     @Test
-    fun `save stores key, clears the field and reports success`() = runBlocking {
-        val gateway = FakeGateway(Result.success("ок"))
-        val vm = AiSettingsViewModel(store, gateway)
-        vm.update { it.copy(apiKey = "sk-or-1") }
-        vm.saveAndTest()
-        waitUntil { vm.form.value.status?.startsWith("Работает") == true }
+    fun `fresh wizard starts on OpenRouter with the model step locked`() {
+        val vm = loadedVm(FakeChecker(ConnectionCheck.Ok(catalog)))
+        val s = vm.state.value
+        assertTrue(s.editing)
+        assertNull(s.saved)
+        assertEquals(LlmProviderKind.OPENROUTER, s.provider)
+        assertEquals("https://openrouter.ai/api/v1", s.baseUrl)
+        assertFalse(s.modelStepEnabled)
+        assertFalse(s.canSave)
+    }
 
-        assertEquals("Работает: ок", vm.form.value.status)
-        assertEquals("", vm.form.value.apiKey)
-        assertTrue(vm.form.value.hasSavedKey)
+    @Test
+    fun `garbage url is rejected locally without a request`() {
+        val checker = FakeChecker(ConnectionCheck.Ok(catalog))
+        val vm = loadedVm(checker)
+        vm.setBaseUrl("openrouter.ai")
+        vm.check()
+        assertEquals("Адрес должен начинаться с http:// или https://", vm.state.value.urlError)
+        assertTrue(checker.calls.isEmpty())
+        assertFalse(vm.state.value.modelStepEnabled)
+    }
+
+    @Test
+    fun `successful check unlocks the model step, choosing a model enables save`() {
+        val checker = FakeChecker(ConnectionCheck.Ok(catalog)).apply { gate = CompletableDeferred() }
+        val vm = loadedVm(checker)
+        vm.setApiKey(" sk-or-test ")
+        vm.check()
+        waitUntil { vm.state.value.check is CheckState.Checking }
+        assertFalse(vm.state.value.modelStepEnabled)
+        checker.gate!!.complete(Unit)
+        waitUntil { vm.state.value.check is CheckState.Passed }
+
+        val s = vm.state.value
+        assertEquals("Подключение работает: 3 модели", (s.check as CheckState.Passed).message)
+        assertEquals(listOf(Triple(LlmProviderKind.OPENROUTER, "https://openrouter.ai/api/v1", "sk-or-test")), checker.calls)
+        assertTrue(s.modelStepEnabled)
+        assertEquals(catalog, s.visibleModels)
+        assertFalse(s.canSave)
+
+        vm.selectModel("z-ai/glm-4.6")
+        assertTrue(vm.state.value.canSave)
+    }
+
+    @Test
+    fun `editing url or key after a successful check invalidates check and model`() {
+        val vm = loadedVm(FakeChecker(ConnectionCheck.Ok(catalog)))
+        vm.setApiKey("sk-or-test")
+        vm.checkAndWait()
+        vm.selectModel("z-ai/glm-4.6")
+
+        vm.setApiKey("sk-or-test2")
+        assertEquals(CheckState.Idle, vm.state.value.check)
+        assertEquals("", vm.state.value.model)
+        assertFalse(vm.state.value.modelStepEnabled)
+
+        vm.checkAndWait()
+        vm.selectModel("z-ai/glm-4.6")
+        vm.setBaseUrl("https://openrouter.ai/api/v2")
+        assertFalse(vm.state.value.modelStepEnabled)
+        assertFalse(vm.state.value.canSave)
+    }
+
+    @Test
+    fun `bad key and blocked network give distinct messages and keep the model step locked`() {
+        val checker = FakeChecker(ConnectionCheck.Unauthorized("User not found."))
+        val vm = loadedVm(checker)
+        vm.setApiKey("sk-or-invalid")
+        vm.checkAndWait()
+        val unauthorized = (vm.state.value.check as CheckState.Failed).message
+        assertTrue(unauthorized, unauthorized.startsWith("Неверный API-ключ (401)"))
+        assertTrue(unauthorized, unauthorized.contains("User not found."))
+        assertFalse(vm.state.value.modelStepEnabled)
+
+        checker.result = ConnectionCheck.Blocked("Access denied by security policy.")
+        vm.checkAndWait()
+        val blocked = (vm.state.value.check as CheckState.Failed).message
+        assertTrue(blocked, blocked.contains("403") && blocked.contains("VPN") && blocked.contains("Access denied by security policy."))
+        assertFalse(blocked, blocked.contains("Неверный"))
+
+        checker.result = ConnectionCheck.Unreachable("сервер не найден (DNS) — проверьте адрес и интернет")
+        vm.checkAndWait()
+        assertTrue((vm.state.value.check as CheckState.Failed).message.startsWith("Сервер недоступен"))
+
+        checker.result = ConnectionCheck.NoModels
+        vm.checkAndWait()
+        assertEquals("Сервер ответил, но список моделей пуст.", (vm.state.value.check as CheckState.Failed).message)
+        assertFalse(vm.state.value.modelStepEnabled)
+    }
+
+    @Test
+    fun `search filters by id and name, case-insensitive`() {
+        val vm = loadedVm(FakeChecker(ConnectionCheck.Ok(catalog)))
+        vm.setApiKey("k")
+        vm.checkAndWait()
+        vm.setQuery("LLAMA")
+        assertEquals(listOf("meta-llama/llama-3.3-70b-instruct:free"), vm.state.value.visibleModels.map { it.id })
+        vm.setQuery("glm 4")
+        assertEquals(listOf("z-ai/glm-4.6"), vm.state.value.visibleModels.map { it.id })
+    }
+
+    @Test
+    fun `save persists provider, url, model and key and shows the summary`() = runBlocking {
+        val vm = loadedVm(FakeChecker(ConnectionCheck.Ok(catalog)))
+        vm.setApiKey("sk-or-1")
+        vm.checkAndWait()
+        vm.selectModel("openai/gpt-4.1-mini")
+        vm.save()
+        waitUntil { !vm.state.value.editing }
+
+        assertEquals(LlmSettings(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", "https://openrouter.ai/api/v1", true), store.settings.first())
         assertEquals("sk-or-1", store.apiKey())
-        // Пустая модель = подсказка провайдера, иначе OpenRouter ответит 400.
-        assertEquals(LlmSettings(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", null, true), store.settings.first())
-        assertEquals(1, gateway.pings)
+        assertEquals(SavedConfig(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", "https://openrouter.ai/api/v1", true), vm.state.value.saved)
+        assertEquals("", vm.state.value.apiKey)
     }
 
     @Test
-    fun `failed check shows the readable error`() {
-        val vm = AiSettingsViewModel(store, FakeGateway(Result.failure(LlmException("Ошибка авторизации (401): неверный ключ", 401))))
-        vm.update { it.copy(apiKey = "sk-or-invalid") }
-        vm.saveAndTest()
-        waitUntil { vm.form.value.status?.startsWith("Ошибка") == true }
-        assertEquals("Ошибка: Ошибка авторизации (401): неверный ключ", vm.form.value.status)
+    fun `save is ignored until the check passed and a model is chosen`() = runBlocking {
+        val vm = loadedVm(FakeChecker(ConnectionCheck.Ok(catalog)))
+        vm.setApiKey("sk-or-1")
+        vm.save()
+        Thread.sleep(100)
+        assertNull(store.settings.first())
+        assertTrue(vm.state.value.editing)
     }
 
     @Test
-    fun `saved settings are loaded and key can be removed`() = runBlocking {
-        store.save(LlmProviderKind.OPENAI, "gpt-4.1-mini", null, "sk-1")
-        val vm = AiSettingsViewModel(store, FakeGateway(Result.success("ок")))
-        waitUntil { vm.form.value.hasSavedKey }
-        assertEquals(LlmProviderKind.OPENAI, vm.form.value.provider)
-        assertEquals("gpt-4.1-mini", vm.form.value.model)
+    fun `editing a saved config re-checks with the saved key when the field is left empty`() = runBlocking {
+        store.save(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", null, "sk-or-saved")
+        val checker = FakeChecker(ConnectionCheck.Ok(catalog))
+        val vm = loadedVm(checker)
+        assertFalse(vm.state.value.editing)
+        assertNotNull(vm.state.value.saved)
 
+        vm.edit()
+        assertTrue(vm.state.value.editing)
+        assertTrue(vm.state.value.canReuseSavedKey)
+        assertFalse(vm.state.value.modelStepEnabled)
+        vm.checkAndWait()
+        assertEquals("sk-or-saved", checker.calls.single().third)
+        // Сохранённая модель остаётся выбранной, если сервер её отдаёт.
+        assertEquals("openai/gpt-4.1-mini", vm.state.value.model)
+        assertTrue(vm.state.value.canSave)
+
+        // Другой провайдер — чужой ключ не подставляем.
+        vm.selectProvider(LlmProviderKind.OPENAI)
+        assertFalse(vm.state.value.canReuseSavedKey)
+        assertEquals("https://api.openai.com/v1", vm.state.value.baseUrl)
+        assertFalse(vm.state.value.modelStepEnabled)
+    }
+
+    @Test
+    fun `custom server without a model list allows a typed model id`() = runBlocking {
+        val checker = FakeChecker(ConnectionCheck.Ok(emptyList(), listed = false))
+        val vm = loadedVm(checker)
+        vm.selectProvider(LlmProviderKind.OPENAI_COMPATIBLE)
+        vm.setBaseUrl("http://127.0.0.1:8089/v1")
+        vm.checkAndWait()
+        assertTrue(vm.state.value.manualModel)
+        assertEquals(null, checker.calls.single().third)
+        vm.selectModel("my-model")
+        assertTrue(vm.state.value.canSave)
+        vm.save()
+        waitUntil { !vm.state.value.editing }
+        assertEquals(LlmSettings(LlmProviderKind.OPENAI_COMPATIBLE, "my-model", "http://127.0.0.1:8089/v1", false), store.settings.first())
+    }
+
+    @Test
+    fun `remove key and reset`() = runBlocking {
+        store.save(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", null, "sk-or-saved")
+        val vm = loadedVm(FakeChecker(ConnectionCheck.Ok(catalog)))
         vm.clearKey()
-        waitUntil { !vm.form.value.hasSavedKey }
-        assertEquals(null, store.apiKey())
+        waitUntil { vm.state.value.saved?.hasKey == false }
+        assertNull(store.apiKey())
+
+        vm.reset()
+        waitUntil { vm.state.value.saved == null }
+        assertNull(store.settings.first())
+        assertTrue(vm.state.value.editing)
+        assertEquals(LlmProviderKind.OPENROUTER, vm.state.value.provider)
     }
 }
