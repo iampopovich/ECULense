@@ -5,15 +5,10 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- Ключ LLM зашифрован ключом Keystore, который не переносится на другое устройство. -->
+        <exclude domain="file" path="datastore/llm_settings.preferences_pb" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="file" path="datastore/llm_settings.preferences_pb" />
     </device-transfer>
-    -->
 </data-extraction-rules>
