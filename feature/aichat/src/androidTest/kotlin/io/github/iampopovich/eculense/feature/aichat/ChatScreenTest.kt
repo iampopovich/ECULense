@@ -117,6 +117,34 @@ class ChatScreenTest {
     }
 
     @Test
+    fun consentDialogNamesProviderAndDataAndRoutesButtons() {
+        val calls = mutableListOf<String>()
+        val request = ConsentRequest(io.github.iampopovich.eculense.core.ai.ProviderInfo("DEEPSEEK", "DeepSeek", "deepseek-chat"), "Объясни мои ошибки")
+        rule.setContent {
+            ChatScreen(
+                ChatUiState(carDataAvailable = true, useCarData = true, consent = request),
+                onSend = {}, onOpenSettings = {},
+                onConsentAccept = { calls += "accept" }, onConsentDecline = { calls += "decline" }, onConsentCancel = { calls += "cancel" },
+            )
+        }
+        rule.onNodeWithText("Отправить данные машины ИИ?").assertExists()
+        rule.onNodeWithText("«DeepSeek» (модель deepseek-chat)", substring = true).assertExists()
+        rule.onNodeWithText("VIN, координаты GPS и API-ключ не передаются", substring = true).assertExists()
+        SHARED_DATA.forEach { rule.onNodeWithText("• $it").assertExists() }
+        rule.onNodeWithText("Разрешить").performClick()
+        rule.onNodeWithText("Без данных машины").performClick()
+        assertEquals(listOf("accept", "decline"), calls)
+    }
+
+    @Test
+    fun draftReturnsToTheInput() {
+        var consumed = 0
+        rule.setContent { ChatScreen(ChatUiState(draft = "вопрос"), onSend = {}, onOpenSettings = {}, onDraftConsumed = { consumed++ }) }
+        rule.onNodeWithTag("chat-input").assertTextEquals("вопрос")
+        assertEquals(1, consumed)
+    }
+
+    @Test
     fun streamingAnswerGrowsAndGetsCopyButtonWhenDone() {
         val state = mutableStateOf(ChatUiState(listOf(user("hi"), assistant("# Заго")), streaming = true))
         rule.setContent { ChatScreen(state.value, onSend = {}, onOpenSettings = {}) }

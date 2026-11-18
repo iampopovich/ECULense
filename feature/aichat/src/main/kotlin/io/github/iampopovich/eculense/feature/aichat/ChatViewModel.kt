@@ -3,6 +3,8 @@ package io.github.iampopovich.eculense.feature.aichat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.iampopovich.eculense.core.ai.ChatEvent
+import io.github.iampopovich.eculense.core.ai.ChatPrefs
+import io.github.iampopovich.eculense.core.ai.ProviderInfo
 import io.github.iampopovich.eculense.core.ai.ChatMessage
 import io.github.iampopovich.eculense.core.ai.LlmGateway
 import kotlinx.coroutines.CancellationException
@@ -13,6 +15,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
+
+/** Вопрос ждёт согласия: какие данные и какому провайдеру уйдут. */
+internal data class ConsentRequest(val provider: ProviderInfo, val text: String)
 
 internal data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
@@ -26,6 +31,10 @@ internal data class ChatUiState(
     val useCarData: Boolean = false,
     /** Что сейчас смотрит ИИ («ИИ смотрит ошибки…») — пока идёт вызов инструмента. */
     val toolStatus: String? = null,
+    /** Ждём согласия на отправку данных машины этому провайдеру. */
+    val consent: ConsentRequest? = null,
+    /** Текст, который надо вернуть в поле ввода (диалог согласия закрыли). */
+    val draft: String? = null,
 ) {
     /** Запрос ушёл, но первый кусок ответа ещё не пришёл — показываем индикатор «печатает». */
     val awaitingFirstToken: Boolean
@@ -40,7 +49,11 @@ internal data class ChatUiState(
  * Чат через агента Koog ([LlmGateway.chat]): история диалога — у агента (ChatMemory по conversationId),
  * здесь — только то, что видно на экране. Ответ стримится; во время вызова инструментов — подпись «ИИ смотрит…».
  */
-internal class ChatViewModel(private val gateway: LlmGateway, prefill: String?) : ViewModel() {
+internal class ChatViewModel(
+    private val gateway: LlmGateway,
+    private val prefs: ChatPrefs,
+    prefill: String?,
+) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatUiState(carDataAvailable = gateway.hasVehicleTools, useCarData = gateway.hasVehicleTools))
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
     private var job: Job? = null
@@ -48,13 +61,58 @@ internal class ChatViewModel(private val gateway: LlmGateway, prefill: String?) 
     private val conversationId = UUID.randomUUID().toString()
 
     init {
-        if (!prefill.isNullOrBlank()) send(prefill)
+        viewModelScope.launch {
+            val saved = prefs.useCarData()
+            _uiState.update { it.copy(useCarData = (saved ?: true) && it.carDataAvailable) }
+            if (!prefill.isNullOrBlank()) send(prefill)
+        }
     }
 
+    /**
+     * Перед первой отправкой данных машины облачному провайдеру — диалог согласия (что уходит и куда);
+     * без согласия вопрос не уходит.
+     */
     fun send(text: String) {
-        if (text.isBlank() || _uiState.value.streaming) return
+        if (text.isBlank() || _uiState.value.streaming || _uiState.value.consent != null) return
         val question = text.trim()
-        ask(_uiState.value.messages + ChatMessage(ChatMessage.Role.USER, question), question)
+        viewModelScope.launch {
+            if (_uiState.value.useCarData) {
+                val provider = gateway.provider()
+                if (provider != null && !prefs.hasConsent(provider.key)) {
+                    _uiState.update { it.copy(consent = ConsentRequest(provider, question)) }
+                    return@launch
+                }
+            }
+            ask(_uiState.value.messages + ChatMessage(ChatMessage.Role.USER, question), question)
+        }
+    }
+
+    /** «Разрешить»: запоминаем согласие для этого провайдера и отправляем вопрос с данными машины. */
+    fun acceptConsent() {
+        val request = _uiState.value.consent ?: return
+        viewModelScope.launch {
+            prefs.grantConsent(request.provider.key)
+            _uiState.update { it.copy(consent = null) }
+            ask(_uiState.value.messages + ChatMessage(ChatMessage.Role.USER, request.text), request.text)
+        }
+    }
+
+    /** «Без данных машины»: переключатель выключается, вопрос уходит без инструментов. */
+    fun declineConsent() {
+        val request = _uiState.value.consent ?: return
+        _uiState.update { it.copy(consent = null, useCarData = false) }
+        viewModelScope.launch { prefs.setUseCarData(false) }
+        ask(_uiState.value.messages + ChatMessage(ChatMessage.Role.USER, request.text), request.text)
+    }
+
+    /** Закрыли диалог: ничего не отправляем, текст возвращается в поле ввода. */
+    fun cancelConsent() {
+        val request = _uiState.value.consent ?: return
+        _uiState.update { it.copy(consent = null, draft = request.text) }
+    }
+
+    fun draftConsumed() {
+        _uiState.update { it.copy(draft = null) }
     }
 
     /** Повтор вопроса после ошибки — без повторного ввода (неудачный ход агент в историю не записал). */
@@ -65,7 +123,9 @@ internal class ChatViewModel(private val gateway: LlmGateway, prefill: String?) 
     }
 
     fun setUseCarData(enabled: Boolean) {
-        _uiState.update { it.copy(useCarData = enabled && it.carDataAvailable) }
+        if (!_uiState.value.carDataAvailable) return
+        _uiState.update { it.copy(useCarData = enabled) }
+        viewModelScope.launch { prefs.setUseCarData(enabled) }
     }
 
     /** «Стоп»: обрываем поток; уже полученный текст остаётся, пустой пузырь ответа убирается. */

@@ -1,6 +1,8 @@
 package io.github.iampopovich.eculense.feature.aichat
 
 import io.github.iampopovich.eculense.core.ai.ChatEvent
+import io.github.iampopovich.eculense.core.ai.ChatPrefs
+import io.github.iampopovich.eculense.core.ai.ProviderInfo
 import io.github.iampopovich.eculense.core.ai.ChatMessage
 import io.github.iampopovich.eculense.core.ai.LlmGateway
 import kotlinx.coroutines.Dispatchers
@@ -27,15 +29,29 @@ internal data class ChatCall(val conversationId: String, val text: String, val u
 /** Поддельный шлюз: n-й вызов chat() отдаёт поток из responder(n). */
 internal class FakeGateway(
     override val hasVehicleTools: Boolean = true,
+    private val provider: ProviderInfo? = null,
     private val responder: (Int) -> Flow<ChatEvent> = { flowOf(ChatEvent.Text("ок")) },
 ) : LlmGateway {
     val calls = mutableListOf<ChatCall>()
     override fun stream(system: String, history: List<ChatMessage>): Flow<String> = error("not used")
+    override suspend fun provider(): ProviderInfo? = provider
     override fun chat(conversationId: String, userText: String, useCarData: Boolean): Flow<ChatEvent> {
         calls += ChatCall(conversationId, userText, useCarData)
         return responder(calls.size)
     }
 }
+
+internal class FakePrefs(var useCar: Boolean? = null, val consents: MutableSet<String> = mutableSetOf(), var conversation: String? = null) : ChatPrefs {
+    override suspend fun hasConsent(providerKey: String) = providerKey in consents
+    override suspend fun grantConsent(providerKey: String) { consents += providerKey }
+    override suspend fun revokeConsents() = consents.clear()
+    override suspend fun useCarData() = useCar
+    override suspend fun setUseCarData(enabled: Boolean) { useCar = enabled }
+    override suspend fun conversationId() = conversation
+    override suspend fun setConversationId(id: String) { conversation = id }
+}
+
+private val DEEPSEEK = ProviderInfo("DEEPSEEK", "DeepSeek", "deepseek-chat")
 
 internal fun texts(vararg chunks: String): Flow<ChatEvent> = flowOf(*chunks.map { ChatEvent.Text(it) }.toTypedArray())
 
@@ -46,7 +62,7 @@ class ChatViewModelTest {
 
     @Test
     fun `streamed chunks build one assistant message`() = runTest {
-        val vm = ChatViewModel(FakeGateway { texts("Про", "верьте ", "датчик") }, prefill = null)
+        val vm = ChatViewModel(FakeGateway { texts("Про", "верьте ", "датчик") }, FakePrefs(), prefill = null)
         vm.send("P0133?")
         val messages = vm.uiState.value.messages
         assertEquals(ChatMessage(ChatMessage.Role.USER, "P0133?"), messages[0])
@@ -57,7 +73,7 @@ class ChatViewModelTest {
     @Test
     fun `tool calls show what the AI is looking at until text arrives`() = runTest {
         val events = kotlinx.coroutines.channels.Channel<ChatEvent>(kotlinx.coroutines.channels.Channel.UNLIMITED)
-        val vm = ChatViewModel(FakeGateway { events.consumeAsFlow() }, prefill = null)
+        val vm = ChatViewModel(FakeGateway { events.consumeAsFlow() }, FakePrefs(), prefill = null)
         vm.send("Объясни мои ошибки")
         events.send(ChatEvent.ToolCall("dtcHistory", "ИИ смотрит ошибки…"))
         assertEquals("ИИ смотрит ошибки…", vm.uiState.value.toolStatus)
@@ -74,7 +90,7 @@ class ChatViewModelTest {
     @Test
     fun `car data toggle is on when tools exist and is passed to the gateway`() = runTest {
         val gateway = FakeGateway()
-        val vm = ChatViewModel(gateway, prefill = null)
+        val vm = ChatViewModel(gateway, FakePrefs(), prefill = null)
         assertTrue(vm.uiState.value.carDataAvailable && vm.uiState.value.useCarData)
         vm.send("первый")
         vm.setUseCarData(false)
@@ -87,7 +103,7 @@ class ChatViewModelTest {
     @Test
     fun `without tools module there is no toggle and no car data`() = runTest {
         val gateway = FakeGateway(hasVehicleTools = false)
-        val vm = ChatViewModel(gateway, prefill = null)
+        val vm = ChatViewModel(gateway, FakePrefs(), prefill = null)
         assertFalse(vm.uiState.value.carDataAvailable)
         vm.setUseCarData(true)
         vm.send("вопрос")
@@ -95,14 +111,76 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `first question with car data asks for consent and sends nothing until accepted`() = runTest {
+        val gateway = FakeGateway(provider = DEEPSEEK)
+        val prefs = FakePrefs()
+        val vm = ChatViewModel(gateway, prefs, prefill = null)
+        vm.send("Объясни мои ошибки")
+        assertEquals(ConsentRequest(DEEPSEEK, "Объясни мои ошибки"), vm.uiState.value.consent)
+        assertTrue(gateway.calls.isEmpty())
+        assertTrue(vm.uiState.value.messages.isEmpty())
+
+        vm.acceptConsent()
+        assertEquals(setOf("DEEPSEEK"), prefs.consents)
+        assertNull(vm.uiState.value.consent)
+        assertEquals(listOf(ChatCall(gateway.calls.single().conversationId, "Объясни мои ошибки", true)), gateway.calls)
+
+        // согласие запомнено — второй вопрос уходит сразу
+        vm.send("Как прошла последняя поездка?")
+        assertNull(vm.uiState.value.consent)
+        assertEquals(2, gateway.calls.size)
+    }
+
+    @Test
+    fun `declining sends without car data and switches the toggle off for next time`() = runTest {
+        val gateway = FakeGateway(provider = DEEPSEEK)
+        val prefs = FakePrefs()
+        val vm = ChatViewModel(gateway, prefs, prefill = null)
+        vm.send("вопрос")
+        vm.declineConsent()
+        assertFalse(gateway.calls.single().useCarData)
+        assertFalse(vm.uiState.value.useCarData)
+        assertEquals(false, prefs.useCar)
+        assertTrue(prefs.consents.isEmpty())
+    }
+
+    @Test
+    fun `cancel returns the question to the input`() = runTest {
+        val vm = ChatViewModel(FakeGateway(provider = DEEPSEEK), FakePrefs(), prefill = null)
+        vm.send("вопрос")
+        vm.cancelConsent()
+        assertNull(vm.uiState.value.consent)
+        assertEquals("вопрос", vm.uiState.value.draft)
+        vm.draftConsumed()
+        assertNull(vm.uiState.value.draft)
+    }
+
+    @Test
+    fun `prefill from a finding also waits for consent, other provider asks again`() = runTest {
+        val prefs = FakePrefs(consents = mutableSetOf("OPENROUTER"))
+        val vm = ChatViewModel(FakeGateway(provider = DEEPSEEK), prefs, prefill = "Объясни находку")
+        assertEquals("Объясни находку", vm.uiState.value.consent?.text)
+    }
+
+    @Test
+    fun `saved toggle choice is restored and no consent without car data`() = runTest {
+        val gateway = FakeGateway(provider = DEEPSEEK)
+        val vm = ChatViewModel(gateway, FakePrefs(useCar = false), prefill = null)
+        assertFalse(vm.uiState.value.useCarData)
+        vm.send("Что такое P0300?")
+        assertNull(vm.uiState.value.consent)
+        assertFalse(gateway.calls.single().useCarData)
+    }
+
+    @Test
     fun `prefill is sent immediately`() = runTest {
-        val vm = ChatViewModel(FakeGateway(), prefill = "Объясни P0300")
+        val vm = ChatViewModel(FakeGateway(), FakePrefs(), prefill = "Объясни P0300")
         assertEquals("Объясни P0300", vm.uiState.value.messages.first().text)
     }
 
     @Test
     fun `error is shown`() = runTest {
-        val vm = ChatViewModel(FakeGateway { flow { throw IllegalStateException("ИИ не настроен") } }, prefill = null)
+        val vm = ChatViewModel(FakeGateway { flow { throw IllegalStateException("ИИ не настроен") } }, FakePrefs(), prefill = null)
         vm.send("привет")
         assertEquals("ИИ не настроен", vm.uiState.value.error)
         // Пустой пузырь ответа убирается, вопрос пользователя остаётся.
@@ -112,7 +190,7 @@ class ChatViewModelTest {
     @Test
     fun `next question sends only the new text and clears the old error`() = runTest {
         val gateway = FakeGateway { n -> if (n == 1) flow { throw IllegalStateException("x") } else texts("ответ") }
-        val vm = ChatViewModel(gateway, prefill = null)
+        val vm = ChatViewModel(gateway, FakePrefs(), prefill = null)
         vm.send("первый")
         vm.send("второй")
         assertEquals(listOf("первый", "второй"), gateway.calls.map { it.text })
@@ -132,7 +210,7 @@ class ChatViewModelTest {
                 }
             }
         }
-        val vm = ChatViewModel(gateway, prefill = null)
+        val vm = ChatViewModel(gateway, FakePrefs(), prefill = null)
         vm.send("вопрос")
         assertTrue(vm.uiState.value.streaming)
         assertFalse(vm.uiState.value.awaitingFirstToken)
@@ -149,7 +227,7 @@ class ChatViewModelTest {
     @Test
     fun `stop before the first token removes the empty answer and allows a new question`() = runTest {
         val gateway = FakeGateway { n -> if (n == 1) flow { awaitCancellation() } else texts("ответ") }
-        val vm = ChatViewModel(gateway, prefill = null)
+        val vm = ChatViewModel(gateway, FakePrefs(), prefill = null)
         vm.send("первый")
         assertTrue(vm.uiState.value.awaitingFirstToken)
         vm.stop()
@@ -164,7 +242,7 @@ class ChatViewModelTest {
     @Test
     fun `retry resends the unanswered question after an error`() = runTest {
         val gateway = FakeGateway { n -> if (n == 1) flow { throw IllegalStateException("Нет связи") } else texts("ок") }
-        val vm = ChatViewModel(gateway, prefill = null)
+        val vm = ChatViewModel(gateway, FakePrefs(), prefill = null)
         vm.send("вопрос")
         assertTrue(vm.uiState.value.canRetry)
         vm.retry()

@@ -12,8 +12,9 @@ sealed interface ChatEvent {
     data class ToolCall(val toolName: String, val label: String) : ChatEvent
 }
 
-/** Кому уходят данные — для диалога согласия (без ключа). */
-data class ProviderInfo(val title: String, val model: String)
+/** Кому уходят данные — для диалога согласия (без API-ключа). */
+/** key — для согласия (провайдер); title и model — показать пользователю, куда уйдут данные. */
+data class ProviderInfo(val key: String, val title: String, val model: String)
 
 interface LlmGateway {
     /** Ответ модели кусками по мере генерации. Ошибки — [LlmException] с понятным текстом. */

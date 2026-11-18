@@ -10,4 +10,5 @@ val aiModule = module {
     single { LlmSettingsStore(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("llm_settings") }, get()) }
     single<LlmGateway> { KoogLlmGateway(get(), toolbox = getOrNull()) }
     single<ConnectionChecker> { KoogConnectionChecker() }
+    single<ChatPrefs> { DataStoreChatPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("ai_chat") }) }
 }

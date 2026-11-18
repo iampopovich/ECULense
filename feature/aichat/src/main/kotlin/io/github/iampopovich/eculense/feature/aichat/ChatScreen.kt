@@ -79,6 +79,10 @@ internal fun ChatRoute(prefill: String?, viewModel: ChatViewModel = koinViewMode
         onStop = viewModel::stop,
         onRetry = viewModel::retry,
         onUseCarData = viewModel::setUseCarData,
+        onConsentAccept = viewModel::acceptConsent,
+        onConsentDecline = viewModel::declineConsent,
+        onConsentCancel = viewModel::cancelConsent,
+        onDraftConsumed = viewModel::draftConsumed,
     )
 }
 
@@ -92,8 +96,19 @@ internal fun ChatScreen(
     onStop: () -> Unit = {},
     onRetry: () -> Unit = {},
     onUseCarData: (Boolean) -> Unit = {},
+    onConsentAccept: () -> Unit = {},
+    onConsentDecline: () -> Unit = {},
+    onConsentCancel: () -> Unit = {},
+    onDraftConsumed: () -> Unit = {},
 ) {
     var input by rememberSaveable { mutableStateOf("") }
+    state.consent?.let { ConsentDialog(it, onConsentAccept, onConsentDecline, onConsentCancel) }
+    LaunchedEffect(state.draft) {
+        state.draft?.let {
+            input = it
+            onDraftConsumed()
+        }
+    }
     val listState = rememberLazyListState()
     // Ответ растёт и после того, как текст пришёл (Markdown дописывает блоки асинхронно), поэтому держимся за низ
     // списка по фактическому размеру последнего элемента, а не по длине текста.

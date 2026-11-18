@@ -237,7 +237,7 @@ internal class KoogLlmGateway(
     override val hasVehicleTools: Boolean get() = toolbox != null
 
     override suspend fun provider(): ProviderInfo? =
-        store.settings.first()?.takeIf { it.model.isNotBlank() }?.let { ProviderInfo(it.provider.title, it.model) }
+        store.settings.first()?.takeIf { it.model.isNotBlank() }?.let { ProviderInfo(it.provider.name, it.provider.title, it.model) }
 
     override fun chat(conversationId: String, userText: String, useCarData: Boolean): Flow<ChatEvent> = channelFlow {
         val settings = store.settings.first()?.takeIf { it.model.isNotBlank() } ?: throw LlmException(NOT_CONFIGURED)

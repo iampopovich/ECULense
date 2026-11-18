@@ -13,7 +13,7 @@ import org.koin.dsl.navigation3.navigation
 /** Чат — пункт хаба «Пит-стоп» (не вкладка); RouteHandler включает «Спросить ИИ» у ошибок. */
 @OptIn(KoinExperimentalAPI::class)
 val aiChatModule = module {
-    viewModel { (prefill: String?) -> ChatViewModel(get(), prefill) }
+    viewModel { (prefill: String?) -> ChatViewModel(get(), get(), prefill) }
     navigation<AiChatDestination> { route -> ChatRoute(route.prefill) }
     single(named("aichat-hub")) {
         HubEntry(Hub.PITSTOP, AiChatDestination(), "ИИ-помощник", "Спросить о машине и ошибках", R.drawable.ic_ai, order = 30)
