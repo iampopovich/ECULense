@@ -1,4 +1,4 @@
-package io.github.iampopovich.eculense.ui.theme
+package io.github.iampopovich.eculense.core.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
