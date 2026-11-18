@@ -7,11 +7,13 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.text.AnnotatedString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.iampopovich.eculense.core.ai.LlmProviderKind
@@ -69,6 +71,8 @@ class AiSettingsScreenTest {
             AiSettingsScreen(AiSettingsUiState(loaded = true, check = passed), AiSettingsActions(onModel = { picked += it }))
         }
         rule.onNodeWithText("✓ Подключение работает: 2 модели").assertExists()
+        // Восемь провайдеров сдвигают каталог ниже экрана — LazyColumn составляет строки только после прокрутки.
+        rule.onNode(hasScrollAction()).performScrollToNode(hasText("бесплатно", substring = true))
         rule.onNodeWithText("Поиск модели").assertExists()
         rule.onNodeWithText("бесплатно", substring = true).assertExists()
         rule.onNodeWithText("★ рекомендуем", substring = true).assertExists()
