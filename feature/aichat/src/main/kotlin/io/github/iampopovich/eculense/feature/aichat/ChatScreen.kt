@@ -7,6 +7,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.rememberStreamingMarkdownState
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
@@ -196,7 +197,20 @@ private fun AssistantMarkdown(text: String) {
         val have = markdown.content.length
         if (text.length > have) markdown.append(text.substring(have))
     }
-    Markdown(streamingMarkdownState = markdown, modifier = Modifier.fillMaxWidth())
+    // Заголовки по умолчанию — display-стили (огромные для чата): сжимаем до title/body.
+    val type = MaterialTheme.typography
+    Markdown(
+        streamingMarkdownState = markdown,
+        typography = markdownTypography(
+            h1 = type.titleLarge,
+            h2 = type.titleLarge,
+            h3 = type.titleMedium,
+            h4 = type.titleMedium,
+            h5 = type.titleSmall,
+            h6 = type.titleSmall,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
