@@ -1,22 +1,22 @@
 package io.github.iampopovich.eculense.core.ailocal
 
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import kotlinx.coroutines.delay
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -31,11 +31,14 @@ class LocalModelScreenTest {
         totalRamBytes = 11 * gb, availRamBytes = 3 * gb, socManufacturer = "Тестовая", socModel = "T1",
         abis = listOf("arm64-v8a"), freeStorageBytes = 300 * gb, gpu = true, npu = null, aicore = true, sdk = 36,
     )
-    private val e2b = LocalModelCatalog.koogEntries().first { it.fileName == "gemma-4-E2B-it.litertlm" }
-    private val e4b = LocalModelCatalog.koogEntries().first { it.fileName == "gemma-4-E4B-it.litertlm" }
+    private val catalog = LocalModelCatalog.merge(LocalModelCatalog.koogEntries(), GalleryAllowlist.toLocalModels(GalleryAllowlist.bundled()), emptyList())
+    private val e2b = catalog.first { it.fileName == "gemma-4-E2B-it.litertlm" }
+    private val e4b = catalog.first { it.fileName == "gemma-4-E4B-it.litertlm" }
 
     private fun row(m: LocalModel, installed: Boolean = false, progress: Int? = null, report: BenchReport? = null, active: BackendKind? = null) =
-        ModelRow(m, FitEstimator.estimate(m.sizeBytes, device, installed), installed, progress = progress, downloadedBytes = (progress ?: 0) * 26_000_000L, report = report, activeBackend = active)
+        ModelRow(m, FitEstimator.estimate(m.sizeBytes, device, installed, m.minRamGb), installed, progress = progress, downloadedBytes = (progress ?: 0) * 26_000_000L, report = report, activeBackend = active)
+
+    private val rows get() = catalog.map { row(it) }
 
     private val report = BenchReport(
         e2b.packId,
@@ -48,20 +51,39 @@ class LocalModelScreenTest {
     )
 
     @Test
-    fun deviceCardEstimateAndRiskConfirmation() {
+    fun compactListShowsOneRowPerModelWithBadgesAndDownloadIcon() {
         var asked: String? = null
         rule.setContent {
             LocalModelScreen(
-                LocalModelUiState(device = device, nano = NanoStatus(false, "Gemini Nano недоступен: тестовая причина."), rows = listOf(row(e2b), row(e4b))),
+                LocalModelUiState(device = device, nano = NanoStatus(false, "Gemini Nano недоступен: тестовая причина."), rows = rows),
                 LocalModelActions(onDownload = { asked = it }),
             )
         }
         rule.onNodeWithText("Ваше устройство").assertIsDisplayed()
         rule.onNodeWithText("Gemini Nano недоступен: тестовая причина.").assertIsDisplayed()
-        rule.onNode(hasTestTag("local-model-list")).performScrollToNode(hasTestTag("model-${e2b.packId}"))
-        rule.onAllNodesWithText("Оценка: Потянет", useUnmergedTree = true)[0].assertIsDisplayed()
-        rule.onAllNodesWithText("Скачать", useUnmergedTree = true)[0].performClick()
+        // smallest first: FunctionGemma (Koog, actions only)
+        rule.onNode(hasTestTag("local-model-list")).performScrollToNode(hasTestTag("model-${catalog.first().packId}"))
+        rule.onNodeWithText("только действия", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNode(hasTestTag("local-model-list")).performScrollToNode(hasContentDescription("Скачать ${e2b.title}"))
+        rule.onNodeWithContentDescription("Скачать ${e2b.title}").performClick()
         assertEquals(e2b.packId, asked)
+    }
+
+    @Test
+    fun tappingARowOpensTheDetailsSheet() {
+        var selected: String? by mutableStateOf(null)
+        rule.setContent {
+            LocalModelScreen(LocalModelUiState(device = device, rows = rows, selected = selected), LocalModelActions(onSelect = { selected = it }))
+        }
+        rule.onNode(hasTestTag("local-model-list")).performScrollToNode(hasTestTag("model-${e4b.packId}"))
+        rule.onNodeWithTag("model-${e4b.packId}").performClick()
+        rule.waitForIdle()
+        assertEquals(e4b.packId, selected)
+        rule.onNodeWithTag("model-sheet").assertExists()
+        // Gallery wants 12 GB for E4B → tight on an 11 GB phone
+        rule.onNodeWithText("Gallery рекомендует от 12 ГБ ОЗУ").assertExists()
+        rule.onNodeWithText("Оценка: Впритык").assertExists()
+        rule.onNodeWithText("Ускорители: GPU, CPU").assertExists()
     }
 
     @Test
@@ -80,49 +102,29 @@ class LocalModelScreenTest {
     }
 
     @Test
-    fun verdictShowsNumbersBestBackendAndFailedOne() {
+    fun verdictInRowAndNumbersInSheet() {
         rule.setContent {
-            LocalModelScreen(LocalModelUiState(device = device, rows = listOf(row(e2b, installed = true, report = report, active = BackendKind.GPU), row(e4b))), LocalModelActions())
+            LocalModelScreen(LocalModelUiState(device = device, rows = listOf(row(e2b, installed = true, report = report, active = BackendKind.GPU), row(e4b)), selected = e2b.packId), LocalModelActions())
         }
-        rule.onNode(hasTestTag("local-model-list")).performScrollToNode(hasTestTag("verdict-${e2b.packId}"))
-        rule.onNodeWithText("Вердикт: Комфортно").assertIsDisplayed()
-        rule.onNodeWithText("Лучший бэкенд: GPU").assertIsDisplayed()
-        rule.onNodeWithText("GPU: первый токен 1,2 с", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Вердикт: Комфортно").assertExists()
+        rule.onNodeWithText("Лучший бэкенд: GPU").assertExists()
+        rule.onNodeWithText("GPU: первый токен 1,2 с", substring = true).assertExists()
         rule.onNodeWithText("NPU: не подходит", substring = true).assertExists()
         rule.onNodeWithText("Используется в чате: GPU").assertExists()
     }
 
-    /** Прогресс загрузки обновляет список каждые полсекунды — прокрутка до конца списка всё равно должна работать. */
-    @Test
-    fun listScrollsToTheTokenCardWhileADownloadIsProgressing() {
-        rule.setContent {
-            var pct by remember { mutableStateOf(1) }
-            LaunchedEffect(Unit) {
-                while (true) {
-                    delay(300)
-                    pct = (pct + 1) % 100
-                }
-            }
-            LocalModelScreen(LocalModelUiState(device = device, rows = listOf(row(e2b, progress = pct), row(e4b))), LocalModelActions())
-        }
-        rule.onNode(hasTestTag("local-model-list")).performScrollToNode(hasText("Сохранить токен"))
-        rule.onNodeWithText("Сохранить токен").assertIsDisplayed()
-    }
-
-    /** То же жестами пальца (на телефоне прокрутка во время загрузки застревала). */
+    /**
+     * Прогресс загрузки меняется между жестами (как на телефоне) — прокрутка пальцем всё равно доходит до конца.
+     * Прогресс двигает сам тест: бесконечный цикл в LaunchedEffect не даёт тестовым часам «простаивать».
+     */
     @Test
     fun swipeGesturesReachTheEndWhileADownloadIsProgressing() {
+        var pct by mutableIntStateOf(1)
         rule.setContent {
-            var pct by remember { mutableStateOf(1) }
-            LaunchedEffect(Unit) {
-                while (true) {
-                    delay(300)
-                    pct = (pct + 1) % 100
-                }
-            }
-            LocalModelScreen(LocalModelUiState(device = device, rows = listOf(row(e2b, progress = pct), row(e4b))), LocalModelActions())
+            LocalModelScreen(LocalModelUiState(device = device, rows = rows.map { if (it.model.packId == e2b.packId) row(e2b, progress = pct) else it }), LocalModelActions())
         }
-        repeat(12) {
+        repeat(15) {
+            pct = (pct + 3) % 100
             rule.onNode(hasTestTag("local-model-list")).performTouchInput { swipeUp() }
             rule.waitForIdle()
         }
@@ -130,14 +132,12 @@ class LocalModelScreenTest {
     }
 
     @Test
-    fun swipeGesturesReachTheEndWithoutUpdates() {
+    fun searchResultsAppearUnderOtherModels() {
+        val hf = LocalModel("model-custom-qwen3-0-6b-1", "Qwen3-0.6B.litertlm", "Qwen3-0.6B", "", "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/abc/Qwen3-0.6B.litertlm", 613_722_264L, null, false, ModelOrigin.HF, "apache-2.0", "", "abc", repo = "litert-community/Qwen3-0.6B")
         rule.setContent {
-            LocalModelScreen(LocalModelUiState(device = device, rows = listOf(row(e2b, progress = 5), row(e4b))), LocalModelActions())
+            LocalModelScreen(LocalModelUiState(device = device, rows = rows, searchQuery = "qwen3", searchResults = listOf(row(hf))), LocalModelActions())
         }
-        repeat(12) {
-            rule.onNode(hasTestTag("local-model-list")).performTouchInput { swipeUp() }
-            rule.waitForIdle()
-        }
-        rule.onNodeWithText("Сохранить токен").assertIsDisplayed()
+        rule.onNode(hasTestTag("local-model-list")).performScrollToNode(hasText("Qwen3-0.6B"))
+        rule.onNodeWithText("Qwen3-0.6B").assertIsDisplayed()
     }
 }

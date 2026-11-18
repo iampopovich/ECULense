@@ -36,13 +36,23 @@ internal data class ModelRow(
     val partial: Boolean get() = !installed && !downloading && downloadedBytes > 0
 }
 
-/** Подтверждение скачивания: на свой риск, с оценкой и предупреждением о мобильной сети. */
-internal data class DownloadConfirm(val packId: String, val title: String, val sizeBytes: Long?, val fit: FitEstimate, val metered: Boolean, val gatedWithoutToken: Boolean)
+/** Подтверждение скачивания: на свой риск, с оценкой и предупреждением о мобильной сети. [adopt] — модель из поиска HF, её сначала добавить в список. */
+internal data class DownloadConfirm(val packId: String, val title: String, val sizeBytes: Long?, val fit: FitEstimate, val metered: Boolean, val gatedWithoutToken: Boolean, val adopt: LocalModel? = null)
 
 internal data class LocalModelUiState(
     val device: DeviceProfile? = null,
     val nano: NanoStatus? = null,
+    /** Единый список (Koog + Gallery + свои), по размеру от меньшей к большей. */
     val rows: List<ModelRow> = emptyList(),
+    val catalogVersion: String = GalleryAllowlist.BUNDLED_VERSION,
+    val catalogRefreshing: Boolean = false,
+    val searchQuery: String = "",
+    val searchBusy: Boolean = false,
+    val searchError: String? = null,
+    /** null — поиска не было. */
+    val searchResults: List<ModelRow>? = null,
+    /** Модель, открытая в нижней панели деталей. */
+    val selected: String? = null,
     val hasToken: Boolean = false,
     val tokenInput: String = "",
     val linkInput: String = "",
@@ -70,6 +80,9 @@ internal class LocalModelViewModel(
 
     init {
         refreshDevice()
+        _state.update { it.copy(catalogVersion = models.catalogVersion) }
+        // Каталог Gallery и статус gated — по запросу (открытие экрана); без сети остаётся сохранённый/вшитый.
+        refreshCatalog(silent = true)
         viewModelScope.launch {
             val device = _state.value.device ?: probe.profile()
             _state.update { it.copy(nano = nano.status(device.aicore)) }
@@ -100,7 +113,7 @@ internal class LocalModelViewModel(
         val benching = s.progress?.takeIf { it.packId == m.packId }
         return ModelRow(
             model = m,
-            fit = FitEstimator.estimate(m.sizeBytes, device, downloaded = installed),
+            fit = FitEstimator.estimate(m.sizeBytes, device, downloaded = installed, minRamGb = m.minRamGb),
             installed = installed,
             progress = pack?.progress,
             downloadedBytes = pack?.downloadedBytes ?: 0,
@@ -127,7 +140,9 @@ internal class LocalModelViewModel(
 
     /** «Скачать»: всегда можно — но сначала предупреждение «на свой риск» (+ мобильная сеть). */
     fun requestDownload(packId: String) {
-        val row = _state.value.rows.firstOrNull { it.model.packId == packId } ?: return
+        val found = _state.value.rows.firstOrNull { it.model.packId == packId }
+        val searched = if (found == null) _state.value.searchResults?.firstOrNull { it.model.packId == packId } else null
+        val row = found ?: searched ?: return
         if (row.model.url == null) return
         _state.update {
             it.copy(
@@ -135,6 +150,7 @@ internal class LocalModelViewModel(
                     packId, row.model.title, row.model.sizeBytes, row.fit,
                     metered = packs.isMeteredNetwork(),
                     gatedWithoutToken = row.model.gated && !it.hasToken,
+                    adopt = searched?.model,
                 ),
             )
         }
@@ -143,9 +159,46 @@ internal class LocalModelViewModel(
     fun confirmDownload() {
         val c = _state.value.confirm ?: return
         _state.update { it.copy(confirm = null) }
-        packs.download(c.packId)
-        refreshDevice()
+        viewModelScope.launch {
+            // Модель из поиска HF становится «своей» (иначе пакет неизвестен загрузчику), из результатов поиска уходит.
+            c.adopt?.let { m ->
+                models.add(m)
+                _state.update { s -> s.copy(searchResults = s.searchResults?.filterNot { it.model.packId == m.packId }) }
+            }
+            // Нажатие в открытом приложении: загрузка стартует, пока приложение на экране (Android 14+ не даёт
+            // фоновому процессу запустить foreground-службу).
+            packs.download(c.packId)
+            refreshDevice()
+        }
     }
+
+    fun refreshCatalog(silent: Boolean = false) {
+        if (_state.value.catalogRefreshing) return
+        _state.update { it.copy(catalogRefreshing = true) }
+        viewModelScope.launch {
+            val v = runCatching { models.refreshCatalog() }.getOrNull()
+            _state.update { it.copy(catalogRefreshing = false, catalogVersion = models.catalogVersion, message = if (v == null && !silent) "Не удалось обновить каталог — показан сохранённый" else it.message) }
+        }
+    }
+
+    fun setSearchQuery(value: String) = _state.update { it.copy(searchQuery = value, searchError = null) }
+
+    fun search() {
+        val q = _state.value.searchQuery.trim()
+        if (q.isEmpty() || _state.value.searchBusy) return
+        _state.update { it.copy(searchBusy = true, searchError = null) }
+        viewModelScope.launch {
+            val device = _state.value.device ?: probe.profile()
+            runCatching { models.search(q) }
+                .onSuccess { list ->
+                    val rows = list.map { m -> ModelRow(m, FitEstimator.estimate(m.sizeBytes, device), installed = false) }
+                    _state.update { it.copy(searchBusy = false, searchResults = rows) }
+                }
+                .onFailure { e -> _state.update { it.copy(searchBusy = false, searchError = "Поиск не удался: ${e.message ?: "нет связи с Hugging Face"}") } }
+        }
+    }
+
+    fun select(packId: String?) = _state.update { it.copy(selected = packId) }
 
     fun dismissConfirm() = _state.update { it.copy(confirm = null) }
 

@@ -4,6 +4,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,23 +12,37 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,10 +52,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.compose.viewmodel.koinViewModel
@@ -63,6 +84,10 @@ internal class LocalModelActions(
     val onAddLink: () -> Unit = {},
     val onPickFile: () -> Unit = {},
     val onMessageShown: () -> Unit = {},
+    val onSelect: (String?) -> Unit = {},
+    val onRefreshCatalog: () -> Unit = {},
+    val onSearchQuery: (String) -> Unit = {},
+    val onSearch: () -> Unit = {},
 )
 
 @Composable
@@ -101,10 +126,18 @@ internal fun LocalModelRoute(viewModel: LocalModelViewModel = koinViewModel()) {
             onAddLink = viewModel::addLink,
             onPickFile = { picker.launch(arrayOf("*/*")) },
             onMessageShown = viewModel::messageShown,
+            onSelect = viewModel::select,
+            onRefreshCatalog = { viewModel.refreshCatalog() },
+            onSearchQuery = viewModel::setSearchQuery,
+            onSearch = viewModel::search,
         ),
     )
 }
 
+/**
+ * Экран «На устройстве»: компактная карточка телефона, затем ОДИН список моделей по размеру (строка = название,
+ * размер, бейдж источника, оценка, иконка действия/результата), детали и действия — в нижней панели по нажатию.
+ */
 @Composable
 internal fun LocalModelScreen(state: LocalModelUiState, actions: LocalModelActions, modifier: Modifier = Modifier) {
     val snackbar = remember { SnackbarHostState() }
@@ -115,96 +148,251 @@ internal fun LocalModelScreen(state: LocalModelUiState, actions: LocalModelActio
         }
     }
     Box(modifier.fillMaxSize()) {
-        LazyColumn(
-            Modifier.fillMaxSize().padding(horizontal = 16.dp).testTag("local-model-list"),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item { Text("Модель на телефоне", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp)) }
-            item { HonestNote() }
-            item { DeviceCard(state.device, state.nano) }
-            item { Text("Модели из каталога Koog", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp)) }
-            items(state.rows.filter { it.model.origin == ModelOrigin.KOOG }, key = { it.model.packId }) { row -> ModelCard(row, state.hasToken, actions) }
-            val custom = state.rows.filter { it.model.origin != ModelOrigin.KOOG }
-            item { Text("Своя модель", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp)) }
-            items(custom, key = { it.model.packId }) { row -> ModelCard(row, state.hasToken, actions) }
-            item { CustomModelCard(state, actions) }
-            item { TokenCard(state, actions) }
+        LazyColumn(Modifier.fillMaxSize().testTag("local-model-list")) {
+            item {
+                Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Модель на телефоне", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp))
+                    DeviceCard(state.device, state.nano)
+                    Text(
+                        "Работает без интернета, данные машины не уходят. Но медленнее и ошибается чаще облачных — перепроверяйте советы. " +
+                            "Скачивание — на ваш риск; тянет ли телефон, покажет тест после загрузки.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            item { CatalogHeader(state, actions) }
+            items(state.rows, key = { it.model.packId }) { row -> ModelListRow(row, state.hasToken, actions) }
+            item { SectionTitle("Другие модели (Hugging Face)") }
+            item { SearchBox(state, actions) }
+            state.searchResults?.let { results ->
+                if (results.isEmpty() && !state.searchBusy) {
+                    item { Text("Ничего нового не найдено.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp)) }
+                }
+                items(results, key = { "hf-" + it.model.packId }) { row -> ModelListRow(row, state.hasToken, actions) }
+            }
+            item { SectionTitle("Своя модель") }
+            item { Box(Modifier.padding(horizontal = 16.dp)) { CustomModelCard(state, actions) } }
+            item { Box(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) { TokenCard(state, actions) } }
             item { Box(Modifier.padding(bottom = 24.dp)) }
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
     }
+    val selected = state.selected?.let { id -> state.rows.firstOrNull { it.model.packId == id } ?: state.searchResults?.firstOrNull { it.model.packId == id } }
+    if (selected != null) ModelSheet(selected, state.hasToken, actions)
     state.confirm?.let { ConfirmDialog(it, actions) }
 }
 
 @Composable
-private fun HonestNote() {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-        Text(
-            "Модель на телефоне работает без интернета, и данные машины никуда не уходят. Но такие модели заметно " +
-                "медленнее и ошибаются чаще облачных: перепроверяйте советы. Скачать можно любую модель — на свой риск: " +
-                "файлы весят гигабайты, а тянет ли телефон, точно покажет тест после скачивания.",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(16.dp),
-        )
+private fun SectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp))
+}
+
+@Composable
+private fun CatalogHeader(state: LocalModelUiState, actions: LocalModelActions) {
+    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Модели", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Google AI Edge Gallery ${state.catalogVersion.replace('_', '.')} + Koog · по размеру",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (state.catalogRefreshing) {
+            CircularProgressIndicator(Modifier.padding(12.dp).size(24.dp), strokeWidth = 2.dp)
+        } else {
+            IconButton(onClick = actions.onRefreshCatalog) { Icon(painterResource(R.drawable.ic_model_refresh), contentDescription = "Обновить каталог") }
+        }
     }
 }
 
 @Composable
 private fun DeviceCard(device: DeviceProfile?, nano: NanoStatus?) {
     Card(Modifier.fillMaxWidth().testTag("device-card")) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Ваше устройство", style = MaterialTheme.typography.titleMedium)
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Ваше устройство", style = MaterialTheme.typography.titleSmall)
             if (device == null) {
-                Text("Проверяем…")
+                Text("Проверяем…", style = MaterialTheme.typography.bodySmall)
                 return@Column
             }
-            Text("ОЗУ: ${FitEstimator.gb(device.totalRamBytes)} ГБ, свободно сейчас ${FitEstimator.gb(device.availRamBytes)} ГБ")
-            Text("Процессор: ${device.soc}" + if (device.arm64) " (arm64)" else " (нет arm64 — модели не запустятся)")
-            Text("Свободно места: ${FitEstimator.gb(device.freeStorageBytes)} ГБ")
-            Text("GPU для моделей: " + if (device.gpu) "есть (OpenCL)" else "нет драйвера OpenCL — только CPU")
-            Text("NPU: " + (device.npu?.let { "$it (нужна модель, собранная под этот NPU)" } ?: "не найден"))
-            Text("Google AICore: " + if (device.aicore) "установлен" else "нет")
+            Text(
+                "ОЗУ ${FitEstimator.gb(device.totalRamBytes)} ГБ (свободно ${FitEstimator.gb(device.availRamBytes)}) · место ${FitEstimator.gb(device.freeStorageBytes)} ГБ",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                listOf(
+                    device.soc + if (device.arm64) "" else " — нет arm64, модели не запустятся",
+                    if (device.gpu) "GPU есть" else "GPU нет",
+                    device.npu?.let { "NPU $it" } ?: "NPU нет",
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+            )
             nano?.let { Text(it.text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }
 
+private fun fitColor(fit: Fit, scheme: ColorScheme): Color = when (fit) {
+    Fit.OK -> Color(0xFF1B5E20)
+    Fit.TIGHT -> Color(0xFF8D5A00)
+    Fit.UNLIKELY -> scheme.error
+    Fit.UNKNOWN -> scheme.onSurfaceVariant
+}
+
+private fun verdictColor(v: Verdict, scheme: ColorScheme): Color = when (v) {
+    Verdict.COMFORT -> Color(0xFF1B5E20)
+    Verdict.SLOW -> Color(0xFF8D5A00)
+    Verdict.UNSUITABLE -> scheme.error
+}
+
+/** Маленький бейдж: источник, «только действия», «нужен токен HF», оценка. */
 @Composable
-private fun FitChip(fit: Fit) {
-    val color = when (fit) {
-        Fit.OK -> Color(0xFF1B5E20)
-        Fit.TIGHT -> Color(0xFF8D5A00)
-        Fit.UNLIKELY -> MaterialTheme.colorScheme.error
-        Fit.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+private fun Badge(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant, strong: Boolean = false) {
+    Surface(shape = MaterialTheme.shapes.extraSmall, color = MaterialTheme.colorScheme.surfaceVariant) {
+        Text(
+            text,
+            color = color,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (strong) FontWeight.SemiBold else FontWeight.Normal,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
     }
-    Text("Оценка: ${fit.label}", color = color, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
 }
 
 @Composable
-private fun ModelCard(row: ModelRow, hasToken: Boolean, actions: LocalModelActions) {
+private fun ModelBadges(row: ModelRow, hasToken: Boolean, withFit: Boolean = true) {
     val m = row.model
-    Card(Modifier.fillMaxWidth().testTag("model-${m.packId}")) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(m.title, style = MaterialTheme.typography.titleMedium)
+    val scheme = MaterialTheme.colorScheme
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Badge(m.origin.badge)
+        if (m.koog && m.origin != ModelOrigin.KOOG) Badge(ModelOrigin.KOOG.badge)
+        if (m.actionsOnly) Badge("только действия", scheme.tertiary)
+        if (m.gated && !hasToken && !row.installed) Badge("нужен токен HF", scheme.error)
+        if (withFit && !row.installed) Badge(row.fit.fit.label.lowercase(), fitColor(row.fit.fit, scheme), strong = true)
+    }
+}
+
+/** Одна строка списка: название, размер, бейджи — и иконка действия/состояния справа. Нажатие — детали. */
+@Composable
+private fun ModelListRow(row: ModelRow, hasToken: Boolean, actions: LocalModelActions) {
+    val m = row.model
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .clickable { actions.onSelect(m.packId) }
+            .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
+            .testTag("model-${m.packId}"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(m.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text(m.sizeBytes?.let { FitEstimator.size(it) } ?: "?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            ModelBadges(row, hasToken)
+        }
+        Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) { RowTrailing(row, actions) }
+    }
+    HorizontalDivider(Modifier.padding(start = 16.dp))
+}
+
+@Composable
+private fun RowTrailing(row: ModelRow, actions: LocalModelActions) {
+    val m = row.model
+    when {
+        row.downloading -> {
+            if (row.progress != null && row.progress >= 0) {
+                // Лямбда стабильна, значение читается при отрисовке: частые обновления прогресса не перекомпоновывают
+                // индикатор (иначе на телефоне застревала прокрутка списка жестом).
+                val pct by rememberUpdatedState(row.progress / 100f)
+                CircularProgressIndicator(progress = { pct }, modifier = Modifier.size(32.dp).semantics { contentDescription = "Скачивание" }, strokeWidth = 3.dp)
+            } else {
+                CircularProgressIndicator(Modifier.size(32.dp).semantics { contentDescription = "Скачивание" }, strokeWidth = 3.dp)
+            }
+        }
+        row.installed && row.benching -> CircularProgressIndicator(Modifier.size(24.dp).semantics { contentDescription = "Идёт тест скорости" }, strokeWidth = 2.dp)
+        row.installed && row.report != null -> {
+            val v = row.report.verdict
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (row.activeBackend != null) Icon(painterResource(R.drawable.ic_model_check), contentDescription = "Используется в чате", tint = Color(0xFF1B5E20), modifier = Modifier.size(18.dp))
+                Text(v.label, color = verdictColor(v, MaterialTheme.colorScheme), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            }
+        }
+        row.installed -> Icon(painterResource(R.drawable.ic_model_check), contentDescription = "Скачана", tint = MaterialTheme.colorScheme.primary)
+        m.url != null -> IconButton(onClick = { actions.onDownload(m.packId) }) {
+            Icon(painterResource(R.drawable.ic_model_download), contentDescription = if (row.partial) "Продолжить загрузку ${m.title}" else "Скачать ${m.title}")
+        }
+    }
+}
+
+@Composable
+private fun SearchBox(state: LocalModelUiState, actions: LocalModelActions) {
+    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            "Поиск по litert-community: Qwen3, Phi-4-mini, SmolLM, TinyLlama и др. Эти модели не проверены ни Google, ни нами — на ваш риск.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = state.searchQuery,
+            onValueChange = actions.onSearchQuery,
+            label = { Text("Найти модель") },
+            singleLine = true,
+            isError = state.searchError != null,
+            supportingText = state.searchError?.let { { Text(it) } },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { actions.onSearch() }),
+            trailingIcon = {
+                if (state.searchBusy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                else IconButton(onClick = actions.onSearch, enabled = state.searchQuery.isNotBlank()) { Icon(painterResource(R.drawable.ic_model_search), contentDescription = "Искать") }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModelSheet(row: ModelRow, hasToken: Boolean, actions: LocalModelActions) {
+    val m = row.model
+    val uri = LocalUriHandler.current
+    ModalBottomSheet(onDismissRequest = { actions.onSelect(null) }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 32.dp).testTag("model-sheet"),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(m.title, style = MaterialTheme.typography.titleLarge)
+            ModelBadges(row, hasToken, withFit = false)
             Text(
-                listOfNotNull(m.sizeBytes?.let { "${FitEstimator.gb(it)} ГБ" } ?: "размер неизвестен", m.fileName, if (m.gated) "нужен токен HF" else null).joinToString(" · "),
+                listOfNotNull(m.sizeBytes?.let { FitEstimator.size(it) } ?: "размер неизвестен", m.fileName).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (m.description.isNotBlank()) Text(m.description, style = MaterialTheme.typography.bodyMedium)
+            if (m.actionsOnly) Text("Только вызов функций (действия телефона), для разговора о машине не подходит.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+            val facts = listOfNotNull(
+                m.accelerators.takeIf { it.isNotEmpty() }?.let { "Ускорители: " + it.joinToString(", ") { a -> a.uppercase() } },
+                m.minRamGb?.let { "Gallery рекомендует от $it ГБ ОЗУ" },
+                m.license.takeIf { it.isNotBlank() }?.let { "Лицензия: $it" },
+            )
+            facts.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+            if (m.sourceUrl.isNotBlank()) {
+                TextButton(onClick = { runCatching { uri.openUri(m.sourceUrl) } }) { Text("Страница модели") }
+            }
             if (row.report == null) {
-                FitChip(row.fit.fit)
+                Text("Оценка: ${row.fit.fit.label}", color = fitColor(row.fit.fit, MaterialTheme.colorScheme), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
                 row.fit.reasons.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
             if (m.gated && !hasToken && !row.installed) {
-                Text("Закрытая модель: введите токен Hugging Face ниже и примите лицензию на странице модели.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                Text("Закрытая модель: введите токен Hugging Face внизу экрана и примите лицензию на странице модели.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
+            HorizontalDivider()
             when {
                 row.downloading -> {
                     val total = m.sizeBytes
                     if (row.progress != null && row.progress >= 0) {
-                        // Лямбда стабильна, значение читается при отрисовке: частые обновления прогресса не
-                        // перекомпоновывают индикатор (иначе на телефоне застревала прокрутка списка жестом).
                         val pct by rememberUpdatedState(row.progress / 100f)
                         LinearProgressIndicator(progress = { pct }, modifier = Modifier.fillMaxWidth())
                     } else {
@@ -261,14 +449,9 @@ private fun InstalledPart(row: ModelRow, actions: LocalModelActions) {
 @Composable
 private fun VerdictCard(report: BenchReport, row: ModelRow, actions: LocalModelActions) {
     val verdict = report.verdict
-    val color = when (verdict) {
-        Verdict.COMFORT -> Color(0xFF1B5E20)
-        Verdict.SLOW -> Color(0xFF8D5A00)
-        Verdict.UNSUITABLE -> MaterialTheme.colorScheme.error
-    }
     Card(Modifier.fillMaxWidth().testTag("verdict-${row.model.packId}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Вердикт: ${verdict.label}", color = color, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Text("Вердикт: ${verdict.label}", color = verdictColor(verdict, MaterialTheme.colorScheme), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             Text(
                 when (verdict) {
                     Verdict.COMFORT -> "Отвечает быстро: первые слова через пару секунд, дальше ≥ 8 токенов в секунду."
@@ -309,55 +492,51 @@ private fun num(v: Double) = "%.1f".format(v).replace('.', ',')
 
 @Composable
 private fun CustomModelCard(state: LocalModelUiState, actions: LocalModelActions) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Любая модель LiteRT-LM (.litertlm): ссылка на файл с Hugging Face (например, из litert-community) или файл с телефона.", style = MaterialTheme.typography.bodyMedium)
-            OutlinedTextField(
-                value = state.linkInput,
-                onValueChange = actions.onLinkInput,
-                label = { Text("Ссылка Hugging Face") },
-                placeholder = { Text("https://huggingface.co/…/resolve/main/model.litertlm") },
-                singleLine = true,
-                isError = state.linkError != null,
-                supportingText = state.linkError?.let { { Text(it) } },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = actions.onAddLink, enabled = state.linkInput.isNotBlank() && !state.linkBusy) { Text(if (state.linkBusy) "Проверяем…" else "Проверить ссылку") }
-                OutlinedButton(onClick = actions.onPickFile, enabled = state.importProgress == null) { Text("Файл с телефона") }
-            }
-            state.importProgress?.let { Text("Копирование: ${FitEstimator.size(it)}…", style = MaterialTheme.typography.bodySmall) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Любой файл LiteRT-LM (.litertlm): ссылка на Hugging Face или файл с телефона.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedTextField(
+            value = state.linkInput,
+            onValueChange = actions.onLinkInput,
+            label = { Text("Ссылка Hugging Face") },
+            placeholder = { Text("https://huggingface.co/…/resolve/main/model.litertlm") },
+            singleLine = true,
+            isError = state.linkError != null,
+            supportingText = state.linkError?.let { { Text(it) } },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = actions.onAddLink, enabled = state.linkInput.isNotBlank() && !state.linkBusy) { Text(if (state.linkBusy) "Проверяем…" else "Проверить ссылку") }
+            OutlinedButton(onClick = actions.onPickFile, enabled = state.importProgress == null) { Text("Файл с телефона") }
         }
+        state.importProgress?.let { Text("Копирование: ${FitEstimator.size(it)}…", style = MaterialTheme.typography.bodySmall) }
     }
 }
 
 @Composable
 private fun TokenCard(state: LocalModelUiState, actions: LocalModelActions) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Токен Hugging Face (необязательно)", style = MaterialTheme.typography.titleSmall)
-            Text(
-                "Нужен только для закрытых моделей (FunctionGemma, Gemma 3). Хранится зашифрованным ключом Android Keystore и уходит только на huggingface.co.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            if (state.hasToken) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Токен сохранён", modifier = Modifier.weight(1f))
-                    TextButton(onClick = actions.onDeleteToken) { Text("Удалить токен") }
-                }
-            } else {
-                OutlinedTextField(
-                    value = state.tokenInput,
-                    onValueChange = actions.onTokenInput,
-                    label = { Text("hf_…") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Button(onClick = actions.onSaveToken, enabled = state.tokenInput.isNotBlank()) { Text("Сохранить токен") }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Токен Hugging Face (необязательно)", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "Нужен только для закрытых моделей (Gemma 3, Gemma 3n, FunctionGemma). Хранится зашифрованным ключом Android Keystore и уходит только на huggingface.co.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (state.hasToken) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Токен сохранён", modifier = Modifier.weight(1f))
+                TextButton(onClick = actions.onDeleteToken) { Text("Удалить токен") }
             }
+        } else {
+            OutlinedTextField(
+                value = state.tokenInput,
+                onValueChange = actions.onTokenInput,
+                label = { Text("hf_…") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Button(onClick = actions.onSaveToken, enabled = state.tokenInput.isNotBlank()) { Text("Сохранить токен") }
         }
     }
 }
@@ -369,9 +548,10 @@ private fun ConfirmDialog(c: DownloadConfirm, actions: LocalModelActions) {
         title = { Text("Скачать «${c.title}»?") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Размер: " + (c.sizeBytes?.let { "${FitEstimator.gb(it)} ГБ" } ?: "неизвестен") + ". Оценка: ${c.fit.fit.label}.")
+                Text("Размер: " + (c.sizeBytes?.let { FitEstimator.size(it) } ?: "неизвестен") + ". Оценка: ${c.fit.fit.label}.")
                 c.fit.reasons.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
                 Text("Скачиваете на свой риск: модель может не запуститься или работать медленно — это покажет тест после скачивания. Загрузку можно остановить и продолжить позже.")
+                if (c.adopt != null) Text("Модель из Hugging Face не проверена ни Google, ни нами.", style = MaterialTheme.typography.bodySmall)
                 if (c.metered) Text("Вы на мобильной сети: загрузка израсходует трафик.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
                 if (c.gatedWithoutToken) Text("Модель закрыта: без токена Hugging Face загрузка завершится ошибкой 401.", color = MaterialTheme.colorScheme.error)
             }

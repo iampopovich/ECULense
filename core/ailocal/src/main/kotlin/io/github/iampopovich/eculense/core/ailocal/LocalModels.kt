@@ -10,11 +10,15 @@ import io.github.iampopovich.eculense.core.datapacks.PackSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -44,10 +48,69 @@ class LocalModels(
 ) : PackSource, PackAuth {
     private val packs: DataPacks by lazy(packsProvider)
     private val customState: StateFlow<List<LocalModel>> = store.custom.stateIn(scope, SharingStarted.Eagerly, emptyList())
+    private val cacheDir = File(context.filesDir, "ailocal")
+    private val galleryState = MutableStateFlow(loadGallery())
 
-    val models: Flow<List<LocalModel>> = store.custom.map { LocalModelCatalog.koogEntries() + it }
+    val models: Flow<List<LocalModel>> = combine(store.custom, galleryState) { custom, gallery -> LocalModelCatalog.merge(LocalModelCatalog.koogEntries(), gallery, custom) }
 
-    fun all(): List<LocalModel> = LocalModelCatalog.koogEntries() + customState.value
+    fun all(): List<LocalModel> = LocalModelCatalog.merge(LocalModelCatalog.koogEntries(), galleryState.value, customState.value)
+
+    /** Версия allowlist Gallery, из которой собран каталог («1_0_23»). */
+    val catalogVersion: String get() = cachedVersion() ?: GalleryAllowlist.BUNDLED_VERSION
+
+    private fun cachedVersion(): String? = File(cacheDir, "allowlist.version").takeIf { it.exists() }?.readText()?.trim()?.ifBlank { null }
+
+    /** Скачанная копия allowlist (если есть и читается), иначе вшитая; gated — из ответа HF API или известный список. */
+    private fun loadGallery(): List<LocalModel> {
+        val text = File(cacheDir, "allowlist.json").takeIf { it.exists() }?.let { f -> runCatching { f.readText().also { GalleryAllowlist.parse(it) } }.getOrNull() }
+        val models = runCatching { GalleryAllowlist.parse(text ?: GalleryAllowlist.bundledText()) }.getOrElse { GalleryAllowlist.bundled() }
+        return GalleryAllowlist.toLocalModels(models, loadGated())
+    }
+
+    private fun loadGated(): Map<String, Boolean> = File(cacheDir, "gated.txt").takeIf { it.exists() }?.readLines()
+        ?.mapNotNull { line -> line.split('\t').takeIf { it.size == 2 }?.let { it[0] to (it[1] == "1") } }?.toMap().orEmpty()
+
+    /**
+     * Обновить каталог по запросу: allowlist Gallery — от известной версии вверх, пока следующий номер существует
+     * (новые файлы получают больший номер), затем статус gated каждого репозитория из API Hugging Face. Без сети —
+     * остаётся прежний (вшитый) каталог. Возвращает версию или null, если обновить не удалось.
+     */
+    suspend fun refreshCatalog(): String? = withContext(Dispatchers.IO) {
+        var version = catalogVersion
+        var text: String? = null
+        runCatching { text = getText(GalleryAllowlist.url(version)) }
+        repeat(MAX_VERSION_PROBES) {
+            val next = GalleryAllowlist.next(version)
+            val t = runCatching { getText(GalleryAllowlist.url(next)) }.getOrNull() ?: return@repeat
+            version = next
+            text = t
+        }
+        val body = text ?: return@withContext null
+        val parsed = runCatching { GalleryAllowlist.parse(body) }.getOrNull() ?: return@withContext null
+        val repos = GalleryAllowlist.toLocalModels(parsed).mapNotNull { it.repo }.distinct()
+        val gated = repos.mapNotNull { repo -> runCatching { HfApi.gated(getText(HfApi.modelUrl(repo))) }.getOrNull()?.let { repo to it } }.toMap()
+        cacheDir.mkdirs()
+        File(cacheDir, "allowlist.json").writeText(body)
+        File(cacheDir, "allowlist.version").writeText(version)
+        File(cacheDir, "gated.txt").writeText(gated.entries.joinToString("\n") { "${it.key}\t${if (it.value) 1 else 0}" })
+        galleryState.value = GalleryAllowlist.toLocalModels(parsed, gated)
+        packs.changed()
+        version
+    }
+
+    /**
+     * «Другие модели»: поиск по litert-community на Hugging Face. Файлы — с размером и sha256, ссылка закреплена на
+     * коммит. То, что уже есть в каталоге, не повторяется. Модели никем не проверены — на риск пользователя.
+     */
+    suspend fun search(query: String): List<LocalModel> = withContext(Dispatchers.IO) {
+        val known = all().map { it.key }.toSet()
+        val repos = HfApi.searchRepos(getText(HfApi.searchUrl(query))).take(MAX_SEARCH_REPOS)
+        coroutineScope {
+            repos.map { repo -> async { runCatching { HfApi.repoModels(getText(HfApi.repoBlobsUrl(repo))) }.getOrDefault(emptyList()) } }.awaitAll()
+        }.flatten().filter { it.key !in known }.sortedBy { it.sizeBytes ?: Long.MAX_VALUE }
+    }
+
+    private fun getText(url: String): String = http.get(url).use { it.body.readBytes().decodeToString() }
 
     fun find(packId: String): LocalModel? = all().firstOrNull { it.packId == packId }
 
@@ -116,8 +179,14 @@ class LocalModels(
     suspend fun delete(packId: String) {
         packs.delete(packId)
         store.forget(packId)
-        if (find(packId)?.origin != ModelOrigin.KOOG) store.removeCustom(packId)
+        if (find(packId)?.origin in CUSTOM_ORIGINS) store.removeCustom(packId)
         packs.changed()
+    }
+
+    private companion object {
+        val CUSTOM_ORIGINS = setOf(ModelOrigin.CUSTOM_LINK, ModelOrigin.CUSTOM_FILE, ModelOrigin.HF)
+        const val MAX_VERSION_PROBES = 5
+        const val MAX_SEARCH_REPOS = 12
     }
 
     /** «Файл с телефона»: копия в хранилище моделей (атомарно, через staging пакета). */
