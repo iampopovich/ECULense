@@ -35,8 +35,19 @@ interface SessionRepository {
 interface DtcRepository {
     suspend fun saveSnapshot(dtcs: List<Dtc>, vin: String?, takenAtMs: Long? = null, carId: Long? = null)
 
+    /**
+     * Успешное живое чтение кодов (любой адаптер) → событие истории активной машины. Тот же набор кодов, прочитанный
+     * повторно в пределах [DEDUP_WINDOW_MS], не дублируется. Пустое чтение ничего не пишет. true — снимок записан.
+     */
+    suspend fun recordRead(dtcs: List<Dtc>, vin: String? = null): Boolean = false
+
     /** Есть ли уже событие с этим кодом в окне времени — повторный импорт не дублирует события. */
     suspend fun hasEvent(code: String, fromMs: Long, toMs: Long): Boolean = false
+
+    companion object {
+        /** Повторное нажатие «Прочитать» и снимок перед сбросом не плодят одинаковые события. */
+        const val DEDUP_WINDOW_MS = 5 * 60_000L
+    }
 }
 
 internal class RoomSessionRepository(
@@ -83,4 +94,15 @@ internal class RoomDtcRepository(
     }
 
     override suspend fun hasEvent(code: String, fromMs: Long, toMs: Long): Boolean = dao.countEvents(code, fromMs, toMs) > 0
+
+    override suspend fun recordRead(dtcs: List<Dtc>, vin: String?): Boolean {
+        if (dtcs.isEmpty()) return false
+        val at = clock()
+        val car = activeCarId()
+        val last = dao.latestForCar(car)
+        val sameSet = last.map { it.code to it.kind }.toSet() == dtcs.map { it.code to it.kind.name }.toSet()
+        if (last.isNotEmpty() && sameSet && at - last.first().takenAtMs in 0..DtcRepository.DEDUP_WINDOW_MS) return false
+        saveSnapshot(dtcs.distinct(), vin, takenAtMs = at, carId = car)
+        return true
+    }
 }

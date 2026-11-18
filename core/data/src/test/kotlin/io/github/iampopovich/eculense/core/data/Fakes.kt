@@ -1,5 +1,7 @@
 package io.github.iampopovich.eculense.core.data
 
+import io.github.iampopovich.eculense.core.database.DtcDao
+import io.github.iampopovich.eculense.core.database.DtcSnapshotEntity
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.Trip
 import io.github.iampopovich.eculense.core.model.UnitsSettings
@@ -53,5 +55,17 @@ internal class FakeUnits : UnitsRepository {
     override val units = MutableStateFlow(UnitsSettings())
     override suspend fun save(units: UnitsSettings) {
         this.units.value = units
+    }
+}
+
+/** Снимки кодов в памяти; запросы повторяют SQL из DtcDao. */
+internal class FakeDtcDao(val items: MutableList<DtcSnapshotEntity> = mutableListOf()) : DtcDao {
+    override suspend fun insert(items: List<DtcSnapshotEntity>) { this.items += items }
+    override suspend fun forCar(carId: Long) = items.filter { it.carId == carId }.sortedBy { it.takenAtMs }
+    override suspend fun countEvents(code: String, fromMs: Long, toMs: Long) = items.count { it.code == code && it.takenAtMs in fromMs..toMs }
+    override suspend fun latestForCar(carId: Long?): List<DtcSnapshotEntity> {
+        val mine = items.filter { it.carId == carId }
+        val last = mine.maxOfOrNull { it.takenAtMs } ?: return emptyList()
+        return mine.filter { it.takenAtMs == last }
     }
 }

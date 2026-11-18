@@ -59,6 +59,7 @@ internal class DtcViewModel(
         viewModelScope.launch { runCatching { loadHistory() } }
     }
 
+    /** Каждое успешное чтение (демо или настоящий адаптер) попадает в историю активной машины — её читает ИИ. */
     fun read() = launchGuarded {
         val dtcs = controller.withSession { session -> DtcKind.entries.flatMap { session.readDtcs(it) } }
         if (dtcs == null) {
@@ -66,12 +67,13 @@ internal class DtcViewModel(
         } else {
             val items = describe(dtcs)
             _uiState.update { it.copy(items = items, error = null, checked = true) }
+            if (repository.recordRead(dtcs)) loadHistory()
         }
     }
 
     /** Сначала сохранить снимок (после сброса восстановить коды невозможно), потом сбросить и перечитать. */
     fun clear() = launchGuarded {
-        repository.saveSnapshot(_uiState.value.items.map { it.dtc }, vin = null)
+        repository.recordRead(_uiState.value.items.map { it.dtc })
         val cleared = controller.withSession { it.clearDtcs() }
         if (cleared != true) _uiState.update { it.copy(error = "ЭБУ не подтвердил сброс") }
         val dtcs = controller.withSession { session -> DtcKind.entries.flatMap { session.readDtcs(it) } }.orEmpty()

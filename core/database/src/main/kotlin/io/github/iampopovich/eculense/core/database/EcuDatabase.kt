@@ -146,6 +146,10 @@ interface DtcDao {
 
     @Query("SELECT COUNT(*) FROM dtc_snapshots WHERE code = :code AND takenAtMs BETWEEN :fromMs AND :toMs")
     suspend fun countEvents(code: String, fromMs: Long, toMs: Long): Int
+
+    /** Последний снимок машины (все коды с максимальным takenAtMs); carId = null — снимки без машины. */
+    @Query("SELECT * FROM dtc_snapshots WHERE carId IS :carId AND takenAtMs = (SELECT MAX(takenAtMs) FROM dtc_snapshots WHERE carId IS :carId)")
+    suspend fun latestForCar(carId: Long?): List<DtcSnapshotEntity>
 }
 
 /** Агрегат одного датчика: считает SQLite, в Kotlin приходит одна строка вместо тысяч значений. */
