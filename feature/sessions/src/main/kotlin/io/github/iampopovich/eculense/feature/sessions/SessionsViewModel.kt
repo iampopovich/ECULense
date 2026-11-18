@@ -37,6 +37,7 @@ internal sealed interface ImportState {
         val tripsImported: Int = 0,
         val tripsSkipped: Int = 0,
         val unitsImported: Boolean = false,
+        val dtcEventsAdded: Int = 0,
     ) : ImportState
     data class Failed(val message: String) : ImportState
 }
@@ -65,7 +66,7 @@ internal class SessionsViewModel(
                 report.failed.forEach { Log.w(TAG, "Car Scanner import: $it") }
                 ImportState.Done(
                     report.imported, report.skippedDuplicates, report.failed.size,
-                    report.car, report.tripsImported, report.tripsSkipped, report.unitsImported,
+                    report.car, report.tripsImported, report.tripsSkipped, report.unitsImported, report.dtcEventsAdded,
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -77,7 +78,7 @@ internal class SessionsViewModel(
             Log.i(
                 TAG,
                 "Car Scanner import finished in ${System.currentTimeMillis() - started} ms: " +
-                    (done?.let { "imported=${it.imported} duplicates=${it.duplicates} failed=${it.failed} trips=${it.tripsImported}/${it.tripsSkipped} car=${it.car != null} units=${it.unitsImported}" }
+                    (done?.let { "imported=${it.imported} duplicates=${it.duplicates} failed=${it.failed} trips=${it.tripsImported}/${it.tripsSkipped} car=${it.car != null} units=${it.unitsImported} dtcAdded=${it.dtcEventsAdded}" }
                         ?: _importState.value.javaClass.simpleName),
             )
         }

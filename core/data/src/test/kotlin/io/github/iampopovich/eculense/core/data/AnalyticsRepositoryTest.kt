@@ -70,6 +70,7 @@ private class FakeFindingDao : FindingDao {
 private class FakeDtcDao(val items: MutableList<DtcSnapshotEntity> = mutableListOf()) : DtcDao {
     override suspend fun insert(items: List<DtcSnapshotEntity>) { this.items += items }
     override suspend fun forCar(carId: Long) = items.filter { it.carId == carId }.sortedBy { it.takenAtMs }
+    override suspend fun countEvents(code: String, fromMs: Long, toMs: Long) = items.count { it.code == code && it.takenAtMs in fromMs..toMs }
 }
 
 class AnalyticsRepositoryTest {

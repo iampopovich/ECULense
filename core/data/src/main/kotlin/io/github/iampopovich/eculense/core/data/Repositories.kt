@@ -34,6 +34,9 @@ interface SessionRepository {
 
 interface DtcRepository {
     suspend fun saveSnapshot(dtcs: List<Dtc>, vin: String?, takenAtMs: Long? = null, carId: Long? = null)
+
+    /** Есть ли уже событие с этим кодом в окне времени — повторный импорт не дублирует события. */
+    suspend fun hasEvent(code: String, fromMs: Long, toMs: Long): Boolean = false
 }
 
 internal class RoomSessionRepository(
@@ -78,4 +81,6 @@ internal class RoomDtcRepository(
         val car = carId ?: activeCarId()
         dao.insert(dtcs.map { DtcSnapshotEntity(takenAtMs = at, vin = vin, code = it.code, kind = it.kind.name, carId = car) })
     }
+
+    override suspend fun hasEvent(code: String, fromMs: Long, toMs: Long): Boolean = dao.countEvents(code, fromMs, toMs) > 0
 }

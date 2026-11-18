@@ -34,6 +34,8 @@ data class ImportReport(
     val tripsImported: Int = 0,
     val tripsSkipped: Int = 0,
     val unitsImported: Boolean = false,
+    /** Новые события DTC, в т. ч. дозаписанные в уже импортированные записи. */
+    val dtcEventsAdded: Int = 0,
 )
 
 /** created = false — машина уже была (повторный импорт) или заполнена машина по умолчанию. */
@@ -103,9 +105,12 @@ class CarScannerImporter internal constructor(
         val unitsImported = meta?.settings?.takeIf { it.hasUnits }?.let { units.save(it.toUnits()); true } ?: false
         var imported = 0
         var duplicates = 0
+        var dtcAdded = 0
         suspend fun one(name: String, bytes: ByteArray) {
             try {
-                if (importRecording(name, bytes, carMapping)) imported++ else duplicates++
+                val result = importRecording(name, bytes, carMapping)
+                dtcAdded += result.dtcAdded
+                if (result.created) imported++ else duplicates++
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -141,8 +146,11 @@ class CarScannerImporter internal constructor(
             tripsImported = tripsAdded,
             tripsSkipped = tripList.size - tripsAdded,
             unitsImported = unitsImported,
+            dtcEventsAdded = dtcAdded,
         )
     }
+
+    private data class RecordingResult(val created: Boolean, val dtcAdded: Int)
 
     private class CarMapping(val byExternal: Map<Long, Long>, val byName: Map<String, Long>, val first: Long?, val report: ImportedCar?) {
         companion object {
@@ -191,9 +199,9 @@ class CarScannerImporter internal constructor(
     }
 
     /** false — запись уже импортирована раньше. Битая запись не оставляет полусессию: её externalId не должен блокировать повторный импорт. */
-    internal suspend fun importRecording(fileName: String, bytes: ByteArray): Boolean = importRecording(fileName, bytes, CarMapping.EMPTY)
+    internal suspend fun importRecording(fileName: String, bytes: ByteArray): Boolean = importRecording(fileName, bytes, CarMapping.EMPTY).created
 
-    private suspend fun importRecording(fileName: String, bytes: ByteArray, mapping: CarMapping): Boolean {
+    private suspend fun importRecording(fileName: String, bytes: ByteArray, mapping: CarMapping): RecordingResult {
         val externalId = "carscanner:$fileName"
         val reader = BrcReader(bytes)
         val header = reader.header
@@ -201,7 +209,9 @@ class CarScannerImporter internal constructor(
         val carId = mapping.byName[header.carName] ?: mapping.first
         if (sessions.hasExternal(externalId)) {
             if (carId != null) sessions.assignCar(externalId, carId)
-            return false
+            // Дозапись событий DTC, потерянных старым правилом «один код — одно событие на запись».
+            val dtcs = reader.records().mapNotNull { (it as? BrcRecord.DtcEvent)?.let(::toDtc) }.toList()
+            return RecordingResult(created = false, dtcAdded = saveDtcEvents(dtcs, carId))
         }
         val id = sessions.start(
             name = "Car Scanner · ${fileName.removeSuffix(".brc")}",
@@ -211,16 +221,46 @@ class CarScannerImporter internal constructor(
             externalId = externalId,
             carId = carId,
         )
-        try {
+        val dtcAdded = try {
             importRecords(id, reader, carId)
         } catch (e: Throwable) {
             withContext(NonCancellable) { sessions.delete(id) }
             throw e
         }
-        return true
+        return RecordingResult(created = true, dtcAdded = dtcAdded)
     }
 
-    private suspend fun importRecords(id: Long, reader: BrcReader, carId: Long?) {
+    private fun toDtc(record: BrcRecord.DtcEvent): Pair<Long, Dtc>? =
+        dtcCode.find(record.json)?.groupValues?.get(1)?.let { code ->
+            val kind = when (dtcRequest.find(record.json)?.groupValues?.get(1)) {
+                "07" -> DtcKind.PENDING
+                "0A" -> DtcKind.PERMANENT
+                else -> DtcKind.STORED
+            }
+            record.atMs to Dtc(code, kind)
+        }
+
+    /**
+     * Car Scanner пишет код дважды подряд (ответ без заголовков и с ними) — это один и тот же опрос: близнецы в пределах
+     * [DTC_TWIN_WINDOW_MS] схлопываются. Отдельные чтения (секунды/минуты спустя) остаются отдельными событиями.
+     * Событие, которое уже есть в базе (тот же код в том же окне), не дублируется — повторный импорт идемпотентен.
+     */
+    private suspend fun saveDtcEvents(events: List<Pair<Long, Dtc>>, carId: Long?): Int {
+        val distinct = events.sortedBy { it.first }.fold(mutableListOf<Pair<Long, Dtc>>()) { acc, e ->
+            val twin = acc.any { (at, d) -> d.code == e.second.code && e.first - at <= DTC_TWIN_WINDOW_MS }
+            if (!twin) acc += e
+            acc
+        }
+        var added = 0
+        for ((at, dtc) in distinct) {
+            if (dtcHistory.hasEvent(dtc.code, at - DTC_TWIN_WINDOW_MS, at + DTC_TWIN_WINDOW_MS)) continue
+            dtcHistory.saveSnapshot(listOf(dtc), vin = null, takenAtMs = at, carId = carId)
+            added++
+        }
+        return added
+    }
+
+    private suspend fun importRecords(id: Long, reader: BrcReader, carId: Long?): Int {
         val header = reader.header
         val formats = mutableMapOf<Int, Int>()
         val batch = ArrayList<SensorReading>(BATCH)
@@ -243,25 +283,19 @@ class CarScannerImporter internal constructor(
                         batch.clear()
                     }
                 }
-                is BrcRecord.DtcEvent -> dtcCode.find(record.json)?.groupValues?.get(1)?.let { code ->
-                    val kind = when (dtcRequest.find(record.json)?.groupValues?.get(1)) {
-                        "07" -> DtcKind.PENDING
-                        "0A" -> DtcKind.PERMANENT
-                        else -> DtcKind.STORED
-                    }
-                    dtcs += record.atMs to Dtc(code, kind)
-                }
+                is BrcRecord.DtcEvent -> toDtc(record)?.let { dtcs += it }
                 is BrcRecord.GpsPoint -> Unit // GPS-трек не импортируем (приватность), бэклог 1.24 п.11
             }
         }
         if (batch.isNotEmpty()) sessions.append(id, batch)
         sessions.finish(id, endedAtMs = lastMs)
-        // Car Scanner пишет один код дважды (запрос без заголовков и с ними) — схлопываем в пределах записи
-        dtcs.distinctBy { it.second }.forEach { (at, dtc) -> dtcHistory.saveSnapshot(listOf(dtc), vin = null, takenAtMs = at, carId = carId) }
+        return saveDtcEvents(dtcs, carId)
     }
 
     private companion object {
         const val BATCH = 2_000
+        /** Близнецы «без заголовков / с заголовками» пишутся в пределах долей секунды; отдельные чтения в бэкапе — от 9 с. */
+        const val DTC_TWIN_WINDOW_MS = 5_000L
     }
 }
 

@@ -104,6 +104,7 @@ internal fun importSummary(s: ImportState.Done): String = buildList {
     }
     if (s.tripsImported + s.tripsSkipped > 0) add("Поездки: добавлено ${s.tripsImported}, уже были ${s.tripsSkipped}")
     if (s.unitsImported) add("Единицы измерения перенесены")
+    if (s.dtcEventsAdded > 0) add("События кодов ошибок: добавлено ${s.dtcEventsAdded}")
 }.joinToString("\n")
 
 private val SessionSource.label: String

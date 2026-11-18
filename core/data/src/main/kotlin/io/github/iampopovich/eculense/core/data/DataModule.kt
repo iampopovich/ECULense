@@ -30,7 +30,7 @@ val dataModule = module {
         val cars = get<CarRepository>()
         // Новые записи и коды → находки пересчитываются в фоне для всех машин (их одна-две).
         CarScannerImporter(androidContext(), get(), get(), cars, get(), get()) { report ->
-            if (report.imported > 0 || report.tripsImported > 0) {
+            if (report.imported > 0 || report.tripsImported > 0 || report.dtcEventsAdded > 0) {
                 scope.launch { cars.cars().forEach { runCatching { analytics.recompute(it.id) } } }
             }
         }

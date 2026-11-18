@@ -60,6 +60,8 @@ internal class ImportDtcs : DtcRepository {
         snapshots += takenAtMs to dtcs
         cars += carId
     }
+    override suspend fun hasEvent(code: String, fromMs: Long, toMs: Long): Boolean =
+        snapshots.any { (at, list) -> at != null && at in fromMs..toMs && list.any { it.code == code } }
 }
 
 class CarScannerImporterTest {
@@ -124,6 +126,50 @@ class CarScannerImporterTest {
         assertTrue(importer.importRecording("a.brc", recording()))
         assertFalse(importer.importRecording("a.brc", recording()))
         assertEquals(1, sessions.started.size)
+        assertEquals(2, dtcs.snapshots.size)
+    }
+
+    @Test
+    fun `separate reads of the same code in one recording stay separate events`() = runTest {
+        // Car Scanner: чтение без заголовков, через 9 с — с заголовками, через 2 мин — снова
+        val rec = BrcWriter().header(car = "Тестовая", startTicks = startTicks)
+            .dtc(startTicks + 10_000_000, p0113)
+            .dtc(startTicks + 100_000_000, p0113WithHeader)
+            .dtc(startTicks + 1_300_000_000, p0113)
+            .bytes()
+        importer.importRecording("a.brc", rec)
+        val start = sessions.started.single().startedAtMs!!
+        assertEquals(listOf(start + 1_000, start + 10_000, start + 130_000), dtcs.snapshots.map { it.first })
+    }
+
+    @Test
+    fun `header and no-header twin a moment apart is one event`() = runTest {
+        val rec = BrcWriter().header(car = "Тестовая", startTicks = startTicks)
+            .dtc(startTicks + 10_000_000, p0113)
+            .dtc(startTicks + 12_000_000, p0113WithHeader)
+            .bytes()
+        importer.importRecording("a.brc", rec)
+        assertEquals(1, dtcs.snapshots.size)
+    }
+
+    @Test
+    fun `re-import backfills events lost by the old per-recording dedup without duplicating`() = runTest {
+        val rec = BrcWriter().header(car = "Тестовая", startTicks = startTicks)
+            .dtc(startTicks + 10_000_000, p0113)
+            .dtc(startTicks + 1_300_000_000, p0113)
+            .bytes()
+        importer.importRecording("a.brc", rec)
+        val start = sessions.started.single().startedAtMs!!
+        // как на телефоне после старого импорта: из двух событий записи осталось первое
+        dtcs.snapshots.removeAt(1)
+
+        val report = importer.importStream({ ByteArrayInputStream(rec) }, "a.brc")
+        assertEquals(1, report.skippedDuplicates)
+        assertEquals(1, report.dtcEventsAdded)
+        assertEquals(listOf(start + 1_000, start + 130_000), dtcs.snapshots.mapNotNull { it.first }.sorted())
+
+        val again = importer.importStream({ ByteArrayInputStream(rec) }, "a.brc")
+        assertEquals(0, again.dtcEventsAdded)
         assertEquals(2, dtcs.snapshots.size)
     }
 

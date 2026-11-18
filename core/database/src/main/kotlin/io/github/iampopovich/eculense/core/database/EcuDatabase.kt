@@ -138,6 +138,9 @@ interface DtcDao {
 
     @Query("SELECT * FROM dtc_snapshots WHERE carId = :carId ORDER BY takenAtMs")
     suspend fun forCar(carId: Long): List<DtcSnapshotEntity>
+
+    @Query("SELECT COUNT(*) FROM dtc_snapshots WHERE code = :code AND takenAtMs BETWEEN :fromMs AND :toMs")
+    suspend fun countEvents(code: String, fromMs: Long, toMs: Long): Int
 }
 
 /** Агрегат одного датчика: считает SQLite, в Kotlin приходит одна строка вместо тысяч значений. */
