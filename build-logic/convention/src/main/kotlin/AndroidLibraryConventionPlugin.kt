@@ -27,6 +27,8 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                 add("testImplementation", lib("junit"))
                 add("testImplementation", lib("kotlinx-coroutines-test"))
                 add("androidTestImplementation", lib("androidx-junit"))
+                // androidx-junit не тянет сам AndroidJUnitRunner — без него тест-APK падает при старте.
+                add("androidTestImplementation", lib("androidx-test-runner"))
                 add("androidTestImplementation", lib("kotlinx-coroutines-test"))
             }
         }
