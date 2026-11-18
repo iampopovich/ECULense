@@ -1,6 +1,8 @@
 package io.github.iampopovich.eculense.feature.dtc
 
 import io.github.iampopovich.eculense.core.data.DtcRepository
+import io.github.iampopovich.eculense.core.dtcdb.DtcInfo
+import io.github.iampopovich.eculense.core.dtcdb.DtcSource
 import io.github.iampopovich.eculense.core.model.Dtc
 import io.github.iampopovich.eculense.core.model.DtcKind
 import io.github.iampopovich.eculense.core.obd.FakeConnectionController
@@ -31,7 +33,30 @@ class DtcViewModelTest {
     @After fun tearDown() = Dispatchers.resetMain()
 
     private val p0133 = Dtc("P0133", DtcKind.STORED)
-    private val descriptions = DtcDescriptions { if (it == "P0133") "O2 Sensor Circuit Slow Response" else null }
+    private val descriptions = DtcDescriber { codes ->
+        codes.associateWith { if (it == "P0133") DtcInfo(it, "O2 Sensor Circuit Slow Response", DtcSource.OBDEX) else DtcInfo(it, null, DtcSource.OEM_UNKNOWN) }
+    }
+
+    @Test
+    fun `history of the active car is grouped per code with the same descriptions`() = runTest {
+        val history = DtcHistorySource {
+            listOf(DtcHistoryEvent("P1847", DtcKind.PENDING, 1_000), DtcHistoryEvent("P0133", DtcKind.STORED, 2_000), DtcHistoryEvent("P0133", DtcKind.STORED, 3_000))
+        }
+        val vm = DtcViewModel(FakeConnectionController(session = null), descriptions, FakeDtcRepository(), emptyList(), history)
+        val items = vm.uiState.value.history
+        assertEquals(listOf("P0133" to 2, "P1847" to 1), items.map { it.code to it.count })
+        assertEquals("Заводской код производителя, расшифровка неизвестна", items.last().info.text)
+    }
+
+    @Test
+    fun `ask ai prompt carries what is known about the code`() {
+        val info = DtcInfo("P0171", "System Too Lean Bank 1", DtcSource.OBDEX, causes = listOf("Air leak", "MAF", "Fuel pump", "Extra"))
+        assertEquals(
+            "Объясни код ошибки P0171 (System Too Lean Bank 1). Частые причины по базе OBDex: Air leak; MAF; Fuel pump: причины, что проверить, насколько срочно.",
+            askAiPrompt("P0171", info),
+        )
+        assertTrue(askAiPrompt("P1847", DtcInfo("P1847", null, DtcSource.OEM_UNKNOWN)).contains("расшифровка неизвестна"))
+    }
 
     @Test
     fun `read shows codes with descriptions`() = runTest {
