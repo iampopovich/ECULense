@@ -8,13 +8,16 @@ import android.os.Build
 import android.net.ConnectivityManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -115,14 +118,13 @@ class DataPacks(
 
     /** version = null — зафиксированная (или для «Обновить» — найденная проверкой) версия. */
     override fun download(id: String, version: String?) {
-        val request = OneTimeWorkRequestBuilder<PackDownloadWorker>()
-            .setInputData(workDataOf(KEY_ID to id, KEY_VERSION to version))
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-            .addTag(TAG)
-            .addTag("$TAG:$id")
-            .build()
-        work.enqueueUniqueWork("$TAG:$id", ExistingWorkPolicy.KEEP, request)
+        val resumable = manifest(id)?.resumable == true
+        // Нажатие пользователя заменяет ждущую повтора задачу новой (expedited, из открытого приложения); докачка
+        // продолжается с .part, так что замена идущей загрузки ничего не теряет.
+        val policy = if (resumable) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
+        work.enqueueUniqueWork("$TAG:$id", policy, downloadRequest(id, version, resumable))
     }
+
 
     override fun cancel(id: String) {
         work.cancelUniqueWork("$TAG:$id")
@@ -165,7 +167,24 @@ class DataPacks(
     }
 
     companion object {
+        /**
+         * Многогигабайтные пакеты (модели) — expedited-задача: стартует сразу, пока пользователь ещё в приложении (он
+         * только что нажал «Скачать»), и успевает стать foreground-службой — Android 12+/16 запрещает запуск
+         * foreground-службы из фона (`mAllowStartForeground false`). Если квоты expedited нет — обычная задача; без
+         * foreground-службы система остановит её через ~10 минут, и WorkManager продолжит с места обрыва (Range).
+         * Обрыв сети/DNS — Result.retry() с экспоненциальной паузой от [BACKOFF_SECONDS].
+         */
+        internal fun downloadRequest(id: String, version: String?, resumable: Boolean): OneTimeWorkRequest =
+            OneTimeWorkRequestBuilder<PackDownloadWorker>()
+                .setInputData(workDataOf(KEY_ID to id, KEY_VERSION to version))
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_SECONDS, TimeUnit.SECONDS)
+                .apply { if (resumable) setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST) }
+                .addTag(TAG)
+                .addTag("$TAG:$id")
+                .build()
         const val TAG = "datapack"
+        internal const val BACKOFF_SECONDS = 30L
         internal const val KEY_ID = "id"
         internal const val KEY_VERSION = "version"
         internal const val KEY_PROGRESS = "progress"
@@ -187,8 +206,11 @@ class PackDownloadWorker(context: Context, params: WorkerParameters) : Coroutine
         var lastDone = 0L
         return try {
             // Многогигабайтный файл: foreground-задача (обычной WorkManager даёт 10 минут) с уведомлением о прогрессе.
+            // Разрешено, пока приложение на экране (старт по нажатию — expedited); повтор из фона Android 12+ не
+            // пустит в foreground — тогда качаем обычной задачей кусками до остановки системой и докачиваем.
             if (manifest.resumable) runCatching { setForeground(foregroundInfo(manifest.title, -1)) }
-                .onFailure { Log.w(DataPacks.LOG, "foreground not allowed: ${it.message}") }
+                .onSuccess { Log.i(DataPacks.LOG, "pack $id: foreground download (attempt $runAttemptCount)") }
+                .onFailure { Log.w(DataPacks.LOG, "foreground not allowed, continuing in background: ${it.message}") }
             setProgress(workDataOf(DataPacks.KEY_PROGRESS to -1))
             val installed = packs.installer.install(manifest, inputData.getString(DataPacks.KEY_VERSION)) { done, total ->
                 val pct = total?.takeIf { it > 0 }?.let { (done * 100 / it).toInt().coerceIn(0, 100) } ?: -1
@@ -216,6 +238,10 @@ class PackDownloadWorker(context: Context, params: WorkerParameters) : Coroutine
         }
     }
 
+    /** Expedited-задача до Android 12 исполняется как foreground-служба — WorkManager спрашивает уведомление здесь. */
+    override suspend fun getForegroundInfo(): ForegroundInfo =
+        foregroundInfo(inputData.getString(DataPacks.KEY_ID)?.let { packs.manifest(it)?.title } ?: "данные", -1)
+
     private fun foregroundInfo(title: String, pct: Int): ForegroundInfo {
         val nm = applicationContext.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CHANNEL) == null) {
@@ -234,7 +260,8 @@ class PackDownloadWorker(context: Context, params: WorkerParameters) : Coroutine
     }
 
     private companion object {
-        const val MAX_RETRIES = 6
+        // Каждая попытка продолжает с места обрыва, так что попыток можно дать больше (сеть телефона «моргает»).
+        const val MAX_RETRIES = 10
         const val CHANNEL = "downloads"
         const val NOTIFICATION_ID = 4201
     }

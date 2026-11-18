@@ -403,7 +403,11 @@ private fun ModelSheet(row: ModelRow, hasToken: Boolean, actions: LocalModelActi
                             FitEstimator.size(row.downloadedBytes) + (total?.let { " из ${FitEstimator.size(it)}" } ?: ""),
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    OutlinedButton(onClick = { actions.onCancelDownload(m.packId) }) { Text("Остановить") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Ждёт повтора после обрыва: нажатие перезапускает загрузку сразу (из открытого приложения).
+                        if (row.retrying) Button(onClick = { actions.onDownload(m.packId) }) { Text("Повторить сейчас") }
+                        OutlinedButton(onClick = { actions.onCancelDownload(m.packId) }) { Text("Остановить") }
+                    }
                 }
                 !row.installed -> {
                     row.error?.let { Text("Ошибка загрузки: $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
