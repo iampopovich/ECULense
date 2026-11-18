@@ -4,4 +4,6 @@ plugins {
 
 dependencies {
     implementation(project(":core:data"))
+    implementation(project(":core:datapacks"))
+    implementation(project(":core:vehicledb"))
 }

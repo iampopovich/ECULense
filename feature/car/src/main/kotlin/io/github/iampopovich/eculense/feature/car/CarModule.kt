@@ -5,6 +5,7 @@ import io.github.iampopovich.eculense.core.navigation.CarDestination
 import io.github.iampopovich.eculense.core.navigation.CarEditDestination
 import io.github.iampopovich.eculense.core.navigation.Hub
 import io.github.iampopovich.eculense.core.navigation.HubEntry
+import io.github.iampopovich.eculense.core.vehicledb.VehicleRepository
 import org.koin.core.annotation.KoinExperimentalAPI
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
@@ -15,7 +16,7 @@ import org.koin.dsl.navigation3.navigation
 @OptIn(KoinExperimentalAPI::class)
 val carModule = module {
     viewModel { CarViewModel(get(), get()) }
-    viewModel { (carId: Long) -> CarEditViewModel(carId, get()) }
+    viewModel { (carId: Long) -> CarEditViewModel(carId, get(), catalog = getOrNull<VehicleRepository>()?.let(::RepositoryVehicleCatalog), packs = getOrNull()) }
     navigation<CarDestination> { CarRoute() }
     navigation<CarEditDestination> { route ->
         val back = LocalOnBackPressedDispatcherOwner.current

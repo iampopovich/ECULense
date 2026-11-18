@@ -23,7 +23,10 @@ data class CarProfile(
     val cylinders: Int? = null,
     val fuelType: FuelType? = null,
     val gearbox: Gearbox? = null,
+    val drive: DriveType? = null,
     val tankVolumeL: Double? = null,
+    /** Снаряжённая масса, кг (справочник или вручную). */
+    val curbWeightKg: Int? = null,
     val odometerKm: Long? = null,
     val odometerAtMs: Long? = null,
     val vin: String? = null,

@@ -43,7 +43,7 @@ class MigrationTest {
 
         // Room открывает мигрированную базу без ошибок схемы, DAO видят данные
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
         try {
             assertEquals(2, room.sessionDao().observeSessions().first().size)
             assertEquals(listOf(EcuDatabase.DEFAULT_CAR_NAME), room.carDao().all().map { it.name })
@@ -78,7 +78,7 @@ class MigrationTest {
         }
 
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
         try {
             val f = FindingEntity(carId = 1, ruleId = "r", severity = "WARNING", title = "t", message = "m", evidenceJson = "{}", periodFromMs = null, periodToMs = null, createdAtMs = 1)
             room.findingDao().replaceForCar(1, listOf(f, f.copy(ruleId = "r2")))
@@ -89,6 +89,29 @@ class MigrationTest {
             room.carDao().insert(CarEntity(name = "второй"))
             room.carDao().delete(1)
             assertEquals(0, room.findingDao().forCar(1).size)
+        } finally {
+            room.close()
+        }
+    }
+
+    @Test
+    fun v3CarGetsDriveAndMassColumnsKeepingData() = runTest {
+        helper.createDatabase(dbName, 3).use { db ->
+            db.execSQL("INSERT INTO cars (id, name, brand, year) VALUES (1, 'Тестовая', 'Kia', 2005)")
+            db.execSQL("INSERT INTO sessions (id, name, startedAtMs, endedAtMs, source, vin, externalId, carId) VALUES (1, 'cs', 30, 40, 'IMPORT_CARSCANNER', NULL, 'carscanner:a.brc', 1)")
+            db.execSQL("INSERT INTO readings (sessionId, sensorId, value, unit, timestampMs) VALUES (1, '01.05', 90.0, '°C', 31)")
+        }
+        helper.runMigrationsAndValidate(dbName, 4, true, MIGRATION_3_4).use { db ->
+            fun count(sql: String) = db.query(sql).use { c -> c.moveToFirst(); c.getInt(0) }
+            assertEquals(1, count("SELECT COUNT(*) FROM readings"))
+            assertEquals(1, count("SELECT COUNT(*) FROM cars WHERE drive IS NULL AND curbWeightKg IS NULL AND brand = 'Kia'"))
+        }
+        val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
+        try {
+            val car = room.carDao().all().single()
+            room.carDao().update(car.copy(drive = "ALL", curbWeightKg = 1917))
+            assertEquals("ALL" to 1917, room.carDao().all().single().let { it.drive to it.curbWeightKg })
         } finally {
             room.close()
         }

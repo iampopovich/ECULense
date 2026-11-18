@@ -84,6 +84,9 @@ data class CarEntity(
     val sparkPlugsIntervalKm: Int? = null,
     val airFilterIntervalKm: Int? = null,
     val fuelFilterIntervalKm: Int? = null,
+    /** v4: привод (DriveType) и снаряжённая масса из справочника моделей. */
+    val drive: String? = null,
+    val curbWeightKg: Int? = null,
 )
 
 /** Итоги поездки (как таблица trips Car Scanner): путь в мм и топливо в мкл — целые, без потерь при суммировании. */
@@ -276,7 +279,7 @@ interface TripDao {
 
 @Database(
     entities = [SessionEntity::class, ReadingEntity::class, DtcSnapshotEntity::class, CarEntity::class, TripEntity::class, FindingEntity::class],
-    version = 3,
+    version = 4,
 )
 abstract class EcuDatabase : RoomDatabase() {
     abstract fun sessionDao(): SessionDao
@@ -390,10 +393,18 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+/** 3 → 4: привод и масса машины (справочник моделей, 1.25b). Только ADD COLUMN — данные не трогаются. */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `cars` ADD COLUMN `drive` TEXT")
+        db.execSQL("ALTER TABLE `cars` ADD COLUMN `curbWeightKg` INTEGER")
+    }
+}
+
 val databaseModule = module {
     single {
         Room.databaseBuilder(androidContext(), EcuDatabase::class.java, "ecu.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .addCallback(EcuDatabase.defaultCar)
             .build()
     }

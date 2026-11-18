@@ -169,6 +169,8 @@ internal class CarProfileTool(ctx: ToolContext) : VehicleTool<NoArgs>(
             car.cylinders?.let { put("cylinders", it) }
             car.fuelType?.let { put("fuel", it.name.lowercase()) }
             car.gearbox?.let { put("gearbox", it.name.lowercase()) }
+            car.drive?.let { put("drive", it.name.lowercase()) }
+            car.curbWeightKg?.let { put("curb_weight_kg", it) }
             car.tankVolumeL?.let { put("tank_l", Compact.num(it, 0)) }
             car.odometerKm?.let { put("odometer_km", it) }
             car.odometerAtMs?.let { put("odometer_date", Dates.date(it, ctx.zone())) }

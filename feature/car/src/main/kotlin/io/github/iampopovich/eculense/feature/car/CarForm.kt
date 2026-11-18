@@ -1,11 +1,12 @@
 package io.github.iampopovich.eculense.feature.car
 
 import io.github.iampopovich.eculense.core.model.CarProfile
+import io.github.iampopovich.eculense.core.model.DriveType
 import io.github.iampopovich.eculense.core.model.FuelType
 import io.github.iampopovich.eculense.core.model.Gearbox
 import io.github.iampopovich.eculense.core.model.ServiceIntervals
 
-internal enum class CarField { NAME, YEAR, ENGINE_VOLUME, CYLINDERS, TANK, ODOMETER, VIN, FUEL_PRICE, CURRENCY, OIL, PLUGS, AIR_FILTER, FUEL_FILTER }
+internal enum class CarField { NAME, YEAR, ENGINE_VOLUME, CYLINDERS, TANK, MASS, ODOMETER, VIN, FUEL_PRICE, CURRENCY, OIL, PLUGS, AIR_FILTER, FUEL_FILTER }
 
 /**
  * Форма редактора: всё — строки, как их вводит пользователь. Ошибки считаются сразу (предупреждение ошибок по Нильсену):
@@ -25,7 +26,9 @@ internal data class CarForm(
     val cylinders: String = "",
     val fuelType: FuelType? = null,
     val gearbox: Gearbox? = null,
+    val drive: DriveType? = null,
     val tankVolumeL: String = "",
+    val curbWeightKg: String = "",
     val odometerKm: String = "",
     val odometerAtMs: Long? = null,
     val vin: String = "",
@@ -42,6 +45,7 @@ internal data class CarForm(
         checkDouble(engineVolumeL, 0.1, 10.0)?.let { put(CarField.ENGINE_VOLUME, it) }
         checkInt(cylinders, 1, 16)?.let { put(CarField.CYLINDERS, it) }
         checkDouble(tankVolumeL, 5.0, 300.0)?.let { put(CarField.TANK, it) }
+        checkInt(curbWeightKg, 300, 10_000)?.let { put(CarField.MASS, it) }
         checkInt(odometerKm, 0, 5_000_000)?.let { put(CarField.ODOMETER, it) }
         if (vin.isNotBlank() && !VIN.matches(vin.trim().uppercase())) put(CarField.VIN, "VIN — 17 символов: латиница без I, O, Q и цифры")
         checkDouble(fuelPrice, 0.01, 100_000.0)?.let { put(CarField.FUEL_PRICE, it) }
@@ -74,7 +78,9 @@ internal data class CarForm(
             cylinders = cylinders.toIntOrNullTrim(),
             fuelType = fuelType,
             gearbox = gearbox,
+            drive = drive,
             tankVolumeL = tankVolumeL.toDoubleOrNullLocal(),
+            curbWeightKg = curbWeightKg.toIntOrNullTrim(),
             odometerKm = odometer,
             odometerAtMs = odometerAt,
             vin = vin.nullIfBlank()?.uppercase(),
@@ -103,7 +109,9 @@ internal data class CarForm(
             cylinders = car.cylinders?.toString().orEmpty(),
             fuelType = car.fuelType,
             gearbox = car.gearbox,
+            drive = car.drive,
             tankVolumeL = car.tankVolumeL?.let(::plain).orEmpty(),
+            curbWeightKg = car.curbWeightKg?.toString().orEmpty(),
             odometerKm = car.odometerKm?.toString().orEmpty(),
             odometerAtMs = car.odometerAtMs,
             vin = car.vin.orEmpty(),
@@ -116,7 +124,7 @@ internal data class CarForm(
         )
 
         /** 57.3 → «57.3», 2.0 → «2». */
-        private fun plain(v: Double): String = if (v == Math.floor(v) && v < 1e9) v.toLong().toString() else v.toString()
+        internal fun plain(v: Double): String = if (v == Math.floor(v) && v < 1e9) v.toLong().toString() else v.toString()
     }
 }
 

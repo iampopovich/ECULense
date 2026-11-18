@@ -10,6 +10,7 @@ import io.github.iampopovich.eculense.core.database.CarEntity
 import io.github.iampopovich.eculense.core.database.TripDao
 import io.github.iampopovich.eculense.core.database.TripEntity
 import io.github.iampopovich.eculense.core.model.CarProfile
+import io.github.iampopovich.eculense.core.model.DriveType
 import io.github.iampopovich.eculense.core.model.FuelType
 import io.github.iampopovich.eculense.core.model.Gearbox
 import io.github.iampopovich.eculense.core.model.ServiceIntervals
@@ -144,6 +145,8 @@ internal fun CarEntity.toModel() = CarProfile(
     engineCode = engineCode, engineVolumeL = engineVolumeL, cylinders = cylinders,
     fuelType = fuelType?.let { runCatching { FuelType.valueOf(it) }.getOrNull() },
     gearbox = gearbox?.let { runCatching { Gearbox.valueOf(it) }.getOrNull() },
+    drive = drive?.let { runCatching { DriveType.valueOf(it) }.getOrNull() },
+    curbWeightKg = curbWeightKg,
     tankVolumeL = tankVolumeL, odometerKm = odometerKm, odometerAtMs = odometerAtMs, vin = vin, fuelPrice = fuelPrice,
     currency = currency, diagProfile = diagProfile,
     service = ServiceIntervals(oilIntervalKm, sparkPlugsIntervalKm, airFilterIntervalKm, fuelFilterIntervalKm),
@@ -155,6 +158,7 @@ internal fun CarProfile.toEntity() = CarEntity(
     tankVolumeL = tankVolumeL, odometerKm = odometerKm, odometerAtMs = odometerAtMs, vin = vin, fuelPrice = fuelPrice,
     currency = currency, diagProfile = diagProfile, oilIntervalKm = service.oilKm, sparkPlugsIntervalKm = service.sparkPlugsKm,
     airFilterIntervalKm = service.airFilterKm, fuelFilterIntervalKm = service.fuelFilterKm,
+    drive = drive?.name, curbWeightKg = curbWeightKg,
 )
 
 internal fun TripEntity.toModel() = Trip(

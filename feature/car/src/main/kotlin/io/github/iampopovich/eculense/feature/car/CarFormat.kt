@@ -1,6 +1,7 @@
 package io.github.iampopovich.eculense.feature.car
 
 import io.github.iampopovich.eculense.core.model.CarProfile
+import io.github.iampopovich.eculense.core.model.DriveType
 import io.github.iampopovich.eculense.core.model.FuelType
 import io.github.iampopovich.eculense.core.model.Gearbox
 import java.util.Locale
@@ -20,6 +21,7 @@ internal object CarFormat {
         car.cylinders?.let { "$it цил." },
         car.fuelType?.label,
         car.gearbox?.label,
+        car.drive?.let { "${it.label} привод" },
     ).joinToString(" · ")
 }
 
@@ -41,4 +43,11 @@ internal val Gearbox.label: String
         Gearbox.CVT -> "Вариатор"
         Gearbox.ROBOT -> "Робот"
         Gearbox.OTHER -> "Другая"
+    }
+
+internal val DriveType.label: String
+    get() = when (this) {
+        DriveType.FRONT -> "Передний"
+        DriveType.REAR -> "Задний"
+        DriveType.ALL -> "Полный"
     }
