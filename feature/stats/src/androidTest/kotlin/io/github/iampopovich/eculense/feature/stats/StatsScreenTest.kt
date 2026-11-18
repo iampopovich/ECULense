@@ -1,6 +1,8 @@
 package io.github.iampopovich.eculense.feature.stats
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -39,6 +41,20 @@ class StatsScreenTest {
         rule.onNodeWithText("Неделя").performClick()
         assertEquals(listOf(StatsPeriod.WEEK), periods)
         rule.onNodeWithText("Всё время").assertExists()
+    }
+
+    @Test
+    fun liveTripsShowTheirSourceAndEstimates() {
+        val maf = trip.copy(id = 2, source = TripSource.LIVE, fuelMethod = io.github.iampopovich.eculense.core.model.FuelMethod.MAF_ESTIMATE)
+        val none = trip.copy(id = 3, source = TripSource.LIVE, startedAtMs = trip.startedAtMs - 86_400_000, fuelL = 0.0,
+            fuelMethod = io.github.iampopovich.eculense.core.model.FuelMethod.NOT_AVAILABLE)
+        rule.setContent {
+            StatsScreen(StatsUiState(loading = false, car = car, stats = TripStats.of(listOf(trip, maf, none)), trips = listOf(trip, maf, none), totalTrips = 3), onPeriod = {})
+        }
+        rule.onNodeWithText("Car Scanner").assertExists()
+        rule.onAllNodesWithText("Запись ECULense").assertCountEquals(2)
+        rule.onNodeWithText("12,5 км · ≈ 1,1 л · ≈ 8,8 л/100 км").assertExists()
+        rule.onNodeWithText("12,5 км · топливо: оценка недоступна").assertExists()
     }
 
     @Test

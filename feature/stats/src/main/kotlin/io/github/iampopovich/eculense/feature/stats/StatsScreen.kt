@@ -21,8 +21,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.iampopovich.eculense.core.model.FuelMethod
 import io.github.iampopovich.eculense.core.model.StatsPeriod
 import io.github.iampopovich.eculense.core.model.Trip
+import io.github.iampopovich.eculense.core.model.TripSource
 import io.github.iampopovich.eculense.core.model.TripStats
 import io.github.iampopovich.eculense.core.model.UnitsSettings
 import io.github.iampopovich.eculense.feature.stats.StatsFormat.label
@@ -49,8 +51,8 @@ internal fun StatsScreen(state: StatsUiState, onPeriod: (StatsPeriod) -> Unit, m
         if (state.totalTrips == 0) {
             item {
                 Secondary(
-                    "Поездок пока нет. Перенесите их из Car Scanner: Пит-стоп → Поездки → «Импорт из Car Scanner». " +
-                        "Поездки по собственным записям с адаптера появятся в статистике позже.",
+                    "Поездок пока нет. Запишите поездку с адаптера (Панель → «Записывать») — после остановки записи " +
+                        "поездка появится здесь. Или перенесите их из Car Scanner: Пит-стоп → Поездки → «Импорт из Car Scanner».",
                 )
             }
             return@LazyColumn
@@ -114,12 +116,14 @@ private fun Stat(label: String, value: String, modifier: Modifier) {
 @Composable
 private fun TripRow(t: Trip, u: UnitsSettings) {
     val stats = TripStats.of(listOf(t))
+    val approx = if (t.fuelMethod == FuelMethod.MAF_ESTIMATE) "≈ " else ""
+    val fuel = if (!t.fuelKnown) "топливо: оценка недоступна"
+    else "$approx${StatsFormat.volume(t.fuelL, u)} · $approx${StatsFormat.consumption(stats.avgLPer100Km, u)}"
     Column {
         ListItem(
+            overlineContent = { Text(if (t.source == TripSource.IMPORT_CARSCANNER) "Car Scanner" else "Запись ECULense") },
             headlineContent = { Text(EcuDates.dateTime(t.startedAtMs)) },
-            supportingContent = {
-                Text("${StatsFormat.distance(t.distanceKm, u)} · ${StatsFormat.volume(t.fuelL, u)} · ${StatsFormat.consumption(stats.avgLPer100Km, u)}")
-            },
+            supportingContent = { Text("${StatsFormat.distance(t.distanceKm, u)} · $fuel") },
             trailingContent = { Text(StatsFormat.duration(t.drivingMs + t.standingMs), style = MaterialTheme.typography.labelMedium) },
         )
         HorizontalDivider()
