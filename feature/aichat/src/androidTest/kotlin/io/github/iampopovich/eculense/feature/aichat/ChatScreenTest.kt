@@ -1,12 +1,19 @@
 package io.github.iampopovich.eculense.feature.aichat
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.iampopovich.eculense.core.ai.ChatMessage
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,6 +38,62 @@ class ChatScreenTest {
         // Сообщение пользователя — обычный текст, звёздочки остаются как есть.
         rule.onNodeWithText("**P0171?**").assertExists()
         rule.onNodeWithContentDescription("Копировать ответ").assertExists()
+    }
+
+    @Test
+    fun composerSendIsDisabledUntilTextIsTyped() {
+        val sent = mutableListOf<String>()
+        rule.setContent { ChatScreen(ChatUiState(), onSend = { sent += it }, onOpenSettings = {}) }
+        rule.onNodeWithContentDescription("Отправить").assertIsNotEnabled()
+        rule.onNodeWithTag("chat-input").performTextInput("P0171?")
+        rule.onNodeWithContentDescription("Отправить").assertIsEnabled().performClick()
+        assertEquals(listOf("P0171?"), sent)
+        // поле очищается — кнопка снова недоступна
+        rule.onNodeWithContentDescription("Отправить").assertIsNotEnabled()
+    }
+
+    @Test
+    fun streamingTurnsSendIntoStopThatCancels() {
+        var stops = 0
+        val waiting = ChatUiState(listOf(user("hi"), assistant("")), streaming = true)
+        rule.setContent { ChatScreen(waiting, onSend = {}, onOpenSettings = {}, onStop = { stops++ }) }
+        rule.onNodeWithContentDescription("ИИ печатает").assertExists()
+        rule.onNodeWithContentDescription("Отправить").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Остановить ответ").assertIsEnabled().performClick()
+        assertEquals(1, stops)
+    }
+
+    @Test
+    fun suggestionFillsTheInputWithoutSending() {
+        val sent = mutableListOf<String>()
+        rule.setContent { ChatScreen(ChatUiState(), onSend = { sent += it }, onOpenSettings = {}) }
+        rule.onNodeWithText("Объясни мои ошибки").performClick()
+        rule.onNodeWithTag("chat-input").assertTextEquals("Объясни мои ошибки")
+        assertEquals(emptyList<String>(), sent)
+        rule.onNodeWithContentDescription("Отправить").assertIsEnabled()
+    }
+
+    @Test
+    fun htmlEntitiesInAnswersAreDecoded() {
+        rule.setContent {
+            ChatScreen(ChatUiState(listOf(user("t"), assistant("Температура ОЖ стабильно &gt;105 °C"))), onSend = {}, onOpenSettings = {})
+        }
+        rule.waitUntil(5_000) { rule.onAllNodesWithText(">105", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("&gt;", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun stoppedAnswerIsLabelledAndErrorOffersRetry() {
+        var retries = 0
+        rule.setContent {
+            ChatScreen(
+                ChatUiState(listOf(user("a"), assistant("част"), user("b")), error = "Нет связи", stoppedIndex = 1),
+                onSend = {}, onOpenSettings = {}, onRetry = { retries++ },
+            )
+        }
+        rule.onNodeWithText("Ответ остановлен").assertExists()
+        rule.onNodeWithText("Повторить").performClick()
+        assertEquals(1, retries)
     }
 
     @Test
