@@ -36,9 +36,54 @@ internal class Elm327Session(
         return AdapterInfo(version, protocol, isCan, voltage)
     }
 
-    override suspend fun supportedPids(): Set<Int> = TODO("задача 1.8")
-    override suspend fun read(pid: Pid): SensorReading? = TODO("задача 1.8")
-    override suspend fun readDtcs(kind: DtcKind): List<Dtc> = TODO("задача 1.8")
-    override suspend fun clearDtcs(): Boolean = TODO("задача 1.8")
-    override suspend fun readVin(): String? = TODO("задача 1.8")
+    override suspend fun supportedPids(): Set<Int> {
+        val result = mutableSetOf<Int>()
+        var base = 0x00
+        while (base <= 0xC0) {
+            val messages = query("01%02X".format(base)) ?: break
+            val masks = messages.map { it.toUnsigned() }.filter { it.size >= 6 && it[0] == 0x41 && it[1] == base }
+            if (masks.isEmpty()) break
+            masks.forEach { u -> result += SupportedPids.decode(base, u.subList(2, 6).toIntArray()) }
+            if (base + 0x20 !in result) break
+            base += 0x20
+        }
+        return result
+    }
+
+    override suspend fun read(pid: Pid): SensorReading? {
+        val messages = query(pid.command) ?: return null
+        val value = messages.firstNotNullOfOrNull { pid.decodeFrom(it) } ?: return null
+        return SensorReading(pid.sensorId, value, pid.unit, clock())
+    }
+
+    override suspend fun readDtcs(kind: DtcKind): List<Dtc> {
+        val (request, responseSid) = when (kind) {
+            DtcKind.STORED -> "03" to 0x43
+            DtcKind.PENDING -> "07" to 0x47
+            DtcKind.PERMANENT -> "0A" to 0x4A
+        }
+        val messages = query(request, timeoutMs = 5_000) ?: return emptyList()
+        return DtcDecoder.parse(messages, responseSid, isCan, kind)
+    }
+
+    override suspend fun clearDtcs(): Boolean {
+        val result = ElmResponseParser.parse(link.send("04", timeoutMs = 5_000))
+        return result is ElmResult.Data && result.lines.any { it.startsWith("44") }
+    }
+
+    /** MVP: VIN собирается только из CAN-ответа одним сообщением. K-Line VIN (5 строк с номерами) — бэклог 1.24. */
+    override suspend fun readVin(): String? {
+        val messages = query("0902", timeoutMs = 5_000) ?: return null
+        val message = messages.map { it.toUnsigned() }.firstOrNull { it.size > 3 && it[0] == 0x49 } ?: return null
+        return message.drop(3).map { it.toChar() }.filter { it.isLetterOrDigit() }
+            .joinToString("").takeIf { it.length == 17 }
+    }
+
+    /** null = NO DATA (PID не поддержан или ЭБУ промолчал). Ошибка адаптера → ObdException. */
+    private suspend fun query(command: String, timeoutMs: Long = 2_000): List<ByteArray>? =
+        when (val result = ElmResponseParser.parse(link.send(command, timeoutMs))) {
+            is ElmResult.Data -> elmMessages(result.lines)
+            ElmResult.NoData -> null
+            is ElmResult.Error -> throw ObdException("$command → ${result.message}")
+        }
 }
