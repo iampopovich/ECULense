@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.model.Session
+import io.github.iampopovich.eculense.core.model.SessionSource
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import io.github.iampopovich.eculense.core.navigation.SessionDetailDestination
 import org.koin.compose.viewmodel.koinViewModel
@@ -34,10 +35,16 @@ internal fun SessionsScreen(sessions: List<Session>, onOpen: (Session) -> Unit, 
         items(sessions, key = { it.id }) { session ->
             ListItem(
                 headlineContent = { Text(session.name) },
-                supportingContent = { Text(DateFormat.getDateTimeInstance().format(Date(session.startedAtMs)) + " · " + session.source.name) },
+                supportingContent = { Text(DateFormat.getDateTimeInstance().format(Date(session.startedAtMs)) + " · " + session.source.label) },
                 trailingContent = { TextButton(onClick = { onDelete(session) }) { Text("Удалить") } },
                 modifier = Modifier.clickable { onOpen(session) },
             )
         }
     }
 }
+
+private val SessionSource.label: String
+    get() = when (this) {
+        SessionSource.LIVE -> "запись с адаптера"
+        SessionSource.IMPORT_CARSCANNER -> "импорт из Car Scanner"
+    }

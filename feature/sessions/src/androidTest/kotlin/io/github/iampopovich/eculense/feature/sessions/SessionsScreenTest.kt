@@ -25,6 +25,13 @@ class SessionsScreenTest {
     }
 
     @Test
+    fun sourceIsShownInRussian() {
+        rule.setContent { SessionsScreen(listOf(trip), onOpen = {}, onDelete = {}) }
+        rule.onNodeWithText("запись с адаптера", substring = true).assertExists()
+        rule.onNodeWithText("LIVE", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun rowOpensAndDeletes() {
         val opened = mutableListOf<Long>()
         val deleted = mutableListOf<Long>()
