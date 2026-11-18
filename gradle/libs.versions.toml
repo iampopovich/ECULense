@@ -68,6 +68,8 @@ koog-google = { group = "ai.koog", name = "prompt-executor-google-client", versi
 koog-deepseek = { group = "ai.koog", name = "prompt-executor-deepseek-client", version.ref = "koogBeta" }
 koog-mistral = { group = "ai.koog", name = "prompt-executor-mistralai-client", version.ref = "koogBeta" }
 koog-ollama = { group = "ai.koog", name = "prompt-executor-ollama-client", version.ref = "koog" }
+# Спайк 3.6 (только модуль :spike:ondevice под флагом): LiteRT-LM на устройстве через Koog.
+koog-litert = { group = "ai.koog", name = "prompt-executor-litert-client", version.ref = "koogBeta" }
 vico-compose-m3 = { group = "com.patrykandpatrick.vico", name = "compose-m3", version.ref = "vico" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version = "3.41.2.2" }
