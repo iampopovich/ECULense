@@ -21,3 +21,20 @@ import kotlinx.serialization.Serializable
 @Serializable data object DataPacksDestination : NavKey
 @Serializable data object AboutDestination : NavKey
 @Serializable data object SignalsetDestination : NavKey
+@Serializable data object MaintenanceDestination : NavKey
+
+/**
+ * Ссылки из уведомлений: MainActivity получает экстру [EXTRA_SCREEN] и открывает экран поверх «Пит-стопа»
+ * (если фича с этим экраном подключена). Строки — чтобы модулю уведомлений не нужны были ключи фич.
+ */
+object DeepLinks {
+    const val EXTRA_SCREEN = "io.github.iampopovich.eculense.SCREEN"
+    const val ANALYSIS = "analysis"
+    const val MAINTENANCE = "maintenance"
+
+    fun destination(screen: String?): NavKey? = when (screen) {
+        ANALYSIS -> AnalysisDestination
+        MAINTENANCE -> MaintenanceDestination
+        else -> null
+    }
+}

@@ -2,6 +2,7 @@ package io.github.iampopovich.eculense
 
 import io.github.iampopovich.eculense.core.ai.aiModule
 import io.github.iampopovich.eculense.core.aitools.aiToolsModule
+import io.github.iampopovich.eculense.core.background.backgroundModule
 import io.github.iampopovich.eculense.core.bluetooth.bluetoothModule
 import io.github.iampopovich.eculense.core.data.dataModule
 import io.github.iampopovich.eculense.core.datapacks.dataPacksModule
@@ -34,6 +35,8 @@ val appModules: List<Module> = listOf(
     serviceModule,
     databaseModule,
     dataModule,
+    // Фоновый анализ после поездки и напоминания о ТО (WorkManager + уведомления); без него находки считает слой данных.
+    backgroundModule,
     // Пакеты данных по запросу (справочники, базы кодов) — до модулей-читателей.
     dataPacksModule,
     vehicleDbModule,
