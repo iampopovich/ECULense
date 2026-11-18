@@ -54,6 +54,7 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:demo"))
     implementation(project(":core:ai"))
+    implementation(project(":feature:aisettings"))
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
