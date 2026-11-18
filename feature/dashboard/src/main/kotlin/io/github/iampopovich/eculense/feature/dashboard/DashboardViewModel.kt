@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 internal data class LiveValue(val pid: Pid, val value: Double?)
 
@@ -24,7 +25,15 @@ internal data class DashboardUiState(
     val connected: Boolean = false,
     val values: List<LiveValue> = emptyList(),
     val recording: Boolean = false,
+    /** Короткая строка «адаптер · протокол · напряжение» — только когда подключены. */
+    val status: String? = null,
 )
+
+internal fun ConnectionState.statusLine(): String? {
+    if (this !is ConnectionState.Connected) return null
+    val voltage = info.batteryVoltage?.let { " · " + String.format(Locale.ROOT, "%.1f", it) + " В" }.orEmpty()
+    return "${endpoint.label} · протокол ${info.protocolNumber}$voltage"
+}
 
 internal class DashboardViewModel(
     private val controller: ConnectionController,
@@ -46,6 +55,7 @@ internal class DashboardViewModel(
                 connected = state is ConnectionState.Connected,
                 values = pids.map { LiveValue(it, values[it.sensorId]) },
                 recording = sessionId != null,
+                status = state.statusLine(),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardUiState())
 

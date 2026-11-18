@@ -12,5 +12,5 @@ import org.koin.dsl.navigation3.navigation
 val dashboardModule = module {
     viewModelOf(::DashboardViewModel)
     navigation<DashboardDestination> { DashboardRoute() }
-    single(named("dashboard")) { TopLevelEntry(DashboardDestination, "Панель", R.drawable.ic_dashboard, order = 10) }
+    single(named("dashboard")) { TopLevelEntry(DashboardDestination, "Панель", R.drawable.ic_dashboard, order = 0) }
 }

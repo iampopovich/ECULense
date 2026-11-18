@@ -35,6 +35,7 @@ fun EcuLenseApp() {
                 item(
                     icon = { Icon(painterResource(entry.icon), contentDescription = entry.label) },
                     label = { Text(entry.label) },
+                    // Вкладка = корень стека: подэкран (например, «Адаптер» из настроек) не сбрасывает подсветку.
                     selected = backStack.firstOrNull() == entry.destination,
                     onClick = {
                         backStack.clear()

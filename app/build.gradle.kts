@@ -42,6 +42,8 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":feature:dashboard"))
     implementation(project(":feature:connect"))
+    implementation(project(":feature:pitstop"))
+    implementation(project(":feature:settings"))
     implementation(project(":core:obd"))
     implementation(project(":core:bluetooth"))
     implementation(project(":core:usb"))

@@ -47,4 +47,14 @@ class DashboardViewModelTest {
         vm.toggleRecording()
         assertTrue(vm.uiState.value.recording)
     }
+
+    @Test
+    fun `connected state shows a compact adapter status line`() = runTest {
+        val controller = FakeConnectionController(initial = FakeConnectionController.connected(setOf(0x0C)))
+        val vm = DashboardViewModel(controller, FakeRecorder())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
+        assertEquals("Fake ELM · протокол 6 · 12.6 В", vm.uiState.value.status)
+        controller.disconnect()
+        assertEquals(null, vm.uiState.value.status)
+    }
 }

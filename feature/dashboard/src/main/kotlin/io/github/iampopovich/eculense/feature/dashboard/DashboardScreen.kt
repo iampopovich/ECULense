@@ -47,6 +47,9 @@ internal fun DashboardScreen(
         return
     }
     Column(modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        state.status?.let {
+            Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         FilledTonalButton(onClick = onToggleRecording) {
             Text(if (state.recording) "■ Остановить запись" else "● Записывать")
         }
