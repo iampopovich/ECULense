@@ -107,6 +107,8 @@ data class TripEntity(
     val standingMs: Long,
     val source: String,
     val externalId: String? = null,
+    /** v5: как посчитано топливо поездки по записи (FuelMethod); null — поездка Car Scanner. */
+    val fuelMethod: String? = null,
 )
 
 @Dao
@@ -275,11 +277,111 @@ interface TripDao {
     /** IGNORE + уникальный externalId = повторный импорт не дублирует поездки; -1 — такая уже была. */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(trips: List<TripEntity>): List<Long>
+
+    @Query("SELECT * FROM trips WHERE carId = :carId ORDER BY startedAtMs")
+    suspend fun forCar(carId: Long): List<TripEntity>
+
+    /**
+     * Законченные записи без своей поездки ("session:<id>"). Импортированные записи, которые по времени
+     * перекрываются с поездкой Car Scanner, пропускаются: эта поездка уже есть в таблице, дубль не нужен.
+     */
+    @Query(
+        "SELECT s.id, s.startedAtMs, s.endedAtMs, s.source, s.carId FROM sessions s " +
+            "WHERE s.endedAtMs IS NOT NULL AND s.carId IS NOT NULL " +
+            "AND NOT EXISTS (SELECT 1 FROM trips t WHERE t.externalId = 'session:' || s.id) " +
+            "AND (s.source = 'LIVE' OR NOT EXISTS (SELECT 1 FROM trips t WHERE t.carId = s.carId " +
+            "AND t.source = 'IMPORT_CARSCANNER' AND t.startedAtMs < s.endedAtMs AND t.endedAtMs > s.startedAtMs)) " +
+            "ORDER BY s.startedAtMs",
+    )
+    suspend fun sessionsWithoutTrip(): List<TripCandidateRow>
+}
+
+data class TripCandidateRow(val id: Long, val startedAtMs: Long, val endedAtMs: Long, val source: String, val carId: Long)
+
+/** Работа ТО машины (3.3/3.9 п.2): интервалы по пробегу/времени и когда делали последний раз. */
+@Entity(
+    tableName = "maintenance_items",
+    foreignKeys = [ForeignKey(CarEntity::class, ["id"], ["carId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("carId")],
+)
+data class MaintenanceItemEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val carId: Long,
+    val title: String,
+    val intervalKm: Int?,
+    val intervalMonths: Int?,
+    val lastDoneKm: Long?,
+    val lastDoneAtMs: Long?,
+    val note: String?,
+)
+
+/** Записи пробега: MANUAL — ввод пользователя (или перенос из профиля машины), ESTIMATED — оценка. */
+@Entity(
+    tableName = "odometer_log",
+    foreignKeys = [ForeignKey(CarEntity::class, ["id"], ["carId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("carId")],
+)
+data class OdometerEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val carId: Long,
+    val km: Long,
+    val atMs: Long,
+    val source: String,
+)
+
+@Dao
+interface MaintenanceDao {
+    @Query("SELECT * FROM maintenance_items WHERE carId = :carId ORDER BY id")
+    fun observeForCar(carId: Long): Flow<List<MaintenanceItemEntity>>
+
+    @Query("SELECT * FROM maintenance_items WHERE carId = :carId ORDER BY id")
+    suspend fun forCar(carId: Long): List<MaintenanceItemEntity>
+
+    @Query("SELECT * FROM maintenance_items WHERE id = :id")
+    suspend fun byId(id: Long): MaintenanceItemEntity?
+
+    @Insert suspend fun insert(item: MaintenanceItemEntity): Long
+
+    @Insert suspend fun insertAll(items: List<MaintenanceItemEntity>)
+
+    @Update suspend fun update(item: MaintenanceItemEntity)
+
+    @Query("DELETE FROM maintenance_items WHERE id = :id")
+    suspend fun delete(id: Long)
+}
+
+@Dao
+interface OdometerDao {
+    @Query("SELECT * FROM odometer_log WHERE carId = :carId ORDER BY atMs, id")
+    fun observeForCar(carId: Long): Flow<List<OdometerEntity>>
+
+    @Query("SELECT * FROM odometer_log WHERE carId = :carId ORDER BY atMs, id")
+    suspend fun forCar(carId: Long): List<OdometerEntity>
+
+    /** Последний ручной ввод каждой машины (для профиля машины). */
+    @Query(
+        "SELECT * FROM odometer_log o WHERE o.source = 'MANUAL' AND o.id = (SELECT o2.id FROM odometer_log o2 " +
+            "WHERE o2.carId = o.carId AND o2.source = 'MANUAL' ORDER BY o2.atMs DESC, o2.id DESC LIMIT 1)",
+    )
+    fun observeLatestManual(): Flow<List<OdometerEntity>>
+
+    @Query(
+        "SELECT * FROM odometer_log WHERE carId = :carId AND source = 'MANUAL' ORDER BY atMs DESC, id DESC LIMIT 1",
+    )
+    suspend fun latestManual(carId: Long): OdometerEntity?
+
+    @Insert suspend fun insert(entry: OdometerEntity): Long
+
+    @Query("DELETE FROM odometer_log WHERE id = :id")
+    suspend fun delete(id: Long)
 }
 
 @Database(
-    entities = [SessionEntity::class, ReadingEntity::class, DtcSnapshotEntity::class, CarEntity::class, TripEntity::class, FindingEntity::class],
-    version = 4,
+    entities = [
+        SessionEntity::class, ReadingEntity::class, DtcSnapshotEntity::class, CarEntity::class, TripEntity::class, FindingEntity::class,
+        MaintenanceItemEntity::class, OdometerEntity::class,
+    ],
+    version = 5,
 )
 abstract class EcuDatabase : RoomDatabase() {
     abstract fun sessionDao(): SessionDao
@@ -288,6 +390,8 @@ abstract class EcuDatabase : RoomDatabase() {
     abstract fun tripDao(): TripDao
     abstract fun analyticsDao(): AnalyticsDao
     abstract fun findingDao(): FindingDao
+    abstract fun maintenanceDao(): MaintenanceDao
+    abstract fun odometerDao(): OdometerDao
 
     companion object {
         const val DEFAULT_CAR_ID = 1L
@@ -401,10 +505,38 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+/**
+ * 4 → 5: ТО и журнал пробега (3.9 п.2), способ расчёта топлива у поездок. Только CREATE и ADD COLUMN.
+ * Пробег из профиля машины (1.25: odometerKm/odometerAtMs) переносится в odometer_log как ручной ввод, а в
+ * cars обнуляется — источник один, профиль читает пробег из журнала. Без даты — дата миграции.
+ */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `trips` ADD COLUMN `fuelMethod` TEXT")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `maintenance_items` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `carId` INTEGER NOT NULL, " +
+                "`title` TEXT NOT NULL, `intervalKm` INTEGER, `intervalMonths` INTEGER, `lastDoneKm` INTEGER, `lastDoneAtMs` INTEGER, " +
+                "`note` TEXT, FOREIGN KEY(`carId`) REFERENCES `cars`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_maintenance_items_carId` ON `maintenance_items` (`carId`)")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `odometer_log` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `carId` INTEGER NOT NULL, " +
+                "`km` INTEGER NOT NULL, `atMs` INTEGER NOT NULL, `source` TEXT NOT NULL, " +
+                "FOREIGN KEY(`carId`) REFERENCES `cars`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_odometer_log_carId` ON `odometer_log` (`carId`)")
+        db.execSQL(
+            "INSERT INTO odometer_log (carId, km, atMs, source) SELECT id, odometerKm, " +
+                "COALESCE(odometerAtMs, CAST(strftime('%s','now') AS INTEGER) * 1000), 'MANUAL' FROM cars WHERE odometerKm IS NOT NULL",
+        )
+        db.execSQL("UPDATE cars SET odometerKm = NULL, odometerAtMs = NULL")
+    }
+}
+
 val databaseModule = module {
     single {
         Room.databaseBuilder(androidContext(), EcuDatabase::class.java, "ecu.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .addCallback(EcuDatabase.defaultCar)
             .build()
     }
@@ -414,4 +546,6 @@ val databaseModule = module {
     single { get<EcuDatabase>().tripDao() }
     single { get<EcuDatabase>().analyticsDao() }
     single { get<EcuDatabase>().findingDao() }
+    single { get<EcuDatabase>().maintenanceDao() }
+    single { get<EcuDatabase>().odometerDao() }
 }
