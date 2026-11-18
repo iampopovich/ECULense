@@ -1,6 +1,7 @@
 package io.github.iampopovich.eculense.core.datapacks
 
 import org.koin.android.ext.koin.androidContext
+import org.koin.dsl.bind
 import org.koin.dsl.module
 import java.io.File
 
@@ -10,5 +11,5 @@ val dataPacksModule = module {
     single<PackHttp> { UrlConnectionHttp() }
     single { PackInstaller(get(), get(), getAll()) }
     single<PackDbOpener> { AndroidPackDb }
-    single(createdAtStart = true) { DataPacks(androidContext(), get(), get()).also { it.scheduleUpdateCheck() } }
+    single(createdAtStart = true) { DataPacks(androidContext(), get(), get()).also { it.scheduleUpdateCheck() } } bind DataPackService::class
 }

@@ -36,6 +36,19 @@ data class PackState(
 }
 
 /**
+ * Что нужно экранам от пакетов: состояние, скачать/отменить/удалить, тип сети. Интерфейс — чтобы ViewModel-и
+ * тестировались без WorkManager.
+ */
+interface DataPackService {
+    fun observe(): Flow<List<PackState>>
+    fun download(id: String, version: String? = null)
+    fun cancel(id: String)
+    fun delete(id: String)
+    fun isMeteredNetwork(): Boolean
+    suspend fun checkUpdates(): Map<String, String>
+}
+
+/**
  * Пакеты данных по запросу: скачивание через WorkManager (переживает уход с экрана), атомарная установка версии,
  * удаление, еженедельная проверка обновлений только по безлимитной сети. Подтверждение на мобильной сети — на экране
  * ([isMeteredNetwork] до вызова [download]).
@@ -45,7 +58,7 @@ class DataPacks(
     val store: PackStore,
     val installer: PackInstaller,
     val catalog: List<PackManifest> = PackCatalog.all,
-) {
+) : DataPackService {
     private val changes = MutableStateFlow(0)
     private val work get() = WorkManager.getInstance(context)
 
@@ -58,7 +71,7 @@ class DataPacks(
     /** Любое изменение пакета (установка, удаление) — читатели переоткрывают файлы. */
     val revisions: Flow<Int> get() = changes
 
-    fun observe(): Flow<List<PackState>> =
+    override fun observe(): Flow<List<PackState>> =
         combine(changes, work.getWorkInfosByTagFlow(TAG)) { _, infos ->
             catalog.map { m -> state(m, infos.filter { "$TAG:${m.id}" in it.tags }) }
         }
@@ -79,7 +92,7 @@ class DataPacks(
     }
 
     /** version = null — зафиксированная (или для «Обновить» — найденная проверкой) версия. */
-    fun download(id: String, version: String? = null) {
+    override fun download(id: String, version: String?) {
         val request = OneTimeWorkRequestBuilder<PackDownloadWorker>()
             .setInputData(workDataOf(KEY_ID to id, KEY_VERSION to version))
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
@@ -89,11 +102,11 @@ class DataPacks(
         work.enqueueUniqueWork("$TAG:$id", ExistingWorkPolicy.KEEP, request)
     }
 
-    fun cancel(id: String) {
+    override fun cancel(id: String) {
         work.cancelUniqueWork("$TAG:$id")
     }
 
-    fun delete(id: String) {
+    override fun delete(id: String) {
         cancel(id)
         store.delete(id)
         work.pruneWork()
@@ -104,7 +117,7 @@ class DataPacks(
         changes.value++
     }
 
-    fun isMeteredNetwork(): Boolean =
+    override fun isMeteredNetwork(): Boolean =
         context.getSystemService(ConnectivityManager::class.java)?.isActiveNetworkMetered ?: true
 
     /** Раз в неделю, только Wi-Fi/безлимит; проверяются только скачанные пакеты. */
@@ -116,7 +129,7 @@ class DataPacks(
     }
 
     /** Проверка обновлений сейчас (её же делает еженедельный воркер). Возвращает найденные новые версии. */
-    suspend fun checkUpdates(): Map<String, String> {
+    override suspend fun checkUpdates(): Map<String, String> {
         val found = mutableMapOf<String, String>()
         for (m in catalog) {
             val installed = store.installed(m.id) ?: continue

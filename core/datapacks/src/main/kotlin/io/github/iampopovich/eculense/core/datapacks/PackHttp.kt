@@ -22,6 +22,9 @@ interface PackHttp {
 
     /** Location ответа без следования редиректу (`/releases/latest` → `/releases/tag/<tag>`); null — редиректа нет. */
     fun redirectLocation(url: String): String?
+
+    /** HTTP-код HEAD-запроса (200 — файл есть, 404 — нет). */
+    fun status(url: String): Int
 }
 
 class UrlConnectionHttp(private val connectTimeoutMs: Int = 15_000, private val readTimeoutMs: Int = 30_000) : PackHttp {
@@ -47,6 +50,16 @@ class UrlConnectionHttp(private val connectTimeoutMs: Int = 15_000, private val 
         val c = connect(url, follow = false)
         return try {
             if (c.responseCode in 300..399) c.getHeaderField("Location") else null
+        } finally {
+            c.disconnect()
+        }
+    }
+
+    override fun status(url: String): Int {
+        val c = connect(url, follow = true)
+        c.requestMethod = "HEAD"
+        return try {
+            c.responseCode
         } finally {
             c.disconnect()
         }
