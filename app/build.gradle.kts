@@ -49,6 +49,7 @@ dependencies {
     implementation(project(":feature:car"))
     implementation(project(":feature:stats"))
     implementation(project(":feature:analysis"))
+    implementation(project(":feature:maintenance"))
     implementation(project(":core:obd"))
     implementation(project(":core:bluetooth"))
     implementation(project(":core:usb"))

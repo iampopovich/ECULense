@@ -21,6 +21,7 @@ import io.github.iampopovich.eculense.feature.connect.connectModule
 import io.github.iampopovich.eculense.feature.dashboard.dashboardModule
 import io.github.iampopovich.eculense.feature.datapacks.dataPacksFeatureModule
 import io.github.iampopovich.eculense.feature.dtc.dtcModule
+import io.github.iampopovich.eculense.feature.maintenance.maintenanceModule
 import io.github.iampopovich.eculense.feature.pitstop.pitstopModule
 import io.github.iampopovich.eculense.feature.sessions.sessionsModule
 import io.github.iampopovich.eculense.feature.settings.settingsModule
@@ -50,6 +51,7 @@ val appModules: List<Module> = listOf(
     carModule,
     statsModule,
     analysisModule,
+    maintenanceModule,
     dataPacksFeatureModule,
     // Демо-режим (виртуальный ELM327) — последним в списке транспортов, во всех сборках.
     demoModule,
