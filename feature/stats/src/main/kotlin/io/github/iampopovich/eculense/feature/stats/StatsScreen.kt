@@ -27,8 +27,7 @@ import io.github.iampopovich.eculense.core.model.TripStats
 import io.github.iampopovich.eculense.core.model.UnitsSettings
 import io.github.iampopovich.eculense.feature.stats.StatsFormat.label
 import org.koin.compose.viewmodel.koinViewModel
-import java.text.DateFormat
-import java.util.Date
+import io.github.iampopovich.eculense.core.ui.EcuDates
 
 @Composable
 internal fun StatsRoute(viewModel: StatsViewModel = koinViewModel()) {
@@ -117,7 +116,7 @@ private fun TripRow(t: Trip, u: UnitsSettings) {
     val stats = TripStats.of(listOf(t))
     Column {
         ListItem(
-            headlineContent = { Text(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(t.startedAtMs))) },
+            headlineContent = { Text(EcuDates.dateTime(t.startedAtMs)) },
             supportingContent = {
                 Text("${StatsFormat.distance(t.distanceKm, u)} · ${StatsFormat.volume(t.fuelL, u)} · ${StatsFormat.consumption(stats.avgLPer100Km, u)}")
             },

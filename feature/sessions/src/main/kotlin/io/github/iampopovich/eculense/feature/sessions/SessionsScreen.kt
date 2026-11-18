@@ -26,8 +26,7 @@ import io.github.iampopovich.eculense.core.model.SessionSource
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import io.github.iampopovich.eculense.core.navigation.SessionDetailDestination
 import org.koin.compose.viewmodel.koinViewModel
-import java.text.DateFormat
-import java.util.Date
+import io.github.iampopovich.eculense.core.ui.EcuDates
 
 @Composable
 internal fun SessionsRoute(viewModel: SessionsViewModel = koinViewModel()) {
@@ -85,7 +84,7 @@ internal fun SessionsScreen(
             items(sessions, key = { it.id }) { session ->
                 ListItem(
                     headlineContent = { Text(session.name) },
-                    supportingContent = { Text(DateFormat.getDateTimeInstance().format(Date(session.startedAtMs)) + " · " + session.source.label) },
+                    supportingContent = { Text(EcuDates.dateTime(session.startedAtMs) + " · " + session.source.label) },
                     trailingContent = { TextButton(onClick = { onDelete(session) }) { Text("Удалить") } },
                     modifier = Modifier.clickable { onOpen(session) },
                 )

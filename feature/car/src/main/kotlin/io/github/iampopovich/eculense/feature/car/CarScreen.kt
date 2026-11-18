@@ -34,8 +34,7 @@ import io.github.iampopovich.eculense.core.model.UnitsSettings
 import io.github.iampopovich.eculense.core.navigation.CarEditDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import org.koin.compose.viewmodel.koinViewModel
-import java.text.DateFormat
-import java.util.Date
+import io.github.iampopovich.eculense.core.ui.EcuDates
 
 @Composable
 internal fun CarRoute(viewModel: CarViewModel = koinViewModel()) {
@@ -92,7 +91,7 @@ private fun ActiveCarCard(car: CarProfile, onEdit: () -> Unit) {
             car.fuelPrice?.let { Secondary("Цена топлива: ${CarFormat.number(it, 2)} ${car.currency.orEmpty()}/л") }
             car.tankVolumeL?.let { Secondary("Бак: ${CarFormat.number(it, 0)} л") }
             car.odometerKm?.let { km ->
-                val date = car.odometerAtMs?.let { " на " + DateFormat.getDateInstance().format(Date(it)) }.orEmpty()
+                val date = car.odometerAtMs?.let { " на " + EcuDates.date(it) }.orEmpty()
                 Secondary("Пробег: ${CarFormat.number(km.toDouble(), 0)} км$date")
             }
             car.diagProfile?.let { Secondary("Профиль Car Scanner: $it") }
