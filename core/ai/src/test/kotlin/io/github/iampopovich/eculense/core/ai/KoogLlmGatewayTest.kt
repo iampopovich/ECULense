@@ -97,7 +97,15 @@ class KoogLlmGatewayTest {
         }
         http.start()
         server = http
-        return "http://127.0.0.1:${http.address.port}"
+        // Базовый адрес как в настройках: с версией API (OpenRouter → …/api/v1).
+        return "http://127.0.0.1:${http.address.port}/api/v1"
+    }
+
+    private suspend fun streamError(gateway: KoogLlmGateway): LlmException = try {
+        gateway.stream("sys", listOf(ChatMessage(ChatMessage.Role.USER, "hi"))).toList()
+        throw AssertionError("expected error")
+    } catch (e: LlmException) {
+        e
     }
 
     private fun chunk(content: String?, finish: String? = null): String {
@@ -133,9 +141,6 @@ class KoogLlmGatewayTest {
             assertTrue(e.message, e.message!!.contains("No auth credentials found"))
             assertFalse(e.message, e.message!!.contains("sk-or-invalid"))
         }
-        val ping = gateway.ping()
-        assertTrue(ping.isFailure)
-        assertTrue(ping.exceptionOrNull()!!.message!!.contains("401"))
     }
 
     @Test
@@ -143,7 +148,7 @@ class KoogLlmGatewayTest {
         // Так OpenRouter (Cloudflare) отвечает телефону из заблокированной сети/региона на любой запрос.
         val baseUrl = startServer(403, "application/json", """{ "success": false, "error": "Access denied by security policy." }""", mutableListOf())
         val gateway = KoogLlmGateway(store(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", baseUrl, "sk-or-invalid"))
-        val message = gateway.ping().exceptionOrNull()!!.message!!
+        val message = streamError(gateway).message!!
         assertTrue(message, message.contains("403"))
         assertTrue(message, message.contains("Access denied by security policy."))
         assertFalse(message, message.contains("неверный"))
@@ -151,8 +156,27 @@ class KoogLlmGatewayTest {
 
     @Test
     fun `unreachable server gives a network error`() = runBlocking {
-        val gateway = KoogLlmGateway(store(LlmProviderKind.OPENROUTER, "m", "http://127.0.0.1:1", "k"))
-        val ping = gateway.ping()
-        assertTrue(ping.exceptionOrNull()?.message.orEmpty(), ping.exceptionOrNull()?.message.orEmpty().startsWith("Нет связи"))
+        val gateway = KoogLlmGateway(store(LlmProviderKind.OPENROUTER, "m", "http://127.0.0.1:1/api/v1", "k"))
+        val message = streamError(gateway).message.orEmpty()
+        assertTrue(message, message.startsWith("Нет связи"))
+    }
+
+    @Test
+    fun `custom OpenAI-compatible endpoint uses the saved base url without a key`() = runBlocking {
+        val seen = mutableListOf<String>()
+        val sse = chunk("# Ок") + chunk(null, "stop") + "data: [DONE]\n\n"
+        val root = startServer(200, "text/event-stream", sse, seen).removeSuffix("/api/v1")
+        val gateway = KoogLlmGateway(store(LlmProviderKind.OPENAI_COMPATIBLE, "local-model", "$root/v1", null))
+
+        val answer = gateway.stream("sys", listOf(ChatMessage(ChatMessage.Role.USER, "hi"))).toList().joinToString("")
+
+        assertEquals("# Ок", answer)
+        assertEquals(listOf("POST /v1/chat/completions auth=Bearer not-needed"), seen)
+    }
+
+    @Test
+    fun `saved provider without a model is not configured`() = runBlocking {
+        val gateway = KoogLlmGateway(store(LlmProviderKind.OPENROUTER, "", null, "k"))
+        assertEquals("ИИ не настроен: откройте Настройки → ИИ-помощник", streamError(gateway).message)
     }
 }

@@ -9,9 +9,6 @@ data class ChatMessage(val role: Role, val text: String) {
 interface LlmGateway {
     /** Ответ модели кусками по мере генерации. Ошибки — [LlmException] с понятным текстом. */
     fun stream(system: String, history: List<ChatMessage>): Flow<String>
-
-    /** Короткий запрос «ты жив?» для кнопки «Проверить» в настройках. */
-    suspend fun ping(): Result<String>
 }
 
 /** Ошибка ИИ с текстом для пользователя (без ключей и сырых ответов сервера). */

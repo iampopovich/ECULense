@@ -16,7 +16,6 @@ import ai.koog.prompt.executor.clients.openrouter.OpenRouterClientSettings
 import ai.koog.prompt.executor.clients.openrouter.OpenRouterLLMClient
 import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import ai.koog.prompt.executor.model.PromptExecutor
-import ai.koog.prompt.executor.ollama.client.OllamaClient
 import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
@@ -52,7 +51,6 @@ internal object KoogClients {
         LlmProviderKind.ANTHROPIC -> LLMProvider.Anthropic
         LlmProviderKind.GOOGLE -> LLMProvider.Google
         LlmProviderKind.OPENROUTER -> LLMProvider.OpenRouter
-        LlmProviderKind.OLLAMA -> LLMProvider.Ollama
     }
 
     /** Модель задаёт пользователь строкой (id у провайдера), поэтому LLModel собираем сами. */
@@ -74,37 +72,45 @@ internal object KoogClients {
 
     fun executor(settings: LlmSettings, apiKey: String?): PromptExecutor {
         fun key() = apiKey?.takeIf { it.isNotBlank() } ?: throw IllegalStateException("Не задан API-ключ для ${settings.provider.title}")
-        val baseUrl = settings.baseUrl?.takeIf { it.isNotBlank() }
+        // Сохранённый адрес уже содержит версию API (…/api/v1, …/v1, …/v1beta), как его вводит пользователь;
+        // Koog дописывает «/» к базе и относительные пути, поэтому пути задаём без префикса версии.
+        val baseUrl = settings.baseUrl.trim().trimEnd('/').ifBlank { settings.provider.defaultBaseUrl }
         val client: LLMClient = when (settings.provider) {
             LlmProviderKind.OPENROUTER -> OpenRouterLLMClient(
                 apiKey = key(),
-                settings = baseUrl?.let { OpenRouterClientSettings(baseUrl = it, timeoutConfig = timeouts) } ?: OpenRouterClientSettings(timeoutConfig = timeouts),
+                settings = OpenRouterClientSettings(
+                    baseUrl = baseUrl,
+                    chatCompletionsPath = "chat/completions",
+                    modelsPath = "models",
+                    embeddingsPath = "embeddings",
+                    timeoutConfig = timeouts,
+                ),
                 httpClientFactory = httpFactory,
             )
-            LlmProviderKind.OPENAI -> OpenAILLMClient(
-                apiKey = key(),
-                settings = baseUrl?.let { OpenAIClientSettings(baseUrl = it, timeoutConfig = timeouts) } ?: OpenAIClientSettings(timeoutConfig = timeouts),
-                httpClientFactory = httpFactory,
-            )
-            LlmProviderKind.OPENAI_COMPATIBLE -> OpenAILLMClient(
-                apiKey = apiKey?.takeIf { it.isNotBlank() } ?: "not-needed",
-                settings = OpenAIClientSettings(baseUrl = baseUrl ?: throw IllegalStateException("Не задан адрес сервера"), timeoutConfig = timeouts),
+            LlmProviderKind.OPENAI, LlmProviderKind.OPENAI_COMPATIBLE -> OpenAILLMClient(
+                // Локальным серверам ключ обычно не нужен, но Koog требует непустую строку.
+                apiKey = if (settings.provider.needsKey) key() else apiKey?.takeIf { it.isNotBlank() } ?: "not-needed",
+                settings = OpenAIClientSettings(
+                    baseUrl = baseUrl,
+                    timeoutConfig = timeouts,
+                    chatCompletionsPath = "chat/completions",
+                    responsesAPIPath = "responses",
+                    embeddingsPath = "embeddings",
+                    moderationsPath = "moderations",
+                    modelsPath = "models",
+                ),
                 httpClientFactory = httpFactory,
             )
             LlmProviderKind.ANTHROPIC -> AnthropicLLMClient(
                 apiKey = key(),
                 // 1.3.0 отправляет в API не model.id, а значение из modelVersionsMap — кладём туда модель пользователя.
-                settings = AnthropicClientSettings(modelVersionsMap = mapOf(model(settings) to settings.model), timeoutConfig = timeouts),
+                settings = AnthropicClientSettings(modelVersionsMap = mapOf(model(settings) to settings.model), baseUrl = baseUrl, timeoutConfig = timeouts),
                 httpClientFactory = httpFactory,
             )
             LlmProviderKind.GOOGLE -> GoogleLLMClient(
                 apiKey = key(),
-                settings = GoogleClientSettings(timeoutConfig = timeouts),
+                settings = GoogleClientSettings(baseUrl = baseUrl, timeoutConfig = timeouts, defaultPath = "models"),
                 httpClientFactory = httpFactory,
-            )
-            LlmProviderKind.OLLAMA -> OllamaClient(
-                httpClientFactory = httpFactory,
-                baseUrl = baseUrl ?: LlmProviderKind.OLLAMA.defaultBaseUrl!!,
             )
         }
         return MultiLLMPromptExecutor(client)
@@ -144,7 +150,7 @@ internal class KoogLlmGateway(
     private val executorFactory: (LlmSettings, String?) -> PromptExecutor = KoogClients::executor,
 ) : LlmGateway {
     override fun stream(system: String, history: List<ChatMessage>): Flow<String> = flow {
-        val settings = store.settings.first() ?: throw LlmException(NOT_CONFIGURED)
+        val settings = store.settings.first()?.takeIf { it.model.isNotBlank() } ?: throw LlmException(NOT_CONFIGURED)
         val apiKey = store.apiKey()
         val chat = prompt("ecu-chat") {
             system(system)
@@ -170,20 +176,6 @@ internal class KoogLlmGateway(
             )
         } finally {
             executor.close()
-        }
-    }
-
-    override suspend fun ping(): Result<String> {
-        val settings = store.settings.first() ?: return Result.failure(LlmException(NOT_CONFIGURED))
-        val apiKey = store.apiKey()
-        return try {
-            executorFactory(settings, apiKey).use { executor ->
-                Result.success(executor.execute(prompt("ping") { user("Ответь одним словом: ок") }, KoogClients.model(settings)).textContent())
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Result.failure(LlmErrors.describe(e, apiKey))
         }
     }
 

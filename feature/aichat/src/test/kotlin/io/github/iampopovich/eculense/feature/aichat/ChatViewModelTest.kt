@@ -24,7 +24,6 @@ private class FakeGateway(private val chunks: List<String>, private val fail: Bo
         histories += history
         return if (fail) flow { throw IllegalStateException("ИИ не настроен") } else flowOf(*chunks.toTypedArray())
     }
-    override suspend fun ping() = Result.success("ок")
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

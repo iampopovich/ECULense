@@ -25,9 +25,31 @@ class LlmSettingsStoreTest {
 
         store.save(LlmProviderKind.OPENAI, model = "gpt-4.1-mini", baseUrl = null, apiKey = "sk-123")
 
-        assertEquals(LlmSettings(LlmProviderKind.OPENAI, "gpt-4.1-mini", null, hasKey = true), store.settings.first())
+        assertEquals(LlmSettings(LlmProviderKind.OPENAI, "gpt-4.1-mini", "https://api.openai.com/v1", hasKey = true), store.settings.first())
         assertEquals("sk-123", store.apiKey())
         assertEquals("321-ks", dataStore.data.first()[stringPreferencesKey("api_key")])
+    }
+
+    @Test
+    fun `custom base url is kept, default one is not stored`() = runTest {
+        val dataStore = PreferenceDataStoreFactory.create(scope = backgroundScope) { File(tmp.root, "llm4.preferences_pb") }
+        val store = LlmSettingsStore(dataStore, reversingCipher)
+        store.save(LlmProviderKind.OPENAI_COMPATIBLE, "qwen", "http://127.0.0.1:8089/v1/", null)
+        assertEquals("http://127.0.0.1:8089/v1", store.settings.first()?.baseUrl)
+        store.save(LlmProviderKind.OPENROUTER, "m", "https://openrouter.ai/api/v1", "k")
+        assertEquals(null, dataStore.data.first()[stringPreferencesKey("base_url")])
+        assertEquals("https://openrouter.ai/api/v1", store.settings.first()?.baseUrl)
+    }
+
+    @Test
+    fun `switching provider without a new key drops the old key, clear forgets everything`() = runTest {
+        val dataStore = PreferenceDataStoreFactory.create(scope = backgroundScope) { File(tmp.root, "llm5.preferences_pb") }
+        val store = LlmSettingsStore(dataStore, reversingCipher)
+        store.save(LlmProviderKind.OPENROUTER, "m", null, "sk-or-1")
+        store.save(LlmProviderKind.OPENAI_COMPATIBLE, "qwen", "http://127.0.0.1:8089/v1", "")
+        assertEquals(null, store.apiKey())
+        store.clear()
+        assertEquals(null, store.settings.first())
     }
 
     @Test
