@@ -38,11 +38,11 @@ import kotlinx.coroutines.flow.map
 import java.io.IOException
 
 /**
- * Клиенты Koog по провайдеру. Адреса по умолчанию и пути API — из настроек клиентов Koog
- * (`OpenRouterClientSettings`, `OpenAIClientSettings`, `AnthropicClientSettings`, `GoogleClientSettings`,
- * `DeepSeekClientSettings`, `MistralAIClientSettings`, `OllamaClient.DEFAULT_BASE_URL`); от нас — только адрес,
- * если пользователь его поменял, и таймауты. Исключение — [LlmProviderKind.OTHER]: пользователь вводит полный
- * OpenAI-совместимый адрес (…/v1), поэтому пути клиенту OpenAI задаём относительно него.
+ * Клиенты Koog по провайдеру. У пресетов адрес и пути — настройки клиентов Koog по умолчанию
+ * (`OpenRouterClientSettings()`, `OpenAIClientSettings()`, `AnthropicClientSettings()`, `GoogleClientSettings()`,
+ * `DeepSeekClientSettings()`, `MistralAIClientSettings()`, `OllamaClient` с `DEFAULT_BASE_URL`); от нас — только
+ * таймауты. Адрес задаёт пользователь лишь у [LlmProviderKind.OTHER]: полный OpenAI-совместимый адрес (…/v1),
+ * поэтому пути клиенту OpenAI там задаём относительно него.
  */
 internal object KoogClients {
     /**
@@ -73,6 +73,7 @@ internal object KoogClients {
         }
     }
 
+    /** Для показа в сводке; в клиенты пресетов адрес не передаётся. */
     fun defaultBaseUrl(kind: LlmProviderKind): String = defaults.getValue(kind)
 
     fun provider(kind: LlmProviderKind): LLMProvider = when (kind) {
@@ -103,54 +104,69 @@ internal object KoogClients {
     }
 
     /**
-     * [baseUrl] пустой — адрес клиента Koog по умолчанию. [model] нужен только Anthropic: 1.3.0 отправляет в API
-     * не model.id, а значение из modelVersionsMap — кладём туда модель пользователя.
+     * [otherBaseUrl] — адрес пользователя, используется только для [LlmProviderKind.OTHER].
+     * [model] нужен только Anthropic: 1.3.0 отправляет в API не model.id, а значение из modelVersionsMap.
+     * [presetBaseUrlForTests] — только для JVM-тестов (локальный HttpServer вместо провайдера); приложение его не задаёт,
+     * и тогда настройки пресета — целиком Koog по умолчанию.
      */
-    fun client(kind: LlmProviderKind, baseUrl: String, apiKey: String?, model: LLModel? = null): LLMClient {
+    fun client(
+        kind: LlmProviderKind,
+        apiKey: String?,
+        model: LLModel? = null,
+        otherBaseUrl: String? = null,
+        presetBaseUrlForTests: String? = null,
+    ): LLMClient {
         fun key() = apiKey?.trim()?.takeIf { it.isNotEmpty() } ?: throw IllegalStateException("Не задан API-ключ для ${kind.title}")
-        val url = baseUrl.trim().trimEnd('/').ifBlank { defaultBaseUrl(kind) }
+        val test = presetBaseUrlForTests
         return when (kind) {
             LlmProviderKind.OPENROUTER -> OpenRouterLLMClient(
                 apiKey = key(),
-                settings = OpenRouterClientSettings(baseUrl = url, timeoutConfig = timeouts),
+                settings = if (test == null) OpenRouterClientSettings(timeoutConfig = timeouts) else OpenRouterClientSettings(baseUrl = test, timeoutConfig = timeouts),
                 httpClientFactory = httpFactory,
             )
             LlmProviderKind.OPENAI -> OpenAILLMClient(
                 apiKey = key(),
-                settings = OpenAIClientSettings(baseUrl = url, timeoutConfig = timeouts),
+                settings = if (test == null) OpenAIClientSettings(timeoutConfig = timeouts) else OpenAIClientSettings(baseUrl = test, timeoutConfig = timeouts),
                 httpClientFactory = httpFactory,
             )
-            LlmProviderKind.ANTHROPIC -> AnthropicLLMClient(
-                apiKey = key(),
-                settings = if (model != null) {
-                    AnthropicClientSettings(modelVersionsMap = mapOf(model to model.id), baseUrl = url, timeoutConfig = timeouts)
-                } else {
-                    AnthropicClientSettings(baseUrl = url, timeoutConfig = timeouts)
-                },
-                httpClientFactory = httpFactory,
-            )
+            LlmProviderKind.ANTHROPIC -> {
+                val versions = model?.let { mapOf(it to it.id) }
+                AnthropicLLMClient(
+                    apiKey = key(),
+                    settings = when {
+                        test != null && versions != null -> AnthropicClientSettings(modelVersionsMap = versions, baseUrl = test, timeoutConfig = timeouts)
+                        test != null -> AnthropicClientSettings(baseUrl = test, timeoutConfig = timeouts)
+                        versions != null -> AnthropicClientSettings(modelVersionsMap = versions, timeoutConfig = timeouts)
+                        else -> AnthropicClientSettings(timeoutConfig = timeouts)
+                    },
+                    httpClientFactory = httpFactory,
+                )
+            }
             LlmProviderKind.GOOGLE -> GoogleLLMClient(
                 apiKey = key(),
-                settings = GoogleClientSettings(baseUrl = url, timeoutConfig = timeouts),
+                settings = if (test == null) GoogleClientSettings(timeoutConfig = timeouts) else GoogleClientSettings(baseUrl = test, timeoutConfig = timeouts),
                 httpClientFactory = httpFactory,
             )
             LlmProviderKind.DEEPSEEK -> DeepSeekLLMClient(
                 apiKey = key(),
-                settings = DeepSeekClientSettings(baseUrl = url, timeoutConfig = timeouts),
+                settings = if (test == null) DeepSeekClientSettings(timeoutConfig = timeouts) else DeepSeekClientSettings(baseUrl = test, timeoutConfig = timeouts),
                 httpClientFactory = httpFactory,
             )
             LlmProviderKind.MISTRAL -> MistralAILLMClient(
                 apiKey = key(),
-                settings = MistralAIClientSettings(baseUrl = url, timeoutConfig = timeouts),
+                settings = if (test == null) MistralAIClientSettings(timeoutConfig = timeouts) else MistralAIClientSettings(baseUrl = test, timeoutConfig = timeouts),
                 httpClientFactory = httpFactory,
             )
-            LlmProviderKind.OLLAMA -> OllamaClient(httpClientFactory = httpFactory, baseUrl = url, timeoutConfig = timeouts)
+            LlmProviderKind.OLLAMA ->
+                if (test == null) OllamaClient(httpClientFactory = httpFactory, timeoutConfig = timeouts)
+                else OllamaClient(httpClientFactory = httpFactory, baseUrl = test, timeoutConfig = timeouts)
             LlmProviderKind.OTHER -> OpenAILLMClient(
                 // Локальным серверам ключ обычно не нужен, но Koog требует непустую строку.
                 apiKey = apiKey?.trim()?.takeIf { it.isNotEmpty() } ?: "not-needed",
                 // Адрес пользователя уже содержит версию API (…/v1), поэтому пути — относительно него.
                 settings = OpenAIClientSettings(
-                    baseUrl = url,
+                    baseUrl = otherBaseUrl?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() }
+                        ?: throw IllegalStateException("Не задан адрес сервера"),
                     timeoutConfig = timeouts,
                     chatCompletionsPath = "chat/completions",
                     responsesAPIPath = "responses",
@@ -163,12 +179,18 @@ internal object KoogClients {
         }
     }
 
-    fun executor(settings: LlmSettings, apiKey: String?): PromptExecutor {
-        // Адрес мог быть сохранён до появления проверки — http в интернет не пускаем и здесь.
-        (EndpointUrl.validate(settings.baseUrl.ifBlank { defaultBaseUrl(settings.provider) }) as? EndpointUrl.Result.Invalid)
-            ?.let { throw IllegalStateException(it.reason) }
+    fun executor(settings: LlmSettings, apiKey: String?, presetBaseUrlForTests: String? = null): PromptExecutor {
+        val other = if (settings.provider == LlmProviderKind.OTHER) {
+            // Адрес мог быть сохранён до появления проверки — http в интернет не пускаем и здесь.
+            when (val v = EndpointUrl.validate(settings.baseUrl)) {
+                is EndpointUrl.Result.Invalid -> throw IllegalStateException(v.reason)
+                is EndpointUrl.Result.Valid -> v.url
+            }
+        } else {
+            null
+        }
         val key = apiKey.takeIf { settings.provider.usesKey }
-        return MultiLLMPromptExecutor(client(settings.provider, settings.baseUrl, key, model(settings)))
+        return MultiLLMPromptExecutor(client(settings.provider, key, model(settings), other, presetBaseUrlForTests))
     }
 }
 
@@ -202,7 +224,7 @@ internal object LlmErrors {
 
 internal class KoogLlmGateway(
     private val store: LlmSettingsStore,
-    private val executorFactory: (LlmSettings, String?) -> PromptExecutor = KoogClients::executor,
+    private val executorFactory: (LlmSettings, String?) -> PromptExecutor = { s, key -> KoogClients.executor(s, key) },
 ) : LlmGateway {
     override fun stream(system: String, history: List<ChatMessage>): Flow<String> = flow {
         val settings = store.settings.first()?.takeIf { it.model.isNotBlank() } ?: throw LlmException(NOT_CONFIGURED)

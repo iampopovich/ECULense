@@ -18,7 +18,12 @@ class KoogConnectionCheckerTest {
     private var server: HttpServer? = null
     private val seen = mutableListOf<String>()
     private val bodies = mutableListOf<String>()
-    private val checker = KoogConnectionChecker()
+
+    /** Корень локального сервера: пресеты в тестах направляются на него через тестовый вход KoogClients. */
+    private var currentRoot = "http://127.0.0.1:1"
+    private val checker = KoogConnectionChecker { kind, otherUrl, key ->
+        KoogClients.client(kind, key, otherBaseUrl = otherUrl, presetBaseUrlForTests = currentRoot.takeIf { kind != LlmProviderKind.OTHER })
+    }
 
     private class Reply(val status: Int, val body: String, val type: String = "application/json")
 
@@ -42,7 +47,8 @@ class KoogConnectionCheckerTest {
         }
         http.start()
         server = http
-        return "http://127.0.0.1:${http.address.port}"
+        currentRoot = "http://127.0.0.1:${http.address.port}"
+        return currentRoot
     }
 
     private fun openRouterModel(id: String, prompt: String = "0.0000004") = """
@@ -73,7 +79,7 @@ class KoogConnectionCheckerTest {
                 "/api/v1/chat/completions" to Reply(200, completion),
             ),
         )
-        val result = checker.check(LlmProviderKind.OPENROUTER, root, "sk-or-test")
+        val result = checker.check(LlmProviderKind.OPENROUTER, null, "sk-or-test")
 
         assertTrue(result.toString(), result is ConnectionCheck.Ok)
         val models = (result as ConnectionCheck.Ok).models
@@ -95,7 +101,7 @@ class KoogConnectionCheckerTest {
                 "/api/v1/chat/completions" to Reply(401, """{"error":{"message":"User not found.","code":401}}"""),
             ),
         )
-        assertEquals(ConnectionCheck.Unauthorized("User not found."), checker.check(LlmProviderKind.OPENROUTER, root, "sk-or-bad"))
+        assertEquals(ConnectionCheck.Unauthorized("User not found."), checker.check(LlmProviderKind.OPENROUTER, null, "sk-or-bad"))
     }
 
     @Test
@@ -106,25 +112,25 @@ class KoogConnectionCheckerTest {
                 "/api/v1/chat/completions" to Reply(402, """{"error":{"message":"Insufficient credits","code":402}}"""),
             ),
         )
-        assertTrue(checker.check(LlmProviderKind.OPENROUTER, root, "sk-or-1") is ConnectionCheck.Ok)
+        assertTrue(checker.check(LlmProviderKind.OPENROUTER, null, "sk-or-1") is ConnectionCheck.Ok)
     }
 
     @Test
     fun `403 is a block with the server reason, not a bad key`() = runBlocking {
         val root = serve(mapOf("/api/v1/models" to Reply(403, """{ "success": false, "error": "Access denied by security policy." }""")))
-        assertEquals(ConnectionCheck.Blocked("Access denied by security policy."), checker.check(LlmProviderKind.OPENROUTER, root, "sk-or-1"))
+        assertEquals(ConnectionCheck.Blocked("Access denied by security policy."), checker.check(LlmProviderKind.OPENROUTER, null, "sk-or-1"))
     }
 
     @Test
     fun `openai lists models with bearer auth and 401 is a bad key without leaking it`() = runBlocking {
         val root = serve(mapOf("/v1/models" to Reply(200, openAiCatalog("gpt-4o-mini", "gpt-4.1-mini"))))
-        val ok = checker.check(LlmProviderKind.OPENAI, root, "sk-1") as ConnectionCheck.Ok
+        val ok = checker.check(LlmProviderKind.OPENAI, null, "sk-1") as ConnectionCheck.Ok
         assertEquals(listOf("gpt-4.1-mini", "gpt-4o-mini"), ok.models.map { it.id })
         assertEquals(listOf("GET /v1/models Authorization=Bearer sk-1"), seen)
 
         server?.stop(0)
         val root2 = serve(mapOf("/v1/models" to Reply(401, """{"error":{"message":"Incorrect API key provided: sk-secret-123."}}""")))
-        val bad = checker.check(LlmProviderKind.OPENAI, root2, "sk-secret-123")
+        val bad = checker.check(LlmProviderKind.OPENAI, null, "sk-secret-123")
         assertTrue(bad.toString(), bad is ConnectionCheck.Unauthorized)
         assertFalse(bad.toString(), bad.toString().contains("sk-secret-123"))
     }
@@ -132,7 +138,7 @@ class KoogConnectionCheckerTest {
     @Test
     fun `deepseek proves the key via its models list`() = runBlocking {
         val root = serve(mapOf("/models" to Reply(200, """{"object":"list","data":[{"id":"deepseek-chat","object":"model","owned_by":"deepseek"},{"id":"deepseek-reasoner","object":"model","owned_by":"deepseek"}]}""")))
-        val ok = checker.check(LlmProviderKind.DEEPSEEK, root, "sk-ds") as ConnectionCheck.Ok
+        val ok = checker.check(LlmProviderKind.DEEPSEEK, null, "sk-ds") as ConnectionCheck.Ok
         assertEquals(listOf("deepseek-chat", "deepseek-reasoner"), ok.models.map { it.id })
         assertTrue(ok.models.all { it.recommended })
         assertEquals(listOf("GET /models Authorization=Bearer sk-ds"), seen)
@@ -141,7 +147,7 @@ class KoogConnectionCheckerTest {
         val root2 = serve(mapOf("/models" to Reply(401, """{"error":{"message":"Authentication Fails, Your api key is invalid","type":"authentication_error"}}""")))
         assertEquals(
             ConnectionCheck.Unauthorized("Authentication Fails, Your api key is invalid"),
-            checker.check(LlmProviderKind.DEEPSEEK, root2, "sk-bad"),
+            checker.check(LlmProviderKind.DEEPSEEK, null, "sk-bad"),
         )
     }
 
@@ -155,13 +161,13 @@ class KoogConnectionCheckerTest {
                 ),
             ),
         )
-        val ok = checker.check(LlmProviderKind.MISTRAL, root, "ms-1") as ConnectionCheck.Ok
+        val ok = checker.check(LlmProviderKind.MISTRAL, null, "ms-1") as ConnectionCheck.Ok
         assertEquals(listOf("mistral-small-latest", "codestral-latest"), ok.models.map { it.id })
         assertEquals(listOf("GET /v1/models Authorization=Bearer ms-1"), seen)
 
         server?.stop(0)
         val root2 = serve(mapOf("/v1/models" to Reply(401, """{"message":"Unauthorized","request_id":"r"}""")))
-        assertEquals(ConnectionCheck.Unauthorized("Unauthorized"), checker.check(LlmProviderKind.MISTRAL, root2, "bad"))
+        assertEquals(ConnectionCheck.Unauthorized("Unauthorized"), checker.check(LlmProviderKind.MISTRAL, null, "bad"))
     }
 
     @Test
@@ -174,7 +180,7 @@ class KoogConnectionCheckerTest {
                 ),
             ),
         )
-        val ok = checker.check(LlmProviderKind.ANTHROPIC, root, "sk-ant-1") as ConnectionCheck.Ok
+        val ok = checker.check(LlmProviderKind.ANTHROPIC, null, "sk-ant-1") as ConnectionCheck.Ok
         assertEquals("claude-sonnet-4-5-20250929", ok.models.single().id)
         // Датированный id тоже считается рекомендованным (курируемый список хранит алиас).
         assertTrue(ok.models.single().recommended)
@@ -191,7 +197,7 @@ class KoogConnectionCheckerTest {
                 ),
             ),
         )
-        val ok = checker.check(LlmProviderKind.GOOGLE, root, "AIza-1") as ConnectionCheck.Ok
+        val ok = checker.check(LlmProviderKind.GOOGLE, null, "AIza-1") as ConnectionCheck.Ok
         assertEquals(listOf("gemini-2.5-flash"), ok.models.map { it.id })
         assertTrue(seen.single(), seen.single().contains("key=AIza-1"))
 
@@ -201,7 +207,7 @@ class KoogConnectionCheckerTest {
         )
         assertEquals(
             ConnectionCheck.Unauthorized("API key not valid. Please pass a valid API key."),
-            checker.check(LlmProviderKind.GOOGLE, root2, "bad"),
+            checker.check(LlmProviderKind.GOOGLE, null, "bad"),
         )
     }
 
@@ -217,7 +223,7 @@ class KoogConnectionCheckerTest {
                 "/api/show" to Reply(200, ollamaShow),
             ),
         )
-        val ok = checker.check(LlmProviderKind.OLLAMA, root, null) as ConnectionCheck.Ok
+        val ok = checker.check(LlmProviderKind.OLLAMA, null, null) as ConnectionCheck.Ok
         assertEquals(listOf(ModelInfo("llama3.2:3b", contextLength = 131_072)), ok.models)
         assertEquals(listOf("GET /api/tags", "POST /api/show"), seen)
     }
@@ -225,8 +231,10 @@ class KoogConnectionCheckerTest {
     @Test
     fun `ollama without pulled models reports an empty list, nothing listening is unreachable`() = runBlocking {
         val root = serve(mapOf("/api/tags" to Reply(200, """{"models":[]}""")))
-        assertEquals(ConnectionCheck.NoModels, checker.check(LlmProviderKind.OLLAMA, root, null))
-        assertTrue(checker.check(LlmProviderKind.OLLAMA, "http://127.0.0.1:1", null) is ConnectionCheck.Unreachable)
+        assertEquals(ConnectionCheck.NoModels, checker.check(LlmProviderKind.OLLAMA, null, null))
+        server?.stop(0)
+        currentRoot = "http://127.0.0.1:1"
+        assertTrue(checker.check(LlmProviderKind.OLLAMA, null, null) is ConnectionCheck.Unreachable)
     }
 
     @Test
@@ -265,20 +273,29 @@ class KoogConnectionCheckerTest {
                 "/models" to Reply(500, """{"error":{"message":"boom"}}"""),
             ),
         )
-        assertEquals(ConnectionCheck.NoModels, checker.check(LlmProviderKind.OPENAI, root, "sk-1"))
-        assertEquals(ConnectionCheck.Failed(500, "boom"), checker.check(LlmProviderKind.DEEPSEEK, root, "sk-1"))
+        assertEquals(ConnectionCheck.NoModels, checker.check(LlmProviderKind.OPENAI, null, "sk-1"))
+        assertEquals(ConnectionCheck.Failed(500, "boom"), checker.check(LlmProviderKind.DEEPSEEK, null, "sk-1"))
     }
 
     @Test
     fun `wrong address answering html is unreachable, 404 on a preset means a wrong address`() = runBlocking {
         val root = serve(mapOf("/v1/models" to Reply(200, "<html>hello</html>", "text/html")))
-        assertTrue(checker.check(LlmProviderKind.OPENAI, root, "sk-1") is ConnectionCheck.Unreachable)
-        assertTrue(checker.check(LlmProviderKind.MISTRAL, "$root/proxy", "sk-1") is ConnectionCheck.Unreachable)
+        assertTrue(checker.check(LlmProviderKind.OPENAI, null, "sk-1") is ConnectionCheck.Unreachable)
+        // DeepSeek ходит на /models — здесь его нет: 404 у пресета = неверный адрес.
+        assertTrue(checker.check(LlmProviderKind.DEEPSEEK, null, "sk-1") is ConnectionCheck.Unreachable)
+    }
+
+    @Test
+    fun `presets ignore any passed address, only Other validates it`() = runBlocking {
+        serve(mapOf("/v1/models" to Reply(200, openAiCatalog("gpt-4.1-mini"))))
+        // Адрес у пресета игнорируется — даже публичный http не мешает: клиент Koog идёт по своему адресу.
+        assertTrue(checker.check(LlmProviderKind.OPENAI, "http://example.com", "sk-1") is ConnectionCheck.Ok)
+        assertTrue(checker.check(LlmProviderKind.OTHER, null, null) is ConnectionCheck.InvalidUrl)
     }
 
     @Test
     fun `missing key, bad url and public http are caught locally`() = runBlocking {
-        assertEquals(ConnectionCheck.KeyMissing, checker.check(LlmProviderKind.OPENROUTER, LlmProviderKind.OPENROUTER.defaultBaseUrl, " "))
+        assertEquals(ConnectionCheck.KeyMissing, checker.check(LlmProviderKind.OPENROUTER, null, " "))
         assertTrue(checker.check(LlmProviderKind.OTHER, "garbage", null) is ConnectionCheck.InvalidUrl)
         val publicHttp = checker.check(LlmProviderKind.OTHER, "http://example.com/v1", null)
         assertTrue(publicHttp.toString(), publicHttp is ConnectionCheck.InvalidUrl && publicHttp.reason.contains("https://"))

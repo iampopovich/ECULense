@@ -32,9 +32,9 @@ import java.io.File
 
 /** Отвечает заданным результатом; [gate] позволяет «подвесить» проверку и увидеть состояние Checking. */
 private class FakeChecker(var result: ConnectionCheck) : ConnectionChecker {
-    val calls = mutableListOf<Triple<LlmProviderKind, String, String?>>()
+    val calls = mutableListOf<Triple<LlmProviderKind, String?, String?>>()
     var gate: CompletableDeferred<Unit>? = null
-    override suspend fun check(provider: LlmProviderKind, baseUrl: String, apiKey: String?): ConnectionCheck {
+    override suspend fun check(provider: LlmProviderKind, baseUrl: String?, apiKey: String?): ConnectionCheck {
         calls += Triple(provider, baseUrl, apiKey)
         gate?.await()
         return result
@@ -92,7 +92,7 @@ class AiSettingsViewModelTest {
         assertTrue(s.editing)
         assertNull(s.saved)
         assertEquals(LlmProviderKind.OPENROUTER, s.provider)
-        assertEquals(LlmProviderKind.OPENROUTER.defaultBaseUrl, s.baseUrl)
+        assertFalse(s.showUrlField)
         assertFalse(s.modelStepEnabled)
         assertFalse(s.canSave)
     }
@@ -101,6 +101,7 @@ class AiSettingsViewModelTest {
     fun `garbage url is rejected locally without a request`() {
         val checker = FakeChecker(ConnectionCheck.Ok(catalog))
         val vm = loadedVm(checker)
+        vm.selectProvider(LlmProviderKind.OTHER)
         vm.setBaseUrl("openrouter.ai")
         vm.check()
         assertEquals("Адрес должен начинаться с http:// или https://", vm.state.value.urlError)
@@ -121,7 +122,8 @@ class AiSettingsViewModelTest {
 
         val s = vm.state.value
         assertEquals("Подключение работает: 3 модели", (s.check as CheckState.Passed).message)
-        assertEquals(listOf(Triple(LlmProviderKind.OPENROUTER, LlmProviderKind.OPENROUTER.defaultBaseUrl, "sk-or-test")), checker.calls)
+        // Пресет: адрес не передаётся — его задаёт клиент Koog.
+        assertEquals(listOf(Triple(LlmProviderKind.OPENROUTER, null, "sk-or-test")), checker.calls)
         assertTrue(s.modelStepEnabled)
         assertEquals(catalog, s.visibleModels)
         assertFalse(s.canSave)
@@ -233,7 +235,7 @@ class AiSettingsViewModelTest {
         // Другой провайдер — чужой ключ не подставляем.
         vm.selectProvider(LlmProviderKind.OPENAI)
         assertFalse(vm.state.value.canReuseSavedKey)
-        assertEquals(LlmProviderKind.OPENAI.defaultBaseUrl, vm.state.value.baseUrl)
+        assertFalse(vm.state.value.showUrlField)
         assertFalse(vm.state.value.modelStepEnabled)
     }
 
@@ -254,19 +256,19 @@ class AiSettingsViewModelTest {
     }
 
     @Test
-    fun `ollama sends no key even if one was typed, Other starts with an empty address`() {
+    fun `ollama has neither url nor key field and sends neither, Other shows both`() {
         val checker = FakeChecker(ConnectionCheck.Ok(listOf(ModelInfo("llama3.2:3b"))))
         val vm = loadedVm(checker)
         vm.selectProvider(LlmProviderKind.OLLAMA)
-        assertEquals(LlmProviderKind.OLLAMA.defaultBaseUrl, vm.state.value.baseUrl)
+        assertFalse(vm.state.value.showUrlField)
         assertFalse(vm.state.value.showKeyField)
         vm.setApiKey("stray")
-        vm.setBaseUrl("http://127.0.0.1:8089")
         vm.checkAndWait()
-        assertEquals(Triple(LlmProviderKind.OLLAMA, "http://127.0.0.1:8089", null), checker.calls.single())
+        assertEquals(Triple(LlmProviderKind.OLLAMA, null, null), checker.calls.single())
 
         vm.selectProvider(LlmProviderKind.OTHER)
         assertEquals("", vm.state.value.baseUrl)
+        assertTrue(vm.state.value.showUrlField)
         assertTrue(vm.state.value.showKeyField)
     }
 

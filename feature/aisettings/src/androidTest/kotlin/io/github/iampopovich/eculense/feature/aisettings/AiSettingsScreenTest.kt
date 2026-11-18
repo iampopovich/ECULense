@@ -37,7 +37,7 @@ class AiSettingsScreenTest {
     fun freshWizardLocksModelStepAndMasksKey() {
         rule.setContent { AiSettingsScreen(AiSettingsUiState(loaded = true, apiKey = "sk-or-secret"), AiSettingsActions()) }
         rule.onNodeWithText("OpenRouter").assertIsSelected()
-        rule.onNode(hasSetTextAction() and hasText("Адрес API")).assert(hasText(LlmProviderKind.OPENROUTER.defaultBaseUrl))
+        rule.onNodeWithText("Адрес API").assertDoesNotExist()
         rule.onNode(hasSetTextAction() and hasText("API-ключ"))
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("•".repeat("sk-or-secret".length))))
@@ -58,7 +58,10 @@ class AiSettingsScreenTest {
     @Test
     fun localUrlErrorIsShownUnderTheField() {
         rule.setContent {
-            AiSettingsScreen(AiSettingsUiState(loaded = true, baseUrl = "garbage", urlError = "Адрес должен начинаться с http:// или https://"), AiSettingsActions())
+            AiSettingsScreen(
+                AiSettingsUiState(loaded = true, provider = LlmProviderKind.OTHER, baseUrl = "garbage", urlError = "Адрес должен начинаться с http:// или https://"),
+                AiSettingsActions(),
+            )
         }
         rule.onNodeWithText("Адрес должен начинаться с http:// или https://").assertExists()
     }
@@ -132,15 +135,22 @@ class AiSettingsScreenTest {
     }
 
     @Test
-    fun ollamaHidesTheKeyField() {
+    fun ollamaHasNeitherUrlNorKeyField() {
         rule.setContent {
-            AiSettingsScreen(
-                AiSettingsUiState(loaded = true, provider = LlmProviderKind.OLLAMA, baseUrl = LlmProviderKind.OLLAMA.defaultBaseUrl),
-                AiSettingsActions(),
-            )
+            AiSettingsScreen(AiSettingsUiState(loaded = true, provider = LlmProviderKind.OLLAMA), AiSettingsActions())
         }
         rule.onNodeWithText("Ollama").assertIsSelected()
-        rule.onNode(hasSetTextAction() and hasText("Адрес API")).assert(hasText(LlmProviderKind.OLLAMA.defaultBaseUrl))
+        rule.onNodeWithText("Адрес API").assertDoesNotExist()
         rule.onNodeWithText("API-ключ", substring = true).assertDoesNotExist()
+        rule.onNodeWithText("Проверить подключение").assertIsEnabled()
+    }
+
+    @Test
+    fun otherShowsUrlAndOptionalKey() {
+        rule.setContent {
+            AiSettingsScreen(AiSettingsUiState(loaded = true, provider = LlmProviderKind.OTHER), AiSettingsActions())
+        }
+        rule.onNode(hasSetTextAction() and hasText("Адрес API")).assertExists()
+        rule.onNodeWithText("API-ключ (если нужен)").assertExists()
     }
 }

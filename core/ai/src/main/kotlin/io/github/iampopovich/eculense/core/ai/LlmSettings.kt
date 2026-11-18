@@ -13,8 +13,9 @@ import kotlinx.coroutines.flow.map
  * ollama, openai, openrouter) + [OTHER] для любого OpenAI-совместимого сервера. Порядок = порядок в мастере,
  * OpenRouter первым и по умолчанию (решение пользователя).
  *
- * Адреса и пути API не наши: [defaultBaseUrl] берётся из настроек клиента Koog (`OpenAIClientSettings().baseUrl` и т.д.),
- * пути добавляет сам клиент Koog. Храним только адрес, который пользователь изменил (прокси).
+ * Адреса и пути API не наши: у пресетов адрес и пути — только из настроек клиента Koog по умолчанию
+ * (`OpenAIClientSettings()` и т.д.), в UI поля адреса нет и в настройках он не хранится. Адрес вводится и хранится
+ * только у [OTHER]. [defaultBaseUrl] — для показа (сводка), из тех же настроек Koog.
  * [recommended] — курируемые модели, их показываем первыми в каталоге (если сервер их отдаёт).
  */
 enum class LlmProviderKind(
@@ -32,10 +33,10 @@ enum class LlmProviderKind(
     DEEPSEEK("DeepSeek", Key.REQUIRED, listOf("deepseek-chat", "deepseek-reasoner")),
     MISTRAL("Mistral", Key.REQUIRED, listOf("mistral-small-latest", "mistral-medium-latest", "mistral-large-latest")),
 
-    /** Локальный Ollama (по умолчанию у Koog — localhost:11434; для ПК в сети — http://IP:11434). Без ключа. */
+    /** Локальный Ollama по адресу клиента Koog по умолчанию (localhost:11434). Ollama на другом ПК — через [OTHER] (…:11434/v1). */
     OLLAMA("Ollama", Key.NONE, emptyList()),
 
-    /** LM Studio, vLLM, llama.cpp server, LocalAI, прокси: полный OpenAI-совместимый адрес (…/v1). Ключ — если нужен. */
+    /** LM Studio, vLLM, llama.cpp server, LocalAI, Ollama на ПК, прокси: полный OpenAI-совместимый адрес (…/v1). Ключ — если нужен. */
     OTHER("Другой (свой сервер)", Key.OPTIONAL, emptyList()),
     ;
 
@@ -72,19 +73,27 @@ class LlmSettingsStore(
         val name = p[PROVIDER] ?: return@map null
         val legacy = name == LEGACY_CUSTOM
         val provider = if (legacy) LlmProviderKind.OTHER else LlmProviderKind.entries.firstOrNull { it.name == name } ?: return@map null
-        // У прежнего «Свой сервер» адрес по умолчанию в файл не писался — восстанавливаем его.
-        val url = p[BASE_URL] ?: if (legacy) LEGACY_CUSTOM_URL else provider.defaultBaseUrl
+        val url = if (provider == LlmProviderKind.OTHER) {
+            // У прежнего «Свой сервер» адрес по умолчанию в файл не писался — восстанавливаем его.
+            p[BASE_URL] ?: if (legacy) LEGACY_CUSTOM_URL else ""
+        } else {
+            // У пресетов адрес всегда из Koog; сохранённый раньше (прокси) игнорируется и удаляется при следующем save.
+            provider.defaultBaseUrl
+        }
         LlmSettings(provider, p[MODEL].orEmpty(), url, hasKey = p[API_KEY] != null)
     }
 
-    /** Пустой apiKey = «не менять сохранённый». Адрес по умолчанию не храним — его задаёт Koog. */
+    /**
+     * Пустой apiKey = «не менять сохранённый». [baseUrl] хранится только у [LlmProviderKind.OTHER];
+     * для пресетов адрес не храним вовсе — его задают настройки клиента Koog.
+     */
     suspend fun save(provider: LlmProviderKind, model: String, baseUrl: String?, apiKey: String?) {
         dataStore.edit { p ->
             val previous = p[PROVIDER]
             p[PROVIDER] = provider.name
             p[MODEL] = model.trim()
             val url = baseUrl?.trim()?.trimEnd('/')
-            if (url.isNullOrBlank() || url == provider.defaultBaseUrl) p.remove(BASE_URL) else p[BASE_URL] = url
+            if (provider != LlmProviderKind.OTHER || url.isNullOrBlank()) p.remove(BASE_URL) else p[BASE_URL] = url
             when {
                 !provider.usesKey -> p.remove(API_KEY)
                 !apiKey.isNullOrBlank() -> p[API_KEY] = cipher.encrypt(apiKey.trim())

@@ -35,16 +35,28 @@ class LlmSettingsStoreTest {
     }
 
     @Test
-    fun `only a user override of the base url is stored`() = runTest {
+    fun `only Other stores an address, presets always use the Koog default`() = runTest {
         val dataStore = PreferenceDataStoreFactory.create(scope = backgroundScope) { File(tmp.root, "llm4.preferences_pb") }
         val store = LlmSettingsStore(dataStore, reversingCipher)
         store.save(LlmProviderKind.OTHER, "qwen", "http://127.0.0.1:8089/v1/", null)
         assertEquals("http://127.0.0.1:8089/v1", store.settings.first()?.baseUrl)
-        store.save(LlmProviderKind.OPENROUTER, "m", OpenRouterClientSettings().baseUrl, "k")
+        store.save(LlmProviderKind.OPENROUTER, "m", "https://proxy.example.com", "k")
         assertEquals(null, dataStore.data.first()[stringPreferencesKey("base_url")])
         assertEquals(OpenRouterClientSettings().baseUrl, store.settings.first()?.baseUrl)
-        store.save(LlmProviderKind.OPENROUTER, "m", "https://proxy.example.com", "")
-        assertEquals("https://proxy.example.com", store.settings.first()?.baseUrl)
+    }
+
+    @Test
+    fun `a preset address saved by an older version is dropped`() = runTest {
+        val dataStore = PreferenceDataStoreFactory.create(scope = backgroundScope) { File(tmp.root, "legacy3.preferences_pb") }
+        dataStore.edit {
+            it[stringPreferencesKey("provider")] = "OPENROUTER"
+            it[stringPreferencesKey("model")] = "m"
+            it[stringPreferencesKey("base_url")] = "https://openrouter.ai/api/v1"
+        }
+        val store = LlmSettingsStore(dataStore, reversingCipher)
+        assertEquals(OpenRouterClientSettings().baseUrl, store.settings.first()?.baseUrl)
+        store.save(LlmProviderKind.OPENROUTER, "m", null, "")
+        assertEquals(null, dataStore.data.first()[stringPreferencesKey("base_url")])
     }
 
     @Test

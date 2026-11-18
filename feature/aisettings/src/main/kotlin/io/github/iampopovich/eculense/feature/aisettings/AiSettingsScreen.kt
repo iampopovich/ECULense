@@ -212,24 +212,23 @@ private fun ConnectionStep(state: AiSettingsUiState, actions: AiSettingsActions)
     val checking = state.check is CheckState.Checking
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         StepTitle("2. Подключение")
-        OutlinedTextField(
+        if (state.provider == LlmProviderKind.OLLAMA) {
+            Text(
+                "Ollama на этом устройстве (адрес Koog по умолчанию, без ключа). Ollama на ПК в сети — выберите «Другой» и http://IP:11434/v1.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (state.showUrlField) OutlinedTextField(
             value = state.baseUrl,
             onValueChange = actions.onBaseUrl,
             label = { Text("Адрес API") },
-            placeholder = if (state.provider == LlmProviderKind.OTHER) {
-                { Text("http://192.168.1.5:1234/v1") }
-            } else {
-                null
-            },
+            placeholder = { Text("http://192.168.1.5:1234/v1") },
             isError = state.urlError != null,
             supportingText = {
                 Text(
-                    state.urlError ?: when (state.provider) {
-                        LlmProviderKind.OTHER ->
-                            "Полный OpenAI-совместимый адрес: LM Studio http://IP:1234/v1 · vLLM http://IP:8000/v1 · llama.cpp http://IP:8080/v1"
-                        LlmProviderKind.OLLAMA -> "Ollama на ПК в сети: http://IP:11434 (по умолчанию — сам телефон)"
-                        else -> "Адрес по умолчанию из Koog; меняйте только для прокси"
-                    },
+                    state.urlError
+                        ?: "Полный OpenAI-совместимый адрес: LM Studio http://IP:1234/v1 · Ollama http://IP:11434/v1 · vLLM http://IP:8000/v1",
                 )
             },
             singleLine = true,

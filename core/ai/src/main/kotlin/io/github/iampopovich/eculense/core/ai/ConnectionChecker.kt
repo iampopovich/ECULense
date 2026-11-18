@@ -41,7 +41,8 @@ sealed interface ConnectionCheck {
 }
 
 interface ConnectionChecker {
-    suspend fun check(provider: LlmProviderKind, baseUrl: String, apiKey: String?): ConnectionCheck
+    /** [baseUrl] — адрес пользователя, только для [LlmProviderKind.OTHER]; у пресетов адрес задаёт Koog (передавайте null). */
+    suspend fun check(provider: LlmProviderKind, baseUrl: String?, apiKey: String?): ConnectionCheck
 }
 
 /**
@@ -53,18 +54,25 @@ interface ConnectionChecker {
  * Ошибки Koog (`KoogHttpClientException.statusCode/errorBody`) переводятся в состояния [ConnectionCheck].
  */
 class KoogConnectionChecker(
-    private val clientFactory: (LlmProviderKind, String, String?) -> LLMClient = { kind, url, key -> KoogClients.client(kind, url, key) },
+    private val clientFactory: (LlmProviderKind, String?, String?) -> LLMClient = { kind, otherUrl, key ->
+        KoogClients.client(kind, key, otherBaseUrl = otherUrl)
+    },
 ) : ConnectionChecker {
 
-    override suspend fun check(provider: LlmProviderKind, baseUrl: String, apiKey: String?): ConnectionCheck {
-        val base = when (val v = EndpointUrl.validate(baseUrl)) {
-            is EndpointUrl.Result.Invalid -> return ConnectionCheck.InvalidUrl(v.reason)
-            is EndpointUrl.Result.Valid -> v.url
+    override suspend fun check(provider: LlmProviderKind, baseUrl: String?, apiKey: String?): ConnectionCheck {
+        // Адрес вводится только для «Другого»; пресеты ходят по адресу клиента Koog по умолчанию.
+        val otherUrl = if (provider == LlmProviderKind.OTHER) {
+            when (val v = EndpointUrl.validate(baseUrl.orEmpty())) {
+                is EndpointUrl.Result.Invalid -> return ConnectionCheck.InvalidUrl(v.reason)
+                is EndpointUrl.Result.Valid -> v.url
+            }
+        } else {
+            null
         }
         val key = apiKey?.trim()?.takeIf { it.isNotEmpty() && provider.usesKey }
         if (provider.needsKey && key == null) return ConnectionCheck.KeyMissing
         val client = try {
-            clientFactory(provider, base, key)
+            clientFactory(provider, otherUrl, key)
         } catch (e: IllegalStateException) {
             return ConnectionCheck.KeyMissing
         }

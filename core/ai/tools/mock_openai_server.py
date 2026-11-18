@@ -7,7 +7,8 @@
 
 GET  /v1/models            -> model catalog (401 if --key is set and the Bearer key differs)
 POST /v1/chat/completions  -> SSE stream (or plain JSON) with a Markdown answer: heading, list, bold, code.
-Ollama preset (base URL http://127.0.0.1:8089, no key):
+Ollama preset (no URL field — Koog's default http://localhost:11434): run a second mock with --port 11434 and
+`adb reverse tcp:11434 tcp:11434`.
 GET  /api/tags, POST /api/show -> local model list as Koog's OllamaClient.getModels() expects
 POST /api/chat             -> NDJSON stream with the same Markdown answer.
 The app allows plain http only to local addresses (loopback, private LAN, *.local) — see :core:ai EndpointUrl.

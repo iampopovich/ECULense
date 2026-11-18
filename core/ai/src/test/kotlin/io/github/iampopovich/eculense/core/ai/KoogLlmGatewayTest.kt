@@ -116,12 +116,16 @@ class KoogLlmGatewayTest {
         return """data: {"id":"gen-1","object":"chat.completion.chunk","created":1,"model":"openai/gpt-4.1-mini","system_fingerprint":"fp_1","choices":[{"index":0,"delta":$delta,"finish_reason":$reason}]}""" + "\n\n"
     }
 
+    /** Пресет с настоящим клиентом Koog, направленным на локальный сервер через тестовый вход KoogClients. */
+    private fun preset(store: LlmSettingsStore, root: String) =
+        KoogLlmGateway(store) { s, key -> KoogClients.executor(s, key, presetBaseUrlForTests = root) }
+
     @Test
     fun `real OpenRouter client streams from an SSE server`() = runBlocking {
         val seen = mutableListOf<String>()
         val sse = chunk("Привет") + chunk(", мир") + chunk(null, "stop") + "data: [DONE]\n\n"
         val baseUrl = startServer(200, "text/event-stream", sse, seen)
-        val gateway = KoogLlmGateway(store(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", baseUrl, "sk-or-test"))
+        val gateway = preset(store(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", null, "sk-or-test"), baseUrl)
 
         val answer = gateway.stream("sys", listOf(ChatMessage(ChatMessage.Role.USER, "hi"))).toList().joinToString("")
 
@@ -133,7 +137,7 @@ class KoogLlmGatewayTest {
     fun `401 from OpenRouter becomes a readable auth error without the key`() = runBlocking {
         val seen = mutableListOf<String>()
         val baseUrl = startServer(401, "application/json", """{"error":{"message":"No auth credentials found","code":401}}""", seen)
-        val gateway = KoogLlmGateway(store(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", baseUrl, "sk-or-invalid"))
+        val gateway = preset(store(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", null, "sk-or-invalid"), baseUrl)
         try {
             gateway.stream("sys", listOf(ChatMessage(ChatMessage.Role.USER, "hi"))).toList()
             fail("expected error")
@@ -149,7 +153,7 @@ class KoogLlmGatewayTest {
     fun `403 block is not reported as a bad key and shows the server reason`() = runBlocking {
         // Так OpenRouter (Cloudflare) отвечает телефону из заблокированной сети/региона на любой запрос.
         val baseUrl = startServer(403, "application/json", """{ "success": false, "error": "Access denied by security policy." }""", mutableListOf())
-        val gateway = KoogLlmGateway(store(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", baseUrl, "sk-or-invalid"))
+        val gateway = preset(store(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", null, "sk-or-invalid"), baseUrl)
         val message = streamError(gateway).message!!
         assertTrue(message, message.contains("403"))
         assertTrue(message, message.contains("Access denied by security policy."))
@@ -158,7 +162,7 @@ class KoogLlmGatewayTest {
 
     @Test
     fun `unreachable server gives a network error`() = runBlocking {
-        val gateway = KoogLlmGateway(store(LlmProviderKind.OPENROUTER, "m", "http://127.0.0.1:1", "k"))
+        val gateway = preset(store(LlmProviderKind.OPENROUTER, "m", null, "k"), "http://127.0.0.1:1")
         val message = streamError(gateway).message.orEmpty()
         assertTrue(message, message.startsWith("Нет связи"))
     }
@@ -177,6 +181,13 @@ class KoogLlmGatewayTest {
     }
 
     @Test
+    fun `Other saved with a public http address is refused before any request`() = runBlocking {
+        val gateway = KoogLlmGateway(store(LlmProviderKind.OTHER, "m", "http://example.com/v1", null))
+        val message = streamError(gateway).message.orEmpty()
+        assertTrue(message, message.contains("https://"))
+    }
+
+    @Test
     fun `presets stream through their own Koog clients with Koog paths`() = runBlocking {
         val sse = chunk("Да") + chunk(null, "stop") + "data: [DONE]\n\n"
         val expected = mapOf(
@@ -187,7 +198,7 @@ class KoogLlmGatewayTest {
         expected.forEach { (kind, request) ->
             val seen = mutableListOf<String>()
             val root = startServer(200, "text/event-stream", sse, seen)
-            val gateway = KoogLlmGateway(store(kind, "m", root, "k1"))
+            val gateway = preset(store(kind, "m", null, "k1"), root)
             val answer = gateway.stream("sys", listOf(ChatMessage(ChatMessage.Role.USER, "hi"))).toList().joinToString("")
             assertEquals(kind.name, "Да", answer)
             assertEquals(kind.name, listOf(request), seen)
@@ -204,7 +215,7 @@ class KoogLlmGatewayTest {
             """{"model":"llama3.2","message":{"role":"assistant","content":""},"done":true}""",
         ).joinToString("\n", postfix = "\n")
         val root = startServer(200, "application/x-ndjson", ndjson, seen)
-        val gateway = KoogLlmGateway(store(LlmProviderKind.OLLAMA, "llama3.2", root, null))
+        val gateway = preset(store(LlmProviderKind.OLLAMA, "llama3.2", null, null), root)
 
         val answer = gateway.stream("sys", listOf(ChatMessage(ChatMessage.Role.USER, "hi"))).toList().joinToString("")
 

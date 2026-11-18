@@ -36,7 +36,8 @@ internal data class AiSettingsUiState(
     val saved: SavedConfig? = null,
     val editing: Boolean = true,
     val provider: LlmProviderKind = LlmProviderKind.DEFAULT,
-    val baseUrl: String = LlmProviderKind.DEFAULT.defaultBaseUrl,
+    /** Адрес вводится только у «Другой (свой сервер)»; у пресетов его задаёт Koog. */
+    val baseUrl: String = "",
     val apiKey: String = "",
     val urlError: String? = null,
     val check: CheckState = CheckState.Idle,
@@ -48,6 +49,8 @@ internal data class AiSettingsUiState(
     val canReuseSavedKey: Boolean get() = saved?.hasKey == true && saved.provider == provider
     /** У Ollama ключа нет — поле не показываем. */
     val showKeyField: Boolean get() = provider.usesKey
+    /** Поле адреса — только у «Другой (свой сервер)». */
+    val showUrlField: Boolean get() = provider == LlmProviderKind.OTHER
     val modelStepEnabled: Boolean get() = check is CheckState.Passed
     val manualModel: Boolean get() = (check as? CheckState.Passed)?.listed == false
     val canSave: Boolean get() = check is CheckState.Passed && model.isNotBlank() && !busy
@@ -86,7 +89,7 @@ internal class AiSettingsViewModel(
 
     fun selectProvider(provider: LlmProviderKind) {
         if (provider == _state.value.provider) return
-        edit { copy(provider = provider, baseUrl = provider.defaultBaseUrl, apiKey = "") }
+        edit { copy(provider = provider, baseUrl = "", apiKey = "") }
     }
 
     fun setBaseUrl(value: String) = edit { copy(baseUrl = value) }
@@ -100,12 +103,17 @@ internal class AiSettingsViewModel(
     fun check() {
         val s = _state.value
         if (s.check is CheckState.Checking) return
-        val url = when (val v = EndpointUrl.validate(s.baseUrl)) {
-            is EndpointUrl.Result.Invalid -> {
-                _state.update { it.copy(urlError = v.reason, check = CheckState.Idle) }
-                return
+        // Адрес вводится только для «Другого»; у пресетов его задаёт Koog.
+        val url = if (s.provider != LlmProviderKind.OTHER) {
+            null
+        } else {
+            when (val v = EndpointUrl.validate(s.baseUrl)) {
+                is EndpointUrl.Result.Invalid -> {
+                    _state.update { it.copy(urlError = v.reason, check = CheckState.Idle) }
+                    return
+                }
+                is EndpointUrl.Result.Valid -> v.url
             }
-            is EndpointUrl.Result.Valid -> v.url
         }
         // Модель, выбранная до проверки (например, сохранённая при «Изменить»), остаётся, если сервер её отдаёт.
         val previousModel = s.model.ifBlank { s.saved?.takeIf { it.provider == s.provider }?.model.orEmpty() }
@@ -134,7 +142,7 @@ internal class AiSettingsViewModel(
         if (!s.canSave) return
         _state.update { it.copy(busy = true) }
         viewModelScope.launch {
-            val url = (EndpointUrl.validate(s.baseUrl) as EndpointUrl.Result.Valid).url
+            val url = if (s.provider == LlmProviderKind.OTHER) (EndpointUrl.validate(s.baseUrl) as EndpointUrl.Result.Valid).url else null
             store.save(s.provider, s.model, url, s.apiKey)
             val saved = store.settings.first()?.let { SavedConfig(it.provider, it.model, it.baseUrl, it.hasKey) }
             _state.update { it.copy(saved = saved, editing = false, apiKey = "", busy = false) }
@@ -146,7 +154,12 @@ internal class AiSettingsViewModel(
         val saved = _state.value.saved ?: return
         checkJob?.cancel()
         _state.update {
-            it.copy(editing = true, provider = saved.provider, baseUrl = saved.baseUrl, apiKey = "")
+            it.copy(
+                editing = true,
+                provider = saved.provider,
+                baseUrl = if (saved.provider == LlmProviderKind.OTHER) saved.baseUrl else "",
+                apiKey = "",
+            )
                 .invalidated()
                 .copy(model = saved.model)
         }
