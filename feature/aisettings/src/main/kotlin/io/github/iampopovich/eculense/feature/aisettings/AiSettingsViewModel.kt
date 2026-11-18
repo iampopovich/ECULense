@@ -48,6 +48,8 @@ internal data class AiSettingsUiState(
     val busy: Boolean = false,
     /** Модуль «На устройстве» подключён — в списке провайдеров есть пункт, ведущий на его экран. */
     val onDeviceAvailable: Boolean = false,
+    /** Облачная сборка: вместо пункта «На устройстве» — приглушённая строка «доступно в сборке «Локально»». */
+    val onDeviceInOtherBuild: Boolean = false,
     /** Выбрана модель на телефоне — чат идёт через неё (облачная настройка, если есть, не активна). */
     val onDevice: OnDeviceSummary? = null,
 ) {
@@ -76,8 +78,12 @@ internal class AiSettingsViewModel(
     /** Модель на телефоне (:core:ailocal), если модуль подключён. */
     private val onDevice: OnDeviceLlm? = null,
     onDeviceRoute: Boolean = false,
+    /** Флаг флейвора сборки (BuildCapabilities): локальные модели есть только в сборке «Локально». */
+    onDeviceInOtherBuild: Boolean = false,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(AiSettingsUiState(onDeviceAvailable = onDeviceRoute && onDevice != null))
+    private val _state = MutableStateFlow(
+        AiSettingsUiState(onDeviceAvailable = onDeviceRoute && onDevice != null, onDeviceInOtherBuild = onDeviceInOtherBuild && onDevice == null),
+    )
     val state: StateFlow<AiSettingsUiState> = _state.asStateFlow()
     private var checkJob: Job? = null
 
@@ -208,7 +214,11 @@ internal class AiSettingsViewModel(
         viewModelScope.launch {
             store.clear()
             onDevice?.deactivate()
-            _state.value = AiSettingsUiState(loaded = true, onDeviceAvailable = _state.value.onDeviceAvailable)
+            _state.value = AiSettingsUiState(
+                loaded = true,
+                onDeviceAvailable = _state.value.onDeviceAvailable,
+                onDeviceInOtherBuild = _state.value.onDeviceInOtherBuild,
+            )
         }
     }
 

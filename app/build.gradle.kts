@@ -35,12 +35,26 @@ android {
         compose = true
         buildConfig = true
     }
-    packaging {
-        jniLibs {
-            // LiteRT-LM (модель на телефоне, :core:ailocal) — ~25 МБ нативных библиотек на ABI. Рантайм работает только
-            // на arm64 (телефоны); x86_64-копии (эмулятор) в APK не кладём.
-            excludes += setOf("lib/x86_64/libLiteRt.so", "lib/x86_64/libLiteRtClGlAccelerator.so", "lib/x86_64/liblitertlm_jni.so")
+    // 3.10 п.11: две сборки одного приложения (один applicationId, разные APK). cloud — только облачные провайдеры
+    // (≈ 10 МБ), local — плюс модель на телефоне (:core:ailocal, LiteRT-LM, ≈ 35 МБ). Различие — только в source set
+    // флейвора (OnDeviceModules.kt) и зависимости localImplementation; общий код типов :core:ailocal не видит.
+    flavorDimensions += "ai"
+    productFlavors {
+        create("cloud") {
+            dimension = "ai"
         }
+        create("local") {
+            dimension = "ai"
+            versionNameSuffix = "-local"
+        }
+    }
+}
+
+androidComponents {
+    // LiteRT-LM (только в local) — ~25 МБ нативных библиотек на ABI. Рантайм работает только на arm64 (телефоны);
+    // x86_64-копии (эмулятор) в APK не кладём.
+    onVariants(selector().withFlavor("ai" to "local")) { variant ->
+        variant.packaging.jniLibs.excludes.addAll("lib/x86_64/libLiteRt.so", "lib/x86_64/libLiteRtClGlAccelerator.so", "lib/x86_64/liblitertlm_jni.so")
     }
 }
 
@@ -73,8 +87,8 @@ dependencies {
     implementation(project(":feature:datapacks"))
     implementation(project(":feature:aisettings"))
     implementation(project(":feature:aichat"))
-    // 3.10 модель на телефоне (LiteRT-LM через Koog); убрать строку + include + aiLocalModule → без локальной модели.
-    implementation(project(":core:ailocal"))
+    // 3.10 модель на телефоне (LiteRT-LM через Koog) — только в сборке local; подключение — app/src/local/.../OnDeviceModules.kt.
+    "localImplementation"(project(":core:ailocal"))
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)

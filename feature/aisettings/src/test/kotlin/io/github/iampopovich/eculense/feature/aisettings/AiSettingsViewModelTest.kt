@@ -114,6 +114,18 @@ class AiSettingsViewModelTest {
     }
 
     @Test
+    fun `cloud build shows the other-build hint instead of the on-device entry, reset keeps it`() {
+        val vm = AiSettingsViewModel(store, FakeChecker(ConnectionCheck.Ok(catalog)), onDeviceInOtherBuild = true).also { v -> waitUntil { v.state.value.loaded } }
+        assertFalse(vm.state.value.onDeviceAvailable)
+        assertTrue(vm.state.value.onDeviceInOtherBuild)
+        vm.reset()
+        waitUntil { vm.state.value.loaded }
+        assertTrue(vm.state.value.onDeviceInOtherBuild)
+        // локальная сборка и сборка без флага подсказку не показывают
+        assertFalse(loadedVm(FakeChecker(ConnectionCheck.Ok(catalog))).state.value.onDeviceInOtherBuild)
+    }
+
+    @Test
     fun `saving a cloud provider stops using the on-device model`() {
         val local = FakeOnDevice(OnDeviceSummary("Тестовая модель", "CPU"))
         val vm = AiSettingsViewModel(store, FakeChecker(ConnectionCheck.Ok(catalog)), local, onDeviceRoute = true).also { v -> waitUntil { v.state.value.loaded } }

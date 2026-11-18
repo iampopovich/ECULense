@@ -171,7 +171,7 @@ private fun Wizard(state: AiSettingsUiState, actions: AiSettingsActions, modifie
     Column(modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp)) {
             item { Text("ИИ-помощник", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp)) }
-            item { ProviderStep(state.provider, actions.onProvider, state.onDeviceAvailable, actions.onOnDevice) }
+            item { ProviderStep(state.provider, actions.onProvider, state.onDeviceAvailable, actions.onOnDevice, state.onDeviceInOtherBuild) }
             item { ConnectionStep(state, actions) }
             item { StepTitle("3. Модель", enabled = state.modelStepEnabled) }
             when {
@@ -226,7 +226,13 @@ private fun StepTitle(text: String, enabled: Boolean = true) {
 }
 
 @Composable
-private fun ProviderStep(selected: LlmProviderKind, onProvider: (LlmProviderKind) -> Unit, onDeviceAvailable: Boolean = false, onOnDevice: () -> Unit = {}) {
+private fun ProviderStep(
+    selected: LlmProviderKind,
+    onProvider: (LlmProviderKind) -> Unit,
+    onDeviceAvailable: Boolean = false,
+    onOnDevice: () -> Unit = {},
+    onDeviceInOtherBuild: Boolean = false,
+) {
     Column {
         StepTitle("1. Провайдер")
         Column(Modifier.selectableGroup()) {
@@ -257,6 +263,14 @@ private fun ProviderStep(selected: LlmProviderKind, onProvider: (LlmProviderKind
                         )
                     }
                 }
+            } else if (onDeviceInOtherBuild) {
+                // Облачная сборка: пункта нет, одна приглушённая строка (не нажимается).
+                Text(
+                    "Локальные модели доступны в сборке «Локально»",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 4.dp),
+                )
             }
         }
     }

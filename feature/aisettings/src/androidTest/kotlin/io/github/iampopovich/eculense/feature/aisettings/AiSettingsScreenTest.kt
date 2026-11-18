@@ -34,6 +34,20 @@ class AiSettingsScreenTest {
     )
 
     @Test
+    fun cloudBuildShowsMutedHintInsteadOfOnDeviceEntry() {
+        rule.setContent { AiSettingsScreen(AiSettingsUiState(loaded = true, onDeviceInOtherBuild = true), AiSettingsActions()) }
+        rule.onNodeWithText("Локальные модели доступны в сборке «Локально»").assertExists()
+        rule.onNodeWithText("На устройстве").assertDoesNotExist()
+    }
+
+    @Test
+    fun localBuildShowsOnDeviceEntryWithoutHint() {
+        rule.setContent { AiSettingsScreen(AiSettingsUiState(loaded = true, onDeviceAvailable = true), AiSettingsActions()) }
+        rule.onNodeWithText("На устройстве").assertExists()
+        rule.onNodeWithText("Локальные модели доступны в сборке «Локально»").assertDoesNotExist()
+    }
+
+    @Test
     fun freshWizardLocksModelStepAndMasksKey() {
         rule.setContent { AiSettingsScreen(AiSettingsUiState(loaded = true, apiKey = "sk-or-secret"), AiSettingsActions()) }
         rule.onNodeWithText("OpenRouter").assertIsSelected()
