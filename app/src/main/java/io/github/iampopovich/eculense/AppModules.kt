@@ -10,6 +10,7 @@ import io.github.iampopovich.eculense.core.service.serviceModule
 import io.github.iampopovich.eculense.core.usb.usbModule
 import io.github.iampopovich.eculense.feature.aichat.aiChatModule
 import io.github.iampopovich.eculense.feature.aisettings.aiSettingsModule
+import io.github.iampopovich.eculense.feature.car.carModule
 import io.github.iampopovich.eculense.feature.connect.connectModule
 import io.github.iampopovich.eculense.feature.dashboard.dashboardModule
 import io.github.iampopovich.eculense.feature.dtc.dtcModule
@@ -32,6 +33,7 @@ val appModules: List<Module> = listOf(
     settingsModule,
     dtcModule,
     sessionsModule,
+    carModule,
     // Демо-режим (виртуальный ELM327) — последним в списке транспортов, во всех сборках.
     demoModule,
     // ИИ (этап 2): убрать эти строки + модули в settings.gradle.kts/app → приложение работает без ИИ.
