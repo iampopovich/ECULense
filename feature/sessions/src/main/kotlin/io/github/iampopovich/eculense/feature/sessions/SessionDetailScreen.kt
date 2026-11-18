@@ -38,6 +38,7 @@ import org.koin.core.parameter.parametersOf
 @Composable
 internal fun SessionDetailRoute(sessionId: Long, viewModel: SessionDetailViewModel = koinViewModel { parametersOf(sessionId) }) {
     val bySensor by viewModel.readingsBySensor.collectAsStateWithLifecycle()
+    val loading by viewModel.loading.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selected by remember { mutableStateOf<String?>(null) }
@@ -73,6 +74,8 @@ internal fun SessionDetailRoute(sessionId: Long, viewModel: SessionDetailViewMod
                 modelProducer = modelProducer,
                 modifier = Modifier.fillMaxWidth().height(260.dp),
             )
+        } else if (loading) {
+            Text("Загрузка записи…")
         } else {
             Text("Мало точек для графика")
         }

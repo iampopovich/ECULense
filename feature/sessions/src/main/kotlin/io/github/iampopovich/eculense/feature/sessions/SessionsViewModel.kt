@@ -75,8 +75,15 @@ internal class SessionDetailViewModel(
     private val _readings = MutableStateFlow<Map<String, List<SensorReading>>>(emptyMap())
     val readingsBySensor: StateFlow<Map<String, List<SensorReading>>> = _readings.asStateFlow()
 
+    /** Импортированная поездка Car Scanner — до ~120 тыс. значений, загрузка занимает секунды. */
+    private val _loading = MutableStateFlow(true)
+    val loading: StateFlow<Boolean> = _loading.asStateFlow()
+
     init {
-        viewModelScope.launch { _readings.value = repository.readings(sessionId).groupBy { it.sensorId } }
+        viewModelScope.launch {
+            _readings.value = withContext(Dispatchers.Default) { repository.readings(sessionId).groupBy { it.sensorId } }
+            _loading.value = false
+        }
     }
 
     /** Пишет CSV в cache/exports и возвращает content:// Uri для Intent.ACTION_SEND. */
