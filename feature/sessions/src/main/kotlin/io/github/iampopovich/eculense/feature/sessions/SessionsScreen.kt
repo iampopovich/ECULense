@@ -74,10 +74,7 @@ internal fun SessionsScreen(
                 Text("Импорт… обработано записей: ${importState.processed}", Modifier.padding(horizontal = 16.dp))
                 LinearProgressIndicator(Modifier.fillMaxWidth().padding(16.dp))
             }
-            is ImportState.Done -> Text(
-                "Импортировано ${importState.imported}, пропущено дублей ${importState.duplicates}, ошибок ${importState.failed}",
-                Modifier.padding(horizontal = 16.dp),
-            )
+            is ImportState.Done -> Text(importSummary(importState), Modifier.padding(horizontal = 16.dp))
             is ImportState.Failed -> Text("Импорт не удался: ${importState.message}", Modifier.padding(horizontal = 16.dp))
         }
         if (sessions.isEmpty()) {
@@ -96,6 +93,19 @@ internal fun SessionsScreen(
         }
     }
 }
+
+/** Что именно перенесено — записи, машина, поездки, единицы и цена топлива (видимость состояния системы). */
+internal fun importSummary(s: ImportState.Done): String = buildList {
+    add("Импортировано ${s.imported}, пропущено дублей ${s.duplicates}, ошибок ${s.failed}")
+    s.car?.let { car ->
+        val details = listOfNotNull(car.brand, car.year?.toString()).joinToString(", ")
+        val how = if (car.created) "добавлена" else "обновлена"
+        add("Машина «${car.name}»${if (details.isNotEmpty()) " ($details)" else ""} — $how")
+        car.fuelPrice?.let { add("Цена топлива: ${it.toString().replace('.', ',')} ${car.currency.orEmpty()}/л".replace(" /л", "/л")) }
+    }
+    if (s.tripsImported + s.tripsSkipped > 0) add("Поездки: добавлено ${s.tripsImported}, уже были ${s.tripsSkipped}")
+    if (s.unitsImported) add("Единицы измерения перенесены")
+}.joinToString("\n")
 
 private val SessionSource.label: String
     get() = when (this) {

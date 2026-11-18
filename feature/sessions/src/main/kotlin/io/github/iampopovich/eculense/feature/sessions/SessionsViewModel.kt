@@ -7,6 +7,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.iampopovich.eculense.core.data.CarScannerImporter
+import io.github.iampopovich.eculense.core.data.ImportedCar
 import io.github.iampopovich.eculense.core.data.SessionCsv
 import io.github.iampopovich.eculense.core.data.SessionRepository
 import io.github.iampopovich.eculense.core.model.SensorReading
@@ -26,7 +27,15 @@ import java.io.File
 internal sealed interface ImportState {
     data object Idle : ImportState
     data class Running(val processed: Int) : ImportState
-    data class Done(val imported: Int, val duplicates: Int, val failed: Int) : ImportState
+    data class Done(
+        val imported: Int,
+        val duplicates: Int,
+        val failed: Int,
+        val car: ImportedCar? = null,
+        val tripsImported: Int = 0,
+        val tripsSkipped: Int = 0,
+        val unitsImported: Boolean = false,
+    ) : ImportState
     data class Failed(val message: String) : ImportState
 }
 
@@ -52,7 +61,10 @@ internal class SessionsViewModel(
             _importState.value = try {
                 val report = importer.import(uri, fileName) { _importState.value = ImportState.Running(it) }
                 report.failed.forEach { Log.w(TAG, "Car Scanner import: $it") }
-                ImportState.Done(report.imported, report.skippedDuplicates, report.failed.size)
+                ImportState.Done(
+                    report.imported, report.skippedDuplicates, report.failed.size,
+                    report.car, report.tripsImported, report.tripsSkipped, report.unitsImported,
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
