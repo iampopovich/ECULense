@@ -135,7 +135,103 @@ interface SessionDao {
 @Dao
 interface DtcDao {
     @Insert suspend fun insert(items: List<DtcSnapshotEntity>)
+
+    @Query("SELECT * FROM dtc_snapshots WHERE carId = :carId ORDER BY takenAtMs")
+    suspend fun forCar(carId: Long): List<DtcSnapshotEntity>
 }
+
+/** Агрегат одного датчика: считает SQLite, в Kotlin приходит одна строка вместо тысяч значений. */
+data class SensorAggregateRow(
+    val sensorId: String,
+    val unit: String,
+    val count: Int,
+    val min: Double,
+    val max: Double,
+    val mean: Double,
+    val sessions: Int,
+)
+
+/** Лёгкая проекция показания (без id и единицы) для однопроходных расчётов по сессии. */
+data class ReadingPoint(val sensorId: String, val value: Double, val timestampMs: Long)
+
+/** Сессия со счётчиком значений — для списков и инструментов ИИ. */
+data class SessionSummaryRow(
+    val id: Long,
+    val startedAtMs: Long,
+    val endedAtMs: Long?,
+    val source: String,
+    val readings: Int,
+)
+
+/**
+ * Запросы аналитики (этап 3). Агрегаты — в SQL, без загрузки 1,3 млн значений в память; перцентили —
+ * по прореженной выборке (`id % step = 0`). «Прогретый» = после первого замера ОЖ ≥ 80 °C в этой сессии.
+ * Индекс по sessionId уже есть; полный проход по readings на телефоне — 0,2–2,5 с, отдельный индекс не нужен.
+ */
+@Dao
+interface AnalyticsDao {
+    @Query(
+        "SELECT s.id, s.startedAtMs, s.endedAtMs, s.source, " +
+            "(SELECT COUNT(*) FROM readings r WHERE r.sessionId = s.id) AS readings " +
+            "FROM sessions s WHERE s.carId = :carId AND s.startedAtMs BETWEEN :fromMs AND :toMs " +
+            "ORDER BY s.startedAtMs DESC LIMIT :limit",
+    )
+    suspend fun sessions(carId: Long, fromMs: Long, toMs: Long, limit: Int): List<SessionSummaryRow>
+
+    @Query("SELECT id, startedAtMs FROM sessions WHERE carId = :carId ORDER BY startedAtMs")
+    suspend fun sessionStarts(carId: Long): List<SessionStartRow>
+
+    @Query("SELECT id, startedAtMs, endedAtMs, source, 0 AS readings FROM sessions WHERE id = :sessionId AND carId = :carId")
+    suspend fun session(carId: Long, sessionId: Long): SessionSummaryRow?
+
+    @Query(
+        "SELECT sensorId, MIN(unit) AS unit, COUNT(*) AS count, MIN(value) AS min, MAX(value) AS max, AVG(value) AS mean, " +
+            "1 AS sessions FROM readings WHERE sessionId = :sessionId GROUP BY sensorId ORDER BY sensorId",
+    )
+    suspend fun sessionAggregates(sessionId: Long): List<SensorAggregateRow>
+
+    @Query("SELECT value FROM readings WHERE sessionId = :sessionId AND sensorId = :sensorId AND id % :step = 0")
+    suspend fun sessionSample(sessionId: Long, sensorId: String, step: Int): List<Double>
+
+    @Query(
+        "SELECT r.sensorId, MIN(r.unit) AS unit, COUNT(*) AS count, MIN(r.value) AS min, MAX(r.value) AS max, " +
+            "AVG(r.value) AS mean, COUNT(DISTINCT r.sessionId) AS sessions " +
+            "FROM readings r JOIN sessions s ON s.id = r.sessionId " +
+            "WHERE s.carId = :carId AND s.startedAtMs BETWEEN :fromMs AND :toMs AND r.sensorId = :sensorId " +
+            "GROUP BY r.sensorId",
+    )
+    suspend fun sensorAggregate(carId: Long, sensorId: String, fromMs: Long, toMs: Long): SensorAggregateRow?
+
+    @Query(
+        "WITH warm AS (SELECT sessionId, MIN(timestampMs) AS t FROM readings WHERE sensorId = '01.05' AND value >= 80 GROUP BY sessionId) " +
+            "SELECT r.sensorId, MIN(r.unit) AS unit, COUNT(*) AS count, MIN(r.value) AS min, MAX(r.value) AS max, " +
+            "AVG(r.value) AS mean, COUNT(DISTINCT r.sessionId) AS sessions " +
+            "FROM readings r JOIN sessions s ON s.id = r.sessionId JOIN warm w ON w.sessionId = r.sessionId " +
+            "WHERE s.carId = :carId AND s.startedAtMs BETWEEN :fromMs AND :toMs AND r.sensorId = :sensorId AND r.timestampMs >= w.t " +
+            "GROUP BY r.sensorId",
+    )
+    suspend fun warmSensorAggregate(carId: Long, sensorId: String, fromMs: Long, toMs: Long): SensorAggregateRow?
+
+    @Query(
+        "SELECT r.value FROM readings r JOIN sessions s ON s.id = r.sessionId " +
+            "WHERE s.carId = :carId AND s.startedAtMs BETWEEN :fromMs AND :toMs AND r.sensorId = :sensorId AND r.id % :step = 0",
+    )
+    suspend fun sensorSample(carId: Long, sensorId: String, fromMs: Long, toMs: Long, step: Int): List<Double>
+
+    @Query(
+        "WITH warm AS (SELECT sessionId, MIN(timestampMs) AS t FROM readings WHERE sensorId = '01.05' AND value >= 80 GROUP BY sessionId) " +
+            "SELECT r.value FROM readings r JOIN sessions s ON s.id = r.sessionId JOIN warm w ON w.sessionId = r.sessionId " +
+            "WHERE s.carId = :carId AND s.startedAtMs BETWEEN :fromMs AND :toMs AND r.sensorId = :sensorId " +
+            "AND r.timestampMs >= w.t AND r.id % :step = 0",
+    )
+    suspend fun warmSensorSample(carId: Long, sensorId: String, fromMs: Long, toMs: Long, step: Int): List<Double>
+
+    /** Только нужные правилам датчики одной сессии, по времени — вход для однопроходного дайджеста. */
+    @Query("SELECT sensorId, value, timestampMs FROM readings WHERE sessionId = :sessionId AND sensorId IN (:sensorIds) ORDER BY timestampMs")
+    suspend fun points(sessionId: Long, sensorIds: Collection<String>): List<ReadingPoint>
+}
+
+data class SessionStartRow(val id: Long, val startedAtMs: Long)
 
 @Dao
 interface CarDao {
@@ -184,6 +280,7 @@ abstract class EcuDatabase : RoomDatabase() {
     abstract fun dtcDao(): DtcDao
     abstract fun carDao(): CarDao
     abstract fun tripDao(): TripDao
+    abstract fun analyticsDao(): AnalyticsDao
 
     companion object {
         const val DEFAULT_CAR_ID = 1L
@@ -242,4 +339,5 @@ val databaseModule = module {
     single { get<EcuDatabase>().dtcDao() }
     single { get<EcuDatabase>().carDao() }
     single { get<EcuDatabase>().tripDao() }
+    single { get<EcuDatabase>().analyticsDao() }
 }
