@@ -46,6 +46,8 @@ dependencies {
     implementation(project(":core:bluetooth"))
     implementation(project(":core:usb"))
     implementation(project(":core:service"))
+    implementation(project(":core:database"))
+    implementation(project(":core:data"))
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
