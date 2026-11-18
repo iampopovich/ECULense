@@ -44,8 +44,10 @@ class KoogLlmGatewayTest {
         scope.cancel()
     }
 
+    private var files = 0
+
     private suspend fun store(provider: LlmProviderKind, model: String, baseUrl: String?, key: String?): LlmSettingsStore {
-        val dataStore = PreferenceDataStoreFactory.create(scope = scope) { File(tmp.root, "gw.preferences_pb") }
+        val dataStore = PreferenceDataStoreFactory.create(scope = scope) { File(tmp.root, "gw${files++}.preferences_pb") }
         return LlmSettingsStore(dataStore, plain).also { it.save(provider, model, baseUrl, key) }
     }
 
@@ -97,8 +99,8 @@ class KoogLlmGatewayTest {
         }
         http.start()
         server = http
-        // Базовый адрес как в настройках: с версией API (OpenRouter → …/api/v1).
-        return "http://127.0.0.1:${http.address.port}/api/v1"
+        // Базовый адрес как в настройках Koog: корень хоста, пути добавляет клиент Koog.
+        return "http://127.0.0.1:${http.address.port}"
     }
 
     private suspend fun streamError(gateway: KoogLlmGateway): LlmException = try {
@@ -111,7 +113,7 @@ class KoogLlmGatewayTest {
     private fun chunk(content: String?, finish: String? = null): String {
         val delta = if (content != null) """{"role":"assistant","content":"$content"}""" else "{}"
         val reason = finish?.let { "\"$it\"" } ?: "null"
-        return """data: {"id":"gen-1","object":"chat.completion.chunk","created":1,"model":"openai/gpt-4.1-mini","choices":[{"index":0,"delta":$delta,"finish_reason":$reason}]}""" + "\n\n"
+        return """data: {"id":"gen-1","object":"chat.completion.chunk","created":1,"model":"openai/gpt-4.1-mini","system_fingerprint":"fp_1","choices":[{"index":0,"delta":$delta,"finish_reason":$reason}]}""" + "\n\n"
     }
 
     @Test
@@ -156,22 +158,58 @@ class KoogLlmGatewayTest {
 
     @Test
     fun `unreachable server gives a network error`() = runBlocking {
-        val gateway = KoogLlmGateway(store(LlmProviderKind.OPENROUTER, "m", "http://127.0.0.1:1/api/v1", "k"))
+        val gateway = KoogLlmGateway(store(LlmProviderKind.OPENROUTER, "m", "http://127.0.0.1:1", "k"))
         val message = streamError(gateway).message.orEmpty()
         assertTrue(message, message.startsWith("Нет связи"))
     }
 
     @Test
-    fun `custom OpenAI-compatible endpoint uses the saved base url without a key`() = runBlocking {
+    fun `Other endpoint passes the full saved base url to the OpenAI client, no key needed`() = runBlocking {
         val seen = mutableListOf<String>()
         val sse = chunk("# Ок") + chunk(null, "stop") + "data: [DONE]\n\n"
-        val root = startServer(200, "text/event-stream", sse, seen).removeSuffix("/api/v1")
-        val gateway = KoogLlmGateway(store(LlmProviderKind.OPENAI_COMPATIBLE, "local-model", "$root/v1", null))
+        val root = startServer(200, "text/event-stream", sse, seen)
+        val gateway = KoogLlmGateway(store(LlmProviderKind.OTHER, "local-model", "$root/v1", null))
 
         val answer = gateway.stream("sys", listOf(ChatMessage(ChatMessage.Role.USER, "hi"))).toList().joinToString("")
 
         assertEquals("# Ок", answer)
         assertEquals(listOf("POST /v1/chat/completions auth=Bearer not-needed"), seen)
+    }
+
+    @Test
+    fun `presets stream through their own Koog clients with Koog paths`() = runBlocking {
+        val sse = chunk("Да") + chunk(null, "stop") + "data: [DONE]\n\n"
+        val expected = mapOf(
+            LlmProviderKind.OPENAI to "POST /v1/chat/completions auth=Bearer k1",
+            LlmProviderKind.DEEPSEEK to "POST /chat/completions auth=Bearer k1",
+            LlmProviderKind.MISTRAL to "POST /v1/chat/completions auth=Bearer k1",
+        )
+        expected.forEach { (kind, request) ->
+            val seen = mutableListOf<String>()
+            val root = startServer(200, "text/event-stream", sse, seen)
+            val gateway = KoogLlmGateway(store(kind, "m", root, "k1"))
+            val answer = gateway.stream("sys", listOf(ChatMessage(ChatMessage.Role.USER, "hi"))).toList().joinToString("")
+            assertEquals(kind.name, "Да", answer)
+            assertEquals(kind.name, listOf(request), seen)
+            server?.stop(0)
+        }
+    }
+
+    @Test
+    fun `ollama streams ndjson through Koog's Ollama client without a key`() = runBlocking {
+        val seen = mutableListOf<String>()
+        val ndjson = listOf(
+            """{"model":"llama3.2","message":{"role":"assistant","content":"## При"},"done":false}""",
+            """{"model":"llama3.2","message":{"role":"assistant","content":"вет"},"done":false}""",
+            """{"model":"llama3.2","message":{"role":"assistant","content":""},"done":true}""",
+        ).joinToString("\n", postfix = "\n")
+        val root = startServer(200, "application/x-ndjson", ndjson, seen)
+        val gateway = KoogLlmGateway(store(LlmProviderKind.OLLAMA, "llama3.2", root, null))
+
+        val answer = gateway.stream("sys", listOf(ChatMessage(ChatMessage.Role.USER, "hi"))).toList().joinToString("")
+
+        assertEquals("## Привет", answer)
+        assertEquals(listOf("POST /api/chat auth=null"), seen)
     }
 
     @Test

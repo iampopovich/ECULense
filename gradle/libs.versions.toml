@@ -16,7 +16,8 @@ datastore = "1.3.0"
 coroutines = "1.11.0"
 serialization = "1.13.0"
 koog = "1.3.0"
-koogGoogle = "1.3.0-beta"
+# Google/DeepSeek/Mistral-клиенты Koog 1.3.0 опубликованы только как -beta.
+koogBeta = "1.3.0-beta"
 vico = "3.3.1"
 turbine = "1.2.1"
 usbSerial = "3.12.0"
@@ -58,9 +59,12 @@ kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 koog-agents = { group = "ai.koog", name = "koog-agents", version.ref = "koog" }
-# koog-agents 1.3.0 (Android) не содержит клиентов OpenRouter и Google — подключаем отдельно.
+# koog-agents 1.3.0 (Android) не содержит клиентов OpenRouter, Google, DeepSeek, Mistral — подключаем отдельно.
 koog-openrouter = { group = "ai.koog", name = "prompt-executor-openrouter-client", version.ref = "koog" }
-koog-google = { group = "ai.koog", name = "prompt-executor-google-client", version.ref = "koogGoogle" }
+koog-google = { group = "ai.koog", name = "prompt-executor-google-client", version.ref = "koogBeta" }
+koog-deepseek = { group = "ai.koog", name = "prompt-executor-deepseek-client", version.ref = "koogBeta" }
+koog-mistral = { group = "ai.koog", name = "prompt-executor-mistralai-client", version.ref = "koogBeta" }
+koog-ollama = { group = "ai.koog", name = "prompt-executor-ollama-client", version.ref = "koog" }
 vico-compose-m3 = { group = "com.patrykandpatrick.vico", name = "compose-m3", version.ref = "vico" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 usbserial = { group = "com.github.mik3y", name = "usb-serial-for-android", version.ref = "usbSerial" }

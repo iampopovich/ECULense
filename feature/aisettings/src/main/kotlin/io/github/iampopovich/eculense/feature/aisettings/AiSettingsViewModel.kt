@@ -46,6 +46,8 @@ internal data class AiSettingsUiState(
 ) {
     /** Пустое поле ключа = использовать сохранённый (только для того же провайдера). */
     val canReuseSavedKey: Boolean get() = saved?.hasKey == true && saved.provider == provider
+    /** У Ollama ключа нет — поле не показываем. */
+    val showKeyField: Boolean get() = provider.usesKey
     val modelStepEnabled: Boolean get() = check is CheckState.Passed
     val manualModel: Boolean get() = (check as? CheckState.Passed)?.listed == false
     val canSave: Boolean get() = check is CheckState.Passed && model.isNotBlank() && !busy
@@ -109,10 +111,14 @@ internal class AiSettingsViewModel(
         val previousModel = s.model.ifBlank { s.saved?.takeIf { it.provider == s.provider }?.model.orEmpty() }
         _state.update { it.copy(urlError = null, check = CheckState.Checking, model = "") }
         checkJob = viewModelScope.launch {
-            val key = s.apiKey.trim().ifBlank { if (s.canReuseSavedKey) store.apiKey().orEmpty() else "" }.ifBlank { null }
+            val key = if (!s.provider.usesKey) {
+                null
+            } else {
+                s.apiKey.trim().ifBlank { if (s.canReuseSavedKey) store.apiKey().orEmpty() else "" }.ifBlank { null }
+            }
             val result = checker.check(s.provider, url, key)
             _state.update { current ->
-                val next = result.toCheckState()
+                val next = result.toCheckState(s.provider)
                 val keep = (next as? CheckState.Passed)?.let { p -> previousModel.takeIf { m -> m.isNotBlank() && (!p.listed || p.models.any { it.id == m }) } }
                 current.copy(
                     check = next,
@@ -168,11 +174,13 @@ internal class AiSettingsViewModel(
         }
     }
 
-    private fun ConnectionCheck.toCheckState(): CheckState = when (this) {
+    private fun ConnectionCheck.toCheckState(provider: LlmProviderKind): CheckState = when (this) {
         is ConnectionCheck.Ok ->
             if (listed) CheckState.Passed(models, true, "Подключение работает: ${models.size} ${modelsWord(models.size)}")
             else CheckState.Passed(emptyList(), false, "Сервер отвечает, но не отдаёт список моделей — введите id модели вручную.")
-        ConnectionCheck.NoModels -> CheckState.Failed("Сервер ответил, но список моделей пуст.")
+        ConnectionCheck.NoModels ->
+            if (provider == LlmProviderKind.OLLAMA) CheckState.Failed("Ollama отвечает, но моделей нет — скачайте модель на ПК: ollama pull llama3.2")
+            else CheckState.Failed("Сервер ответил, но список моделей пуст.")
         ConnectionCheck.KeyMissing -> CheckState.Failed("Введите API-ключ.")
         is ConnectionCheck.InvalidUrl -> CheckState.Failed(reason)
         is ConnectionCheck.Unauthorized ->

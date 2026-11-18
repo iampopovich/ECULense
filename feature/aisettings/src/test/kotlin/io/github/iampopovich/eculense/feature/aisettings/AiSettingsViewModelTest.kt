@@ -92,7 +92,7 @@ class AiSettingsViewModelTest {
         assertTrue(s.editing)
         assertNull(s.saved)
         assertEquals(LlmProviderKind.OPENROUTER, s.provider)
-        assertEquals("https://openrouter.ai/api/v1", s.baseUrl)
+        assertEquals(LlmProviderKind.OPENROUTER.defaultBaseUrl, s.baseUrl)
         assertFalse(s.modelStepEnabled)
         assertFalse(s.canSave)
     }
@@ -121,7 +121,7 @@ class AiSettingsViewModelTest {
 
         val s = vm.state.value
         assertEquals("Подключение работает: 3 модели", (s.check as CheckState.Passed).message)
-        assertEquals(listOf(Triple(LlmProviderKind.OPENROUTER, "https://openrouter.ai/api/v1", "sk-or-test")), checker.calls)
+        assertEquals(listOf(Triple(LlmProviderKind.OPENROUTER, LlmProviderKind.OPENROUTER.defaultBaseUrl, "sk-or-test")), checker.calls)
         assertTrue(s.modelStepEnabled)
         assertEquals(catalog, s.visibleModels)
         assertFalse(s.canSave)
@@ -144,7 +144,7 @@ class AiSettingsViewModelTest {
 
         vm.checkAndWait()
         vm.selectModel("z-ai/glm-4.6")
-        vm.setBaseUrl("https://openrouter.ai/api/v2")
+        vm.setBaseUrl("https://openrouter.example.com")
         assertFalse(vm.state.value.modelStepEnabled)
         assertFalse(vm.state.value.canSave)
     }
@@ -196,9 +196,9 @@ class AiSettingsViewModelTest {
         vm.save()
         waitUntil { !vm.state.value.editing }
 
-        assertEquals(LlmSettings(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", "https://openrouter.ai/api/v1", true), store.settings.first())
+        assertEquals(LlmSettings(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", LlmProviderKind.OPENROUTER.defaultBaseUrl, true), store.settings.first())
         assertEquals("sk-or-1", store.apiKey())
-        assertEquals(SavedConfig(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", "https://openrouter.ai/api/v1", true), vm.state.value.saved)
+        assertEquals(SavedConfig(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", LlmProviderKind.OPENROUTER.defaultBaseUrl, true), vm.state.value.saved)
         assertEquals("", vm.state.value.apiKey)
     }
 
@@ -233,7 +233,7 @@ class AiSettingsViewModelTest {
         // Другой провайдер — чужой ключ не подставляем.
         vm.selectProvider(LlmProviderKind.OPENAI)
         assertFalse(vm.state.value.canReuseSavedKey)
-        assertEquals("https://api.openai.com/v1", vm.state.value.baseUrl)
+        assertEquals(LlmProviderKind.OPENAI.defaultBaseUrl, vm.state.value.baseUrl)
         assertFalse(vm.state.value.modelStepEnabled)
     }
 
@@ -241,7 +241,7 @@ class AiSettingsViewModelTest {
     fun `custom server without a model list allows a typed model id`() = runBlocking {
         val checker = FakeChecker(ConnectionCheck.Ok(emptyList(), listed = false))
         val vm = loadedVm(checker)
-        vm.selectProvider(LlmProviderKind.OPENAI_COMPATIBLE)
+        vm.selectProvider(LlmProviderKind.OTHER)
         vm.setBaseUrl("http://127.0.0.1:8089/v1")
         vm.checkAndWait()
         assertTrue(vm.state.value.manualModel)
@@ -250,7 +250,44 @@ class AiSettingsViewModelTest {
         assertTrue(vm.state.value.canSave)
         vm.save()
         waitUntil { !vm.state.value.editing }
-        assertEquals(LlmSettings(LlmProviderKind.OPENAI_COMPATIBLE, "my-model", "http://127.0.0.1:8089/v1", false), store.settings.first())
+        assertEquals(LlmSettings(LlmProviderKind.OTHER, "my-model", "http://127.0.0.1:8089/v1", false), store.settings.first())
+    }
+
+    @Test
+    fun `ollama sends no key even if one was typed, Other starts with an empty address`() {
+        val checker = FakeChecker(ConnectionCheck.Ok(listOf(ModelInfo("llama3.2:3b"))))
+        val vm = loadedVm(checker)
+        vm.selectProvider(LlmProviderKind.OLLAMA)
+        assertEquals(LlmProviderKind.OLLAMA.defaultBaseUrl, vm.state.value.baseUrl)
+        assertFalse(vm.state.value.showKeyField)
+        vm.setApiKey("stray")
+        vm.setBaseUrl("http://127.0.0.1:8089")
+        vm.checkAndWait()
+        assertEquals(Triple(LlmProviderKind.OLLAMA, "http://127.0.0.1:8089", null), checker.calls.single())
+
+        vm.selectProvider(LlmProviderKind.OTHER)
+        assertEquals("", vm.state.value.baseUrl)
+        assertTrue(vm.state.value.showKeyField)
+    }
+
+    @Test
+    fun `public http address is rejected locally with the https hint`() {
+        val checker = FakeChecker(ConnectionCheck.Ok(catalog))
+        val vm = loadedVm(checker)
+        vm.selectProvider(LlmProviderKind.OTHER)
+        vm.setBaseUrl("http://example.com/v1")
+        vm.check()
+        assertTrue(vm.state.value.urlError.orEmpty(), vm.state.value.urlError.orEmpty().contains("https://"))
+        assertTrue(checker.calls.isEmpty())
+    }
+
+    @Test
+    fun `empty ollama catalog suggests pulling a model`() {
+        val vm = loadedVm(FakeChecker(ConnectionCheck.NoModels))
+        vm.selectProvider(LlmProviderKind.OLLAMA)
+        vm.checkAndWait()
+        val message = (vm.state.value.check as CheckState.Failed).message
+        assertTrue(message, message.contains("ollama pull"))
     }
 
     @Test

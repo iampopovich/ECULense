@@ -9,5 +9,5 @@ val aiModule = module {
     single<SecretCipher> { KeystoreCipher() }
     single { LlmSettingsStore(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("llm_settings") }, get()) }
     single<LlmGateway> { KoogLlmGateway(get()) }
-    single<ConnectionChecker> { KtorConnectionChecker() }
+    single<ConnectionChecker> { KoogConnectionChecker() }
 }

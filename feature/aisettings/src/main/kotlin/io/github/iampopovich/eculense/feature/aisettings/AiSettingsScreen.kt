@@ -104,6 +104,7 @@ private fun SavedSummary(saved: SavedConfig, actions: AiSettingsActions, modifie
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val key = when {
+                    !saved.provider.usesKey -> "без ключа"
                     saved.hasKey -> "ключ сохранён"
                     saved.provider.needsKey -> "ключ не задан"
                     else -> "без ключа"
@@ -215,13 +216,19 @@ private fun ConnectionStep(state: AiSettingsUiState, actions: AiSettingsActions)
             value = state.baseUrl,
             onValueChange = actions.onBaseUrl,
             label = { Text("Адрес API") },
+            placeholder = if (state.provider == LlmProviderKind.OTHER) {
+                { Text("http://192.168.1.5:1234/v1") }
+            } else {
+                null
+            },
             isError = state.urlError != null,
             supportingText = {
                 Text(
-                    state.urlError ?: if (state.provider == LlmProviderKind.OPENAI_COMPATIBLE) {
-                        "LM Studio: http://IP:1234/v1 · Ollama: http://IP:11434/v1 · vLLM: http://IP:8000/v1"
-                    } else {
-                        "Адрес по умолчанию; меняйте только для прокси"
+                    state.urlError ?: when (state.provider) {
+                        LlmProviderKind.OTHER ->
+                            "Полный OpenAI-совместимый адрес: LM Studio http://IP:1234/v1 · vLLM http://IP:8000/v1 · llama.cpp http://IP:8080/v1"
+                        LlmProviderKind.OLLAMA -> "Ollama на ПК в сети: http://IP:11434 (по умолчанию — сам телефон)"
+                        else -> "Адрес по умолчанию из Koog; меняйте только для прокси"
                     },
                 )
             },
@@ -229,7 +236,7 @@ private fun ConnectionStep(state: AiSettingsUiState, actions: AiSettingsActions)
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false, imeAction = ImeAction.Next),
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        if (state.showKeyField) OutlinedTextField(
             value = state.apiKey,
             onValueChange = actions.onApiKey,
             label = { Text(if (state.provider.needsKey) "API-ключ" else "API-ключ (если нужен)") },

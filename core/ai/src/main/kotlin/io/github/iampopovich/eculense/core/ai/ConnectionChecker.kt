@@ -1,27 +1,19 @@
 package io.github.iampopovich.eculense.core.ai
 
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.okhttp.OkHttp
+import ai.koog.http.client.KoogHttpClientException
+import ai.koog.prompt.dsl.prompt
+import ai.koog.prompt.executor.clients.LLMClient
+import ai.koog.prompt.executor.ollama.client.OllamaClient
+import ai.koog.prompt.llm.LLMCapability
+import ai.koog.prompt.llm.LLMProvider
+import ai.koog.prompt.llm.LLModel
+import ai.koog.prompt.params.LLMParams
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.request.get
-import io.ktor.client.request.header
-import io.ktor.client.request.parameter
-import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.longOrNull
 import java.net.ConnectException
 import java.net.SocketTimeoutException
-import java.net.URI
-import java.net.URISyntaxException
 import java.net.UnknownHostException
 import java.net.UnknownServiceException
 import javax.net.ssl.SSLException
@@ -52,172 +44,127 @@ interface ConnectionChecker {
     suspend fun check(provider: LlmProviderKind, baseUrl: String, apiKey: String?): ConnectionCheck
 }
 
-/** Локальная проверка адреса — до любого запроса в сеть. */
-object EndpointUrl {
-    sealed interface Result {
-        data class Valid(val url: String) : Result
-        data class Invalid(val reason: String) : Result
-    }
-
-    fun validate(raw: String): Result {
-        val text = raw.trim()
-        if (text.isEmpty()) return Result.Invalid("Введите адрес сервера")
-        if (text.any { it.isWhitespace() }) return Result.Invalid("В адресе не должно быть пробелов")
-        val uri = try {
-            URI(text)
-        } catch (_: URISyntaxException) {
-            return Result.Invalid("Некорректный адрес. Пример: https://openrouter.ai/api/v1")
-        }
-        val scheme = uri.scheme?.lowercase()
-        if (scheme != "http" && scheme != "https") return Result.Invalid("Адрес должен начинаться с http:// или https://")
-        // При неверном порту URI молча переходит в «registry»-режим: host = null, authority = "host:99999".
-        val authority = uri.rawAuthority.orEmpty()
-        val portText = authority.substringAfterLast(':', "").takeIf { ':' in authority && !authority.endsWith("]") }
-        if (portText != null && portText.isNotEmpty() && (portText.toIntOrNull() ?: 0) !in 1..65535) {
-            return Result.Invalid("Неверный порт в адресе")
-        }
-        if (uri.host.isNullOrBlank()) return Result.Invalid("В адресе нет имени сервера")
-        if (uri.rawQuery != null || uri.rawFragment != null) return Result.Invalid("Уберите из адреса параметры (?… и #…)")
-        return Result.Valid(text.trimEnd('/'))
-    }
-}
-
 /**
- * Проверка «ключ + адрес» и загрузка каталога, как `hermes model`: GET {base}/models с авторизацией провайдера.
- * Каталог OpenRouter публичный, поэтому ключ доказываем отдельно через GET {base}/key (401 на плохой ключ).
- * Свой Ktor-запрос, а не Koog `models()`: Koog отдаёт только id (без контекста/цены) и не знает /key.
+ * Проверка «ключ + адрес» и каталог моделей — только средствами клиентов Koog, без своих путей и запросов:
+ * каталог = `LLMClient.models()` (у Ollama — `OllamaClient.getModels()`, models() там не реализован).
+ * Для всех, кроме OpenRouter, список моделей требует ключ, так что он же и доказывает ключ.
+ * Каталог OpenRouter публичный, а отдельного вызова «проверить ключ» в Koog 1.3.0 нет, поэтому ключ доказываем
+ * самым дешёвым запросом Koog — `execute` на 1 токен (maxTokens = 1) к бесплатной модели из каталога.
+ * Ошибки Koog (`KoogHttpClientException.statusCode/errorBody`) переводятся в состояния [ConnectionCheck].
  */
-class KtorConnectionChecker(private val http: HttpClient = defaultClient()) : ConnectionChecker {
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+class KoogConnectionChecker(
+    private val clientFactory: (LlmProviderKind, String, String?) -> LLMClient = { kind, url, key -> KoogClients.client(kind, url, key) },
+) : ConnectionChecker {
 
     override suspend fun check(provider: LlmProviderKind, baseUrl: String, apiKey: String?): ConnectionCheck {
         val base = when (val v = EndpointUrl.validate(baseUrl)) {
             is EndpointUrl.Result.Invalid -> return ConnectionCheck.InvalidUrl(v.reason)
             is EndpointUrl.Result.Valid -> v.url
         }
-        val key = apiKey?.trim()?.takeIf { it.isNotEmpty() }
+        val key = apiKey?.trim()?.takeIf { it.isNotEmpty() && provider.usesKey }
         if (provider.needsKey && key == null) return ConnectionCheck.KeyMissing
+        val client = try {
+            clientFactory(provider, base, key)
+        } catch (e: IllegalStateException) {
+            return ConnectionCheck.KeyMissing
+        }
         return try {
-            when (provider) {
-                LlmProviderKind.OPENROUTER -> {
-                    get("$base/key", key, provider).failure(provider, key)?.let { return it }
-                    catalog(get("$base/models", key, provider), provider, key, ::openAiModels)
-                }
-                LlmProviderKind.OPENAI, LlmProviderKind.OPENAI_COMPATIBLE ->
-                    catalog(get("$base/models", key, provider), provider, key, ::openAiModels)
-                LlmProviderKind.ANTHROPIC ->
-                    catalog(get("$base/v1/models", key, provider, "limit" to "1000"), provider, key, ::anthropicModels)
-                LlmProviderKind.GOOGLE ->
-                    catalog(get("$base/models", key, provider, "key" to key.orEmpty(), "pageSize" to "1000"), provider, key, ::googleModels)
+            val models = catalog(client, provider)
+            if (models.isEmpty()) {
+                return if (provider == LlmProviderKind.OTHER) ConnectionCheck.Ok(emptyList(), listed = false) else ConnectionCheck.NoModels
             }
+            if (provider == LlmProviderKind.OPENROUTER) proveKey(client, provider, models, key)?.let { return it }
+            ConnectionCheck.Ok(order(models, provider.recommended))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            ConnectionCheck.Unreachable(redact(networkReason(e), key))
+            failure(e, provider, key)
+        } finally {
+            runCatching { client.close() }
         }
     }
 
-    private class Reply(val status: Int, val body: String)
-
-    private suspend fun get(url: String, key: String?, provider: LlmProviderKind, vararg params: Pair<String, String>): Reply {
-        val response = http.get(url) {
-            params.forEach { (name, value) -> parameter(name, value) }
-            when (provider) {
-                LlmProviderKind.ANTHROPIC -> {
-                    header("x-api-key", key)
-                    header("anthropic-version", "2023-06-01")
-                }
-                LlmProviderKind.GOOGLE -> Unit
-                else -> if (key != null) header("Authorization", "Bearer $key")
+    private suspend fun catalog(client: LLMClient, provider: LlmProviderKind): List<ModelInfo> =
+        if (client is OllamaClient) {
+            client.getModels()
+                .filter { it.capabilities.isEmpty() || LLMCapability.Completion in it.capabilities }
+                .map { ModelInfo(it.name, contextLength = it.contextLength) }
+        } else {
+            client.models().map { model ->
+                // Google отдаёт имена ресурсов «models/…», а в запросах Koog ждёт голый id.
+                val id = if (provider == LlmProviderKind.GOOGLE) model.id.removePrefix("models/") else model.id
+                ModelInfo(
+                    id = id,
+                    contextLength = model.contextLength,
+                    isFree = if (provider == LlmProviderKind.OPENROUTER) id.endsWith(":free") else null,
+                )
             }
         }
-        return Reply(response.status.value, response.bodyAsText())
-    }
 
-    private fun Reply.failure(provider: LlmProviderKind, key: String?): ConnectionCheck? {
-        val detail = redact(providerMessage.find(body)?.groupValues?.get(1), key)
-        return when {
-            status in 200..299 -> null
-            status == 401 -> ConnectionCheck.Unauthorized(detail)
-            // Google на плохой ключ отвечает 400 INVALID_ARGUMENT с причиной API_KEY_INVALID.
-            status == 400 && provider == LlmProviderKind.GOOGLE && ("API_KEY_INVALID" in body || "API key not valid" in body) ->
-                ConnectionCheck.Unauthorized(detail)
-            status == 403 -> ConnectionCheck.Blocked(detail)
-            status == 404 -> ConnectionCheck.Unreachable("по этому адресу нет API (404) — проверьте адрес")
-            else -> ConnectionCheck.Failed(status, detail)
-        }
-    }
-
-    private fun catalog(
-        reply: Reply,
-        provider: LlmProviderKind,
-        key: String?,
-        parse: (JsonElement) -> List<ModelInfo>?,
-    ): ConnectionCheck {
-        // Свой сервер может не уметь /models (llama.cpp старых версий и т.п.) — тогда модель вводится руками.
-        if (reply.status == 404 && provider == LlmProviderKind.OPENAI_COMPATIBLE) return ConnectionCheck.Ok(emptyList(), listed = false)
-        reply.failure(provider, key)?.let { return it }
-        val models = try {
-            parse(json.parseToJsonElement(reply.body))
-        } catch (_: SerializationException) {
-            null
-        } catch (_: IllegalArgumentException) {
-            null
-        } ?: return ConnectionCheck.Unreachable("сервер ответил не в формате API (не JSON) — проверьте адрес")
-        if (models.isEmpty()) {
-            return if (provider == LlmProviderKind.OPENAI_COMPATIBLE) ConnectionCheck.Ok(emptyList(), listed = false) else ConnectionCheck.NoModels
-        }
-        return ConnectionCheck.Ok(order(models, provider.recommended))
-    }
-
-    private fun JsonElement.obj(name: String) = (this as? JsonObject)?.get(name)
-    private fun JsonElement?.str() = (this as? JsonPrimitive)?.contentOrNull
-    private fun JsonElement?.long() = (this as? JsonPrimitive)?.longOrNull
-
-    /** OpenAI/OpenRouter/LM Studio/vLLM: {"data":[{"id":…, "name"?, "context_length"|"max_model_len"?, "pricing"?}]} */
-    private fun openAiModels(root: JsonElement): List<ModelInfo>? {
-        val data = root.obj("data") as? JsonArray ?: return null
-        return data.mapNotNull { item ->
-            val id = item.obj("id").str() ?: return@mapNotNull null
-            val pricing = item.obj("pricing")
-            val free = pricing?.let { p -> listOf("prompt", "completion").all { p.obj(it).str()?.toDoubleOrNull() == 0.0 } }
-            ModelInfo(
-                id = id,
-                name = item.obj("name").str() ?: id,
-                contextLength = item.obj("context_length").long() ?: item.obj("max_model_len").long(),
-                isFree = free,
+    /** null — ключ принят. Любой ответ, кроме 401/403, значит, что авторизация пройдена (402 — ключ верный, нет средств). */
+    private suspend fun proveKey(client: LLMClient, provider: LlmProviderKind, models: List<ModelInfo>, key: String?): ConnectionCheck? {
+        val probe = models.firstOrNull { it.isFree == true }?.id
+            ?: provider.recommended.firstOrNull { r -> models.any { it.id == r } }
+            ?: models.first().id
+        return try {
+            client.execute(
+                prompt("key-check", params = LLMParams(maxTokens = 1)) { user("ping") },
+                LLModel(LLMProvider.OpenRouter, probe, listOf(LLMCapability.Completion), 8_192),
+                emptyList(),
             )
+            null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val http = httpError(e)
+            when {
+                http?.statusCode == 401 || http?.statusCode == 403 -> failure(e, provider, key)
+                http == null && isNetwork(e) -> failure(e, provider, key)
+                else -> null
+            }
         }
     }
 
-    private fun anthropicModels(root: JsonElement): List<ModelInfo>? {
-        val data = root.obj("data") as? JsonArray ?: return null
-        return data.mapNotNull { item ->
-            val id = item.obj("id").str() ?: return@mapNotNull null
-            ModelInfo(id, item.obj("display_name").str() ?: id)
+    private fun failure(e: Throwable, provider: LlmProviderKind, key: String?): ConnectionCheck {
+        val http = httpError(e)
+        val status = http?.statusCode
+        if (status != null) {
+            val body = http.errorBody.orEmpty()
+            val detail = redact(providerMessage.find(body)?.groupValues?.get(1), key)
+            return when {
+                status == 401 -> ConnectionCheck.Unauthorized(detail)
+                // Google на плохой ключ отвечает 400 INVALID_ARGUMENT с причиной API_KEY_INVALID.
+                status == 400 && provider == LlmProviderKind.GOOGLE && ("API_KEY_INVALID" in body || "API key not valid" in body) ->
+                    ConnectionCheck.Unauthorized(detail)
+                status == 403 -> ConnectionCheck.Blocked(detail)
+                // Свой сервер может не уметь /models (llama.cpp старых версий и т.п.) — модель вводится руками.
+                status == 404 && provider == LlmProviderKind.OTHER -> ConnectionCheck.Ok(emptyList(), listed = false)
+                status == 404 -> ConnectionCheck.Unreachable("по этому адресу нет API (404) — проверьте адрес")
+                else -> ConnectionCheck.Failed(status, detail)
+            }
         }
-    }
-
-    /** Только модели для чата (generateContent), id без префикса «models/». */
-    private fun googleModels(root: JsonElement): List<ModelInfo>? {
-        val list = root.obj("models") as? JsonArray ?: return null
-        return list.mapNotNull { item ->
-            val methods = (item.obj("supportedGenerationMethods") as? JsonArray)?.mapNotNull { it.str() }.orEmpty()
-            if ("generateContent" !in methods) return@mapNotNull null
-            val id = item.obj("name").str()?.removePrefix("models/") ?: return@mapNotNull null
-            ModelInfo(id, item.obj("displayName").str() ?: id, item.obj("inputTokenLimit").long())
+        if (!isNetwork(e) && chain(e).any { it is SerializationException || it is IllegalArgumentException }) {
+            // Сервер ответил, но не в формате API клиента Koog (HTML, нестандартный список моделей).
+            return if (provider == LlmProviderKind.OTHER) {
+                ConnectionCheck.Ok(emptyList(), listed = false)
+            } else {
+                ConnectionCheck.Unreachable("сервер ответил не в формате API — проверьте адрес")
+            }
         }
+        return ConnectionCheck.Unreachable(redact(networkReason(e), key))
     }
 
     companion object {
         private val providerMessage = Regex("\"(?:message|error)\"\\s*:\\s*\"([^\"]{1,200})\"")
 
-        fun defaultClient(): HttpClient = HttpClient(OkHttp) {
-            install(HttpTimeout) {
-                connectTimeoutMillis = 10_000
-                requestTimeoutMillis = 30_000
-                socketTimeoutMillis = 20_000
-            }
+        private fun chain(e: Throwable) = generateSequence(e) { it.cause }.take(10).toList()
+
+        private fun httpError(e: Throwable): KoogHttpClientException? =
+            chain(e).filterIsInstance<KoogHttpClientException>().firstOrNull { it.statusCode != null }
+
+        private fun isNetwork(e: Throwable) = chain(e).any {
+            it is UnknownHostException || it is ConnectException || it is SocketTimeoutException || it is SSLException ||
+                it is HttpRequestTimeoutException || it is ConnectTimeoutException || it is UnknownServiceException
         }
 
         /** Рекомендованные (в порядке курируемого списка) первыми, остальные по алфавиту. */
@@ -231,7 +178,7 @@ class KtorConnectionChecker(private val http: HttpClient = defaultClient()) : Co
             if (text != null && key != null && key.length >= 4) text.replace(key, "***") else text
 
         private fun networkReason(e: Throwable): String {
-            val chain = generateSequence(e) { it.cause }.take(8).toList()
+            val chain = chain(e)
             return when {
                 chain.any { it is UnknownHostException } -> "сервер не найден (DNS) — проверьте адрес и интернет"
                 chain.any { it is UnknownServiceException && it.message.orEmpty().contains("CLEARTEXT", true) } ->
@@ -240,7 +187,7 @@ class KtorConnectionChecker(private val http: HttpClient = defaultClient()) : Co
                 chain.any { it is HttpRequestTimeoutException || it is ConnectTimeoutException || it is SocketTimeoutException } ->
                     "сервер не ответил вовремя"
                 chain.any { it is SSLException } -> "ошибка защищённого соединения (TLS)"
-                else -> e.message ?: e::class.simpleName.orEmpty()
+                else -> chain.last().message ?: e.message ?: e::class.simpleName.orEmpty()
             }
         }
     }

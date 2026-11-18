@@ -35,7 +35,7 @@ class AiSettingsScreenTest {
     fun freshWizardLocksModelStepAndMasksKey() {
         rule.setContent { AiSettingsScreen(AiSettingsUiState(loaded = true, apiKey = "sk-or-secret"), AiSettingsActions()) }
         rule.onNodeWithText("OpenRouter").assertIsSelected()
-        rule.onNode(hasSetTextAction() and hasText("Адрес API")).assert(hasText("https://openrouter.ai/api/v1"))
+        rule.onNode(hasSetTextAction() and hasText("Адрес API")).assert(hasText(LlmProviderKind.OPENROUTER.defaultBaseUrl))
         rule.onNode(hasSetTextAction() and hasText("API-ключ"))
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("•".repeat("sk-or-secret".length))))
@@ -91,7 +91,7 @@ class AiSettingsScreenTest {
     fun savedConfigShowsSummaryWithEditAndRemoveKey() {
         val removed = mutableIntStateOf(0)
         val edited = mutableIntStateOf(0)
-        val saved = SavedConfig(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", "https://openrouter.ai/api/v1", hasKey = true)
+        val saved = SavedConfig(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", LlmProviderKind.OPENROUTER.defaultBaseUrl, hasKey = true)
         rule.setContent {
             AiSettingsScreen(
                 AiSettingsUiState(loaded = true, saved = saved, editing = false),
@@ -110,12 +110,33 @@ class AiSettingsScreenTest {
         val passed = CheckState.Passed(emptyList(), listed = false, message = "manual")
         rule.setContent {
             AiSettingsScreen(
-                AiSettingsUiState(loaded = true, provider = LlmProviderKind.OPENAI_COMPATIBLE, baseUrl = "http://127.0.0.1:8089/v1", check = passed),
+                AiSettingsUiState(loaded = true, provider = LlmProviderKind.OTHER, baseUrl = "http://127.0.0.1:8089/v1", check = passed),
                 AiSettingsActions(),
             )
         }
         rule.onNodeWithText("API-ключ (если нужен)").assertExists()
         rule.onNodeWithText("ID модели").assertExists()
         rule.onNodeWithText("Поиск модели").assertDoesNotExist()
+    }
+
+    @Test
+    fun providerListIsKoogPresetsPlusOther() {
+        rule.setContent { AiSettingsScreen(AiSettingsUiState(loaded = true), AiSettingsActions()) }
+        listOf("OpenRouter", "OpenAI", "Anthropic", "Google Gemini", "DeepSeek", "Mistral", "Ollama", "Другой (свой сервер)")
+            .forEach { rule.onNodeWithText(it).assertExists() }
+        rule.onNodeWithText("Свой сервер", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun ollamaHidesTheKeyField() {
+        rule.setContent {
+            AiSettingsScreen(
+                AiSettingsUiState(loaded = true, provider = LlmProviderKind.OLLAMA, baseUrl = LlmProviderKind.OLLAMA.defaultBaseUrl),
+                AiSettingsActions(),
+            )
+        }
+        rule.onNodeWithText("Ollama").assertIsSelected()
+        rule.onNode(hasSetTextAction() and hasText("Адрес API")).assert(hasText(LlmProviderKind.OLLAMA.defaultBaseUrl))
+        rule.onNodeWithText("API-ключ", substring = true).assertDoesNotExist()
     }
 }

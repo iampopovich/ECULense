@@ -8,14 +8,19 @@ import ai.koog.prompt.executor.clients.ConnectionTimeoutConfig
 import ai.koog.prompt.executor.clients.LLMClient
 import ai.koog.prompt.executor.clients.anthropic.AnthropicClientSettings
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
+import ai.koog.prompt.executor.clients.deepseek.DeepSeekClientSettings
+import ai.koog.prompt.executor.clients.deepseek.DeepSeekLLMClient
 import ai.koog.prompt.executor.clients.google.GoogleClientSettings
 import ai.koog.prompt.executor.clients.google.GoogleLLMClient
+import ai.koog.prompt.executor.clients.mistralai.MistralAIClientSettings
+import ai.koog.prompt.executor.clients.mistralai.MistralAILLMClient
 import ai.koog.prompt.executor.clients.openai.OpenAIClientSettings
 import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.executor.clients.openrouter.OpenRouterClientSettings
 import ai.koog.prompt.executor.clients.openrouter.OpenRouterLLMClient
 import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import ai.koog.prompt.executor.model.PromptExecutor
+import ai.koog.prompt.executor.ollama.client.OllamaClient
 import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
@@ -32,6 +37,13 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 
+/**
+ * Клиенты Koog по провайдеру. Адреса по умолчанию и пути API — из настроек клиентов Koog
+ * (`OpenRouterClientSettings`, `OpenAIClientSettings`, `AnthropicClientSettings`, `GoogleClientSettings`,
+ * `DeepSeekClientSettings`, `MistralAIClientSettings`, `OllamaClient.DEFAULT_BASE_URL`); от нас — только адрес,
+ * если пользователь его поменял, и таймауты. Исключение — [LlmProviderKind.OTHER]: пользователь вводит полный
+ * OpenAI-совместимый адрес (…/v1), поэтому пути клиенту OpenAI задаём относительно него.
+ */
 internal object KoogClients {
     /**
      * Koog 1.3.0: удобные функции OpenAILLMClient(apiKey) и т.п. ищут фабрику HTTP через ServiceLoader,
@@ -46,11 +58,31 @@ internal object KoogClients {
         socketTimeoutMillis = 90_000,
     )
 
+    private val defaults: Map<LlmProviderKind, String> by lazy {
+        LlmProviderKind.entries.associateWith { kind ->
+            when (kind) {
+                LlmProviderKind.OPENROUTER -> OpenRouterClientSettings().baseUrl
+                LlmProviderKind.OPENAI -> OpenAIClientSettings().baseUrl
+                LlmProviderKind.ANTHROPIC -> AnthropicClientSettings().baseUrl
+                LlmProviderKind.GOOGLE -> GoogleClientSettings().baseUrl
+                LlmProviderKind.DEEPSEEK -> DeepSeekClientSettings().baseUrl
+                LlmProviderKind.MISTRAL -> MistralAIClientSettings().baseUrl
+                LlmProviderKind.OLLAMA -> OllamaClient.DEFAULT_BASE_URL
+                LlmProviderKind.OTHER -> ""
+            }
+        }
+    }
+
+    fun defaultBaseUrl(kind: LlmProviderKind): String = defaults.getValue(kind)
+
     fun provider(kind: LlmProviderKind): LLMProvider = when (kind) {
-        LlmProviderKind.OPENAI, LlmProviderKind.OPENAI_COMPATIBLE -> LLMProvider.OpenAI
+        LlmProviderKind.OPENAI, LlmProviderKind.OTHER -> LLMProvider.OpenAI
         LlmProviderKind.ANTHROPIC -> LLMProvider.Anthropic
         LlmProviderKind.GOOGLE -> LLMProvider.Google
         LlmProviderKind.OPENROUTER -> LLMProvider.OpenRouter
+        LlmProviderKind.DEEPSEEK -> LLMProvider.DeepSeek
+        LlmProviderKind.MISTRAL -> LLMProvider.MistralAI
+        LlmProviderKind.OLLAMA -> LLMProvider.Ollama
     }
 
     /** Модель задаёт пользователь строкой (id у провайдера), поэтому LLModel собираем сами. */
@@ -70,28 +102,55 @@ internal object KoogClients {
         )
     }
 
-    fun executor(settings: LlmSettings, apiKey: String?): PromptExecutor {
-        fun key() = apiKey?.takeIf { it.isNotBlank() } ?: throw IllegalStateException("Не задан API-ключ для ${settings.provider.title}")
-        // Сохранённый адрес уже содержит версию API (…/api/v1, …/v1, …/v1beta), как его вводит пользователь;
-        // Koog дописывает «/» к базе и относительные пути, поэтому пути задаём без префикса версии.
-        val baseUrl = settings.baseUrl.trim().trimEnd('/').ifBlank { settings.provider.defaultBaseUrl }
-        val client: LLMClient = when (settings.provider) {
+    /**
+     * [baseUrl] пустой — адрес клиента Koog по умолчанию. [model] нужен только Anthropic: 1.3.0 отправляет в API
+     * не model.id, а значение из modelVersionsMap — кладём туда модель пользователя.
+     */
+    fun client(kind: LlmProviderKind, baseUrl: String, apiKey: String?, model: LLModel? = null): LLMClient {
+        fun key() = apiKey?.trim()?.takeIf { it.isNotEmpty() } ?: throw IllegalStateException("Не задан API-ключ для ${kind.title}")
+        val url = baseUrl.trim().trimEnd('/').ifBlank { defaultBaseUrl(kind) }
+        return when (kind) {
             LlmProviderKind.OPENROUTER -> OpenRouterLLMClient(
                 apiKey = key(),
-                settings = OpenRouterClientSettings(
-                    baseUrl = baseUrl,
-                    chatCompletionsPath = "chat/completions",
-                    modelsPath = "models",
-                    embeddingsPath = "embeddings",
-                    timeoutConfig = timeouts,
-                ),
+                settings = OpenRouterClientSettings(baseUrl = url, timeoutConfig = timeouts),
                 httpClientFactory = httpFactory,
             )
-            LlmProviderKind.OPENAI, LlmProviderKind.OPENAI_COMPATIBLE -> OpenAILLMClient(
+            LlmProviderKind.OPENAI -> OpenAILLMClient(
+                apiKey = key(),
+                settings = OpenAIClientSettings(baseUrl = url, timeoutConfig = timeouts),
+                httpClientFactory = httpFactory,
+            )
+            LlmProviderKind.ANTHROPIC -> AnthropicLLMClient(
+                apiKey = key(),
+                settings = if (model != null) {
+                    AnthropicClientSettings(modelVersionsMap = mapOf(model to model.id), baseUrl = url, timeoutConfig = timeouts)
+                } else {
+                    AnthropicClientSettings(baseUrl = url, timeoutConfig = timeouts)
+                },
+                httpClientFactory = httpFactory,
+            )
+            LlmProviderKind.GOOGLE -> GoogleLLMClient(
+                apiKey = key(),
+                settings = GoogleClientSettings(baseUrl = url, timeoutConfig = timeouts),
+                httpClientFactory = httpFactory,
+            )
+            LlmProviderKind.DEEPSEEK -> DeepSeekLLMClient(
+                apiKey = key(),
+                settings = DeepSeekClientSettings(baseUrl = url, timeoutConfig = timeouts),
+                httpClientFactory = httpFactory,
+            )
+            LlmProviderKind.MISTRAL -> MistralAILLMClient(
+                apiKey = key(),
+                settings = MistralAIClientSettings(baseUrl = url, timeoutConfig = timeouts),
+                httpClientFactory = httpFactory,
+            )
+            LlmProviderKind.OLLAMA -> OllamaClient(httpClientFactory = httpFactory, baseUrl = url, timeoutConfig = timeouts)
+            LlmProviderKind.OTHER -> OpenAILLMClient(
                 // Локальным серверам ключ обычно не нужен, но Koog требует непустую строку.
-                apiKey = if (settings.provider.needsKey) key() else apiKey?.takeIf { it.isNotBlank() } ?: "not-needed",
+                apiKey = apiKey?.trim()?.takeIf { it.isNotEmpty() } ?: "not-needed",
+                // Адрес пользователя уже содержит версию API (…/v1), поэтому пути — относительно него.
                 settings = OpenAIClientSettings(
-                    baseUrl = baseUrl,
+                    baseUrl = url,
                     timeoutConfig = timeouts,
                     chatCompletionsPath = "chat/completions",
                     responsesAPIPath = "responses",
@@ -101,19 +160,15 @@ internal object KoogClients {
                 ),
                 httpClientFactory = httpFactory,
             )
-            LlmProviderKind.ANTHROPIC -> AnthropicLLMClient(
-                apiKey = key(),
-                // 1.3.0 отправляет в API не model.id, а значение из modelVersionsMap — кладём туда модель пользователя.
-                settings = AnthropicClientSettings(modelVersionsMap = mapOf(model(settings) to settings.model), baseUrl = baseUrl, timeoutConfig = timeouts),
-                httpClientFactory = httpFactory,
-            )
-            LlmProviderKind.GOOGLE -> GoogleLLMClient(
-                apiKey = key(),
-                settings = GoogleClientSettings(baseUrl = baseUrl, timeoutConfig = timeouts, defaultPath = "models"),
-                httpClientFactory = httpFactory,
-            )
         }
-        return MultiLLMPromptExecutor(client)
+    }
+
+    fun executor(settings: LlmSettings, apiKey: String?): PromptExecutor {
+        // Адрес мог быть сохранён до появления проверки — http в интернет не пускаем и здесь.
+        (EndpointUrl.validate(settings.baseUrl.ifBlank { defaultBaseUrl(settings.provider) }) as? EndpointUrl.Result.Invalid)
+            ?.let { throw IllegalStateException(it.reason) }
+        val key = apiKey.takeIf { settings.provider.usesKey }
+        return MultiLLMPromptExecutor(client(settings.provider, settings.baseUrl, key, model(settings)))
     }
 }
 

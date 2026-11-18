@@ -9,35 +9,53 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /**
- * Порядок = порядок в мастере подключения; OpenRouter — первым и по умолчанию (решение пользователя).
- * [defaultBaseUrl] — базовый адрес API в том виде, в каком его вводит пользователь (как в `hermes model`):
- * каталог моделей = GET {base}/models (у Anthropic — {base}/v1/models), чат — {base}/chat/completions.
- * [recommended] — курируемые модели, их показываем первыми в списке (если сервер их отдаёт).
+ * Провайдеры = ровно пресеты koog-spring-boot-starter (META-INF/config/koog: anthropic, deepseek, google, mistral,
+ * ollama, openai, openrouter) + [OTHER] для любого OpenAI-совместимого сервера. Порядок = порядок в мастере,
+ * OpenRouter первым и по умолчанию (решение пользователя).
+ *
+ * Адреса и пути API не наши: [defaultBaseUrl] берётся из настроек клиента Koog (`OpenAIClientSettings().baseUrl` и т.д.),
+ * пути добавляет сам клиент Koog. Храним только адрес, который пользователь изменил (прокси).
+ * [recommended] — курируемые модели, их показываем первыми в каталоге (если сервер их отдаёт).
  */
 enum class LlmProviderKind(
     val title: String,
-    val needsKey: Boolean,
-    val defaultBaseUrl: String,
+    private val key: Key,
     val recommended: List<String>,
 ) {
     OPENROUTER(
-        "OpenRouter", true, "https://openrouter.ai/api/v1",
+        "OpenRouter", Key.REQUIRED,
         listOf("openai/gpt-4.1-mini", "google/gemini-2.5-flash", "anthropic/claude-sonnet-4.5", "deepseek/deepseek-chat-v3.1", "openai/gpt-4.1"),
     ),
-    OPENAI("OpenAI", true, "https://api.openai.com/v1", listOf("gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini")),
-    ANTHROPIC("Anthropic", true, "https://api.anthropic.com", listOf("claude-sonnet-4-5", "claude-haiku-4-5")),
-    GOOGLE("Google Gemini", true, "https://generativelanguage.googleapis.com/v1beta", listOf("gemini-2.5-flash", "gemini-2.5-pro")),
+    OPENAI("OpenAI", Key.REQUIRED, listOf("gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini")),
+    ANTHROPIC("Anthropic", Key.REQUIRED, listOf("claude-sonnet-4-5", "claude-haiku-4-5")),
+    GOOGLE("Google Gemini", Key.REQUIRED, listOf("gemini-2.5-flash", "gemini-2.5-pro")),
+    DEEPSEEK("DeepSeek", Key.REQUIRED, listOf("deepseek-chat", "deepseek-reasoner")),
+    MISTRAL("Mistral", Key.REQUIRED, listOf("mistral-small-latest", "mistral-medium-latest", "mistral-large-latest")),
 
-    /** LM Studio, Ollama (/v1), vLLM, llama.cpp server и любые OpenAI-совместимые API. Ключ необязателен. */
-    OPENAI_COMPATIBLE("Свой сервер (OpenAI-совместимый)", false, "http://192.168.1.10:1234/v1", emptyList()),
+    /** Локальный Ollama (по умолчанию у Koog — localhost:11434; для ПК в сети — http://IP:11434). Без ключа. */
+    OLLAMA("Ollama", Key.NONE, emptyList()),
+
+    /** LM Studio, vLLM, llama.cpp server, LocalAI, прокси: полный OpenAI-совместимый адрес (…/v1). Ключ — если нужен. */
+    OTHER("Другой (свой сервер)", Key.OPTIONAL, emptyList()),
     ;
+
+    private enum class Key { REQUIRED, OPTIONAL, NONE }
+
+    /** Без ключа провайдер не работает. */
+    val needsKey: Boolean get() = key == Key.REQUIRED
+
+    /** Показывать ли поле ключа вообще (у Ollama его нет). */
+    val usesKey: Boolean get() = key != Key.NONE
+
+    /** Адрес по умолчанию из настроек клиента Koog; у [OTHER] его нет — адрес вводит пользователь. */
+    val defaultBaseUrl: String get() = KoogClients.defaultBaseUrl(this)
 
     companion object {
         val DEFAULT = OPENROUTER
     }
 }
 
-/** [baseUrl] — действующий адрес: сохранённый или адрес провайдера по умолчанию. */
+/** [baseUrl] — действующий адрес: сохранённый пользователем или адрес клиента Koog по умолчанию. */
 data class LlmSettings(
     val provider: LlmProviderKind,
     val model: String,
@@ -49,13 +67,17 @@ class LlmSettingsStore(
     private val dataStore: DataStore<Preferences>,
     private val cipher: SecretCipher,
 ) {
-    /** null — ИИ не настроен (или сохранён провайдер, которого больше нет, например старый OLLAMA). */
+    /** null — ИИ не настроен (или сохранён провайдер, которого больше нет). */
     val settings: Flow<LlmSettings?> = dataStore.data.map { p ->
-        val provider = p[PROVIDER]?.let { name -> LlmProviderKind.entries.firstOrNull { it.name == name } } ?: return@map null
-        LlmSettings(provider, p[MODEL].orEmpty(), p[BASE_URL] ?: provider.defaultBaseUrl, hasKey = p[API_KEY] != null)
+        val name = p[PROVIDER] ?: return@map null
+        val legacy = name == LEGACY_CUSTOM
+        val provider = if (legacy) LlmProviderKind.OTHER else LlmProviderKind.entries.firstOrNull { it.name == name } ?: return@map null
+        // У прежнего «Свой сервер» адрес по умолчанию в файл не писался — восстанавливаем его.
+        val url = p[BASE_URL] ?: if (legacy) LEGACY_CUSTOM_URL else provider.defaultBaseUrl
+        LlmSettings(provider, p[MODEL].orEmpty(), url, hasKey = p[API_KEY] != null)
     }
 
-    /** Пустой apiKey = «не менять сохранённый». Адрес по умолчанию не храним — обновится вместе с приложением. */
+    /** Пустой apiKey = «не менять сохранённый». Адрес по умолчанию не храним — его задаёт Koog. */
     suspend fun save(provider: LlmProviderKind, model: String, baseUrl: String?, apiKey: String?) {
         dataStore.edit { p ->
             val previous = p[PROVIDER]
@@ -64,6 +86,7 @@ class LlmSettingsStore(
             val url = baseUrl?.trim()?.trimEnd('/')
             if (url.isNullOrBlank() || url == provider.defaultBaseUrl) p.remove(BASE_URL) else p[BASE_URL] = url
             when {
+                !provider.usesKey -> p.remove(API_KEY)
                 !apiKey.isNullOrBlank() -> p[API_KEY] = cipher.encrypt(apiKey.trim())
                 // Ключ одного провайдера не годится другому.
                 previous != null && previous != provider.name -> p.remove(API_KEY)
@@ -88,5 +111,9 @@ class LlmSettingsStore(
         val MODEL = stringPreferencesKey("model")
         val BASE_URL = stringPreferencesKey("base_url")
         val API_KEY = stringPreferencesKey("api_key")
+
+        /** Имя и адрес по умолчанию прежнего пункта «Свой сервер (OpenAI-совместимый)» — читаются как [LlmProviderKind.OTHER]. */
+        const val LEGACY_CUSTOM = "OPENAI_COMPATIBLE"
+        const val LEGACY_CUSTOM_URL = "http://192.168.1.10:1234/v1"
     }
 }
