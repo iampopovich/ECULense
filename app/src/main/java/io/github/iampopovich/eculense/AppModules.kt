@@ -4,6 +4,7 @@ import io.github.iampopovich.eculense.core.bluetooth.bluetoothModule
 import io.github.iampopovich.eculense.core.obd.obdModule
 import io.github.iampopovich.eculense.core.service.serviceModule
 import io.github.iampopovich.eculense.core.usb.usbModule
+import io.github.iampopovich.eculense.feature.connect.connectModule
 import io.github.iampopovich.eculense.feature.dashboard.dashboardModule
 import org.koin.core.module.Module
 
@@ -13,5 +14,6 @@ val appModules: List<Module> = listOf(
     bluetoothModule,
     usbModule,
     serviceModule,
+    connectModule,
     dashboardModule,
 )
