@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.ai.LlmProviderKind
 import io.github.iampopovich.eculense.core.ai.ModelInfo
+import io.github.iampopovich.eculense.core.navigation.LocalModelDestination
+import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -60,11 +62,18 @@ internal class AiSettingsActions(
     val onCancelEdit: () -> Unit = {},
     val onClearKey: () -> Unit = {},
     val onReset: () -> Unit = {},
+    /** Пункт «На устройстве» — открыть экран модели на телефоне. */
+    val onOnDevice: () -> Unit = {},
+    /** Перестать использовать модель на телефоне. */
+    val onUseCloud: () -> Unit = {},
+    /** Открыть мастер облачного провайдера (когда сохранена только модель на телефоне). */
+    val onStartWizard: () -> Unit = {},
 )
 
 @Composable
 internal fun AiSettingsRoute(viewModel: AiSettingsViewModel = koinViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val navigator = LocalNavigator.current
     AiSettingsScreen(
         state,
         AiSettingsActions(
@@ -79,6 +88,9 @@ internal fun AiSettingsRoute(viewModel: AiSettingsViewModel = koinViewModel()) {
             onCancelEdit = viewModel::cancelEdit,
             onClearKey = viewModel::clearKey,
             onReset = viewModel::reset,
+            onOnDevice = { navigator.navigate(LocalModelDestination) },
+            onUseCloud = viewModel::useCloud,
+            onStartWizard = viewModel::startWizard,
         ),
     )
 }
@@ -87,35 +99,63 @@ internal fun AiSettingsRoute(viewModel: AiSettingsViewModel = koinViewModel()) {
 internal fun AiSettingsScreen(state: AiSettingsUiState, actions: AiSettingsActions, modifier: Modifier = Modifier) {
     if (!state.loaded) return
     val saved = state.saved
-    if (!state.editing && saved != null) {
-        SavedSummary(saved, actions, modifier)
+    if (!state.editing && (saved != null || state.onDevice != null)) {
+        SavedSummary(state, actions, modifier)
     } else {
         Wizard(state, actions, modifier)
     }
 }
 
 @Composable
-private fun SavedSummary(saved: SavedConfig, actions: AiSettingsActions, modifier: Modifier) {
+private fun SavedSummary(state: AiSettingsUiState, actions: AiSettingsActions, modifier: Modifier) {
+    val saved = state.saved
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("ИИ-помощник", style = MaterialTheme.typography.headlineSmall)
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                val key = when {
-                    !saved.provider.usesKey -> "без ключа"
-                    saved.hasKey -> "ключ сохранён"
-                    saved.provider.needsKey -> "ключ не задан"
-                    else -> "без ключа"
+        state.onDevice?.let { local ->
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Сейчас: на устройстве · ${local.model}", style = MaterialTheme.typography.titleMedium)
+                    Text(local.detail, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Без интернета, данные машины не покидают телефон. Отвечает медленнее и ошибается чаще облачных моделей.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                Text("${saved.provider.title} · ${saved.model} · $key", style = MaterialTheme.typography.titleMedium)
-                Text(saved.baseUrl, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = actions.onOnDevice) { Text("Модель на телефоне") }
+                OutlinedButton(onClick = actions.onUseCloud) { Text(if (saved != null) "Перейти на облако" else "Не использовать") }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = actions.onEdit) { Text("Изменить") }
-            if (saved.hasKey) OutlinedButton(onClick = actions.onClearKey) { Text("Удалить ключ") }
+        if (saved == null) {
+            if (state.onDevice != null) OutlinedButton(onClick = actions.onStartWizard) { Text("Настроить облачного провайдера") }
+        } else {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val key = when {
+                        !saved.provider.usesKey -> "без ключа"
+                        saved.hasKey -> "ключ сохранён"
+                        saved.provider.needsKey -> "ключ не задан"
+                        else -> "без ключа"
+                    }
+                    if (state.onDevice != null) {
+                        Text("Облачный провайдер (не используется, пока выбрана модель на телефоне)", style = MaterialTheme.typography.labelMedium)
+                    }
+                    Text("${saved.provider.title} · ${saved.model} · $key", style = MaterialTheme.typography.titleMedium)
+                    Text(saved.baseUrl, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = actions.onEdit) { Text("Изменить") }
+                if (saved.hasKey) OutlinedButton(onClick = actions.onClearKey) { Text("Удалить ключ") }
+            }
+        }
+        if (state.onDevice == null && state.onDeviceAvailable) {
+            OutlinedButton(onClick = actions.onOnDevice) { Text("Модель на телефоне (без интернета)") }
         }
         TextButton(onClick = actions.onReset) { Text("Сбросить настройки ИИ") }
         Text(
@@ -131,7 +171,7 @@ private fun Wizard(state: AiSettingsUiState, actions: AiSettingsActions, modifie
     Column(modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp)) {
             item { Text("ИИ-помощник", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp)) }
-            item { ProviderStep(state.provider, actions.onProvider) }
+            item { ProviderStep(state.provider, actions.onProvider, state.onDeviceAvailable, actions.onOnDevice) }
             item { ConnectionStep(state, actions) }
             item { StepTitle("3. Модель", enabled = state.modelStepEnabled) }
             when {
@@ -186,7 +226,7 @@ private fun StepTitle(text: String, enabled: Boolean = true) {
 }
 
 @Composable
-private fun ProviderStep(selected: LlmProviderKind, onProvider: (LlmProviderKind) -> Unit) {
+private fun ProviderStep(selected: LlmProviderKind, onProvider: (LlmProviderKind) -> Unit, onDeviceAvailable: Boolean = false, onOnDevice: () -> Unit = {}) {
     Column {
         StepTitle("1. Провайдер")
         Column(Modifier.selectableGroup()) {
@@ -199,6 +239,23 @@ private fun ProviderStep(selected: LlmProviderKind, onProvider: (LlmProviderKind
                 ) {
                     RadioButton(selected = kind == selected, onClick = null)
                     Text(kind.title, Modifier.padding(start = 8.dp))
+                }
+            }
+            if (onDeviceAvailable) {
+                // Не облачный провайдер: свой экран (проверка телефона → скачивание → тест), ключ и адрес не нужны.
+                Row(
+                    Modifier.fillMaxWidth().selectable(selected = false, onClick = onOnDevice, role = Role.Button).padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(selected = false, onClick = null)
+                    Column(Modifier.padding(start = 8.dp)) {
+                        Text("На устройстве")
+                        Text(
+                            "Модель на телефоне, без интернета: проверка телефона, скачивание и тест скорости",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }

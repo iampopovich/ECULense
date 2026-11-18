@@ -8,6 +8,9 @@ import io.github.iampopovich.eculense.core.ai.LlmSettings
 import io.github.iampopovich.eculense.core.ai.LlmSettingsStore
 import io.github.iampopovich.eculense.core.ai.ModelInfo
 import io.github.iampopovich.eculense.core.ai.SecretCipher
+import io.github.iampopovich.eculense.core.ai.OnDeviceLlm
+import io.github.iampopovich.eculense.core.ai.OnDeviceSession
+import io.github.iampopovich.eculense.core.ai.OnDeviceSummary
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -83,6 +86,43 @@ class AiSettingsViewModelTest {
     private fun AiSettingsViewModel.checkAndWait() {
         check()
         waitUntil { state.value.check !is CheckState.Checking }
+    }
+
+    private class FakeOnDevice(initial: OnDeviceSummary?) : OnDeviceLlm {
+        val flow = kotlinx.coroutines.flow.MutableStateFlow(initial)
+        var deactivated = 0
+        override suspend fun session(): OnDeviceSession? = null
+        override val summary = flow
+        override suspend fun deactivate() {
+            deactivated++
+            flow.value = null
+        }
+    }
+
+    @Test
+    fun `on-device entry appears only with the module and an active local model shows as the summary`() {
+        assertFalse(loadedVm(FakeChecker(ConnectionCheck.Ok(catalog))).state.value.onDeviceAvailable)
+        val local = FakeOnDevice(OnDeviceSummary("Тестовая модель", "GPU · 13,2 ток/с · Комфортно"))
+        val vm = AiSettingsViewModel(store, FakeChecker(ConnectionCheck.Ok(catalog)), local, onDeviceRoute = true).also { v -> waitUntil { v.state.value.loaded } }
+        assertTrue(vm.state.value.onDeviceAvailable)
+        assertEquals("Тестовая модель", vm.state.value.onDevice?.model)
+        assertFalse("сводка, а не мастер", vm.state.value.editing)
+        vm.useCloud()
+        waitUntil { vm.state.value.onDevice == null }
+        assertEquals(1, local.deactivated)
+        assertTrue("облако не настроено — мастер", vm.state.value.editing)
+    }
+
+    @Test
+    fun `saving a cloud provider stops using the on-device model`() {
+        val local = FakeOnDevice(OnDeviceSummary("Тестовая модель", "CPU"))
+        val vm = AiSettingsViewModel(store, FakeChecker(ConnectionCheck.Ok(catalog)), local, onDeviceRoute = true).also { v -> waitUntil { v.state.value.loaded } }
+        vm.startWizard()
+        vm.setApiKey("sk-test")
+        vm.checkAndWait()
+        vm.selectModel("openai/gpt-4.1-mini")
+        vm.save()
+        waitUntil { local.deactivated == 1 }
     }
 
     @Test

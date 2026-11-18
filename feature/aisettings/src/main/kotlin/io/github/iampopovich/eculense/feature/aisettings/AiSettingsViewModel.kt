@@ -8,6 +8,8 @@ import io.github.iampopovich.eculense.core.ai.EndpointUrl
 import io.github.iampopovich.eculense.core.ai.LlmProviderKind
 import io.github.iampopovich.eculense.core.ai.LlmSettingsStore
 import io.github.iampopovich.eculense.core.ai.ModelInfo
+import io.github.iampopovich.eculense.core.ai.OnDeviceLlm
+import io.github.iampopovich.eculense.core.ai.OnDeviceSummary
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +46,10 @@ internal data class AiSettingsUiState(
     val query: String = "",
     val model: String = "",
     val busy: Boolean = false,
+    /** Модуль «На устройстве» подключён — в списке провайдеров есть пункт, ведущий на его экран. */
+    val onDeviceAvailable: Boolean = false,
+    /** Выбрана модель на телефоне — чат идёт через неё (облачная настройка, если есть, не активна). */
+    val onDevice: OnDeviceSummary? = null,
 ) {
     /** Пустое поле ключа = использовать сохранённый (только для того же провайдера). */
     val canReuseSavedKey: Boolean get() = saved?.hasKey == true && saved.provider == provider
@@ -67,15 +73,28 @@ internal data class AiSettingsUiState(
 internal class AiSettingsViewModel(
     private val store: LlmSettingsStore,
     private val checker: ConnectionChecker,
+    /** Модель на телефоне (:core:ailocal), если модуль подключён. */
+    private val onDevice: OnDeviceLlm? = null,
+    onDeviceRoute: Boolean = false,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(AiSettingsUiState())
+    private val _state = MutableStateFlow(AiSettingsUiState(onDeviceAvailable = onDeviceRoute && onDevice != null))
     val state: StateFlow<AiSettingsUiState> = _state.asStateFlow()
     private var checkJob: Job? = null
 
     init {
         viewModelScope.launch {
             val saved = store.settings.first()?.let { SavedConfig(it.provider, it.model, it.baseUrl, it.hasKey) }
-            _state.update { it.copy(loaded = true, saved = saved, editing = saved == null) }
+            val local = onDevice?.summary?.first()
+            _state.update { it.copy(loaded = true, saved = saved, editing = saved == null && local == null, onDevice = local) }
+            onDevice?.summary?.collect { s -> _state.update { it.copy(onDevice = s) } }
+        }
+    }
+
+    /** «Перейти на облачного провайдера»: локальная модель перестаёт использоваться, файлы остаются. */
+    fun useCloud() {
+        viewModelScope.launch {
+            onDevice?.deactivate()
+            _state.update { it.copy(onDevice = null, editing = it.saved == null) }
         }
     }
 
@@ -144,6 +163,8 @@ internal class AiSettingsViewModel(
         viewModelScope.launch {
             val url = if (s.provider == LlmProviderKind.OTHER) (EndpointUrl.validate(s.baseUrl) as EndpointUrl.Result.Valid).url else null
             store.save(s.provider, s.model, url, s.apiKey)
+            // сохранили облачного провайдера — значит, выбрали его вместо модели на телефоне
+            onDevice?.deactivate()
             val saved = store.settings.first()?.let { SavedConfig(it.provider, it.model, it.baseUrl, it.hasKey) }
             _state.update { it.copy(saved = saved, editing = false, apiKey = "", busy = false) }
         }
@@ -165,8 +186,11 @@ internal class AiSettingsViewModel(
         }
     }
 
+    /** Мастер облачного провайдера, когда сохранена только модель на телефоне. */
+    fun startWizard() = _state.update { it.copy(editing = true) }
+
     fun cancelEdit() {
-        if (_state.value.saved == null) return
+        if (_state.value.saved == null && _state.value.onDevice == null) return
         checkJob?.cancel()
         _state.update { it.copy(editing = false, apiKey = "").invalidated() }
     }
@@ -183,7 +207,8 @@ internal class AiSettingsViewModel(
         checkJob?.cancel()
         viewModelScope.launch {
             store.clear()
-            _state.value = AiSettingsUiState(loaded = true)
+            onDevice?.deactivate()
+            _state.value = AiSettingsUiState(loaded = true, onDeviceAvailable = _state.value.onDeviceAvailable)
         }
     }
 
