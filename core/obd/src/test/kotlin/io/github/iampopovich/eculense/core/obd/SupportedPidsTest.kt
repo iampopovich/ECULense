@@ -1,0 +1,17 @@
+package io.github.iampopovich.eculense.core.obd
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class SupportedPidsTest {
+    @Test
+    fun `decode mask BE3FA813`() {
+        val expected = setOf(0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x13, 0x15, 0x1C, 0x1F, 0x20)
+        assertEquals(expected, SupportedPids.decode(0x00, intArrayOf(0xBE, 0x3F, 0xA8, 0x13)))
+    }
+
+    @Test
+    fun `base offset is applied`() {
+        assertEquals(setOf(0x21), SupportedPids.decode(0x20, intArrayOf(0x80, 0x00, 0x00, 0x00)))
+    }
+}
