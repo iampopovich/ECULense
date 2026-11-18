@@ -2,6 +2,7 @@ package io.github.iampopovich.eculense
 
 import io.github.iampopovich.eculense.core.bluetooth.bluetoothModule
 import io.github.iampopovich.eculense.core.obd.obdModule
+import io.github.iampopovich.eculense.core.service.serviceModule
 import io.github.iampopovich.eculense.core.usb.usbModule
 import io.github.iampopovich.eculense.feature.dashboard.dashboardModule
 import org.koin.core.module.Module
@@ -11,5 +12,6 @@ val appModules: List<Module> = listOf(
     obdModule(includeEmulator = BuildConfig.DEBUG),
     bluetoothModule,
     usbModule,
+    serviceModule,
     dashboardModule,
 )
