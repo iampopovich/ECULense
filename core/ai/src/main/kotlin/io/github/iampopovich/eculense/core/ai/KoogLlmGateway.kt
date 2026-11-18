@@ -113,7 +113,7 @@ internal object KoogClients {
 
 /** Перевод исключений Koog/сети в понятный текст. Ключ вырезается, если вдруг попал в ответ сервера. */
 internal object LlmErrors {
-    private val providerMessage = Regex("\"message\"\\s*:\\s*\"([^\"]{1,200})\"")
+    private val providerMessage = Regex("\"(?:message|error)\"\\s*:\\s*\"([^\"]{1,200})\"")
 
     fun describe(error: Throwable, apiKey: String?): LlmException {
         if (error is LlmException) return error
@@ -122,7 +122,8 @@ internal object LlmErrors {
         val status = http?.statusCode
         val text = when {
             error is IllegalStateException && chain.none { it is KoogHttpClientException } -> error.message ?: "ИИ не настроен"
-            status == 401 || status == 403 -> "Ошибка авторизации ($status): неверный или отозванный API-ключ. Проверьте ключ в Настройки → ИИ-помощник."
+            status == 401 -> "Ошибка авторизации (401): неверный или отозванный API-ключ. Проверьте ключ в Настройки → ИИ-помощник."
+            status == 403 -> "Доступ запрещён (403): у ключа нет прав или провайдер блокирует запросы из этой сети/региона (попробуйте VPN)."
             status == 402 -> "Недостаточно средств на счёте провайдера (402)."
             status == 404 -> "Модель или адрес не найдены (404): проверьте название модели."
             status == 429 -> "Слишком много запросов (429): подождите и повторите."

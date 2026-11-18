@@ -139,6 +139,17 @@ class KoogLlmGatewayTest {
     }
 
     @Test
+    fun `403 block is not reported as a bad key and shows the server reason`() = runBlocking {
+        // Так OpenRouter (Cloudflare) отвечает телефону из заблокированной сети/региона на любой запрос.
+        val baseUrl = startServer(403, "application/json", """{ "success": false, "error": "Access denied by security policy." }""", mutableListOf())
+        val gateway = KoogLlmGateway(store(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", baseUrl, "sk-or-invalid"))
+        val message = gateway.ping().exceptionOrNull()!!.message!!
+        assertTrue(message, message.contains("403"))
+        assertTrue(message, message.contains("Access denied by security policy."))
+        assertFalse(message, message.contains("неверный"))
+    }
+
+    @Test
     fun `unreachable server gives a network error`() = runBlocking {
         val gateway = KoogLlmGateway(store(LlmProviderKind.OPENROUTER, "m", "http://127.0.0.1:1", "k"))
         val ping = gateway.ping()
