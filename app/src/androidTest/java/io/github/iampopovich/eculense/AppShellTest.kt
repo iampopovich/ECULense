@@ -48,6 +48,9 @@ class AppShellTest {
         tab("Настройки").performClick()
         rule.onNodeWithText("Адаптер").assertIsDisplayed()
         rule.onNodeWithText("Выбор и подключение ELM327").assertIsDisplayed()
+        // Модуль ИИ подключён: пункт настроек ИИ в хабе.
+        rule.onNodeWithText("ИИ-помощник").assertIsDisplayed()
+        rule.onNodeWithText("Провайдер, модель, ключ").assertIsDisplayed()
     }
 
     @Test
@@ -55,7 +58,9 @@ class AppShellTest {
         tab("Пит-стоп").performClick()
         rule.onNodeWithText("Ошибки (DTC)").assertIsDisplayed()
         rule.onNodeWithText("Поездки").assertIsDisplayed()
-        rule.onNodeWithText("ИИ-помощник появится позже").assertIsDisplayed()
+        // Ровно одна карточка ИИ (onNodeWithText падает на дубликатах), заглушки нет.
+        rule.onNodeWithText("ИИ-помощник").assertIsDisplayed()
+        rule.onNodeWithText("ИИ-помощник появится позже").assertDoesNotExist()
     }
 
     @Test

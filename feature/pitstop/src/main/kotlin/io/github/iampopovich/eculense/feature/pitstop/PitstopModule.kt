@@ -36,6 +36,8 @@ internal fun PitstopRoute() {
     val koin = getKoin()
     val entries = remember { koin.getAll<HubEntry>().forHub(Hub.PITSTOP) }
     val hasAssistant = remember { koin.getAll<RouteHandler>().any { it.routeClass == AiChatDestination::class } }
+    // Чат сам регистрирует свой HubEntry — тогда отдельная карточка-заглушка не нужна (одна карточка ИИ).
+    val assistantListed = entries.any { it.destination is AiChatDestination }
     val navigator = LocalNavigator.current
     HubScaffold(title = "Пит-стоп") {
         if (entries.isEmpty()) {
@@ -44,16 +46,18 @@ internal fun PitstopRoute() {
         items(entries, key = { it.title }) { entry ->
             HubCard(entry.title, entry.subtitle, painterResource(entry.icon), onClick = { navigator.navigate(entry.destination) })
         }
-        item {
-            if (hasAssistant) {
-                HubCard(
-                    "ИИ-помощник",
-                    "Спросить о машине и ошибках",
-                    painterResource(R.drawable.ic_assistant),
-                    onClick = { navigator.navigate(AiChatDestination()) },
-                )
-            } else {
-                HubCard("ИИ-помощник появится позже", "Модуль ИИ пока не подключён", painterResource(R.drawable.ic_assistant))
+        if (!assistantListed) {
+            item {
+                if (hasAssistant) {
+                    HubCard(
+                        "ИИ-помощник",
+                        "Спросить о машине и ошибках",
+                        painterResource(R.drawable.ic_assistant),
+                        onClick = { navigator.navigate(AiChatDestination()) },
+                    )
+                } else {
+                    HubCard("ИИ-помощник появится позже", "Модуль ИИ пока не подключён", painterResource(R.drawable.ic_assistant))
+                }
             }
         }
     }

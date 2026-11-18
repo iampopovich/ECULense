@@ -8,6 +8,7 @@ import io.github.iampopovich.eculense.core.demo.demoModule
 import io.github.iampopovich.eculense.core.obd.obdModule
 import io.github.iampopovich.eculense.core.service.serviceModule
 import io.github.iampopovich.eculense.core.usb.usbModule
+import io.github.iampopovich.eculense.feature.aichat.aiChatModule
 import io.github.iampopovich.eculense.feature.aisettings.aiSettingsModule
 import io.github.iampopovich.eculense.feature.connect.connectModule
 import io.github.iampopovich.eculense.feature.dashboard.dashboardModule
@@ -36,4 +37,5 @@ val appModules: List<Module> = listOf(
     // ИИ (этап 2): убрать эти строки + модули в settings.gradle.kts/app → приложение работает без ИИ.
     aiModule,
     aiSettingsModule,
+    aiChatModule,
 )
