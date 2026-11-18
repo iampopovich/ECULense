@@ -74,7 +74,7 @@ class BenchService : Service() {
             reply.putString(KEY_ERROR, (t.message ?: t::class.java.simpleName).take(300))
         }
         reply.putLong(KEY_PEAK, peakRss())
-        Log.i(TAG, "bench $backend done in ${SystemClock.elapsedRealtime() - started} ms ok=${reply.getBoolean(KEY_OK)}")
+        Log.w(TAG, "bench $backend done in ${SystemClock.elapsedRealtime() - started} ms ok=${reply.getBoolean(KEY_OK)}")
         runCatching { replyTo.send(Message.obtain().apply { this.data = reply }) }
         // Свежий процесс на каждый бэкенд: память движка и VmHWM не переходят в следующий замер.
         Handler(Looper.getMainLooper()).postDelayed({ Process.killProcess(Process.myPid()) }, 300)
@@ -167,7 +167,9 @@ class BenchRunner(private val context: Context) {
             override fun onBindingDied(name: ComponentName?) = finish(BackendRun(backend, ok = false, error = crashed))
         }
         cacheDir.mkdirs()
-        val bound = app.bindService(Intent(app, BenchService::class.java), connection, Context.BIND_AUTO_CREATE)
+        // BIND_IMPORTANT: процесс теста получает приоритет видимого экрана — иначе MIUI убирает «фоновый» процесс с
+        // гигабайтами PSS (на 14T Pro так погибал GPU-прогон E4B, хотя в тестовом процессе он проходит).
+        val bound = app.bindService(Intent(app, BenchService::class.java), connection, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
         if (!bound) finish(BackendRun(backend, ok = false, error = "не удалось запустить процесс теста"))
         cont.invokeOnCancellation { connection?.let { runCatching { app.unbindService(it) } } }
     }

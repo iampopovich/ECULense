@@ -54,7 +54,7 @@ class LocalBench(
             for (b in backends) {
                 _progress.value = BenchProgress(packId, b, done.toList())
                 val r = runner.run(file, b, File(cacheDir, "bench"))
-                Log.i(BenchService.TAG, "bench ${file.name} $r")
+                Log.w(BenchService.TAG, "bench ${file.name} $r")
                 done += r
             }
             val report = BenchReport(packId, done.toList(), clock())
