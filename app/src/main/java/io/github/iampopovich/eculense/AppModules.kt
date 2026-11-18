@@ -1,6 +1,8 @@
 package io.github.iampopovich.eculense
 
 import io.github.iampopovich.eculense.core.ai.aiModule
+import io.github.iampopovich.eculense.core.backup.backupModule
+import io.github.iampopovich.eculense.feature.backup.backupFeatureModule
 import io.github.iampopovich.eculense.core.aitools.aiToolsModule
 import io.github.iampopovich.eculense.core.background.backgroundModule
 import io.github.iampopovich.eculense.core.bluetooth.bluetoothModule
@@ -53,6 +55,9 @@ val appModules: List<Module> = listOf(
     analysisModule,
     maintenanceModule,
     dataPacksFeatureModule,
+    // Импорт бэкапов Car Scanner (WorkManager) и резервная копия ECULense; без них «Поездки»/«Статистика» без ссылки на импорт.
+    backupModule,
+    backupFeatureModule,
     // Демо-режим (виртуальный ELM327) — последним в списке транспортов, во всех сборках.
     demoModule,
     // ИИ (этап 2): убрать эти строки + модули в settings.gradle.kts/app → приложение работает без ИИ.

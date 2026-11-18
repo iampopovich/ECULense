@@ -46,7 +46,7 @@ data class ImportHistoryItem(
             fileName = fileName, startedAtMs = startedAtMs, finishedAtMs = finishedAtMs, status = ImportStatus.DONE,
             recordingsAdded = report.imported, recordingsSkipped = report.skippedDuplicates, tripsAdded = report.tripsImported,
             tripsUpdated = report.tripsUpdated, tripsSkipped = report.tripsSkipped, dtcAdded = report.dtcEventsAdded,
-            carFieldsUpdated = report.carFieldsUpdated.size + if (report.car?.created == true) 1 else 0,
+            carFieldsUpdated = report.carFieldsUpdated.size,
             unitsUpdated = report.unitsImported, errors = report.failed.size,
         )
     }

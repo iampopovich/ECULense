@@ -71,6 +71,9 @@ dependencies {
     implementation(project(":feature:stats"))
     implementation(project(":feature:analysis"))
     implementation(project(":feature:maintenance"))
+    // 1.27 импорт бэкапов Car Scanner в фоне и резервная копия ECULense
+    implementation(project(":core:backup"))
+    implementation(project(":feature:backup"))
     implementation(project(":core:obd"))
     implementation(project(":core:bluetooth"))
     implementation(project(":core:usb"))
