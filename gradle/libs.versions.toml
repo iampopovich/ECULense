@@ -67,6 +67,8 @@ koog-mistral = { group = "ai.koog", name = "prompt-executor-mistralai-client", v
 koog-ollama = { group = "ai.koog", name = "prompt-executor-ollama-client", version.ref = "koog" }
 vico-compose-m3 = { group = "com.patrykandpatrick.vico", name = "compose-m3", version.ref = "vico" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version = "3.41.2.2" }
+androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 usbserial = { group = "com.github.mik3y", name = "usb-serial-for-android", version.ref = "usbSerial" }
 # Markdown в ответах ИИ, со стримингом (rememberStreamingMarkdownState)
 markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
