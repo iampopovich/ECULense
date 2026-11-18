@@ -16,7 +16,8 @@ class FakeSessionRepository : SessionRepository {
     val appended = mutableListOf<SensorReading>()
     val finished = mutableListOf<Long>()
     override fun observeSessions() = flowOf(emptyList<Session>())
-    override suspend fun start(name: String, source: SessionSource, vin: String?, startedAtMs: Long?, externalId: String?) = 1L
+    override suspend fun start(name: String, source: SessionSource, vin: String?, startedAtMs: Long?, externalId: String?, carId: Long?) = 1L
+    override suspend fun assignCar(externalId: String, carId: Long) = Unit
     override suspend fun append(sessionId: Long, readings: List<SensorReading>) {
         appended += readings
     }

@@ -20,7 +20,7 @@ import org.junit.Test
 
 private class FakeDtcRepository : DtcRepository {
     val saved = mutableListOf<Dtc>()
-    override suspend fun saveSnapshot(dtcs: List<Dtc>, vin: String?, takenAtMs: Long?) {
+    override suspend fun saveSnapshot(dtcs: List<Dtc>, vin: String?, takenAtMs: Long?, carId: Long?) {
         saved += dtcs
     }
 }

@@ -2,6 +2,7 @@ package io.github.iampopovich.eculense.core.data
 
 import io.github.iampopovich.eculense.core.carscanner.BrcWriter
 import io.github.iampopovich.eculense.core.carscanner.DOTNET_EPOCH_TICKS
+import io.github.iampopovich.eculense.core.carscanner.JdbcSqlite
 import io.github.iampopovich.eculense.core.model.Dtc
 import io.github.iampopovich.eculense.core.model.DtcKind
 import io.github.iampopovich.eculense.core.model.SensorReading
@@ -15,22 +16,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-private class ImportSessions : SessionRepository {
-    data class Started(val id: Long, val name: String, val source: SessionSource, val startedAtMs: Long?, val externalId: String?)
+internal class ImportSessions : SessionRepository {
+    data class Started(val id: Long, val name: String, val source: SessionSource, val startedAtMs: Long?, val externalId: String?, val carId: Long? = null)
 
     val started = mutableListOf<Started>()
     val readings = mutableMapOf<Long, MutableList<SensorReading>>()
     val ended = mutableMapOf<Long, Long?>()
     val deleted = mutableListOf<Long>()
+    private var nextId = 1L
 
     override fun observeSessions() = flowOf(emptyList<Session>())
-    override suspend fun start(name: String, source: SessionSource, vin: String?, startedAtMs: Long?, externalId: String?): Long {
-        val id = started.size + 1L
-        started += Started(id, name, source, startedAtMs, externalId)
+    override suspend fun start(name: String, source: SessionSource, vin: String?, startedAtMs: Long?, externalId: String?, carId: Long?): Long {
+        val id = nextId++
+        started += Started(id, name, source, startedAtMs, externalId, carId)
         return id
+    }
+    override suspend fun assignCar(externalId: String, carId: Long) {
+        started.replaceAll { if (it.externalId == externalId) it.copy(carId = carId) else it }
     }
     override suspend fun append(sessionId: Long, readings: List<SensorReading>) {
         this.readings.getOrPut(sessionId) { mutableListOf() } += readings
@@ -47,17 +53,21 @@ private class ImportSessions : SessionRepository {
     override suspend fun hasExternal(externalId: String) = started.any { it.externalId == externalId }
 }
 
-private class ImportDtcs : DtcRepository {
+internal class ImportDtcs : DtcRepository {
     val snapshots = mutableListOf<Pair<Long?, List<Dtc>>>()
-    override suspend fun saveSnapshot(dtcs: List<Dtc>, vin: String?, takenAtMs: Long?) {
+    val cars = mutableListOf<Long?>()
+    override suspend fun saveSnapshot(dtcs: List<Dtc>, vin: String?, takenAtMs: Long?, carId: Long?) {
         snapshots += takenAtMs to dtcs
+        cars += carId
     }
 }
 
 class CarScannerImporterTest {
     private val sessions = ImportSessions()
     private val dtcs = ImportDtcs()
-    private val importer = CarScannerImporter({ null }, sessions, dtcs)
+    private val importer = CarScannerImporter(
+        { null }, sessions, dtcs, FakeCars(), FakeTrips(), FakeUnits(), JdbcSqlite, File(System.getProperty("java.io.tmpdir")),
+    )
     private val startTicks = DOTNET_EPOCH_TICKS + 1_778_212_013_000L * 10_000
     private val p0113 = """{"Code":"P0113","RawCode":"0113","RequestCommand":"03","ResponseHeader":""}"""
     private val p0113WithHeader = """{"Code":"P0113","RawCode":"0113","RequestCommand":"03","ResponseHeader":"C233F1"}"""
@@ -123,7 +133,7 @@ class CarScannerImporterTest {
             .point(1.0, 12, 800.0)
             .raw(byteArrayOf(1, 2, 3, 4, 0, 0, 0, 0))
             .bytes()
-        val report = importer.importStream(ByteArrayInputStream(broken), "broken.brc")
+        val report = importer.importStream({ ByteArrayInputStream(broken) }, "broken.brc")
         assertEquals(0, report.imported)
         assertEquals(1, report.failed.size)
         assertTrue(sessions.started.isEmpty())
@@ -143,13 +153,13 @@ class CarScannerImporterTest {
         }.toByteArray()
         val progress = mutableListOf<Int>()
 
-        val first = importer.importStream(ByteArrayInputStream(zip), "backup.cbz") { progress += it }
-        val second = importer.importStream(ByteArrayInputStream(zip), "backup.cbz")
+        val first = importer.importStream({ ByteArrayInputStream(zip) }, "backup.cbz") { progress += it }
+        val second = importer.importStream({ ByteArrayInputStream(zip) }, "backup.cbz")
 
         assertEquals(2, first.imported)
         assertEquals(0, first.skippedDuplicates)
         assertEquals(1, first.failed.size)
         assertEquals(listOf(1, 2, 3), progress)
-        assertEquals(ImportReport(imported = 0, skippedDuplicates = 2, failed = first.failed), second)
+        assertEquals(ImportReport(imported = 0, skippedDuplicates = 2, failed = first.failed, unitsImported = true), second)
     }
 }
