@@ -29,6 +29,12 @@ interface LlmGateway {
      */
     fun chat(conversationId: String, userText: String, useCarData: Boolean): Flow<ChatEvent>
 
+    /** Сохранённый диалог (тексты вопросов и ответов) — переживает перезапуск приложения. */
+    suspend fun history(conversationId: String): List<ChatMessage> = emptyList()
+
+    /** «Новый диалог»: старый удаляется (списка диалогов в приложении нет). */
+    suspend fun deleteConversation(conversationId: String) = Unit
+
     /** Текущий провайдер; null — ИИ не настроен. */
     suspend fun provider(): ProviderInfo? = null
 }

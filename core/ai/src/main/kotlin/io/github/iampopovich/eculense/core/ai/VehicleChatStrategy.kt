@@ -80,12 +80,11 @@ internal object VehicleChatStrategy {
 }
 
 /**
- * Что сохраняет ChatMemory: только тексты вопросов и ответов, последние [WINDOW] сообщений. Вызовы инструментов и их
+ * Что сохраняет ChatMemory: только тексты вопросов и ответов (окно — в [ChatHistoryStore.load]). Вызовы инструментов и их
  * JSON в следующих ходах не нужны (модель вызовет инструмент заново) и стоят токенов; к тому же обрезка окна
  * посреди пары «вызов — результат» ломает запрос к API.
  */
 internal object TextOnlyHistory : ChatMemoryPreProcessor {
-    const val WINDOW = 20
 
     override fun preprocess(messages: List<Message>): List<Message> = messages.mapNotNull { m ->
         val text = m.parts.filterIsInstance<MessagePart.Text>().joinToString("") { it.text }
@@ -95,5 +94,5 @@ internal object TextOnlyHistory : ChatMemoryPreProcessor {
             m is Message.Assistant -> Message.Assistant(text, m.metaInfo)
             else -> null
         }
-    }.takeLast(WINDOW)
+    }
 }

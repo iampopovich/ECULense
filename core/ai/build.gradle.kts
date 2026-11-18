@@ -1,6 +1,8 @@
 plugins {
     id("ecu.android.library")
     alias(libs.plugins.kotlin.serialization)
+    // История чата ИИ — своя база ai_chat.db (выпиливается вместе с модулем).
+    id("ecu.android.room")
 }
 
 dependencies {
@@ -17,4 +19,5 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
+    androidTestImplementation(libs.androidx.room.testing)
 }

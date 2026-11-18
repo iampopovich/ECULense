@@ -30,11 +30,15 @@ internal data class ChatCall(val conversationId: String, val text: String, val u
 internal class FakeGateway(
     override val hasVehicleTools: Boolean = true,
     private val provider: ProviderInfo? = null,
+    private val history: Map<String, List<ChatMessage>> = emptyMap(),
     private val responder: (Int) -> Flow<ChatEvent> = { flowOf(ChatEvent.Text("ок")) },
 ) : LlmGateway {
     val calls = mutableListOf<ChatCall>()
+    val deleted = mutableListOf<String>()
     override fun stream(system: String, history: List<ChatMessage>): Flow<String> = error("not used")
     override suspend fun provider(): ProviderInfo? = provider
+    override suspend fun history(conversationId: String) = history[conversationId].orEmpty()
+    override suspend fun deleteConversation(conversationId: String) { deleted += conversationId }
     override fun chat(conversationId: String, userText: String, useCarData: Boolean): Flow<ChatEvent> {
         calls += ChatCall(conversationId, userText, useCarData)
         return responder(calls.size)
@@ -170,6 +174,37 @@ class ChatViewModelTest {
         vm.send("Что такое P0300?")
         assertNull(vm.uiState.value.consent)
         assertFalse(gateway.calls.single().useCarData)
+    }
+
+    @Test
+    fun `saved conversation is shown after restart and continues with the same id`() = runTest {
+        val saved = listOf(ChatMessage(ChatMessage.Role.USER, "старый вопрос"), ChatMessage(ChatMessage.Role.ASSISTANT, "старый ответ"))
+        val gateway = FakeGateway(history = mapOf("c-old" to saved))
+        val vm = ChatViewModel(gateway, FakePrefs(conversation = "c-old"), prefill = null)
+        assertEquals(saved, vm.uiState.value.messages)
+        vm.send("новый")
+        assertEquals("c-old", gateway.calls.single().conversationId)
+        assertEquals(4, vm.uiState.value.messages.size)
+    }
+
+    @Test
+    fun `new dialog clears the screen, deletes the old one and uses a new id`() = runTest {
+        val gateway = FakeGateway(history = mapOf("c-old" to listOf(ChatMessage(ChatMessage.Role.USER, "q"))))
+        val prefs = FakePrefs(conversation = "c-old")
+        val vm = ChatViewModel(gateway, prefs, prefill = null)
+        vm.newDialog()
+        assertTrue(vm.uiState.value.messages.isEmpty())
+        assertEquals(listOf("c-old"), gateway.deleted)
+        assertTrue(prefs.conversation != "c-old" && prefs.conversation != null)
+        vm.send("привет")
+        assertEquals(prefs.conversation, gateway.calls.single().conversationId)
+    }
+
+    @Test
+    fun `first start saves a conversation id`() = runTest {
+        val prefs = FakePrefs()
+        ChatViewModel(FakeGateway(), prefs, prefill = null)
+        assertTrue(prefs.conversation != null)
     }
 
     @Test

@@ -145,6 +145,25 @@ class ChatScreenTest {
     }
 
     @Test
+    fun newDialogAsksForConfirmation() {
+        var created = 0
+        rule.setContent { ChatScreen(ChatUiState(listOf(user("q"), assistant("a"))), onSend = {}, onOpenSettings = {}, onNewDialog = { created++ }) }
+        rule.onNodeWithContentDescription("Новый диалог").performClick()
+        rule.onNodeWithText("Начать новый диалог?").assertExists()
+        rule.onNodeWithText("Отмена").performClick()
+        assertEquals(0, created)
+        rule.onNodeWithContentDescription("Новый диалог").performClick()
+        rule.onNodeWithText("Новый диалог").performClick()
+        assertEquals(1, created)
+    }
+
+    @Test
+    fun newDialogDisabledForEmptyChat() {
+        rule.setContent { ChatScreen(ChatUiState(), onSend = {}, onOpenSettings = {}) }
+        rule.onNodeWithContentDescription("Новый диалог").assertIsNotEnabled()
+    }
+
+    @Test
     fun streamingAnswerGrowsAndGetsCopyButtonWhenDone() {
         val state = mutableStateOf(ChatUiState(listOf(user("hi"), assistant("# Заго")), streaming = true))
         rule.setContent { ChatScreen(state.value, onSend = {}, onOpenSettings = {}) }

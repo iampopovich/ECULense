@@ -128,6 +128,13 @@ class VehicleChatAgentTest {
 
         gateway.chat("c2", "Новый диалог", useCarData = true).toList()
         assertEquals(listOf("Новый диалог"), exec.prompts[3].messages.drop(1).map { it.textContent() })
+        // для экрана — полный текст диалога; новый диалог удаляет старый
+        assertEquals(
+            listOf(ChatMessage(ChatMessage.Role.USER, "Вопрос 1"), ChatMessage(ChatMessage.Role.ASSISTANT, "Первый ответ"), ChatMessage(ChatMessage.Role.USER, "Вопрос 2"), ChatMessage(ChatMessage.Role.ASSISTANT, "Второй ответ")),
+            gateway.history("c1"),
+        )
+        gateway.deleteConversation("c1")
+        assertEquals(emptyList<ChatMessage>(), gateway.history("c1"))
     }
 
     @Test
@@ -169,7 +176,6 @@ class VehicleChatAgentTest {
             Message.Assistant("ответ", rmeta),
         )
         assertEquals(listOf("q", "смотрю", "ответ"), TextOnlyHistory.preprocess(msgs).map { it.textContent() })
-        assertEquals(TextOnlyHistory.WINDOW, TextOnlyHistory.preprocess(List(50) { Message.User("q$it", meta) }).size)
     }
 
     // --- Spike (план 3.4): Koog 1.3.0 поддерживает suspend-методы @Tool в ToolSet (ToolFromCallable → callSuspendBy).

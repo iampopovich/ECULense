@@ -1,8 +1,6 @@
 package io.github.iampopovich.eculense.core.ai
 
-import ai.koog.agents.chatMemory.feature.ChatHistoryProvider
 import ai.koog.agents.chatMemory.feature.ChatMemory
-import ai.koog.agents.chatMemory.feature.InMemoryChatHistoryProvider
 import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.http.client.KoogHttpClient
@@ -231,10 +229,14 @@ internal object LlmErrors {
 internal class KoogLlmGateway(
     private val store: LlmSettingsStore,
     private val toolbox: VehicleToolbox? = null,
-    private val historyProvider: ChatHistoryProvider = InMemoryChatHistoryProvider(),
+    private val historyProvider: ChatHistoryStore = InMemoryChatHistory(),
     private val executorFactory: (LlmSettings, String?) -> PromptExecutor = { s, key -> KoogClients.executor(s, key) },
 ) : LlmGateway {
     override val hasVehicleTools: Boolean get() = toolbox != null
+
+    override suspend fun history(conversationId: String): List<ChatMessage> = historyProvider.transcript(conversationId)
+
+    override suspend fun deleteConversation(conversationId: String) = historyProvider.delete(conversationId)
 
     override suspend fun provider(): ProviderInfo? =
         store.settings.first()?.takeIf { it.model.isNotBlank() }?.let { ProviderInfo(it.provider.name, it.provider.title, it.model) }

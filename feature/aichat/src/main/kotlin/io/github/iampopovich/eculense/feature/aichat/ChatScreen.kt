@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -83,6 +84,7 @@ internal fun ChatRoute(prefill: String?, viewModel: ChatViewModel = koinViewMode
         onConsentDecline = viewModel::declineConsent,
         onConsentCancel = viewModel::cancelConsent,
         onDraftConsumed = viewModel::draftConsumed,
+        onNewDialog = viewModel::newDialog,
     )
 }
 
@@ -100,8 +102,10 @@ internal fun ChatScreen(
     onConsentDecline: () -> Unit = {},
     onConsentCancel: () -> Unit = {},
     onDraftConsumed: () -> Unit = {},
+    onNewDialog: () -> Unit = {},
 ) {
     var input by rememberSaveable { mutableStateOf("") }
+    var confirmNew by rememberSaveable { mutableStateOf(false) }
     state.consent?.let { ConsentDialog(it, onConsentAccept, onConsentDecline, onConsentCancel) }
     LaunchedEffect(state.draft) {
         state.draft?.let {
@@ -131,9 +135,26 @@ internal fun ChatScreen(
     Column(modifier.fillMaxSize().aboveKeyboard().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("ИИ-помощник", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+            IconButton(onClick = { confirmNew = true }, enabled = state.messages.isNotEmpty()) {
+                Icon(painterResource(R.drawable.ic_new_chat), contentDescription = "Новый диалог")
+            }
             IconButton(onClick = onOpenSettings) {
                 Icon(painterResource(R.drawable.ic_tune), contentDescription = "Настройки ИИ")
             }
+        }
+        if (confirmNew) {
+            AlertDialog(
+                onDismissRequest = { confirmNew = false },
+                title = { Text("Начать новый диалог?") },
+                text = { Text("Текущая переписка будет удалена, ИИ перестанет её учитывать.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirmNew = false
+                        onNewDialog()
+                    }) { Text("Новый диалог") }
+                },
+                dismissButton = { TextButton(onClick = { confirmNew = false }) { Text("Отмена") } },
+            )
         }
         if (state.carDataAvailable) {
             // Вся строка — одна зона касания (48 dp), подпись читается вместе с переключателем.

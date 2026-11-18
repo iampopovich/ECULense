@@ -58,13 +58,28 @@ internal class ChatViewModel(
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
     private var job: Job? = null
     private var generation = 0
-    private val conversationId = UUID.randomUUID().toString()
+    private var conversationId = UUID.randomUUID().toString()
 
     init {
         viewModelScope.launch {
             val saved = prefs.useCarData()
-            _uiState.update { it.copy(useCarData = (saved ?: true) && it.carDataAvailable) }
+            // Диалог переживает перезапуск: id — в настройках, тексты — в ai_chat.db (ChatMemory).
+            conversationId = prefs.conversationId() ?: conversationId.also { prefs.setConversationId(it) }
+            val history = runCatching { gateway.history(conversationId) }.getOrDefault(emptyList())
+            _uiState.update { it.copy(useCarData = (saved ?: true) && it.carDataAvailable, messages = history + it.messages) }
             if (!prefill.isNullOrBlank()) send(prefill)
+        }
+    }
+
+    /** «Новый диалог»: текущая переписка удаляется, ИИ её больше не видит. */
+    fun newDialog() {
+        if (_uiState.value.streaming) stop()
+        val old = conversationId
+        conversationId = UUID.randomUUID().toString()
+        _uiState.update { it.copy(messages = emptyList(), error = null, stoppedIndex = null, toolStatus = null, consent = null) }
+        viewModelScope.launch {
+            prefs.setConversationId(conversationId)
+            gateway.deleteConversation(old)
         }
     }
 
