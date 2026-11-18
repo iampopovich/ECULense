@@ -1,6 +1,14 @@
 package io.github.iampopovich.eculense.feature.aichat
 
+import android.content.ClipData
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.model.rememberStreamingMarkdownState
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,7 +76,8 @@ internal fun ChatScreen(
     val lastLength = state.messages.lastOrNull()?.text?.length ?: 0
     LaunchedEffect(state.messages.size, lastLength, state.error) {
         val count = listState.layoutInfo.totalItemsCount
-        if (count > 0) listState.scrollToItem(count - 1)
+        // Большое смещение упирается в конец списка: видно низ растущего ответа, а не его начало.
+        if (count > 0) listState.scrollToItem(count - 1, Int.MAX_VALUE)
     }
     Column(modifier.fillMaxSize().aboveKeyboard().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -93,8 +102,9 @@ internal fun ChatScreen(
                 }
             }
             itemsIndexed(state.messages) { index, message ->
-                val typing = state.streaming && index == state.messages.lastIndex && message.text.isEmpty()
-                Bubble(message, typing)
+                val last = index == state.messages.lastIndex
+                val typing = state.streaming && last && message.text.isEmpty()
+                Bubble(message, typing, streaming = state.streaming && last)
             }
             state.error?.let { error ->
                 item {
@@ -145,19 +155,60 @@ private fun Modifier.aboveKeyboard(): Modifier {
 }
 
 @Composable
-private fun Bubble(message: ChatMessage, typing: Boolean) {
+private fun Bubble(message: ChatMessage, typing: Boolean, streaming: Boolean) {
     val mine = message.role == ChatMessage.Role.USER
-    Box(Modifier.fillMaxWidth(), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
-        Text(
-            text = if (typing) "…" else message.text,
-            color = if (mine) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier
-                .widthIn(max = 320.dp)
-                .background(
-                    if (mine) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    RoundedCornerShape(12.dp),
-                )
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        )
+    if (mine) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+            Text(
+                text = message.text,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier
+                    .widthIn(max = 320.dp)
+                    .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        }
+        return
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        if (typing) {
+            Text("…")
+        } else {
+            AssistantMarkdown(message.text)
+            if (!streaming) CopyButton(message.text)
+        }
+    }
+}
+
+/**
+ * Ответ ИИ как Markdown. Состояние парсера потоковое (append-only): при каждом новом куске текста
+ * дописываем только хвост, уже разобранные блоки не перерисовываются.
+ */
+@Composable
+private fun AssistantMarkdown(text: String) {
+    val markdown = rememberStreamingMarkdownState()
+    LaunchedEffect(markdown, text) {
+        val have = markdown.content.length
+        if (text.length > have) markdown.append(text.substring(have))
+    }
+    Markdown(streamingMarkdownState = markdown, modifier = Modifier.fillMaxWidth())
+}
+
+@Composable
+private fun CopyButton(text: String) {
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+        IconButton(
+            onClick = { scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("ECULense", text))) } },
+            modifier = Modifier.size(36.dp),
+        ) {
+            Icon(painterResource(R.drawable.ic_copy), contentDescription = "Копировать ответ", modifier = Modifier.size(18.dp))
+        }
     }
 }

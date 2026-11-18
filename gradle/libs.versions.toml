@@ -20,6 +20,7 @@ koogGoogle = "1.3.0-beta"
 vico = "3.3.1"
 turbine = "1.2.1"
 usbSerial = "3.12.0"
+markdownRenderer = "0.46.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -63,6 +64,8 @@ koog-google = { group = "ai.koog", name = "prompt-executor-google-client", versi
 vico-compose-m3 = { group = "com.patrykandpatrick.vico", name = "compose-m3", version.ref = "vico" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 usbserial = { group = "com.github.mik3y", name = "usb-serial-for-android", version.ref = "usbSerial" }
+# Markdown в ответах ИИ, со стримингом (rememberStreamingMarkdownState)
+markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
 # только для build-logic
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }

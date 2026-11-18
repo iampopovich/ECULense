@@ -4,4 +4,5 @@ plugins {
 
 dependencies {
     implementation(project(":core:ai"))
+    implementation(libs.markdown.renderer.m3)
 }
