@@ -114,15 +114,22 @@ class BenchRunner(private val context: Context) {
     private suspend fun runOnce(model: File, backend: BackendKind, cacheDir: File): BackendRun = suspendCancellableCoroutine { cont ->
         val app = context.applicationContext
         var connection: ServiceConnection? = null
+        // Ответ процесса теста. Возобновляемся только после гибели процесса (он завершается сам через 300 мс после
+        // ответа): иначе следующий бэкенд привязывается к ещё живому, умирающему процессу и «падает» сразу — так на
+        // 14T Pro GPU-прогон выглядел аварийным через 0,4 с после ответа CPU.
+        var answered: BackendRun? = null
         fun finish(run: BackendRun) {
             if (!cont.isActive) return
             connection?.let { runCatching { app.unbindService(it) } }
             cont.resume(run)
         }
+        val main = Handler(Looper.getMainLooper())
+        val crashed = "процесс теста завершился аварийно — нехватка памяти или сбой драйвера"
+        fun died() = finish(answered ?: BackendRun(backend, ok = false, error = crashed))
         val replies = Messenger(Handler(Looper.getMainLooper()) { msg ->
             val d = msg.data
             val peak = d.getLong(BenchService.KEY_PEAK).takeIf { it > 0 }
-            finish(
+            answered =
                 if (d.getBoolean(BenchService.KEY_OK)) {
                     BackendRun(
                         backend, ok = true,
@@ -136,15 +143,15 @@ class BenchRunner(private val context: Context) {
                     )
                 } else {
                     BackendRun(backend, ok = false, error = d.getString(BenchService.KEY_ERROR), peakRssBytes = peak)
-                },
-            )
+                }
+            // страховка, если сообщение о гибели процесса не придёт
+            main.postDelayed({ answered?.let { finish(it) } }, PROCESS_EXIT_WAIT_MS)
             true
         })
-        val crashed = "процесс теста завершился аварийно — нехватка памяти или сбой драйвера"
         connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, binder: IBinder) {
                 runCatching {
-                    binder.linkToDeath({ Handler(Looper.getMainLooper()).post { finish(BackendRun(backend, ok = false, error = crashed)) } }, 0)
+                    binder.linkToDeath({ main.post { died() } }, 0)
                 }
                 val request = Message.obtain().apply {
                     data = Bundle().apply {
@@ -161,10 +168,10 @@ class BenchRunner(private val context: Context) {
 
             // Процесс умер до ответа (ответ, если успел, уже обработан — finish идемпотентен).
             override fun onServiceDisconnected(name: ComponentName?) {
-                Handler(Looper.getMainLooper()).postDelayed({ finish(BackendRun(backend, ok = false, error = crashed)) }, 500)
+                main.postDelayed({ died() }, 500)
             }
 
-            override fun onBindingDied(name: ComponentName?) = finish(BackendRun(backend, ok = false, error = crashed))
+            override fun onBindingDied(name: ComponentName?) = died()
         }
         cacheDir.mkdirs()
         // BIND_IMPORTANT: процесс теста получает приоритет видимого экрана — иначе MIUI убирает «фоновый» процесс с
@@ -172,6 +179,10 @@ class BenchRunner(private val context: Context) {
         val bound = app.bindService(Intent(app, BenchService::class.java), connection, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
         if (!bound) finish(BackendRun(backend, ok = false, error = "не удалось запустить процесс теста"))
         cont.invokeOnCancellation { connection?.let { runCatching { app.unbindService(it) } } }
+    }
+
+    private companion object {
+        const val PROCESS_EXIT_WAIT_MS = 3_000L
     }
 }
 
