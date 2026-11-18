@@ -149,6 +149,7 @@ object LocalModelCatalog {
                 sizeBytes = k.sizeBytes ?: g.sizeBytes,
                 sha256 = k.sha256 ?: g.sha256,
                 version = k.version,
+                license = k.license.ifBlank { g.license },
                 gated = g.gated || k.gated,
                 koog = true,
             )

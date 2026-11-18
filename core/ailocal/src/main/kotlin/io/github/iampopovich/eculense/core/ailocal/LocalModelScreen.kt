@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -51,6 +52,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
@@ -233,16 +235,21 @@ private fun DeviceCard(device: DeviceProfile?, nano: NanoStatus?) {
     }
 }
 
+/** Зелёный/янтарный с контрастом ≥ 4,5:1 и на светлой, и на тёмной теме (поверхность определяется по яркости). */
+private fun ColorScheme.dark(): Boolean = surface.luminance() < 0.5f
+private fun ColorScheme.good(): Color = if (dark()) Color(0xFF81C784) else Color(0xFF1B5E20)
+private fun ColorScheme.warn(): Color = if (dark()) Color(0xFFFFB74D) else Color(0xFF8D5A00)
+
 private fun fitColor(fit: Fit, scheme: ColorScheme): Color = when (fit) {
-    Fit.OK -> Color(0xFF1B5E20)
-    Fit.TIGHT -> Color(0xFF8D5A00)
+    Fit.OK -> scheme.good()
+    Fit.TIGHT -> scheme.warn()
     Fit.UNLIKELY -> scheme.error
     Fit.UNKNOWN -> scheme.onSurfaceVariant
 }
 
 private fun verdictColor(v: Verdict, scheme: ColorScheme): Color = when (v) {
-    Verdict.COMFORT -> Color(0xFF1B5E20)
-    Verdict.SLOW -> Color(0xFF8D5A00)
+    Verdict.COMFORT -> scheme.good()
+    Verdict.SLOW -> scheme.warn()
     Verdict.UNSUITABLE -> scheme.error
 }
 
@@ -293,7 +300,7 @@ private fun ModelListRow(row: ModelRow, hasToken: Boolean, actions: LocalModelAc
             }
             ModelBadges(row, hasToken)
         }
-        Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) { RowTrailing(row, actions) }
+        Box(Modifier.heightIn(min = 56.dp).widthIn(min = 56.dp).padding(end = 8.dp), contentAlignment = Alignment.Center) { RowTrailing(row, actions) }
     }
     HorizontalDivider(Modifier.padding(start = 16.dp))
 }
@@ -316,7 +323,7 @@ private fun RowTrailing(row: ModelRow, actions: LocalModelActions) {
         row.installed && row.report != null -> {
             val v = row.report.verdict
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (row.activeBackend != null) Icon(painterResource(R.drawable.ic_model_check), contentDescription = "Используется в чате", tint = Color(0xFF1B5E20), modifier = Modifier.size(18.dp))
+                if (row.activeBackend != null) Icon(painterResource(R.drawable.ic_model_check), contentDescription = "Используется в чате", tint = MaterialTheme.colorScheme.good(), modifier = Modifier.size(18.dp))
                 Text(v.label, color = verdictColor(v, MaterialTheme.colorScheme), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
             }
         }

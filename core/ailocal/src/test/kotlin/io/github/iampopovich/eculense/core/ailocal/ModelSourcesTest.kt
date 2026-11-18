@@ -72,6 +72,7 @@ class ModelSourcesTest {
         assertEquals(ModelOrigin.GALLERY, e2b.origin)
         assertTrue(e2b.koog)
         assertEquals(8, e2b.minRamGb)
+        assertEquals("Apache-2.0", e2b.license)
         assertFalse(merged.single { it.fileName.startsWith("Qwen2.5") }.koog)
     }
 
