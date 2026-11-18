@@ -133,7 +133,7 @@ private fun OdometerCard(state: MaintenanceUiState, zone: ZoneId, onEnter: () ->
             } else {
                 Text((if (e.estimated) "≈ " else "") + MaintenanceFormat.km(e.km), style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("odometer"))
                 val base = "Введено ${MaintenanceFormat.km(e.baseKm)} · ${MaintenanceFormat.date(e.baseAtMs, zone)}"
-                Secondary(if (e.estimated) "$base, плюс ${MaintenanceFormat.km(e.addedKm)} по записанным поездкам (оценка)" else base)
+                Secondary(if (e.estimated) "$base, плюс ${MaintenanceFormat.addedKm(e.addedKm)} по записанным поездкам (оценка)" else base)
             }
             FilledTonalButton(onClick = onEnter) { Text(if (e == null) "Ввести пробег" else "Обновить пробег") }
         }
@@ -149,7 +149,7 @@ private fun ItemCard(d: MaintenanceDue, zone: ZoneId, onDone: () -> Unit, onEdit
                 StatusChip(d.status)
             }
             Secondary(MaintenanceFormat.interval(d.item))
-            Secondary(MaintenanceFormat.lastDone(d.item, zone))
+            MaintenanceFormat.lastDone(d.item, zone)?.let { Secondary(it) }
             Text(MaintenanceFormat.remaining(d), style = MaterialTheme.typography.bodyMedium)
             d.item.note?.takeIf { it.isNotBlank() }?.let { Secondary(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -267,6 +267,10 @@ private fun EditDialog(item: MaintenanceItem?, onSave: (MaintenanceItem) -> Unit
                 )
                 OutlinedTextField(note, { note = it }, label = { Text("Заметка") }, maxLines = 3)
                 Secondary("Пустой интервал — не считать по нему. Срабатывает то, что наступит раньше.")
+                if (item != null && (item.lastDoneKm != null || item.lastDoneAtMs != null)) {
+                    // Отметка «сделано» по ошибке, а снекбар уже ушёл, — вернуть «ещё не отмечали».
+                    TextButton(onClick = { onSave(item.copy(lastDoneKm = null, lastDoneAtMs = null)) }) { Text("Сбросить отметку «сделано»") }
+                }
                 if (item != null) TextButton(onClick = { onDelete(item) }) { Text("Удалить работу", color = MaterialTheme.colorScheme.error) }
             }
         },

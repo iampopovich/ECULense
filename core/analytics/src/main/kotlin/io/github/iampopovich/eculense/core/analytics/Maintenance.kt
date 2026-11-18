@@ -90,9 +90,9 @@ object MaintenanceRule {
         return MaintenanceDue(item, status, dueKm, kmLeft, dueAt, daysLeft)
     }
 
-    /** Все работы: сначала просроченные, потом «скоро», «в норме», «неизвестно»; внутри — по названию. */
+    /** Все работы: сначала просроченные, потом «скоро», «в норме», «неизвестно»; внутри — в порядке добавления (шаблон: масло первым). */
     fun evaluateAll(items: List<MaintenanceItem>, odometerKm: Double?, nowMs: Long, zone: ZoneId = ZoneId.systemDefault()): List<MaintenanceDue> =
-        items.map { evaluate(it, odometerKm, nowMs, zone) }.sortedWith(compareByDescending<MaintenanceDue> { it.status.rank }.thenBy { it.item.title })
+        items.map { evaluate(it, odometerKm, nowMs, zone) }.sortedWith(compareByDescending<MaintenanceDue> { it.status.rank }.thenBy { it.item.id })
 
     /** Что пора делать: просроченное и «скоро». */
     fun due(items: List<MaintenanceItem>, odometerKm: Double?, nowMs: Long, zone: ZoneId = ZoneId.systemDefault()): List<MaintenanceDue> =

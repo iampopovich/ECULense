@@ -12,7 +12,8 @@ internal object StatsFormat {
 
     fun distance(km: Double, units: UnitsSettings): String = units.distance(km).let { (v, u) -> "${number(v)} $u" }
 
-    fun volume(l: Double, units: UnitsSettings): String = units.volume(l).let { (v, u) -> "${number(v)} $u" }
+    /** Меньше литра — с сотыми: иначе короткая поездка показывает «0,0 л». */
+    fun volume(l: Double, units: UnitsSettings): String = units.volume(l).let { (v, u) -> "${number(v, if (v < 1.0) 2 else 1)} $u" }
 
     fun consumption(lPer100: Double?, units: UnitsSettings): String =
         lPer100?.let { units.consumption(it).let { (v, u) -> "${number(v)} $u" } } ?: "—"

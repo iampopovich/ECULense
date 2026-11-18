@@ -100,6 +100,15 @@ class MaintenanceScreenTest {
     }
 
     @Test
+    fun mistakenDoneMarkCanBeResetFromTheEditDialog() {
+        val saved = mutableListOf<MaintenanceItem>()
+        rule.setContent { MaintenanceScreen(state(), zone, MaintenanceActions(save = { saved += it })) }
+        rule.onAllNodesWithText("Изменить")[0].performClick()
+        rule.onNodeWithText("Сбросить отметку «сделано»").performClick()
+        assertEquals(oil.copy(lastDoneKm = null, lastDoneAtMs = null), saved.single())
+    }
+
+    @Test
     fun addWorkButtonOpensEmptyForm() {
         rule.setContent { MaintenanceScreen(state(), zone, MaintenanceActions()) }
         rule.onNodeWithText("Добавить работу").performScrollTo().performClick()

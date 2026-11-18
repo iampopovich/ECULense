@@ -143,6 +143,8 @@ class MaintenanceFormatTest {
     @Test
     fun `numbers dates and remaining texts`() {
         assertEquals("120\u00A0000\u00A0км", MaintenanceFormat.km(120_000))
+        assertEquals("0,2\u00A0км", MaintenanceFormat.addedKm(0.23))
+        assertEquals("1\u00A0234\u00A0км", MaintenanceFormat.addedKm(1_234.4))
         assertEquals("Каждые 10\u00A0000\u00A0км или 12\u00A0мес.", MaintenanceFormat.interval(MaintenanceItem(carId = 1, title = "x", intervalKm = 10_000, intervalMonths = 12)))
         assertEquals("Интервал не задан", MaintenanceFormat.interval(MaintenanceItem(carId = 1, title = "x")))
         val item = MaintenanceItem(carId = 1, title = "x", intervalKm = 10_000, intervalMonths = 12, lastDoneKm = 50_000, lastDoneAtMs = ms("2026-01-01"))

@@ -18,6 +18,9 @@ internal object MaintenanceFormat {
 
     fun km(v: Number): String = String.format(ru, "%,d", v.toDouble().roundToLong()).replace('\u202F', '\u00A0').replace(' ', '\u00A0') + "\u00A0км"
 
+    /** Небольшая добавка к пробегу — с десятыми («0,2 км»), иначе короткая поездка выглядит как «плюс 0 км». */
+    fun addedKm(v: Double): String = if (v < 10.0) String.format(ru, "%.1f", v) + "\u00A0км" else km(v)
+
     fun status(s: MaintenanceStatus): String = when (s) {
         MaintenanceStatus.OVERDUE -> "Просрочено"
         MaintenanceStatus.SOON -> "Скоро"
@@ -30,9 +33,10 @@ internal object MaintenanceFormat {
         return if (parts.isEmpty()) "Интервал не задан" else "Каждые " + parts.joinToString(" или ")
     }
 
-    fun lastDone(item: MaintenanceItem, zone: ZoneId): String {
+    /** null — ещё не отмечали (тогда подсказку «Отметьте, когда делали» даёт [remaining]). */
+    fun lastDone(item: MaintenanceItem, zone: ZoneId): String? {
         val parts = listOfNotNull(item.lastDoneAtMs?.let { date(it, zone) }, item.lastDoneKm?.let { km(it) })
-        return if (parts.isEmpty()) "Ещё не отмечали, когда делали" else "Последний раз: " + parts.joinToString(", ")
+        return if (parts.isEmpty()) null else "Последний раз: " + parts.joinToString(", ")
     }
 
     /** «осталось 1 200 км · через 3 мес.», «просрочено на 300 км», «отметьте, когда делали». */
