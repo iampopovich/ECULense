@@ -1,4 +1,4 @@
-package com.example.eculense
+package io.github.iampopovich.eculense
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,7 +20,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
-import com.example.eculense.ui.theme.ECULenseTheme
+import io.github.iampopovich.eculense.ui.theme.ECULenseTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

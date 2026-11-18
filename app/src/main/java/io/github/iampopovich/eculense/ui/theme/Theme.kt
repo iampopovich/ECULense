@@ -1,4 +1,4 @@
-package com.example.eculense.ui.theme
+package io.github.iampopovich.eculense.ui.theme
 
 import android.app.Activity
 import android.os.Build
