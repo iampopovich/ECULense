@@ -4,6 +4,7 @@ import io.github.iampopovich.eculense.core.ai.aiModule
 import io.github.iampopovich.eculense.core.aitools.aiToolsModule
 import io.github.iampopovich.eculense.core.bluetooth.bluetoothModule
 import io.github.iampopovich.eculense.core.data.dataModule
+import io.github.iampopovich.eculense.core.datapacks.dataPacksModule
 import io.github.iampopovich.eculense.core.database.databaseModule
 import io.github.iampopovich.eculense.core.demo.demoModule
 import io.github.iampopovich.eculense.core.obd.obdModule
@@ -30,6 +31,8 @@ val appModules: List<Module> = listOf(
     serviceModule,
     databaseModule,
     dataModule,
+    // Пакеты данных по запросу (справочники, базы кодов) — до модулей-читателей.
+    dataPacksModule,
     connectModule,
     dashboardModule,
     pitstopModule,
