@@ -26,7 +26,8 @@ internal class BluetoothClassicTransport(
     private var socket: BluetoothSocket? = null
 
     override fun openStreams(): Pair<InputStream, OutputStream> {
-        adapter.cancelDiscovery()
+        // Без BLUETOOTH_SCAN (API 31+) бросает SecurityException; сами поиск не запускаем, так что это не критично.
+        runCatching { adapter.cancelDiscovery() }
         val s = adapter.getRemoteDevice(address).createInsecureRfcommSocketToServiceRecord(SPP_UUID)
         s.connect()
         socket = s
