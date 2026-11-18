@@ -28,6 +28,15 @@ class ConnectViewModelTest {
     }
 
     @Test
+    fun `paired bluetooth first, demo adapter last`() = runTest {
+        val demo = AdapterEndpoint("demo", "demo", "Демо-режим (симуляция)")
+        val wifi = AdapterEndpoint("wifi", "192.168.0.10:35000", "Wi-Fi ELM327")
+        val vm = ConnectViewModel(FakeConnectionController(endpoints = listOf(demo, wifi, obd)))
+        vm.refresh()
+        assertEquals(listOf(obd, wifi, demo), vm.endpoints.value)
+    }
+
+    @Test
     fun `connect is delegated to controller`() = runTest {
         val controller = FakeConnectionController()
         ConnectViewModel(controller).connect(obd)

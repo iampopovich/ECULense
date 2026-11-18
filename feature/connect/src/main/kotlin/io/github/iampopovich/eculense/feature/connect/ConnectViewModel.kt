@@ -16,7 +16,14 @@ internal class ConnectViewModel(private val controller: ConnectionController) : 
     val state: StateFlow<ConnectionState> = controller.state
 
     fun refresh() {
-        viewModelScope.launch { _endpoints.value = controller.discover() }
+        // Спаренные BT — первыми, затем Wi-Fi/USB, демо-режим — всегда последним (порядок getAll() в Koin не гарантирован).
+        viewModelScope.launch { _endpoints.value = controller.discover().sortedBy { kindRank(it.kind) } }
+    }
+
+    private fun kindRank(kind: String): Int = when (kind) {
+        "bt" -> 0
+        "demo" -> 2
+        else -> 1
     }
 
     fun connect(endpoint: AdapterEndpoint) = controller.connect(endpoint)
