@@ -48,8 +48,9 @@ object FitEstimator {
     const val TIGHT_RATIO = 1.6
     /** Запас места сверх размера файла: кэш движка (XNNPack) и временные файлы. */
     const val STORAGE_MARGIN = 1L shl 30
+    const val MIN_RAM_FAR_BELOW = 0.75
 
-    fun estimate(sizeBytes: Long?, device: DeviceProfile, downloaded: Boolean = false): FitEstimate {
+    fun estimate(sizeBytes: Long?, device: DeviceProfile, downloaded: Boolean = false, minRamGb: Int? = null): FitEstimate {
         if (!device.arm64) {
             return FitEstimate(Fit.UNLIKELY, listOf("Нет arm64-v8a: рантайм LiteRT-LM собран только под 64-битные ARM-процессоры."), null)
         }
@@ -68,6 +69,16 @@ object FitEstimator {
             Fit.OK -> "Модели нужно ≈ ${gb(need)} ГБ ОЗУ, в телефоне ${gb(device.totalRamBytes)} ГБ — запас есть."
             Fit.TIGHT -> "Модели нужно ≈ ${gb(need)} ГБ ОЗУ, в телефоне ${gb(device.totalRamBytes)} ГБ — система может закрывать другие приложения или саму модель."
             else -> "Модели нужно ≈ ${gb(need)} ГБ ОЗУ, а в телефоне всего ${gb(device.totalRamBytes)} ГБ — вероятна нехватка памяти."
+        }
+        // Минимум ОЗУ из allowlist Google AI Edge Gallery (в ГиБ, как totalMem/1024³). Телефоны «на 12 ГБ» сообщают
+        // ≈ 11 ГиБ, поэтому ниже минимума — не запрет, а «впритык»; сильно ниже (< 75 %) — «скорее всего нет».
+        if (minRamGb != null) {
+            val totalGib = device.totalRamBytes.toDouble() / (1L shl 30)
+            if (totalGib < minRamGb) {
+                val capped = if (totalGib < minRamGb * MIN_RAM_FAR_BELOW) Fit.UNLIKELY else Fit.TIGHT
+                if (capped.ordinal > fit.ordinal) fit = capped
+                reasons += "Google AI Edge Gallery рекомендует для неё от $minRamGb ГБ ОЗУ."
+            }
         }
         if (!downloaded && device.freeStorageBytes < sizeBytes + STORAGE_MARGIN) {
             fit = Fit.UNLIKELY

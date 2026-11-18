@@ -10,11 +10,13 @@ import java.net.URI
 import java.security.MessageDigest
 
 @Serializable
-enum class ModelOrigin { KOOG, CUSTOM_LINK, CUSTOM_FILE }
+enum class ModelOrigin(val badge: String) { KOOG("Koog"), GALLERY("Gallery"), HF("HF"), CUSTOM_LINK("своя"), CUSTOM_FILE("файл") }
 
 /**
  * Модель для экрана «На устройстве». [fileName] = id модели в Koog (`LiteRTLLModels`): клиент Koog открывает
  * `modelsPath/<id>`. [packId] — id пакета данных (скачивание/хранение через :core:datapacks).
+ * [repo] — репозиторий HF (ключ дедупликации вместе с [fileName]); [koog] — модель есть и в каталоге Koog;
+ * [minRamGb]/[accelerators] — из allowlist Google AI Edge Gallery; [actionsOnly] — модель для вызова функций, не для чата.
  */
 @Serializable
 data class LocalModel(
@@ -30,7 +32,14 @@ data class LocalModel(
     val license: String,
     val sourceUrl: String,
     val version: String,
+    val repo: String? = null,
+    val koog: Boolean = false,
+    val minRamGb: Int? = null,
+    val accelerators: List<String> = emptyList(),
+    val actionsOnly: Boolean = false,
+    val supportsImage: Boolean = false,
 ) {
+    val key: Pair<String?, String> get() = repo to fileName
     fun toPack(): PackManifest? {
         val link = url ?: return null
         return PackManifest(
@@ -114,7 +123,39 @@ object LocalModelCatalog {
             license = s?.license.orEmpty(),
             sourceUrl = s?.let { "https://huggingface.co/${it.repo}" }.orEmpty(),
             version = s?.revision?.take(12) ?: "koog",
+            repo = s?.repo,
+            koog = true,
+            actionsOnly = m.id == LiteRTLLModels.FunctionGemma.id,
         )
+    }
+
+    /** id пакета модели каталога: из имени файла (тот же, что был у записей Koog — начатые загрузки не теряются). */
+    fun catalogId(fileName: String): String = "model-" + slug(fileName.removeSuffix(".litertlm"))
+
+    /**
+     * Единый список: Koog + Gallery + свои/из поиска HF. Дубликаты по (репозиторий, файл) склеиваются: метаданные
+     * Gallery (название, описание, ОЗУ, ускорители), но ревизия/sha256/id пакета Koog — они проверены с рантаймом
+     * клиента Koog, и начатая загрузка продолжается. Свои модели, совпадающие с каталогом, не дублируются.
+     * Сортировка — по размеру от меньшей к большей, неизвестный размер — в конце.
+     */
+    fun merge(koog: List<LocalModel>, gallery: List<LocalModel>, custom: List<LocalModel>): List<LocalModel> {
+        val byKey = LinkedHashMap<Pair<String?, String>, LocalModel>()
+        gallery.forEach { byKey.putIfAbsent(it.key, it) }
+        koog.forEach { k ->
+            val g = byKey[k.key]
+            byKey[k.key] = if (g == null || k.url == null) k else g.copy(
+                packId = k.packId,
+                url = k.url,
+                sizeBytes = k.sizeBytes ?: g.sizeBytes,
+                sha256 = k.sha256 ?: g.sha256,
+                version = k.version,
+                gated = g.gated || k.gated,
+                koog = true,
+            )
+        }
+        val catalogIds = byKey.values.map { it.packId }.toSet()
+        custom.forEach { c -> if (c.packId !in catalogIds) byKey.putIfAbsent(c.key, c) }
+        return byKey.values.sortedWith(compareBy<LocalModel> { it.sizeBytes ?: Long.MAX_VALUE }.thenBy { it.title.lowercase() })
     }
 
     /** id пакета своей модели: стабилен для одной ссылки, безопасен для путей. */

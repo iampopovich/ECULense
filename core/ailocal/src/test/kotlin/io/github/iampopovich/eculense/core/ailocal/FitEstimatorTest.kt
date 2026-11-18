@@ -68,6 +68,19 @@ class FitEstimatorTest {
     }
 
     @Test
+    fun `Gallery minimum memory caps the estimate - below it at most tight, far below unlikely`() {
+        // 14T Pro reports 10.9 GiB: Gemma 4 E2B (min 8) stays OK, E4B (min 12) becomes tight with Gallery's reason
+        assertEquals(Fit.OK, FitEstimator.estimate(e2b, phone(10.9), minRamGb = 8).fit)
+        val e4bOnFlagship = FitEstimator.estimate(e4b, phone(10.9), minRamGb = 12)
+        assertEquals(Fit.TIGHT, e4bOnFlagship.fit)
+        assertTrue(e4bOnFlagship.reasons.any { "12 ГБ" in it && "Gallery" in it })
+        // 3.6 GB phone vs a 1 GB model the Gallery wants 6 GB for
+        assertEquals(Fit.UNLIKELY, FitEstimator.estimate(584_417_280L, phone(3.6), minRamGb = 6).fit)
+        // no minimum known: plain heuristic
+        assertEquals(Fit.OK, FitEstimator.estimate(e4b, phone(10.9), minRamGb = null).fit)
+    }
+
+    @Test
     fun `unknown size gives an honest unknown estimate`() {
         assertEquals(Fit.UNKNOWN, FitEstimator.estimate(null, phone(8.0)).fit)
     }
