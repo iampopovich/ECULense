@@ -135,7 +135,8 @@ class DataPacks(
         changed()
     }
 
-    internal fun changed() {
+    /** Сообщить экранам об изменении (установка, удаление, новая модель в каталоге). */
+    fun changed() {
         changes.value++
     }
 

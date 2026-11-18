@@ -70,6 +70,10 @@ koog-mistral = { group = "ai.koog", name = "prompt-executor-mistralai-client", v
 koog-ollama = { group = "ai.koog", name = "prompt-executor-ollama-client", version.ref = "koog" }
 # Спайк 3.6 (только модуль :spike:ondevice под флагом): LiteRT-LM на устройстве через Koog.
 koog-litert = { group = "ai.koog", name = "prompt-executor-litert-client", version.ref = "koogBeta" }
+# 3.10 :core:ailocal — рантайм, на котором собран клиент Koog 1.3.0-beta (в его POM — runtime-зависимость; с 0.19 клиент падает).
+litertlm-android = { group = "com.google.ai.edge.litertlm", name = "litertlm-android", version = "0.11.0" }
+# 3.10: Gemini Nano через AICore (ML Kit GenAI Prompt API) — только проверка доступности.
+mlkit-genai-prompt = { group = "com.google.mlkit", name = "genai-prompt", version = "1.0.0-beta5" }
 vico-compose-m3 = { group = "com.patrykandpatrick.vico", name = "compose-m3", version.ref = "vico" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version = "3.41.2.2" }

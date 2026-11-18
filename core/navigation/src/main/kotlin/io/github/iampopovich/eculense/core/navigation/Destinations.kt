@@ -22,6 +22,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object AboutDestination : NavKey
 @Serializable data object SignalsetDestination : NavKey
 @Serializable data object MaintenanceDestination : NavKey
+/** 3.10: модель на телефоне (модуль :core:ailocal; мастер ИИ показывает пункт, только если есть RouteHandler). */
+@Serializable data object LocalModelDestination : NavKey
 
 /**
  * Ссылки из уведомлений: MainActivity получает экстру [EXTRA_SCREEN] и открывает экран поверх «Пит-стопа»

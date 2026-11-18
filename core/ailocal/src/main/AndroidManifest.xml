@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- GPU-бэкенд LiteRT-LM (OpenCL) на API 31+: вендорская библиотека должна быть объявлена, иначе не загрузится. -->
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL-pixel.so" android:required="false" />
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
+        <!-- Тест скорости модели — в отдельном процессе: нативный сбой или нехватка памяти не роняют приложение. -->
+        <service
+            android:name=".BenchService"
+            android:exported="false"
+            android:process=":bench" />
+    </application>
+</manifest>
