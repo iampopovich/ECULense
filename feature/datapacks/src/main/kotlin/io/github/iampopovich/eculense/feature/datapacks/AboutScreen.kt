@@ -22,7 +22,7 @@ internal data class Attribution(val title: String, val license: String, val url:
 
 /** Все внешние данные приложения: пакеты по запросу + встроенная база кодов + OBDb. */
 internal val ATTRIBUTIONS: List<Attribution> =
-    PackCatalog.all.map { Attribution(it.title, it.license, it.sourceUrl, "${it.attribution} Зафиксированная версия: ${it.version}.") } + listOf(
+    PackCatalog.all.map { Attribution(it.title, it.license, it.sourceUrl, "${it.attribution.trimEnd().removeSuffix(".")}. Зафиксированная версия: ${it.version}.") } + listOf(
         Attribution(
             "Расширенные PID (OBDb)", "CC BY-SA 4.0", "https://github.com/OBDb",
             "Signalset data: OBDb (obdb.community), CC BY-SA 4.0. Скачивается по марке и модели без изменений.",

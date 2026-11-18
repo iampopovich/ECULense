@@ -20,6 +20,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -38,6 +40,9 @@ internal fun VehiclePickerDialog(
     onFill: () -> Unit,
     onClose: () -> Unit,
 ) {
+    // поле поиска открывает клавиатуру; после «Заполнить»/«Закрыть» она не должна остаться поверх формы
+    val keyboard = LocalSoftwareKeyboardController.current
+    DisposableEffect(Unit) { onDispose { keyboard?.hide() } }
     Dialog(onDismissRequest = onBack, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
