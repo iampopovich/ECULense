@@ -37,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -54,6 +55,8 @@ import io.github.iampopovich.eculense.core.ai.ChatMessage
 import io.github.iampopovich.eculense.core.navigation.AiSettingsDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import io.github.iampopovich.eculense.core.ui.aboveKeyboard
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -86,6 +89,18 @@ internal fun ChatScreen(
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
+    // Ответ растёт и после того, как текст пришёл (Markdown дописывает блоки асинхронно), поэтому держимся за низ
+    // списка по фактическому размеру последнего элемента, а не по длине текста.
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val info = listState.layoutInfo
+            // только пока последний элемент виден: пролистанную вверх историю не дёргаем
+            info.visibleItemsInfo.lastOrNull()?.takeIf { it.index == info.totalItemsCount - 1 }?.let { it.index to it.size }
+        }
+            .filterNotNull()
+            .distinctUntilChanged()
+            .collect { (index, _) -> listState.scrollToItem(index, Int.MAX_VALUE) }
+    }
     val lastLength = state.messages.lastOrNull()?.text?.length ?: 0
     LaunchedEffect(state.messages.size, lastLength, state.error, state.streaming) {
         val count = listState.layoutInfo.totalItemsCount
