@@ -16,4 +16,6 @@ dependencies {
     // В POM Koog LiteRT-LM — runtime-зависимость, а Backend нужен в конфиге клиента.
     androidTestImplementation("com.google.ai.edge.litertlm:litertlm-android:$litertlm")
     androidTestImplementation(libs.kotlinx.coroutines.test)
+    // 3.10: доступность Gemini Nano (ML Kit GenAI Prompt API, AICore)
+    androidTestImplementation("com.google.mlkit:genai-prompt:1.0.0-beta5")
 }
