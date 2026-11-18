@@ -110,6 +110,7 @@ class VehicleDataToolsTest {
             SensorSummaryTool(ctx).execute(SensorArgs("01.07", warmOnly = true)),
             FindingsTool(ctx).execute(LimitArgs(20)),
             DtcHistoryTool(ctx).execute(LimitArgs(30)),
+            MaintenanceDueTool(ctx).execute(NoArgs()),
         )
     }
 
@@ -117,7 +118,7 @@ class VehicleDataToolsTest {
     fun `every answer fits the 2 KB budget and is logged with its size`() {
         val answers = all()
         answers.forEach { assertTrue("${it.toByteArray().size}: $it", it.toByteArray().size <= Compact.MAX_BYTES) }
-        assertEquals(listOf("carProfile", "tripStats", "listSessions", "sessionStats", "sensorSummary", "findings", "dtcHistory"), logged.map { it.first })
+        assertEquals(listOf("carProfile", "tripStats", "listSessions", "sessionStats", "sensorSummary", "findings", "dtcHistory", "maintenanceDue"), logged.map { it.first })
         assertEquals(answers.map { it.toByteArray().size }, logged.map { it.second })
     }
 
@@ -241,10 +242,10 @@ class VehicleDataToolsTest {
     }
 
     @Test
-    fun `toolbox registers seven read-only tools with labels and argument schemas`() {
+    fun `toolbox registers eight read-only tools with labels and argument schemas`() {
         val box = VehicleDataToolbox(ctx)
         val tools = box.registry().tools
-        assertEquals(setOf("carProfile", "tripStats", "listSessions", "sessionStats", "sensorSummary", "findings", "dtcHistory"), tools.map { it.name }.toSet())
+        assertEquals(setOf("carProfile", "tripStats", "listSessions", "sessionStats", "sensorSummary", "findings", "dtcHistory", "maintenanceDue"), tools.map { it.name }.toSet())
         assertEquals("ИИ смотрит ошибки…", box.progressLabel("dtcHistory"))
         val session = tools.single { it.name == "sessionStats" }.descriptor
         assertEquals(listOf("sessionId"), session.requiredParameters.map { it.name })

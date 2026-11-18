@@ -9,6 +9,7 @@ import io.github.iampopovich.eculense.core.analytics.SensorIds
 import io.github.iampopovich.eculense.core.analytics.Severity
 import io.github.iampopovich.eculense.core.data.AnalyticsRepository
 import io.github.iampopovich.eculense.core.data.CarRepository
+import io.github.iampopovich.eculense.core.data.MaintenanceRepository
 import io.github.iampopovich.eculense.core.data.StoredFinding
 import io.github.iampopovich.eculense.core.data.TripRepository
 import io.github.iampopovich.eculense.core.dtcdb.DtcInfo
@@ -45,6 +46,8 @@ internal class ToolContext(
     val log: (tool: String, bytes: Int, json: String) -> Unit = ::logcat,
     /** Расшифровки DTC с учётом марки (OBDex/заводская база); без пакетов — встроенный CSV. */
     val describeDtc: suspend (codes: Collection<String>, make: String?) -> Map<String, DtcInfo> = { _, _ -> emptyMap() },
+    /** ТО и пробег (3.9); null — модуль ТО не подключён. */
+    val maintenance: MaintenanceRepository? = null,
 )
 
 private fun logcat(tool: String, bytes: Int, json: String) {
@@ -197,12 +200,12 @@ internal class CarProfileTool(ctx: ToolContext) : VehicleTool<NoArgs>(
 
 internal class TripStatsTool(ctx: ToolContext) : VehicleTool<PeriodArgs>(
     typeToken<PeriodArgs>(), "tripStats",
-    "Trip totals for a period (trips imported from Car Scanner): count, km, fuel, average l/100km, driving/standing hours, fuel cost, the last trip and recent months.",
+    "Trip totals for a period (trips imported from Car Scanner and trips computed from own recordings, fuel of those may be a MAF estimate): count, km, fuel, average l/100km, driving/standing hours, fuel cost, the last trip and recent months.",
     ctx,
 ) {
     override suspend fun answer(args: PeriodArgs, carId: Long): JsonObject {
         val all = ctx.trips.observeTrips(carId).first()
-        if (all.isEmpty()) return Compact.noData("no trips; trips come from Car Scanner import")
+        if (all.isEmpty()) return Compact.noData("no trips; trips come from Car Scanner import or from recordings with speed data")
         val p = period(args.period)
         val now = ctx.clock()
         val zone = ctx.zone()
