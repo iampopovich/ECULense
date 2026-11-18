@@ -16,7 +16,7 @@ import org.koin.dsl.navigation3.navigation
 @OptIn(KoinExperimentalAPI::class)
 val sessionsModule = module {
     viewModelOf(::SessionsViewModel)
-    viewModel { (sessionId: Long) -> SessionDetailViewModel(sessionId, get(), androidContext()) }
+    viewModel { (sessionId: Long) -> SessionDetailViewModel(sessionId, get(), androidContext(), get()) }
     navigation<SessionsDestination> { SessionsRoute() }
     navigation<SessionDetailDestination> { route -> SessionDetailRoute(route.sessionId) }
     single(named("sessions-hub")) {

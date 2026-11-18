@@ -10,6 +10,8 @@ import io.github.iampopovich.eculense.core.data.CarScannerImporter
 import io.github.iampopovich.eculense.core.data.ImportedCar
 import io.github.iampopovich.eculense.core.data.SessionCsv
 import io.github.iampopovich.eculense.core.data.SessionRepository
+import io.github.iampopovich.eculense.core.data.UnitsRepository
+import kotlinx.coroutines.flow.first
 import io.github.iampopovich.eculense.core.model.SensorReading
 import io.github.iampopovich.eculense.core.model.Session
 import kotlinx.coroutines.CancellationException
@@ -83,6 +85,7 @@ internal class SessionDetailViewModel(
     private val sessionId: Long,
     private val repository: SessionRepository,
     private val context: Context,
+    private val units: UnitsRepository,
 ) : ViewModel() {
     private val _readings = MutableStateFlow<Map<String, List<SensorReading>>>(emptyMap())
     val readingsBySensor: StateFlow<Map<String, List<SensorReading>>> = _readings.asStateFlow()
@@ -102,7 +105,7 @@ internal class SessionDetailViewModel(
     suspend fun exportCsv(): Uri = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }
         val file = File(dir, "ecu-session-$sessionId.csv")
-        file.bufferedWriter().use { SessionCsv.write(repository.readings(sessionId), it) }
+        file.bufferedWriter().use { SessionCsv.write(repository.readings(sessionId), it, units.units.first()) }
         FileProvider.getUriForFile(context, "${context.packageName}.sessions.files", file)
     }
 }
