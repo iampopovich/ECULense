@@ -32,6 +32,17 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
 
     override fun progressLabel(toolName: String): String = LABELS[toolName] ?: "ИИ смотрит данные машины…"
 
+    override suspend fun digest(): String? {
+        val parts = listOf(
+            "carProfile" to suspend { CarProfileTool(ctx).execute(NoArgs()) },
+            "dtcHistory" to suspend { DtcHistoryTool(ctx).execute(LimitArgs(15)) },
+            "findings" to suspend { FindingsTool(ctx).execute(LimitArgs(8)) },
+            "maintenanceDue" to suspend { MaintenanceDueTool(ctx).execute(NoArgs()) },
+            "listSessions" to suspend { ListSessionsTool(ctx).execute(ListSessionsArgs(limit = 1)) },
+        ).mapNotNull { (name, call) -> runCatching { call() }.getOrNull()?.let { "$name: $it" } }
+        return parts.takeIf { it.isNotEmpty() }?.joinToString("\n")
+    }
+
     companion object {
         val LABELS = mapOf(
             "carProfile" to "ИИ смотрит профиль машины…",

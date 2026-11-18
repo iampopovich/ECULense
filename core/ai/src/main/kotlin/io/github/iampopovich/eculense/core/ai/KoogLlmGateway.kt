@@ -254,8 +254,16 @@ internal class KoogLlmGateway(
         }
         if (local != null) {
             val tools = toolbox?.takeIf { useCarData && local.supportsTools }
+            // Модель без инструментов (на телефоне): данные машины — сводкой в системном промпте, числа считает приложение.
+            val digest = if (useCarData && toolbox != null && !local.supportsTools) {
+                send(ChatEvent.Status("Приложение собирает данные машины…"))
+                toolbox.digest()
+            } else {
+                null
+            }
+            val system = digest?.let { SystemPrompts.chatWithDigest(it) } ?: SystemPrompts.chat(withTools = tools != null)
             try {
-                runAgent(local.executor, local.model, tools, conversationId, userText, streaming = local.streaming)
+                runAgent(local.executor, local.model, tools, conversationId, userText, streaming = local.streaming, system = system)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -290,18 +298,19 @@ internal class KoogLlmGateway(
         conversationId: String,
         userText: String,
         streaming: Boolean,
+        system: String = SystemPrompts.chat(withTools = tools != null),
     ) {
         val agent = AIAgent(
             promptExecutor = executor,
             llmModel = model,
             strategy = VehicleChatStrategy.create(
-                system = SystemPrompts.chat(withTools = tools != null),
+                system = system,
                 emit = { send(it) },
                 label = { name -> tools?.progressLabel(name) ?: name },
                 streaming = streaming,
             ),
             toolRegistry = tools?.registry() ?: ToolRegistry.EMPTY,
-            systemPrompt = SystemPrompts.chat(withTools = tools != null),
+            systemPrompt = system,
         ) {
             install(ChatMemory) {
                 chatHistoryProvider = historyProvider

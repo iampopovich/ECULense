@@ -244,6 +244,26 @@ class VehicleChatAgentTest {
     }
 
     @Test
+    fun `on-device model without tools gets the car data digest in the system prompt`() = runBlocking {
+        val exec = WholeAnswerExecutor(listOf(Message.Assistant("P0171 — бедная смесь", rmeta)))
+        val toolbox = object : VehicleToolbox {
+            override fun registry() = ToolRegistry.EMPTY
+            override fun progressLabel(toolName: String) = toolName
+            override suspend fun digest() = """dtcHistory: {"codes":[{"code":"P0171"}]}"""
+        }
+        val gateway = KoogLlmGateway(store(), toolbox = toolbox, onDevice = FakeOnDevice(OnDeviceSession(localInfo, localModel, exec, streaming = false, supportsTools = false)))
+        val events = gateway.chat("c1", "Объясни мои ошибки", useCarData = true).toList()
+        assertEquals(ChatEvent.Status("Приложение собирает данные машины…"), events.first())
+        val system = exec.prompts.single().messages.first().textContent()
+        assertTrue(system, system.contains("\"code\":\"P0171\"") && system.contains("бери только отсюда"))
+        // без переключателя «данные машины» сводки нет
+        val plain = WholeAnswerExecutor(listOf(Message.Assistant("ок", rmeta)))
+        KoogLlmGateway(store(), toolbox = toolbox, onDevice = FakeOnDevice(OnDeviceSession(localInfo, localModel, plain, streaming = false, supportsTools = false)))
+            .chat("c2", "?", useCarData = false).toList()
+        assertFalse(plain.prompts.single().messages.first().textContent().contains("P0171"))
+    }
+
+    @Test
     fun `without an on-device selection the cloud provider is used`() = runBlocking {
         val exec = ScriptedExecutor(listOf(textRound("Облако")))
         val gateway = KoogLlmGateway(store(), onDevice = FakeOnDevice(null)) { _, _ -> exec }

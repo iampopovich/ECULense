@@ -79,7 +79,8 @@ class LocalLlmRuntime(
             model = llm,
             executor = executor!!,
             streaming = false,
-            supportsTools = true,
+            // Gemma 4 через клиент Koog инструменты не вызывает (замер 3.10) — данные машины идут сводкой (VehicleToolbox.digest).
+            supportsTools = false,
         )
     }
 

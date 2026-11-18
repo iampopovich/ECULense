@@ -20,4 +20,12 @@ object SystemPrompts {
     """.trimIndent()
 
     fun chat(withTools: Boolean): String = if (withTools) MECHANIC + "\n" + VEHICLE_DATA else MECHANIC
+
+    /** Модель на телефоне инструменты не вызывает (проверено на Gemma 4): данные приложение кладёт в промпт само. */
+    fun chatWithDigest(digest: String): String = MECHANIC + "\n" + """
+        Ниже — данные машины пользователя, их посчитало приложение (JSON по разделам). VIN и координат там нет.
+        5. Все числа, даты и коды бери только отсюда, не придумывай. Если раздела нет или там no_data — так и скажи.
+        6. Находки (findings) рассчитаны по правилам — объясняй их, не спорь с числами.
+        Данные:
+    """.trimIndent() + "\n" + digest
 }
