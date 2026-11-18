@@ -4,6 +4,8 @@ enum class FuelType { PETROL, DIESEL, LPG, CNG, HYBRID, ELECTRIC, OTHER }
 
 enum class Gearbox { MANUAL, AUTOMATIC, CVT, ROBOT, OTHER }
 
+enum class DriveType { FRONT, REAR, ALL }
+
 /**
  * Профиль автомобиля. Заполняется вручную или импортом из Car Scanner (тогда externalId = id машины в бэкапе).
  * VIN хранится только локально и никогда не уходит в промпты ИИ: для этого есть [withoutVin].

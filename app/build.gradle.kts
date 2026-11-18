@@ -59,6 +59,7 @@ dependencies {
     implementation(project(":core:ai"))
     implementation(project(":core:aitools"))
     implementation(project(":core:datapacks"))
+    implementation(project(":core:vehicledb"))
     implementation(project(":feature:aisettings"))
     implementation(project(":feature:aichat"))
     implementation(platform(libs.koin.bom))
