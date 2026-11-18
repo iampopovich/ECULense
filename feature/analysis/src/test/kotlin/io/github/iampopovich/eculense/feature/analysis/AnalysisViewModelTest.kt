@@ -1,0 +1,115 @@
+package io.github.iampopovich.eculense.feature.analysis
+
+import io.github.iampopovich.eculense.core.analytics.DtcEvent
+import io.github.iampopovich.eculense.core.analytics.Evidence
+import io.github.iampopovich.eculense.core.analytics.Finding
+import io.github.iampopovich.eculense.core.analytics.Severity
+import io.github.iampopovich.eculense.core.data.AnalysisState
+import io.github.iampopovich.eculense.core.data.AnalyticsRepository
+import io.github.iampopovich.eculense.core.data.CarRepository
+import io.github.iampopovich.eculense.core.data.SensorSummary
+import io.github.iampopovich.eculense.core.data.SessionReport
+import io.github.iampopovich.eculense.core.data.SessionSummary
+import io.github.iampopovich.eculense.core.data.StoredFinding
+import io.github.iampopovich.eculense.core.model.CarProfile
+import io.github.iampopovich.eculense.core.model.SessionSource
+import io.github.iampopovich.eculense.core.navigation.AiChatDestination
+import io.github.iampopovich.eculense.core.navigation.RouteHandler
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+private class OneCar : CarRepository {
+    val car = CarProfile(id = 1, name = "Тестовая")
+    override fun observeCars(): Flow<List<CarProfile>> = flowOf(listOf(car))
+    override fun observeActiveCar(): Flow<CarProfile?> = flowOf(car)
+    override suspend fun activeCarId(): Long = 1
+    override suspend fun cars() = listOf(car)
+    override suspend fun byExternalId(externalId: String): CarProfile? = null
+    override suspend fun save(car: CarProfile) = car.id
+    override suspend fun delete(id: Long) = false
+    override suspend fun setActive(id: Long) = Unit
+}
+
+private class FakeAnalytics(initial: List<StoredFinding> = emptyList()) : AnalyticsRepository {
+    val stored = MutableStateFlow(initial)
+    var recomputes = 0
+    override val state = MutableStateFlow<AnalysisState>(AnalysisState.Idle)
+    override fun observeFindings(carId: Long) = stored.map { l -> l.filter { it.carId == carId } }
+    override suspend fun findings(carId: Long) = stored.value.filter { it.carId == carId }
+    override suspend fun finding(id: Long) = stored.value.firstOrNull { it.id == id }
+    override suspend fun recompute(carId: Long): List<Finding> {
+        recomputes++
+        val f = Finding("coolant-overheat", Severity.WARNING, "Перегрев двигателя", "ОЖ ≥ 105 °C", listOf(Evidence("Максимум ОЖ", "106,0 °C")), listOf(7))
+        stored.value = listOf(StoredFinding(1, carId, f, 10))
+        state.value = AnalysisState.Done(10, 1234, 74)
+        return listOf(f)
+    }
+    override suspend fun sessions(carId: Long, fromMs: Long, toMs: Long, limit: Int) =
+        listOf(SessionSummary(7, 100, 200, SessionSource.IMPORT_CARSCANNER, 5), SessionSummary(8, 300, 400, SessionSource.LIVE, 1))
+    override suspend fun sessionReport(carId: Long, sessionId: Long): SessionReport? = null
+    override suspend fun sensorSummary(carId: Long, sensorId: String, fromMs: Long, toMs: Long, warmOnly: Boolean): SensorSummary? = null
+    override suspend fun dtcEvents(carId: Long): List<DtcEvent> = emptyList()
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class AnalysisViewModelTest {
+    @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
+    @After fun tearDown() = Dispatchers.resetMain()
+
+    @Test
+    fun `first open recomputes when there are no findings yet`() = runTest {
+        val analytics = FakeAnalytics()
+        val vm = AnalysisViewModel(analytics, OneCar())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
+        assertEquals(1, analytics.recomputes)
+        val s = vm.uiState.value
+        assertEquals("Тестовая", s.car?.name)
+        assertEquals(listOf("coolant-overheat"), s.problems.map { it.finding.ruleId })
+        assertTrue(s.analysis is AnalysisState.Done)
+    }
+
+    @Test
+    fun `existing findings are shown without recompute, button recomputes`() = runTest {
+        val f = StoredFinding(5, 1, Finding("voltage-low", Severity.OK, "Недозаряд АКБ", "ok"), 1)
+        val analytics = FakeAnalytics(listOf(f))
+        val vm = AnalysisViewModel(analytics, OneCar())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
+        assertEquals(0, analytics.recomputes)
+        assertEquals(listOf(f), vm.uiState.value.ok)
+        vm.recompute()
+        assertEquals(1, analytics.recomputes)
+    }
+
+    @Test
+    fun `finding details with sessions and ask ai only when chat exists`() = runTest {
+        val analytics = FakeAnalytics().apply { recompute(1) }
+        val withAi = FindingViewModel(1, analytics, listOf(RouteHandler(AiChatDestination::class)))
+        assertTrue(withAi.uiState.value.canAskAi)
+        assertEquals(listOf(7L), withAi.uiState.value.sessions.map { it.id })
+        assertFalse(FindingViewModel(1, analytics, emptyList()).uiState.value.canAskAi)
+    }
+
+    @Test
+    fun `ask ai prompt carries the computed numbers`() {
+        val f = StoredFinding(1, 1, Finding("fuel-trim-long", Severity.WARNING, "Долгосрочная коррекция топлива", "Банк 1 +12,5 %.", listOf(Evidence("LTFT банк 1", "+12,5 %"))), 1)
+        val text = askAiPrompt(f)
+        assertTrue(text, text.startsWith("Объясни находку анализа «Долгосрочная коррекция топлива» (Внимание)"))
+        assertTrue(text, text.contains("LTFT банк 1 — +12,5 %"))
+    }
+}

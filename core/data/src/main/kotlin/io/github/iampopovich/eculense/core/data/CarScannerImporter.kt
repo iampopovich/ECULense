@@ -59,6 +59,8 @@ class CarScannerImporter internal constructor(
     private val units: UnitsRepository,
     private val sqlite: SqliteOpener,
     private val tempDir: File,
+    /** После импорта (пересчёт аналитики); не блокирует результат. */
+    private val afterImport: (ImportReport) -> Unit = {},
 ) {
     constructor(
         context: Context,
@@ -67,9 +69,10 @@ class CarScannerImporter internal constructor(
         cars: CarRepository,
         trips: TripRepository,
         units: UnitsRepository,
+        afterImport: (ImportReport) -> Unit = {},
     ) : this(
         { uri: Uri -> context.contentResolver.openInputStream(uri) },
-        sessions, dtcHistory, cars, trips, units, AndroidSqlite, context.cacheDir,
+        sessions, dtcHistory, cars, trips, units, AndroidSqlite, context.cacheDir, afterImport,
     )
 
     private val dtcCode = Regex("\"Code\":\"([A-Z0-9]{5})\"")
@@ -80,7 +83,7 @@ class CarScannerImporter internal constructor(
      * onRecording(n) вызывается после каждой обработанной записи (n — сколько записей уже обработано).
      */
     suspend fun import(uri: Uri, fileName: String, onRecording: (Int) -> Unit = {}): ImportReport = withContext(Dispatchers.IO) {
-        importStream({ open(uri) ?: error("Не удалось открыть файл") }, fileName, onRecording)
+        importStream({ open(uri) ?: error("Не удалось открыть файл") }, fileName, onRecording).also(afterImport)
     }
 
     internal suspend fun importStream(input: () -> InputStream, fileName: String, onRecording: (Int) -> Unit = {}): ImportReport {

@@ -43,11 +43,52 @@ class MigrationTest {
 
         // Room открывает мигрированную базу без ошибок схемы, DAO видят данные
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
-            .addMigrations(MIGRATION_1_2).build()
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
         try {
             assertEquals(2, room.sessionDao().observeSessions().first().size)
             assertEquals(listOf(EcuDatabase.DEFAULT_CAR_NAME), room.carDao().all().map { it.name })
             assertEquals(1, room.sessionDao().readings(1).size)
+        } finally {
+            room.close()
+        }
+    }
+
+    @Test
+    fun v2DataSurvivesMigrationToFindings() = runTest {
+        helper.createDatabase(dbName, 2).use { db ->
+            db.execSQL("INSERT INTO cars (id, name, brand, year) VALUES (1, 'Тестовая', 'Kia', 2005)")
+            db.execSQL("INSERT INTO sessions (id, name, startedAtMs, endedAtMs, source, vin, externalId, carId) VALUES (1, 'cs', 30, 40, 'IMPORT_CARSCANNER', NULL, 'carscanner:a.brc', 1)")
+            db.execSQL("INSERT INTO readings (sessionId, sensorId, value, unit, timestampMs) VALUES (1, '01.05', 90.0, '°C', 31)")
+            db.execSQL("INSERT INTO readings (sessionId, sensorId, value, unit, timestampMs) VALUES (1, '01.07', 12.5, '%', 32)")
+            db.execSQL("INSERT INTO dtc_snapshots (takenAtMs, vin, code, kind, carId) VALUES (35, NULL, 'P0113', 'STORED', 1)")
+            db.execSQL(
+                "INSERT INTO trips (carId, startedAtMs, endedAtMs, distanceMm, fuelUl, fuelPricePerL, drivingMs, standingMs, source, externalId) " +
+                    "VALUES (1, 1, 2, 3, 4, NULL, 1, 0, 'IMPORT_CARSCANNER', 'carscanner:1:1')",
+            )
+        }
+
+        helper.runMigrationsAndValidate(dbName, 3, true, MIGRATION_2_3).use { db ->
+            fun count(sql: String) = db.query(sql).use { c -> c.moveToFirst(); c.getInt(0) }
+            assertEquals(1, count("SELECT COUNT(*) FROM sessions"))
+            assertEquals(2, count("SELECT COUNT(*) FROM readings"))
+            assertEquals(1, count("SELECT COUNT(*) FROM dtc_snapshots"))
+            assertEquals(1, count("SELECT COUNT(*) FROM trips"))
+            assertEquals(1, count("SELECT COUNT(*) FROM cars WHERE name = 'Тестовая'"))
+            assertEquals(0, count("SELECT COUNT(*) FROM findings"))
+        }
+
+        val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+        try {
+            val f = FindingEntity(carId = 1, ruleId = "r", severity = "WARNING", title = "t", message = "m", evidenceJson = "{}", periodFromMs = null, periodToMs = null, createdAtMs = 1)
+            room.findingDao().replaceForCar(1, listOf(f, f.copy(ruleId = "r2")))
+            room.findingDao().replaceForCar(1, listOf(f.copy(ruleId = "r3")))
+            assertEquals(listOf("r3"), room.findingDao().forCar(1).map { it.ruleId })
+            assertEquals(2, room.sessionDao().readings(1).size)
+            // находки удаляются вместе с машиной
+            room.carDao().insert(CarEntity(name = "второй"))
+            room.carDao().delete(1)
+            assertEquals(0, room.findingDao().forCar(1).size)
         } finally {
             room.close()
         }

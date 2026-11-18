@@ -178,7 +178,7 @@ interface AnalyticsDao {
     )
     suspend fun sessions(carId: Long, fromMs: Long, toMs: Long, limit: Int): List<SessionSummaryRow>
 
-    @Query("SELECT id, startedAtMs FROM sessions WHERE carId = :carId ORDER BY startedAtMs")
+    @Query("SELECT id, startedAtMs, endedAtMs FROM sessions WHERE carId = :carId ORDER BY startedAtMs")
     suspend fun sessionStarts(carId: Long): List<SessionStartRow>
 
     @Query("SELECT id, startedAtMs, endedAtMs, source, 0 AS readings FROM sessions WHERE id = :sessionId AND carId = :carId")
@@ -231,7 +231,7 @@ interface AnalyticsDao {
     suspend fun points(sessionId: Long, sensorIds: Collection<String>): List<ReadingPoint>
 }
 
-data class SessionStartRow(val id: Long, val startedAtMs: Long)
+data class SessionStartRow(val id: Long, val startedAtMs: Long, val endedAtMs: Long? = null)
 
 @Dao
 interface CarDao {
@@ -272,8 +272,8 @@ interface TripDao {
 }
 
 @Database(
-    entities = [SessionEntity::class, ReadingEntity::class, DtcSnapshotEntity::class, CarEntity::class, TripEntity::class],
-    version = 2,
+    entities = [SessionEntity::class, ReadingEntity::class, DtcSnapshotEntity::class, CarEntity::class, TripEntity::class, FindingEntity::class],
+    version = 3,
 )
 abstract class EcuDatabase : RoomDatabase() {
     abstract fun sessionDao(): SessionDao
@@ -281,6 +281,7 @@ abstract class EcuDatabase : RoomDatabase() {
     abstract fun carDao(): CarDao
     abstract fun tripDao(): TripDao
     abstract fun analyticsDao(): AnalyticsDao
+    abstract fun findingDao(): FindingDao
 
     companion object {
         const val DEFAULT_CAR_ID = 1L
@@ -328,10 +329,68 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+/**
+ * Находка аналитики (этап 3) для машины. evidenceJson — {"evidence":[{"label","value"}],"sessions":[id…]};
+ * пересчёт заменяет все находки машины разом ([FindingDao.replaceForCar]).
+ */
+@Entity(
+    tableName = "findings",
+    foreignKeys = [ForeignKey(CarEntity::class, ["id"], ["carId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("carId")],
+)
+data class FindingEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val carId: Long,
+    val ruleId: String,
+    val severity: String,
+    val title: String,
+    val message: String,
+    val evidenceJson: String,
+    val periodFromMs: Long?,
+    val periodToMs: Long?,
+    val createdAtMs: Long,
+)
+
+@Dao
+interface FindingDao {
+    @Query("SELECT * FROM findings WHERE carId = :carId ORDER BY id")
+    fun observeForCar(carId: Long): Flow<List<FindingEntity>>
+
+    @Query("SELECT * FROM findings WHERE carId = :carId ORDER BY id")
+    suspend fun forCar(carId: Long): List<FindingEntity>
+
+    @Query("SELECT * FROM findings WHERE id = :id")
+    suspend fun byId(id: Long): FindingEntity?
+
+    @Query("DELETE FROM findings WHERE carId = :carId")
+    suspend fun deleteForCar(carId: Long)
+
+    @Insert suspend fun insertAll(items: List<FindingEntity>)
+
+    @androidx.room.Transaction
+    suspend fun replaceForCar(carId: Long, items: List<FindingEntity>) {
+        deleteForCar(carId)
+        insertAll(items)
+    }
+}
+
+/** 2 → 3: таблица находок аналитики. Только CREATE — существующие таблицы и данные не трогаются. */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `findings` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `carId` INTEGER NOT NULL, " +
+                "`ruleId` TEXT NOT NULL, `severity` TEXT NOT NULL, `title` TEXT NOT NULL, `message` TEXT NOT NULL, " +
+                "`evidenceJson` TEXT NOT NULL, `periodFromMs` INTEGER, `periodToMs` INTEGER, `createdAtMs` INTEGER NOT NULL, " +
+                "FOREIGN KEY(`carId`) REFERENCES `cars`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_findings_carId` ON `findings` (`carId`)")
+    }
+}
+
 val databaseModule = module {
     single {
         Room.databaseBuilder(androidContext(), EcuDatabase::class.java, "ecu.db")
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .addCallback(EcuDatabase.defaultCar)
             .build()
     }
@@ -340,4 +399,5 @@ val databaseModule = module {
     single { get<EcuDatabase>().carDao() }
     single { get<EcuDatabase>().tripDao() }
     single { get<EcuDatabase>().analyticsDao() }
+    single { get<EcuDatabase>().findingDao() }
 }

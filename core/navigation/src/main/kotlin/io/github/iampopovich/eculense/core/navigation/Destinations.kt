@@ -16,3 +16,5 @@ import kotlinx.serialization.Serializable
 @Serializable data object StatsDestination : NavKey
 /** carId = 0 — новая машина. */
 @Serializable data class CarEditDestination(val carId: Long = 0) : NavKey
+@Serializable data object AnalysisDestination : NavKey
+@Serializable data class FindingDestination(val findingId: Long) : NavKey
