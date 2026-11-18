@@ -23,6 +23,8 @@ internal class LiveSessionRecorder(
     private val controller: ConnectionController,
     private val repository: SessionRepository,
     private val scope: CoroutineScope,
+    /** После finish: поездка по записи и фоновый анализ (3.9). Ошибки здесь не ломают запись. */
+    private val onFinished: suspend (sessionId: Long) -> Unit = {},
 ) : SessionRecorder {
     private val _active = MutableStateFlow<Long?>(null)
     override val activeSessionId: StateFlow<Long?> = _active.asStateFlow()
@@ -46,6 +48,8 @@ internal class LiveSessionRecorder(
                 withContext(NonCancellable) {
                     if (batch.isNotEmpty()) repository.append(id, batch.toList())
                     repository.finish(id)
+                    _active.value = null
+                    runCatching { onFinished(id) }
                 }
                 _active.value = null
             }

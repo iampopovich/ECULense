@@ -49,4 +49,23 @@ class LiveSessionRecorderTest {
         assertEquals(listOf(1L), repository.finished)
         assertNull(recorder.activeSessionId.value)
     }
+
+    @Test
+    fun `finished recording is handed over for trip building and analysis`() = runTest {
+        val controller = FakeConnectionController()
+        val repository = FakeSessionRepository()
+        val handed = mutableListOf<Long>()
+        val recorder = LiveSessionRecorder(controller, repository, backgroundScope, onFinished = { handed += it })
+
+        recorder.start("тест")
+        runCurrent()
+        controller.readingsFlow.emit(SensorReading("01.0D", 30.0, "km/h", 1))
+        runCurrent()
+        assertEquals(emptyList<Long>(), handed)
+        recorder.stop()
+        runCurrent()
+
+        assertEquals(listOf(1L), repository.finished)
+        assertEquals(listOf(1L), handed)
+    }
 }

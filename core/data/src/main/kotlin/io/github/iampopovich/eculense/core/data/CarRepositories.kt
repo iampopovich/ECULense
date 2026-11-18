@@ -7,12 +7,16 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import io.github.iampopovich.eculense.core.database.CarDao
 import io.github.iampopovich.eculense.core.database.CarEntity
+import io.github.iampopovich.eculense.core.database.OdometerDao
+import io.github.iampopovich.eculense.core.database.OdometerEntity
 import io.github.iampopovich.eculense.core.database.TripDao
 import io.github.iampopovich.eculense.core.database.TripEntity
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.DriveType
+import io.github.iampopovich.eculense.core.model.FuelMethod
 import io.github.iampopovich.eculense.core.model.FuelType
 import io.github.iampopovich.eculense.core.model.Gearbox
+import io.github.iampopovich.eculense.core.model.OdometerSource
 import io.github.iampopovich.eculense.core.model.ServiceIntervals
 import io.github.iampopovich.eculense.core.model.Trip
 import io.github.iampopovich.eculense.core.model.TripSource
@@ -20,6 +24,7 @@ import io.github.iampopovich.eculense.core.model.UnitsSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlin.math.roundToLong
 
@@ -39,8 +44,15 @@ interface CarRepository {
 
 interface TripRepository {
     fun observeTrips(carId: Long): Flow<List<Trip>>
+    suspend fun trips(carId: Long): List<Trip> = observeTrips(carId).first()
     /** Возвращает, сколько поездок добавлено (повторы по externalId пропускаются). */
     suspend fun addAll(trips: List<Trip>): Int
+}
+
+/** Флаг «типовой список ТО уже предлагался»: удалённые пользователем работы не возвращаются сами. */
+interface MaintenancePrefs {
+    suspend fun templateSeeded(carId: Long): Boolean
+    suspend fun markTemplateSeeded(carId: Long)
 }
 
 interface UnitsRepository {
@@ -54,12 +66,20 @@ interface VehiclePrefs {
     suspend fun setActiveCarId(id: Long)
 }
 
-internal class DataStoreVehiclePrefs(private val store: DataStore<Preferences>) : VehiclePrefs, UnitsRepository {
+internal class DataStoreVehiclePrefs(private val store: DataStore<Preferences>) : VehiclePrefs, UnitsRepository, MaintenancePrefs {
     override val activeCarId: Flow<Long?> = store.data.map { it[ACTIVE_CAR] }
 
     override suspend fun setActiveCarId(id: Long) {
         store.edit { it[ACTIVE_CAR] = id }
     }
+
+    override suspend fun templateSeeded(carId: Long): Boolean = store.data.first()[seededKey(carId)] == true
+
+    override suspend fun markTemplateSeeded(carId: Long) {
+        store.edit { it[seededKey(carId)] = true }
+    }
+
+    private fun seededKey(carId: Long) = booleanPreferencesKey("maintenance_seeded_$carId")
 
     override val units: Flow<UnitsSettings> = store.data.map { p ->
         val d = UnitsSettings()
@@ -107,8 +127,21 @@ internal class DataStoreVehiclePrefs(private val store: DataStore<Preferences>) 
     }
 }
 
-internal class RoomCarRepository(private val dao: CarDao, private val prefs: VehiclePrefs) : CarRepository {
-    override fun observeCars(): Flow<List<CarProfile>> = dao.observeAll().map { list -> list.map { it.toModel() } }
+/**
+ * Пробег профиля (odometerKm/odometerAtMs) живёт в журнале odometer_log (v5): профиль показывает последний ручной
+ * ввод, а сохранение профиля с новым пробегом добавляет запись в журнал. Колонки cars.odometer* больше не пишутся.
+ */
+internal class RoomCarRepository(
+    private val dao: CarDao,
+    private val prefs: VehiclePrefs,
+    private val odometer: OdometerDao? = null,
+    private val clock: () -> Long = System::currentTimeMillis,
+) : CarRepository {
+    private val latestOdometer: Flow<Map<Long, OdometerEntity>> =
+        odometer?.observeLatestManual()?.map { list -> list.associateBy { it.carId } } ?: flowOf(emptyMap())
+
+    override fun observeCars(): Flow<List<CarProfile>> =
+        combine(dao.observeAll(), latestOdometer) { list, odo -> list.map { it.toModel().withOdometer(odo[it.id]) } }
 
     /** Сохранённый id, если такая машина ещё есть; иначе — первая машина. */
     override fun observeActiveCar(): Flow<CarProfile?> =
@@ -116,12 +149,26 @@ internal class RoomCarRepository(private val dao: CarDao, private val prefs: Veh
 
     override suspend fun activeCarId(): Long? = observeActiveCar().first()?.id
 
-    override suspend fun cars(): List<CarProfile> = dao.all().map { it.toModel() }
+    override suspend fun cars(): List<CarProfile> = latestOdometer.first().let { odo -> dao.all().map { it.toModel().withOdometer(odo[it.id]) } }
 
-    override suspend fun byExternalId(externalId: String): CarProfile? = dao.byExternalId(externalId)?.toModel()
+    override suspend fun byExternalId(externalId: String): CarProfile? =
+        dao.byExternalId(externalId)?.let { e -> e.toModel().withOdometer(odometer?.latestManual(e.id)) }
 
-    override suspend fun save(car: CarProfile): Long =
-        if (car.id == 0L) dao.insert(car.toEntity()) else car.id.also { dao.update(car.toEntity()) }
+    override suspend fun save(car: CarProfile): Long {
+        val entity = car.toEntity().copy(odometerKm = null, odometerAtMs = null)
+        val id = if (car.id == 0L) dao.insert(entity) else car.id.also { dao.update(entity) }
+        val km = car.odometerKm
+        val log = odometer
+        if (km != null && log != null) {
+            val latest = log.latestManual(id)
+            if (latest == null || latest.km != km || (car.odometerAtMs != null && latest.atMs != car.odometerAtMs)) {
+                log.insert(OdometerEntity(carId = id, km = km, atMs = car.odometerAtMs ?: clock(), source = OdometerSource.MANUAL.name))
+            }
+        }
+        return id
+    }
+
+    private fun CarProfile.withOdometer(e: OdometerEntity?) = if (e == null) this else copy(odometerKm = e.km, odometerAtMs = e.atMs)
 
     override suspend fun delete(id: Long): Boolean {
         if (dao.all().size <= 1) return false
@@ -136,6 +183,8 @@ internal class RoomCarRepository(private val dao: CarDao, private val prefs: Veh
 
 internal class RoomTripRepository(private val dao: TripDao) : TripRepository {
     override fun observeTrips(carId: Long): Flow<List<Trip>> = dao.observeForCar(carId).map { list -> list.map { it.toModel() } }
+
+    override suspend fun trips(carId: Long): List<Trip> = dao.forCar(carId).map { it.toModel() }
 
     override suspend fun addAll(trips: List<Trip>): Int = dao.insertAll(trips.map { it.toEntity() }).count { it > 0 }
 }
@@ -165,10 +214,11 @@ internal fun TripEntity.toModel() = Trip(
     id = id, carId = carId, startedAtMs = startedAtMs, endedAtMs = endedAtMs, distanceKm = distanceMm / 1_000_000.0,
     fuelL = fuelUl / 1_000_000.0, fuelPricePerL = fuelPricePerL, drivingMs = drivingMs, standingMs = standingMs,
     source = runCatching { TripSource.valueOf(source) }.getOrDefault(TripSource.LIVE), externalId = externalId,
+    fuelMethod = fuelMethod?.let { runCatching { FuelMethod.valueOf(it) }.getOrNull() },
 )
 
 internal fun Trip.toEntity() = TripEntity(
     id = id, carId = carId, startedAtMs = startedAtMs, endedAtMs = endedAtMs, distanceMm = (distanceKm * 1_000_000).roundToLong(),
     fuelUl = (fuelL * 1_000_000).roundToLong(), fuelPricePerL = fuelPricePerL, drivingMs = drivingMs, standingMs = standingMs,
-    source = source.name, externalId = externalId,
+    source = source.name, externalId = externalId, fuelMethod = fuelMethod?.name,
 )

@@ -40,6 +40,7 @@ internal class FakeCars(withDefault: Boolean = true) : CarRepository {
 internal class FakeTrips : TripRepository {
     val all = MutableStateFlow<List<Trip>>(emptyList())
     override fun observeTrips(carId: Long): Flow<List<Trip>> = all.map { list -> list.filter { it.carId == carId } }
+    override suspend fun trips(carId: Long): List<Trip> = all.value.filter { it.carId == carId }
     override suspend fun addAll(trips: List<Trip>): Int {
         val known = all.value.mapNotNull { it.externalId }.toSet()
         val fresh = trips.filter { it.externalId == null || it.externalId !in known }
