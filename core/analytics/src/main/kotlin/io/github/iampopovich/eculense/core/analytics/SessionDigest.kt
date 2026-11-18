@@ -83,11 +83,12 @@ object SessionDigester {
         private fun running(now: Long) = fresh(rpmAt, now, STATE_MAX_AGE_MS) && rpm > RUNNING_RPM
         private fun warm(now: Long) = fresh(coolantAt, now, COOLANT_MAX_AGE_MS) && coolantNow >= WARM_COOLANT_C
 
-        fun accept(r: SensorReading) {
-            val v = r.value
+        fun accept(r: SensorReading) = accept(r.sensorId, r.value, r.timestampMs)
+
+        /** Без промежуточных объектов: пересчёт по истории — это миллион значений. */
+        fun accept(sensorId: String, v: Double, t: Long) {
             if (v.isNaN() || v.isInfinite()) return
-            val t = r.timestampMs
-            when (r.sensorId) {
+            when (sensorId) {
                 RPM -> { rpm = v; rpmAt = t }
                 SPEED -> { speed = v; speedAt = t }
                 COOLANT -> {
@@ -99,13 +100,13 @@ object SessionDigester {
                     val start = firstCoolant!!
                     if (warmupMs == null && start <= COLD_START_MAX_C && v >= WARM_COOLANT_C) warmupMs = t - firstCoolantAt
                 }
-                MODULE_VOLTAGE, ELM_VOLTAGE -> voltage.getValue(r.sensorId).accept(t, v, running(t))
+                MODULE_VOLTAGE, ELM_VOLTAGE -> voltage.getValue(sensorId).accept(t, v, running(t))
                 MAF -> {
                     val idle = fresh(speedAt, t, STATE_MAX_AGE_MS) && speed == 0.0 && running(t) && rpm <= IDLE_MAX_RPM
                     if (idle && warm(t)) idleMaf.add(v)
                 }
                 MIL_DISTANCE -> mil.add(v)
-                in SensorIds.TRIMS -> if (warm(t)) trims.getOrPut(r.sensorId) { MutableAgg() }.add(v)
+                in SensorIds.TRIMS -> if (warm(t)) trims.getOrPut(sensorId) { MutableAgg() }.add(v)
             }
         }
 

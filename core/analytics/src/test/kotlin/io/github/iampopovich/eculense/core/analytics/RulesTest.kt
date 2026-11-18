@@ -65,6 +65,16 @@ class RulesTest {
     }
 
     @Test
+    fun `adapter voltage finding warns that the adapter reads lower`() {
+        val hist = (1..199).fold(Histogram.EMPTY) { h, _ -> h.add(12.8) }.add(10.1)
+        val low = digest().copy(voltageSensor = ELM_VOLTAGE, runningVoltage = aggOf(10.1, 12.8), runningVoltageHist = hist, lowVoltageMs = 241_000)
+        val f = VoltageRule.evaluate(input(listOf(low))).first { it.ruleId == "voltage-low" }
+        assertTrue(f.message, f.message.contains("адаптер"))
+        // кратковременный провал (стартер, перезапуск) отделён от устойчивого уровня
+        assertTrue(f.evidence.joinToString(), f.evidence.any { it.label.startsWith("1 %") && it.value == "12,8 В" })
+    }
+
+    @Test
     fun `high voltage is a warning`() {
         val high = digest().copy(voltageSensor = ELM_VOLTAGE, runningVoltage = aggOf(15.2), highVoltageMs = 20_000)
         assertEquals(Severity.WARNING, VoltageRule.evaluate(input(listOf(high))).first { it.ruleId == "voltage-high" }.severity)
@@ -97,6 +107,18 @@ class RulesTest {
         val f = FuelTrimRule.evaluate(input(listOf(d)))
         assertEquals(Severity.WARNING, f.first { it.ruleId == "fuel-trim-bank-asymmetry" }.severity)
         assertEquals(Severity.OK, f.first { it.ruleId == "fuel-trim-long" }.severity)
+    }
+
+    @Test
+    fun `latest session decides long term trim, older readings do not dilute it`() {
+        // декабрь: LTFT1 −8,6 %; май: LTFT1/LTFT2 +12,5 % — ЭБУ сейчас добавляет топливо на обоих банках
+        val dec = digest(1).copy(warmTrims = mapOf(LTFT1 to aggOf(-8.6)))
+        val may = digest(2).copy(warmTrims = mapOf(LTFT1 to aggOf(12.5, 12.5), LTFT2 to aggOf(12.5, 12.5, 12.5)))
+        val lt = FuelTrimRule.evaluate(input(listOf(dec, may))).first { it.ruleId == "fuel-trim-long" }
+        assertEquals(Severity.WARNING, lt.severity)
+        assertTrue(lt.message, lt.message.contains("банк 1 +12,5 %") && lt.message.contains("банк 2 +12,5 %"))
+        assertTrue(lt.evidence.joinToString { it.value }, lt.evidence.any { it.value.contains("−8,6") || it.value.contains("-8,6") })
+        assertEquals(listOf(2L), lt.sessionIds)
     }
 
     @Test

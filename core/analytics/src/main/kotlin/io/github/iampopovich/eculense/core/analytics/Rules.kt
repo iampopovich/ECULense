@@ -118,23 +118,30 @@ object VoltageRule : AnalyticsRule {
             return listOf(noData(LOW, "Недозаряд АКБ", msg), noData(HIGH, "Перезаряд АКБ", msg))
         }
         val all = withV.map { it.runningVoltage }.merged()
-        val median = withV.map { it.runningVoltageHist }.fold(Histogram.EMPTY) { a, b -> a + b }.quantile(0.5)
+        val hist = withV.map { it.runningVoltageHist }.fold(Histogram.EMPTY) { a, b -> a + b }
+        val median = hist.quantile(0.5)
         val sources = withV.mapNotNull { it.voltageSensor }.distinct().joinToString { SensorIds.NAMES[it] ?: it }
         val evidence = listOfNotNull(
-            Evidence("Минимум на работающем двигателе", "${Fmt.n(all.min)} В"),
+            hist.quantile(0.01)?.let { Evidence("1 % замеров ниже", "${Fmt.n(it)} В") },
             median?.let { Evidence("Медиана", "${Fmt.n(it)} В") },
             Evidence("Максимум", "${Fmt.n(all.max)} В"),
+            Evidence("Минимум (кратковременно, вкл. перезапуски)", "${Fmt.n(all.min)} В"),
             Evidence("Источник", sources),
         )
         val low = withV.filter { it.lowVoltageMs >= Thresholds.VOLTAGE_LOW_MIN_MS }
         val high = withV.filter { it.highVoltageMs >= Thresholds.VOLTAGE_HIGH_MIN_MS }
+        val adapterNote = if (low.any { it.voltageSensor == SensorIds.ELM_VOLTAGE }) {
+            " Напряжение измерено адаптером на разъёме OBD — оно бывает на 0,2–0,3 В ниже, чем на клеммах АКБ: сверьте мультиметром."
+        } else {
+            ""
+        }
         return listOf(
             if (low.isEmpty()) {
                 ok(LOW, "Недозаряд АКБ", "Генератор заряжает: ниже ${Fmt.n(Thresholds.VOLTAGE_LOW_V)} В дольше минуты не было.", evidence)
             } else {
                 Finding(
                     LOW, Severity.WARNING, "Недозаряд АКБ",
-                    "Напряжение ниже ${Fmt.n(Thresholds.VOLTAGE_LOW_V)} В на работающем двигателе дольше минуты в ${low.size} записях — проверьте генератор, ремень и клеммы.",
+                    "Напряжение ниже ${Fmt.n(Thresholds.VOLTAGE_LOW_V)} В на работающем двигателе дольше минуты в ${low.size} записях — проверьте генератор, ремень и клеммы.$adapterNote",
                     evidence + Evidence("Самый долгий отрезок", Fmt.seconds(low.maxOf { it.lowVoltageMs })),
                     low.map { it.sessionId }, low.minOf { it.startedAtMs }, low.maxOf { it.startedAtMs },
                 )
@@ -160,24 +167,25 @@ object FuelTrimRule : AnalyticsRule {
     private const val ASYM = "fuel-trim-bank-asymmetry"
     override val ids = listOf(LONG, TOTAL, ASYM)
 
-    private data class Bank(val n: Int, val stft: Agg, val ltft: Agg, val sessions: List<Long>)
+    /** ltft/stft — из последней записи, где есть прогретая LTFT банка: адаптация ЭБУ меняется, старые месяцы её не описывают. */
+    private data class Bank(val n: Int, val stft: Agg, val ltft: Agg, val ltftAll: Agg, val atMs: Long, val sessions: List<Long>)
 
     override fun evaluate(input: AnalysisInput): List<Finding> {
-        fun merged(id: String) = input.sessions.mapNotNull { it.warmTrims[id] }.merged()
-        fun sessionsWith(vararg ids: String) = input.sessions.filter { d -> ids.any { (d.warmTrims[it]?.count ?: 0) > 0 } }.map { it.sessionId }
-        val banks = listOf(
-            Bank(1, merged(SensorIds.STFT1), merged(SensorIds.LTFT1), sessionsWith(SensorIds.STFT1, SensorIds.LTFT1)),
-            Bank(2, merged(SensorIds.STFT2), merged(SensorIds.LTFT2), sessionsWith(SensorIds.STFT2, SensorIds.LTFT2)),
-        )
-        val withLt = banks.filter { it.ltft.count > 0 }
+        fun bank(n: Int, stftId: String, ltftId: String): Bank? {
+            val latest = input.sessions.filter { (it.warmTrims[ltftId]?.count ?: 0) > 0 }.maxByOrNull { it.startedAtMs } ?: return null
+            val stft = latest.warmTrims[stftId]?.takeIf { it.count > 0 } ?: Agg.EMPTY
+            return Bank(n, stft, latest.warmTrims.getValue(ltftId), input.sessions.mapNotNull { it.warmTrims[ltftId] }.merged(), latest.startedAtMs, listOf(latest.sessionId))
+        }
+        val withLt = listOfNotNull(bank(1, SensorIds.STFT1, SensorIds.LTFT1), bank(2, SensorIds.STFT2, SensorIds.LTFT2))
         if (withLt.isEmpty()) {
             val msg = "Нет долгосрочных коррекций (01.07/01.09) на прогретом двигателе (ОЖ ≥ 80 °C)."
             return listOf(noData(LONG, "Долгосрочная коррекция топлива", msg), noData(TOTAL, "Суммарная коррекция топлива", msg), noData(ASYM, "Разница банков", msg))
         }
         val few = { b: Bank -> b.ltft.count < Thresholds.MIN_TRIM_SAMPLES }
         val evidence = withLt.flatMap { b ->
+            val all = if (b.ltftAll.count > b.ltft.count) "; за всё время ${Fmt.signed(b.ltftAll.min)}…${Fmt.signed(b.ltftAll.max)} %" else ""
             listOfNotNull(
-                Evidence("LTFT банк ${b.n}", "${Fmt.signed(b.ltft.mean!!)} % (замеров: ${b.ltft.count})"),
+                Evidence("LTFT банк ${b.n}", "${Fmt.signed(b.ltft.mean!!)} % (запись ${Fmt.date(b.atMs, input.zone)}, замеров: ${b.ltft.count})$all"),
                 b.stft.mean?.let { Evidence("STFT банк ${b.n}", "${Fmt.signed(it)} %, макс. ${Fmt.signed(b.stft.max)} % (замеров: ${b.stft.count})") },
             )
         }
