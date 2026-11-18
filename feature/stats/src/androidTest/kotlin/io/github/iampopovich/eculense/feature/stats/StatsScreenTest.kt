@@ -60,7 +60,16 @@ class StatsScreenTest {
     @Test
     fun emptyStateExplainsImport() {
         rule.setContent { StatsScreen(StatsUiState(loading = false, car = car), onPeriod = {}) }
-        rule.onNodeWithText("Импорт из Car Scanner", substring = true).assertExists()
+        rule.onNodeWithText("Импорт и резервные копии", substring = true).assertExists()
+        rule.onNodeWithText("Перенести поездки из Car Scanner").assertDoesNotExist()
+    }
+
+    @Test
+    fun importLinkOpensBackupScreen() {
+        var clicks = 0
+        rule.setContent { StatsScreen(StatsUiState(loading = false, car = car), onPeriod = {}, onImport = { clicks++ }) }
+        rule.onNodeWithText("Перенести поездки из Car Scanner").performClick()
+        assertEquals(1, clicks)
     }
 
     @Test

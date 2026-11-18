@@ -16,11 +16,17 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.iampopovich.eculense.core.navigation.BackupDestination
+import io.github.iampopovich.eculense.core.navigation.LocalNavigator
+import io.github.iampopovich.eculense.core.navigation.RouteHandler
+import org.koin.compose.getKoin
 import io.github.iampopovich.eculense.core.model.FuelMethod
 import io.github.iampopovich.eculense.core.model.StatsPeriod
 import io.github.iampopovich.eculense.core.model.Trip
@@ -34,11 +40,15 @@ import io.github.iampopovich.eculense.core.ui.EcuDates
 @Composable
 internal fun StatsRoute(viewModel: StatsViewModel = koinViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    StatsScreen(state, onPeriod = viewModel::selectPeriod)
+    val navigator = LocalNavigator.current
+    val koin = getKoin()
+    // перенос статистики из Car Scanner — в :feature:backup; нет фичи — нет ссылки
+    val hasBackup = remember { koin.getAll<RouteHandler>().any { it.routeClass == BackupDestination::class } }
+    StatsScreen(state, onPeriod = viewModel::selectPeriod, onImport = if (hasBackup) ({ navigator.navigate(BackupDestination) }) else null)
 }
 
 @Composable
-internal fun StatsScreen(state: StatsUiState, onPeriod: (StatsPeriod) -> Unit, modifier: Modifier = Modifier) {
+internal fun StatsScreen(state: StatsUiState, onPeriod: (StatsPeriod) -> Unit, modifier: Modifier = Modifier, onImport: (() -> Unit)? = null) {
     LazyColumn(modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Column(Modifier.padding(top = 16.dp)) {
@@ -52,20 +62,29 @@ internal fun StatsScreen(state: StatsUiState, onPeriod: (StatsPeriod) -> Unit, m
             item {
                 Secondary(
                     "Поездок пока нет. Запишите поездку с адаптера (Панель → «Записывать») — после остановки записи " +
-                        "поездка появится здесь. Или перенесите их из Car Scanner: Пит-стоп → Поездки → «Импорт из Car Scanner».",
+                        "поездка появится здесь. Или перенесите их из Car Scanner: Настройки → «Импорт и резервные копии».",
                 )
             }
+            onImport?.let { item { ImportLink(it) } }
             return@LazyColumn
         }
         if (state.trips.isEmpty()) {
             item { Secondary("За этот период поездок нет — выберите период длиннее.") }
+            onImport?.let { item { ImportLink(it) } }
             return@LazyColumn
         }
         item { Summary(state.stats, state.units, state.car?.currency) }
         item { Text("Поездки", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
         items(state.trips, key = { it.id.takeIf { id -> id != 0L } ?: it.startedAtMs }) { TripRow(it, state.units) }
+        onImport?.let { item { ImportLink(it) } }
         item { Text(" ", Modifier.padding(bottom = 8.dp)) }
     }
+}
+
+/** Пользователь ещё ездит с Car Scanner — новые поездки переносятся повторным импортом бэкапа. */
+@Composable
+private fun ImportLink(onImport: () -> Unit) {
+    TextButton(onClick = onImport) { Text("Перенести поездки из Car Scanner") }
 }
 
 @Composable

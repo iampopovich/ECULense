@@ -2,90 +2,34 @@ package io.github.iampopovich.eculense.feature.sessions
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.iampopovich.eculense.core.data.CarScannerImporter
-import io.github.iampopovich.eculense.core.data.ImportedCar
 import io.github.iampopovich.eculense.core.data.SessionCsv
 import io.github.iampopovich.eculense.core.data.SessionRepository
 import io.github.iampopovich.eculense.core.data.UnitsRepository
-import kotlinx.coroutines.flow.first
 import io.github.iampopovich.eculense.core.model.SensorReading
 import io.github.iampopovich.eculense.core.model.Session
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Состояние импорта бэкапа Car Scanner для строки статуса над списком. */
-internal sealed interface ImportState {
-    data object Idle : ImportState
-    data class Running(val processed: Int) : ImportState
-    data class Done(
-        val imported: Int,
-        val duplicates: Int,
-        val failed: Int,
-        val car: ImportedCar? = null,
-        val tripsImported: Int = 0,
-        val tripsSkipped: Int = 0,
-        val unitsImported: Boolean = false,
-        val dtcEventsAdded: Int = 0,
-    ) : ImportState
-    data class Failed(val message: String) : ImportState
-}
-
+/** Список записей. Импорт из Car Scanner переехал в «Настройки → Импорт и резервные копии» (1.27, :feature:backup). */
 internal class SessionsViewModel(
     private val repository: SessionRepository,
-    private val importer: CarScannerImporter,
 ) : ViewModel() {
     val sessions: StateFlow<List<Session>> =
         repository.observeSessions().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val _importState = MutableStateFlow<ImportState>(ImportState.Idle)
-    val importState: StateFlow<ImportState> = _importState.asStateFlow()
-
     fun delete(id: Long) {
         viewModelScope.launch { repository.delete(id) }
-    }
-
-    fun import(uri: Uri, fileName: String) {
-        if (_importState.value is ImportState.Running) return
-        _importState.value = ImportState.Running(processed = 0)
-        viewModelScope.launch {
-            val started = System.currentTimeMillis()
-            _importState.value = try {
-                val report = importer.import(uri, fileName) { _importState.value = ImportState.Running(it) }
-                report.failed.forEach { Log.w(TAG, "Car Scanner import: $it") }
-                ImportState.Done(
-                    report.imported, report.skippedDuplicates, report.failed.size,
-                    report.car, report.tripsImported, report.tripsSkipped, report.unitsImported, report.dtcEventsAdded,
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                ImportState.Failed(e.message ?: e.javaClass.simpleName)
-            }
-            // без имени машины и цены — в logcat только счётчики
-            val done = _importState.value as? ImportState.Done
-            Log.i(
-                TAG,
-                "Car Scanner import finished in ${System.currentTimeMillis() - started} ms: " +
-                    (done?.let { "imported=${it.imported} duplicates=${it.duplicates} failed=${it.failed} trips=${it.tripsImported}/${it.tripsSkipped} car=${it.car != null} units=${it.unitsImported} dtcAdded=${it.dtcEventsAdded}" }
-                        ?: _importState.value.javaClass.simpleName),
-            )
-        }
-    }
-
-    private companion object {
-        const val TAG = "SessionsImport"
     }
 }
 
