@@ -6,4 +6,5 @@ plugins {
 dependencies {
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
+    androidTestImplementation(libs.androidx.room.testing)
 }
