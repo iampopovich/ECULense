@@ -44,7 +44,7 @@ internal object CarFormat {
 
     val StatsPeriod.label: String
         get() = when (this) {
-            StatsPeriod.ALL -> "Всё время"
+            StatsPeriod.ALL -> "Всё"
             StatsPeriod.YEAR -> "Год"
             StatsPeriod.MONTH -> "30 дней"
             StatsPeriod.WEEK -> "7 дней"

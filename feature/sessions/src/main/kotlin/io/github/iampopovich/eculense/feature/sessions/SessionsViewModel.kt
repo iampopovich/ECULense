@@ -72,7 +72,14 @@ internal class SessionsViewModel(
             } catch (e: Exception) {
                 ImportState.Failed(e.message ?: e.javaClass.simpleName)
             }
-            Log.i(TAG, "Car Scanner import finished in ${System.currentTimeMillis() - started} ms: ${_importState.value}")
+            // без имени машины и цены — в logcat только счётчики
+            val done = _importState.value as? ImportState.Done
+            Log.i(
+                TAG,
+                "Car Scanner import finished in ${System.currentTimeMillis() - started} ms: " +
+                    (done?.let { "imported=${it.imported} duplicates=${it.duplicates} failed=${it.failed} trips=${it.tripsImported}/${it.tripsSkipped} car=${it.car != null} units=${it.unitsImported}" }
+                        ?: _importState.value.javaClass.simpleName),
+            )
         }
     }
 
