@@ -11,17 +11,19 @@ object SessionStats {
     fun compute(readings: List<SensorReading>): List<SensorStats> =
         readings.groupBy { it.sensorId }.map { (id, list) ->
             val values = list.map { it.value }.sorted()
-            SensorStats(id, values.size, values.first(), values.last(), values.average(), values[((values.size - 1) * 0.95).toInt()])
+            SensorStats(id, values.size, values.first(), values.last(), values.average(), values[Percentiles.rank(values.size, 0.95)])
         }.sortedBy { it.sensorId }
 }
 
 object Percentiles {
-    /** Перцентиль «по нижнему индексу», как в [SessionStats]: для 1..100 и q=0.95 → 95. */
+    /** Перцентиль по ближайшему рангу (ceil(q·n)): для 1..100 и q=0.95 → 95; для трёх значений p95 — максимум. */
     fun of(values: Collection<Double>, q: Double): Double? {
         if (values.isEmpty()) return null
         val sorted = values.sorted()
-        return sorted[((sorted.size - 1) * q).toInt()]
+        return sorted[rank(sorted.size, q)]
     }
+
+    fun rank(n: Int, q: Double): Int = (ceil(q * n).toInt() - 1).coerceIn(0, n - 1)
 
     /** Шаг прореживания (каждое step-е значение), чтобы выборка была не больше maxSample. */
     fun step(count: Int, maxSample: Int = 2_000): Int = if (count <= maxSample) 1 else ceil(count.toDouble() / maxSample).toInt()
