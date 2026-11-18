@@ -41,7 +41,7 @@ internal fun SessionDetailRoute(sessionId: Long, viewModel: SessionDetailViewMod
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selected by remember { mutableStateOf<String?>(null) }
-    val sensor = selected ?: bySensor.keys.firstOrNull()
+    val sensor = selected ?: defaultSensor(bySensor.keys.toList())
     val modelProducer = remember { CartesianChartModelProducer() }
     val points = sensor?.let { bySensor[it] }.orEmpty()
 
@@ -56,7 +56,8 @@ internal fun SessionDetailRoute(sessionId: Long, viewModel: SessionDetailViewMod
 
     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            bySensor.keys.forEach { id ->
+            // Датчик по умолчанию — первым, иначе выбранный чип может оказаться за краем экрана.
+            bySensor.keys.sortedBy { it != defaultSensor(bySensor.keys.toList()) }.forEach { id ->
                 val label = id.removePrefix("01.").toIntOrNull(16)?.let { StandardPids.byCode(it)?.name } ?: id
                 FilterChip(selected = id == sensor, onClick = { selected = id }, label = { Text(label) })
             }
@@ -67,6 +68,7 @@ internal fun SessionDetailRoute(sessionId: Long, viewModel: SessionDetailViewMod
                     rememberLineCartesianLayer(),
                     startAxis = VerticalAxis.rememberStart(),
                     bottomAxis = HorizontalAxis.rememberBottom(),
+                    getXStep = { _, minX, maxX -> niceXStepSeconds(maxX - minX) },
                 ),
                 modelProducer = modelProducer,
                 modifier = Modifier.fillMaxWidth().height(260.dp),
