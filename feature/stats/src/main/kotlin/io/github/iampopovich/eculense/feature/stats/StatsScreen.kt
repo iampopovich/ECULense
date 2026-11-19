@@ -31,6 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.navigation.BackupDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
@@ -81,9 +83,10 @@ internal fun StatsScreen(state: StatsUiState, onPeriod: (StatsPeriod) -> Unit, m
  */
 @Composable
 private fun Header(carName: String?, onImport: (() -> Unit)?) {
-    Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text("Статистика", style = MaterialTheme.typography.headlineSmall)
+    // Кнопка — отдельной строкой: в одной строке с заголовком при крупном шрифте «Статистика» переносилась по буквам.
+    Column(Modifier.fillMaxWidth().padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column {
+            Text("Статистика", style = MaterialTheme.typography.headlineSmall, maxLines = 1)
             carName?.let { Secondary(it) }
         }
         onImport?.let {
@@ -128,7 +131,15 @@ private fun PeriodSelector(selected: StatsPeriod, onPeriod: (StatsPeriod) -> Uni
                 shape = SegmentedButtonDefaults.itemShape(i, periods.size),
                 // без галочки: на узком экране она съедает подпись «Всё время»
                 icon = {},
-                label = { Text(p.label, maxLines = 1, style = MaterialTheme.typography.labelMedium) },
+                // при крупном шрифте «Всё время» не влезала и обрезалась до «Всё» — уменьшаем, а не режем
+                label = {
+                    Text(
+                        p.label,
+                        maxLines = 1,
+                        style = MaterialTheme.typography.labelMedium,
+                        autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = MaterialTheme.typography.labelMedium.fontSize),
+                    )
+                },
             )
         }
     }
