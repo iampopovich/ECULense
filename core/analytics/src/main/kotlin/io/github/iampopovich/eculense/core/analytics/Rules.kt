@@ -346,13 +346,36 @@ object WarmupTrendRule : AnalyticsRule {
 
 /** Коды ошибок: группы связанных кодов, повторы за 30 дней, остальные — справкой. */
 object DtcRule : AnalyticsRule {
-    private data class Group(val id: String, val title: String, val codes: (String) -> Boolean, val explain: String)
+    /** [title] и [explain] получают коды группы, найденные в истории: текст не должен говорить о том, чего нет. */
+    private data class Group(
+        val id: String,
+        val title: (List<String>) -> String,
+        val codes: (String) -> Boolean,
+        val explain: (List<String>) -> String,
+    )
+
+    /** P0171/P0174 — бедная смесь банков 1/2, P0172/P0175 — богатая. */
+    private val MIXTURE_BANK = mapOf("P0171" to 1, "P0172" to 1, "P0174" to 2, "P0175" to 2)
+    private val LEAN = setOf("P0171", "P0174")
+
+    private fun mixtureExplain(codes: List<String>): String {
+        fun banks(of: List<String>): String {
+            val b = of.mapNotNull(MIXTURE_BANK::get).toSortedSet()
+            return if (b.size == 2) "на обоих банках" else "на банке ${b.single()}"
+        }
+        val lean = codes.filter { it in LEAN }
+        val rich = codes.filter { it !in LEAN }
+        val parts = buildList {
+            if (lean.isNotEmpty()) add("смесь бедная ${banks(lean)} — ЭБУ не может её обогатить: подсос воздуха, MAF, давление топлива")
+            if (rich.isNotEmpty()) add("смесь богатая ${banks(rich)} — ЭБУ не может её обеднить: форсунки, давление топлива, MAF, датчик кислорода")
+        }
+        return parts.joinToString("; ")
+    }
 
     private val GROUPS = listOf(
-        Group("dtc-air-sensors", "Датчики воздуха (MAF/MAP/IAT)", { c -> c.length == 5 && c.startsWith("P01") && c.drop(3).toIntOrNull()?.let { it in 0..14 } == true },
-            "коды одной системы измерения воздуха — часто общий разъём, проводка или питание датчиков"),
-        Group("dtc-mixture", "Смесь (P0171/P0174)", { c -> c in setOf("P0171", "P0172", "P0174", "P0175") },
-            "ЭБУ не может удержать состав смеси на обоих банках — подсос воздуха, MAF, давление топлива"),
+        Group("dtc-air-sensors", { "Датчики воздуха (MAF/MAP/IAT)" }, { c -> c.length == 5 && c.startsWith("P01") && c.drop(3).toIntOrNull()?.let { it in 0..14 } == true },
+            { "коды одной системы измерения воздуха — часто общий разъём, проводка или питание датчиков" }),
+        Group("dtc-mixture", { codes -> "Смесь (${codes.joinToString("/")})" }, { c -> c in MIXTURE_BANK }, ::mixtureExplain),
     )
     override val ids = GROUPS.map { it.id } + listOf("dtc-repeat", "dtc-other", "dtc-history")
 
@@ -386,8 +409,8 @@ object DtcRule : AnalyticsRule {
             used += codes
             val all = codes.flatMap { occ.getValue(it) }
             out += Finding(
-                g.id, Severity.WARNING, g.title,
-                "${summary(codes)}: ${g.explain}.",
+                g.id, Severity.WARNING, g.title(codes),
+                "${summary(codes)}: ${g.explain(codes)}.",
                 codes.map(::evidence), fromMs = all.minOf { it.atMs }, toMs = all.maxOf { it.atMs },
             )
         }

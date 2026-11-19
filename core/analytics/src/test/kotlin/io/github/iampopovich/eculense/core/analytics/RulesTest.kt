@@ -198,6 +198,26 @@ class RulesTest {
     }
 
     @Test
+    fun `mixture finding names only the banks that have codes`() {
+        fun mixture(vararg codes: String) = DtcRule.evaluate(
+            input(dtc = codes.flatMap { listOf(DtcEvent(it, DtcKind.STORED, ms(2026, 5, 1)), DtcEvent(it, DtcKind.STORED, ms(2026, 5, 8))) }),
+        ).single { it.ruleId == "dtc-mixture" }
+
+        val bank1 = mixture("P0171")
+        assertEquals("Смесь (P0171)", bank1.title)
+        assertTrue(bank1.message, bank1.message.contains("бедная") && bank1.message.contains("банке 1"))
+        assertFalse(bank1.message, bank1.message.contains("обоих"))
+
+        val both = mixture("P0171", "P0174")
+        assertEquals("Смесь (P0171/P0174)", both.title)
+        assertTrue(both.message, both.message.contains("бедная") && both.message.contains("обоих банках"))
+
+        val rich2 = mixture("P0175")
+        assertTrue(rich2.message, rich2.message.contains("богатая") && rich2.message.contains("банке 2"))
+        assertFalse(rich2.message, rich2.message.contains("подсос"))
+    }
+
+    @Test
     fun `repeat within 30 days outside groups`() {
         val events = listOf(DtcEvent("P0300", DtcKind.STORED, ms(2026, 2, 1)), DtcEvent("P0300", DtcKind.STORED, ms(2026, 2, 20)))
         val f = DtcRule.evaluate(input(dtc = events))
