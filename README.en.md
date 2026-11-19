@@ -73,7 +73,7 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
 
 ## Installation
 
-CI builds APKs for every commit: the `apk-release` artifact on the [Actions](../../actions) tab. There are two builds of the same app:
+Ready-made APKs are on the [Releases](../../releases) page; per-commit builds are the `apk-release` artifact on the [Actions](../../actions) tab. There are two builds of the same app:
 
 | Build | Size | For whom |
 |---|---|---|
@@ -98,6 +98,8 @@ You need JDK 17+ (CI uses 21) and the Android SDK.
 ```
 
 A full build needs about 4 GB of Gradle heap; this is already set in `gradle.properties`.
+
+Releasing: add a version section to [CHANGELOG.md](CHANGELOG.md) and push a tag (`git tag 0.2.0 && git push origin 0.2.0`). CI builds both APKs, signs them with the key from the repository secrets and creates a draft release with notes from the changelog (`.github/workflows/release.yml`).
 
 ### How it's built
 
