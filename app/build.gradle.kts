@@ -13,14 +13,30 @@ android {
         applicationId = "io.github.iampopovich.eculense"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI релиза передаёт версию из тега: -Pecu.versionName=0.1.0 -Pecu.versionCode=100 (.github/workflows/release.yml).
+        versionCode = providers.gradleProperty("ecu.versionCode").map(String::toInt).getOrElse(1)
+        versionName = providers.gradleProperty("ecu.versionName").getOrElse("0.1.0")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Ключ релиза — только из окружения (секреты CI); без него release подписывается отладочным ключом,
+    // чтобы APK ставился, а CI помечает такие файлы суффиксом -debugkey.
+    val releaseKeystore = providers.environmentVariable("ECU_KEYSTORE_FILE").orNull
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = providers.environmentVariable("ECU_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("ECU_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("ECU_KEY_PASSWORD").get()
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
