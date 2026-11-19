@@ -83,6 +83,14 @@ internal class ChatViewModel(
         }
     }
 
+    /** Пометка «модель на телефоне» — заново при каждом показе экрана: провайдера меняют в настройках, а VM живёт дальше. */
+    fun refreshProvider() {
+        viewModelScope.launch {
+            val onDevice = runCatching { gateway.provider()?.onDevice == true }.getOrDefault(false)
+            _uiState.update { it.copy(onDevice = onDevice) }
+        }
+    }
+
     /** «Новый диалог»: текущая переписка удаляется, ИИ её больше не видит. */
     fun newDialog() {
         if (_uiState.value.streaming) stop()

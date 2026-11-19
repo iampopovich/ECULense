@@ -60,6 +60,7 @@ import io.github.iampopovich.eculense.core.ai.ChatMessage
 import io.github.iampopovich.eculense.core.navigation.AiSettingsDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import io.github.iampopovich.eculense.core.ui.aboveKeyboard
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
@@ -73,6 +74,11 @@ internal val CHAT_SUGGESTIONS = listOf("Как машина вела себя з
 internal fun ChatRoute(prefill: String?, viewModel: ChatViewModel = koinViewModel { parametersOf(prefill) }) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val navigator = LocalNavigator.current
+    // вернулись из «Настроек ИИ» — провайдер мог смениться (телефон ↔ облако)
+    LifecycleResumeEffect(viewModel) {
+        viewModel.refreshProvider()
+        onPauseOrDispose { }
+    }
     ChatScreen(
         state = state,
         onSend = viewModel::send,
