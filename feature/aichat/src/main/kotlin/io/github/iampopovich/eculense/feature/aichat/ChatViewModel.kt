@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.iampopovich.eculense.core.ai.ChatEvent
 import io.github.iampopovich.eculense.core.ai.ChatPrefs
+import io.github.iampopovich.eculense.core.ai.ExpertNote
 import io.github.iampopovich.eculense.core.ai.ProviderInfo
 import io.github.iampopovich.eculense.core.ai.ChatMessage
 import io.github.iampopovich.eculense.core.ai.LlmGateway
@@ -18,6 +19,9 @@ import java.util.UUID
 
 /** Вопрос ждёт согласия: какие данные и какому провайдеру уйдут. */
 internal data class ConsentRequest(val provider: ProviderInfo, val text: String)
+
+/** «Над ответом работали: …» и раскрываемые «Заметки экспертов». */
+internal data class ExpertsInfo(val roles: List<String>, val notes: List<ExpertNote>)
 
 internal data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
@@ -37,6 +41,11 @@ internal data class ChatUiState(
     val consent: ConsentRequest? = null,
     /** Текст, который надо вернуть в поле ввода (диалог согласия закрыли). */
     val draft: String? = null,
+    /**
+     * Кто работал над ответом — по индексу сообщения ответа. Только для текущего показа: в историю (ai_chat.db) пишется
+     * лишь финальный ответ, после перезапуска подписи и заметок нет.
+     */
+    val experts: Map<Int, ExpertsInfo> = emptyMap(),
 ) {
     /** Запрос ушёл, но первый кусок ответа ещё не пришёл — показываем индикатор «печатает». */
     val awaitingFirstToken: Boolean
@@ -79,7 +88,7 @@ internal class ChatViewModel(
         if (_uiState.value.streaming) stop()
         val old = conversationId
         conversationId = UUID.randomUUID().toString()
-        _uiState.update { it.copy(messages = emptyList(), error = null, stoppedIndex = null, toolStatus = null, consent = null) }
+        _uiState.update { it.copy(messages = emptyList(), error = null, stoppedIndex = null, toolStatus = null, consent = null, experts = emptyMap()) }
         viewModelScope.launch {
             prefs.setConversationId(conversationId)
             gateway.deleteConversation(old)
@@ -175,7 +184,7 @@ internal class ChatViewModel(
                         when (event) {
                             is ChatEvent.ToolCall -> s.copy(toolStatus = event.label)
                             is ChatEvent.Status -> s.copy(toolStatus = event.label)
-                            is ChatEvent.Experts -> s
+                            is ChatEvent.Experts -> s.copy(experts = s.experts + (s.messages.lastIndex to ExpertsInfo(event.roles, event.notes)))
                             is ChatEvent.Text -> {
                                 val last = s.messages.last()
                                 s.copy(messages = s.messages.dropLast(1) + last.copy(text = last.text + event.delta), toolStatus = null)

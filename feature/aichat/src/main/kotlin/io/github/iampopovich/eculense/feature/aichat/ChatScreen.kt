@@ -67,7 +67,7 @@ import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
 /** Подсказки пустого чата: подставляются в поле ввода (не отправляются сами — запрос стоит денег). */
-internal val CHAT_SUGGESTIONS = listOf("Объясни мои ошибки", "Как прошла последняя поездка?")
+internal val CHAT_SUGGESTIONS = listOf("Как машина вела себя за полгода", "Объясни мои ошибки", "Сколько трачу на топливо", "Что пора обслужить")
 
 @Composable
 internal fun ChatRoute(prefill: String?, viewModel: ChatViewModel = koinViewModel { parametersOf(prefill) }) {
@@ -204,7 +204,12 @@ internal fun ChatScreen(
                 when {
                     message.role == ChatMessage.Role.USER -> UserBubble(message.text)
                     last && state.awaitingFirstToken -> TypingIndicator(state.toolStatus)
-                    else -> AssistantMessage(message.text, streaming = state.streaming && last, stopped = state.stoppedIndex == index)
+                    else -> AssistantMessage(
+                        message.text,
+                        streaming = state.streaming && last,
+                        stopped = state.stoppedIndex == index,
+                        experts = state.experts[index],
+                    )
                 }
             }
             // Инструменты между кругами ответа: текст уже есть, ИИ снова смотрит данные.
@@ -256,7 +261,7 @@ private fun UserBubble(text: String) {
 
 /** Ответ ИИ — на всю ширину без пузыря (как в Gemini/ChatGPT), Markdown + «Копировать» после завершения. */
 @Composable
-private fun AssistantMessage(text: String, streaming: Boolean, stopped: Boolean) {
+private fun AssistantMessage(text: String, streaming: Boolean, stopped: Boolean, experts: ExpertsInfo? = null) {
     val shown = HtmlEntities.decode(text, complete = !streaming)
     Column(Modifier.fillMaxWidth()) {
         AssistantMarkdown(shown)
@@ -265,6 +270,44 @@ private fun AssistantMessage(text: String, streaming: Boolean, stopped: Boolean)
                 CopyButton(shown)
                 if (stopped) {
                     Text("Ответ остановлен", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            experts?.let { ExpertsFooter(it) }
+        }
+    }
+}
+
+/**
+ * «Над ответом работали: Аналитик эксплуатации · Моторист · Диагност» и свёрнутый блок «Заметки экспертов»
+ * (markdown каждой заметки под заголовком роли). Заметок нет, если роль отвечала сама или модель была на телефоне.
+ */
+@Composable
+private fun ExpertsFooter(info: ExpertsInfo) {
+    var expanded by rememberSaveable(info) { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            "Над ответом работали: " + info.roles.joinToString(" · "),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (info.notes.isNotEmpty()) {
+            TextButton(onClick = { expanded = !expanded }, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(if (expanded) "Скрыть заметки экспертов" else "Заметки экспертов (${info.notes.size})")
+            }
+            if (expanded) {
+                info.notes.forEach { note ->
+                    Column(
+                        Modifier.fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                    ) {
+                        Text(note.title, style = MaterialTheme.typography.titleSmall)
+                        if (note.failed) {
+                            Text(note.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                        } else {
+                            AssistantMarkdown(note.text)
+                        }
+                    }
                 }
             }
         }

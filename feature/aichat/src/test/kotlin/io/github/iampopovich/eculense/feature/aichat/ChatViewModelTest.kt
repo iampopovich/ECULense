@@ -226,6 +226,34 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `experts and their notes are attached to the answer they worked on`() = runTest {
+        val notes = listOf(
+            io.github.iampopovich.eculense.core.ai.ExpertNote("usage", "Аналитик эксплуатации", "- поездок 12"),
+            io.github.iampopovich.eculense.core.ai.ExpertNote("engine", "Моторист", "недоступен", failed = true),
+        )
+        val gateway = FakeGateway(hasVehicleTools = false) { n ->
+            if (n == 1) {
+                flowOf(
+                    ChatEvent.Status("Аналитик эксплуатации смотрит поездки за 6 месяцев…"),
+                    ChatEvent.Experts(listOf("Аналитик эксплуатации", "Моторист"), notes),
+                    ChatEvent.Text("Коротко: всё ровно"),
+                )
+            } else {
+                texts("второй")
+            }
+        }
+        val vm = ChatViewModel(gateway, FakePrefs(), prefill = null)
+        vm.send("как машина вела себя за полгода")
+        val s = vm.uiState.value
+        assertEquals(ExpertsInfo(listOf("Аналитик эксплуатации", "Моторист"), notes), s.experts[1])
+        // следующий ответ без экспертов — у него своей подписи нет, у первого остаётся
+        vm.send("привет")
+        assertEquals(setOf(1), vm.uiState.value.experts.keys)
+        vm.newDialog()
+        assertTrue(vm.uiState.value.experts.isEmpty())
+    }
+
+    @Test
     fun `prefill is sent immediately`() = runTest {
         val vm = ChatViewModel(FakeGateway(), FakePrefs(), prefill = "Объясни P0300")
         assertEquals("Объясни P0300", vm.uiState.value.messages.first().text)

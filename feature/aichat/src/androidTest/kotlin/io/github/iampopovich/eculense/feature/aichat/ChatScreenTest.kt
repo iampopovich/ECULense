@@ -74,6 +74,43 @@ class ChatScreenTest {
     }
 
     @Test
+    fun emptyChatOffersFourSuggestionsIncludingHalfAYear() {
+        rule.setContent { ChatScreen(ChatUiState(), onSend = {}, onOpenSettings = {}) }
+        listOf("Как машина вела себя за полгода", "Объясни мои ошибки", "Сколько трачу на топливо", "Что пора обслужить")
+            .forEach { rule.onNodeWithText(it).assertExists() }
+        rule.onNodeWithText("Как машина вела себя за полгода").performClick()
+        rule.onNodeWithTag("chat-input").assertTextEquals("Как машина вела себя за полгода")
+    }
+
+    @Test
+    fun expertsLineAndCollapsedNotesUnderTheAnswer() {
+        val notes = listOf(
+            io.github.iampopovich.eculense.core.ai.ExpertNote("usage", "Аналитик эксплуатации", "- **Поездок** стало 12 в месяц"),
+            io.github.iampopovich.eculense.core.ai.ExpertNote("engine", "Моторист", "Эксперт «Моторист» недоступен", failed = true),
+        )
+        val state = ChatUiState(
+            listOf(user("Как машина вела себя за полгода"), assistant("Коротко: всё ровно")),
+            experts = mapOf(1 to ExpertsInfo(listOf("Аналитик эксплуатации", "Моторист", "Диагност"), notes)),
+        )
+        rule.setContent { ChatScreen(state, onSend = {}, onOpenSettings = {}) }
+        rule.onNodeWithText("Над ответом работали: Аналитик эксплуатации · Моторист · Диагност").assertExists()
+        // свёрнуто по умолчанию
+        rule.onNodeWithText("Поездок", substring = true).assertDoesNotExist()
+        rule.onNodeWithText("Заметки экспертов (2)").performClick()
+        rule.waitUntil(5_000) { rule.onAllNodesWithText("Поездок", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("**Поездок", substring = true).assertDoesNotExist()
+        rule.onNodeWithText("Эксперт «Моторист» недоступен").assertExists()
+        rule.onNodeWithText("Скрыть заметки экспертов").performClick()
+        rule.onNodeWithText("Эксперт «Моторист» недоступен").assertDoesNotExist()
+    }
+
+    @Test
+    fun answerWithoutExpertsHasNoExpertsLine() {
+        rule.setContent { ChatScreen(ChatUiState(listOf(user("hi"), assistant("Привет!"))), onSend = {}, onOpenSettings = {}) }
+        rule.onNodeWithText("Над ответом работали", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun htmlEntitiesInAnswersAreDecoded() {
         rule.setContent {
             ChatScreen(ChatUiState(listOf(user("t"), assistant("Температура ОЖ стабильно &gt;105 °C"))), onSend = {}, onOpenSettings = {})
