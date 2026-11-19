@@ -51,7 +51,8 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
 - A maintenance plan with distance and time intervals, and current mileage estimated from your trips.
 
 **AI assistant (optional)**
-- A chat that reads your car's data on its own: code history, findings, sensor statistics, trips, maintenance.
+- A chat that reads your car's data on its own: code history, findings, sensor statistics, trips and monthly trends, maintenance.
+- Questions go to experts (diagnostician, engine, electrical, usage analyst, fuel economist, service and more): each looks at its own data, and an editor writes one answer to the question you asked. Under the answer you see who worked on it and their notes. The on-device model answers in a single call "in all the needed roles at once" — several calls in a row are too slow on a phone.
 - Any provider from the [Koog](https://github.com/JetBrains/koog) presets (OpenRouter, OpenAI, Anthropic, Google, DeepSeek, Mistral, Ollama) or your own OpenAI-compatible server.
 - A model running on the phone itself (the "Local" build). Before downloading, the app estimates whether your device can handle it; after downloading, it runs a benchmark and shows the real speed.
 
