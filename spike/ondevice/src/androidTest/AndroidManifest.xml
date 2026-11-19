@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
-        <!-- GPU-бэкенд LiteRT-LM (OpenCL) на API 31+: вендорская библиотека должна быть объявлена. -->
-        <uses-native-library android:name="libOpenCL.so" android:required="false" />
-        <uses-native-library android:name="libOpenCL-pixel.so" android:required="false" />
-        <uses-native-library android:name="libvndksupport.so" android:required="false" />
-    </application>
-</manifest>

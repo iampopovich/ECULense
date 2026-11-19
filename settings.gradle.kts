@@ -64,5 +64,3 @@ include(":feature:datapacks")
 include(":feature:maintenance")
 include(":feature:backup")
 
-// Spike 3.6 (on-device LLM, LiteRT via Koog): only with -Pecu.spike.ondevice=true — never part of the default build or the APK.
-if (providers.gradleProperty("ecu.spike.ondevice").orNull == "true") include(":spike:ondevice")
