@@ -3,24 +3,33 @@ package io.github.iampopovich.eculense.feature.stats
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.navigation.BackupDestination
@@ -49,42 +58,63 @@ internal fun StatsRoute(viewModel: StatsViewModel = koinViewModel()) {
 
 @Composable
 internal fun StatsScreen(state: StatsUiState, onPeriod: (StatsPeriod) -> Unit, modifier: Modifier = Modifier, onImport: (() -> Unit)? = null) {
-    LazyColumn(modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Column(Modifier.padding(top = 16.dp)) {
-                Text("Статистика", style = MaterialTheme.typography.headlineSmall)
-                state.car?.let { Secondary(it.name) }
-            }
-        }
-        if (state.loading) return@LazyColumn
-        item { PeriodSelector(state.period, onPeriod) }
-        if (state.totalTrips == 0) {
-            item {
-                Secondary(
-                    "Поездок пока нет. Запишите поездку с адаптера (Панель → «Записывать») — после остановки записи " +
-                        "поездка появится здесь. Или перенесите их из Car Scanner: Настройки → «Импорт и резервные копии».",
-                )
-            }
-            onImport?.let { item { ImportLink(it) } }
-            return@LazyColumn
-        }
+    Column(modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Header(state.car?.name, onImport)
+        if (state.loading) return@Column
+        PeriodSelector(state.period, onPeriod)
         if (state.trips.isEmpty()) {
-            item { Secondary("За этот период поездок нет — выберите период длиннее.") }
-            onImport?.let { item { ImportLink(it) } }
-            return@LazyColumn
+            EmptyPlaceholder(StatsFormat.emptyTitle(state.period, state.totalTrips), Modifier.weight(1f))
+            return@Column
         }
-        item { Summary(state.stats, state.units, state.car?.currency) }
-        item { Text("Поездки", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
-        items(state.trips, key = { it.id.takeIf { id -> id != 0L } ?: it.startedAtMs }) { TripRow(it, state.units) }
-        onImport?.let { item { ImportLink(it) } }
-        item { Text(" ", Modifier.padding(bottom = 8.dp)) }
+        LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item { Summary(state.stats, state.units, state.car?.currency) }
+            item { Text("Поездки", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
+            items(state.trips, key = { it.id.takeIf { id -> id != 0L } ?: it.startedAtMs }) { TripRow(it, state.units) }
+            item { Text(" ", Modifier.padding(bottom = 8.dp)) }
+        }
     }
 }
 
-/** Пользователь ещё ездит с Car Scanner — новые поездки переносятся повторным импортом бэкапа. */
+/**
+ * Шапка: заголовок + ОДНА кнопка импорта для всего экрана — импорт бэкапа не зависит от выбранного периода
+ * (повтор ссылки в каждой ветке читался как «импорт за неделю/месяц»). Нет :feature:backup — нет кнопки.
+ */
 @Composable
-private fun ImportLink(onImport: () -> Unit) {
-    TextButton(onClick = onImport) { Text("Перенести поездки из Car Scanner") }
+private fun Header(carName: String?, onImport: (() -> Unit)?) {
+    Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Статистика", style = MaterialTheme.typography.headlineSmall)
+            carName?.let { Secondary(it) }
+        }
+        onImport?.let {
+            FilledTonalButton(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) {
+                Icon(painterResource(R.drawable.ic_import), contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Импорт из Car Scanner", maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyPlaceholder(title: String, modifier: Modifier) {
+    Column(
+        modifier.fillMaxWidth().padding(bottom = 48.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            painterResource(R.drawable.ic_no_trips), contentDescription = null, modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            StatsFormat.EMPTY_HINT, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable

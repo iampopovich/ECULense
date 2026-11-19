@@ -35,4 +35,17 @@ internal object StatsFormat {
 
     /** Порядок в переключателе — от короткого периода к длинному. */
     val periods = listOf(StatsPeriod.WEEK, StatsPeriod.MONTH, StatsPeriod.YEAR, StatsPeriod.ALL)
+
+    const val NO_TRIPS_AT_ALL = "Поездок пока нет"
+    const val EMPTY_HINT = "Запишите поездку на Панели или импортируйте бэкап Car Scanner"
+
+    /** Заголовок плейсхолдера: нет поездок вообще → «пока нет», иначе — за выбранный период. */
+    fun emptyTitle(period: StatsPeriod, totalTrips: Int): String =
+        if (totalTrips == 0) NO_TRIPS_AT_ALL
+        else "Нет поездок за " + when (period) {
+            StatsPeriod.WEEK -> "неделю"
+            StatsPeriod.MONTH -> "месяц"
+            StatsPeriod.YEAR -> "год"
+            StatsPeriod.ALL -> "всё время"
+        }
 }

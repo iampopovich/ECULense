@@ -1,5 +1,8 @@
 package io.github.iampopovich.eculense.feature.stats
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
@@ -58,23 +61,71 @@ class StatsScreenTest {
     }
 
     @Test
-    fun emptyStateExplainsImport() {
+    fun noTripsAtAllShowsPlaceholderWithoutImportWhenBackupIsMissing() {
         rule.setContent { StatsScreen(StatsUiState(loading = false, car = car), onPeriod = {}) }
-        rule.onNodeWithText("Импорт и резервные копии", substring = true).assertExists()
-        rule.onNodeWithText("Перенести поездки из Car Scanner").assertDoesNotExist()
+        rule.onNodeWithText("Поездок пока нет").assertExists()
+        rule.onNodeWithText(StatsFormat.EMPTY_HINT).assertExists()
+        rule.onNodeWithText(IMPORT).assertDoesNotExist()
+        // переключатель периода есть и без данных
+        rule.onNodeWithText("Неделя").assertExists()
     }
 
     @Test
-    fun importLinkOpensBackupScreen() {
+    fun importButtonOpensBackupScreen() {
         var clicks = 0
         rule.setContent { StatsScreen(StatsUiState(loading = false, car = car), onPeriod = {}, onImport = { clicks++ }) }
-        rule.onNodeWithText("Перенести поездки из Car Scanner").performClick()
+        rule.onNodeWithText(IMPORT).performClick()
         assertEquals(1, clicks)
     }
 
+    /** Одна кнопка импорта на экран при любом периоде и состоянии — не «импорт за неделю/месяц». */
     @Test
-    fun emptyPeriodSuggestsLongerOne() {
-        rule.setContent { StatsScreen(StatsUiState(loading = false, car = car, totalTrips = 5), onPeriod = {}) }
-        rule.onNodeWithText("За этот период поездок нет", substring = true).assertExists()
+    fun exactlyOneImportButtonInEveryPeriodAndState() {
+        var state by mutableStateOf(StatsUiState(loading = false, car = car))
+        rule.setContent { StatsScreen(state, onPeriod = { state = state.copy(period = it) }, onImport = {}) }
+        val states = listOf(
+            StatsUiState(loading = false, car = car),
+            StatsUiState(loading = false, car = car, totalTrips = 5),
+            StatsUiState(loading = false, car = car, stats = TripStats.of(listOf(trip)), trips = listOf(trip), totalTrips = 1),
+        )
+        for (s in states) for (p in StatsFormat.periods) {
+            state = s.copy(period = p)
+            rule.waitForIdle()
+            rule.onAllNodesWithText(IMPORT).assertCountEquals(1)
+            rule.onAllNodesWithText("Перенести поездки из Car Scanner").assertCountEquals(0)
+        }
+    }
+
+    @Test
+    fun emptyPeriodShowsPlaceholderNamingThePeriod() {
+        val expected = mapOf(
+            StatsPeriod.WEEK to "Нет поездок за неделю",
+            StatsPeriod.MONTH to "Нет поездок за месяц",
+            StatsPeriod.YEAR to "Нет поездок за год",
+            StatsPeriod.ALL to "Нет поездок за всё время",
+        )
+        var state by mutableStateOf(StatsUiState(loading = false, car = car, totalTrips = 5))
+        rule.setContent { StatsScreen(state, onPeriod = {}) }
+        for ((p, title) in expected) {
+            state = state.copy(period = p)
+            rule.waitForIdle()
+            rule.onNodeWithText(title).assertExists()
+            rule.onNodeWithText(StatsFormat.EMPTY_HINT).assertExists()
+        }
+    }
+
+    @Test
+    fun tripsInPeriodHidePlaceholder() {
+        rule.setContent {
+            StatsScreen(StatsUiState(loading = false, car = car, period = StatsPeriod.WEEK, stats = TripStats.of(listOf(trip)),
+                trips = listOf(trip), totalTrips = 1), onPeriod = {}, onImport = {})
+        }
+        rule.onNodeWithText("Нет поездок", substring = true).assertDoesNotExist()
+        rule.onNodeWithText("Поездок пока нет").assertDoesNotExist()
+        rule.onNodeWithText("Поездки").assertExists()
+    }
+
+    private companion object {
+        const val IMPORT = "Импорт из Car Scanner"
     }
 }
