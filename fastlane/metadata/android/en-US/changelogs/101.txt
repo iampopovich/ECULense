@@ -1,0 +1,3 @@
+English and Russian interface with an in-app language picker; the AI assistant answers in the app's language.
+Statistics: one Car Scanner import button for all periods, empty-period placeholders.
+AI assistant: answer form depends on the question; expert roles with their own tools; monthly trends tool.

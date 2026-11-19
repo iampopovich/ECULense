@@ -30,7 +30,7 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
 
 > **Status:** early version (0.1.0, release candidate). The protocol layer is covered by tests and emulation; field testing with a real adapter in a car is still ahead.
 >
-> **Language:** the interface is Russian only for now. Other languages are planned, but they are not the top priority yet: the first goal is a scanner that is reliable on real cars.
+> **Language:** English and Russian. The app follows the system language; you can also pick one in Settings → Language (or in the system "App language" settings on Android 13+). The AI assistant answers in the app's language.
 
 ## What it does
 
@@ -126,6 +126,7 @@ core/
   vehicledb, dtcdb, obdb  reference data: vehicles, trouble codes, extended PIDs
   ai, aitools             LLMs via Koog, tools exposing the car's data
   ailocal                 on-device models (local build only)
+  analyticstext, obdtext  localized texts for findings, OBD errors and PID names
   background              background analysis and notifications
   demo                    adapter emulator for working without a car
   navigation, ui, model   shared navigation keys, theme, models
@@ -141,6 +142,7 @@ build-logic/              convention plugins (ecu.android.feature and others)
 2. Declare the screen key in `:core:navigation`: `@Serializable data object …Destination : NavKey`.
 3. In the feature's Koin module, register `navigation<…Destination> { … }` and a `HubEntry` or `TopLevelEntry`.
 4. Include the module in `settings.gradle.kts` and in `app`.
+5. Put UI text in the module's `res/values/strings.xml` (English) and `res/values-ru/strings.xml` (Russian); ViewModels hold `UiText`, pure-JVM modules return types, not text. `NoCyrillicLiteralsTest` and lint (`MissingTranslation`) fail the build on a hardcoded or untranslated string.
 
 You shouldn't need to import other features' classes. If you do, `core` is missing a key or an interface.
 

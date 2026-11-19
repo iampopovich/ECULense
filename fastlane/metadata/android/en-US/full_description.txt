@@ -1,0 +1,30 @@
+<p>A typical scanner answers "which error code is set". ECULense tries to answer the next question: what those codes and sensor readings mean together, how urgent it is, and what to check first.</p>
+
+<p>Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble codes, record your drives. The app searches the recordings for common problems (lean mixture, overheating, undercharging, repeated codes from one system) and shows them as findings backed by concrete numbers.</p>
+
+<p><b>Diagnostics</b></p>
+<ul>
+<li>Live standard PIDs: RPM, speed, coolant temperature, MAF, fuel trims, O2 sensors, voltage and more.</li>
+<li>Read and clear trouble codes with descriptions; manufacturer codes are described only for your car's make.</li>
+<li>Bluetooth, Wi-Fi and USB OTG adapters, plus a demo mode with no adapter.</li>
+<li>CAN and K-Line (ISO 9141 / KWP2000), so early-2000s cars work too.</li>
+</ul>
+
+<p><b>Recordings, analysis and maintenance</b></p>
+<ul>
+<li>Session recording, charts, CSV export; trips with distance, fuel and idle time.</li>
+<li>Rules that find problems in recorded data, background analysis after each trip.</li>
+<li>A maintenance plan with distance and time intervals.</li>
+<li>Import of a Car Scanner backup (.cbz) and ECULense's own backups.</li>
+</ul>
+
+<p><b>AI assistant (optional)</b></p>
+<ul>
+<li>A chat that reads your car's data through read-only tools; every number comes from the app, the model only explains it.</li>
+<li>Any provider from the Koog presets (OpenRouter, OpenAI, Anthropic, Google, DeepSeek, Mistral, Ollama) or your own OpenAI-compatible server.</li>
+<li>The assistant answers in the app's language (English or Russian).</li>
+</ul>
+
+<p><b>Privacy</b>: data stays on the phone, no accounts, no analytics. Only what you send to the AI assistant goes to the provider you chose, after explicit consent; VIN and GPS are never included. Without the assistant the app works offline (the network is used only to download reference data on request).</p>
+
+<p>Requires an ELM327 v1.5+ adapter.</p>
