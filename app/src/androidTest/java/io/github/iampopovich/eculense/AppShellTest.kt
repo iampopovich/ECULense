@@ -84,8 +84,7 @@ class AppShellTest {
     fun dtcScreenOpensFromPitstopAndKeepsTabSelected() {
         tab(PitstopR.string.pitstop_tab).performClick()
         text(DtcR.string.dtc_hub_title).performClick()
-        // :feature:dtc screen texts are not in resources yet (until B3).
-        rule.onNodeWithText("Прочитать ошибки").assertIsDisplayed()
+        text(DtcR.string.dtc_read).assertIsDisplayed()
         tab(PitstopR.string.pitstop_tab).assertIsSelected()
     }
 

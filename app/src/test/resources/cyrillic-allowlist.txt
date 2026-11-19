@@ -11,13 +11,6 @@ core/model/src/main/kotlin/io/github/iampopovich/eculense/core/model/LegacyValue
 
 # Temporary: modules not migrated to string resources yet. Each batch removes its own lines.
 core/ailocal/          # temporary until B3
-core/service/          # temporary until B3
-feature/aichat/        # temporary until B3
-feature/aisettings/    # temporary until B3
-feature/backup/        # temporary until B3
-feature/datapacks/     # temporary until B3
-feature/dtc/           # temporary until B3
-feature/stats/         # temporary until B3
 core/backup/           # temporary until B4
 core/bluetooth/        # temporary until B4
 core/data/             # temporary until B4

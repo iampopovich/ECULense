@@ -34,6 +34,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -46,6 +48,7 @@ import io.github.iampopovich.eculense.core.ai.LlmProviderKind
 import io.github.iampopovich.eculense.core.ai.ModelInfo
 import io.github.iampopovich.eculense.core.navigation.LocalModelDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -113,53 +116,55 @@ private fun SavedSummary(state: AiSettingsUiState, actions: AiSettingsActions, m
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("ИИ-помощник", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.aisettings_hub_title), style = MaterialTheme.typography.headlineSmall)
         state.onDevice?.let { local ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Сейчас: на устройстве · ${local.model}", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.aisettings_current_on_device, local.model), style = MaterialTheme.typography.titleMedium)
                     Text(local.detail, style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "Без интернета, данные машины не покидают телефон. Отвечает медленнее и ошибается чаще облачных моделей.",
+                        stringResource(R.string.aisettings_on_device_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = actions.onOnDevice) { Text("Модель на телефоне") }
-                OutlinedButton(onClick = actions.onUseCloud) { Text(if (saved != null) "Перейти на облако" else "Не использовать") }
+                Button(onClick = actions.onOnDevice) { Text(stringResource(R.string.aisettings_phone_model)) }
+                OutlinedButton(onClick = actions.onUseCloud) { Text(stringResource(if (saved != null) R.string.aisettings_switch_to_cloud else R.string.aisettings_dont_use)) }
             }
         }
         if (saved == null) {
-            if (state.onDevice != null) OutlinedButton(onClick = actions.onStartWizard) { Text("Настроить облачного провайдера") }
+            if (state.onDevice != null) OutlinedButton(onClick = actions.onStartWizard) { Text(stringResource(R.string.aisettings_setup_cloud)) }
         } else {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    val key = when {
-                        !saved.provider.usesKey -> "без ключа"
-                        saved.hasKey -> "ключ сохранён"
-                        saved.provider.needsKey -> "ключ не задан"
-                        else -> "без ключа"
-                    }
+                    val key = stringResource(
+                        when {
+                            !saved.provider.usesKey -> R.string.aisettings_key_none
+                            saved.hasKey -> R.string.aisettings_key_saved
+                            saved.provider.needsKey -> R.string.aisettings_key_missing
+                            else -> R.string.aisettings_key_none
+                        },
+                    )
                     if (state.onDevice != null) {
-                        Text("Облачный провайдер (не используется, пока выбрана модель на телефоне)", style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.aisettings_cloud_inactive), style = MaterialTheme.typography.labelMedium)
                     }
-                    Text("${saved.provider.title} · ${saved.model} · $key", style = MaterialTheme.typography.titleMedium)
+                    Text("${providerTitle(saved.provider)} · ${saved.model} · $key", style = MaterialTheme.typography.titleMedium)
                     Text(saved.baseUrl, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = actions.onEdit) { Text("Изменить") }
-                if (saved.hasKey) OutlinedButton(onClick = actions.onClearKey) { Text("Удалить ключ") }
+                Button(onClick = actions.onEdit) { Text(stringResource(CoreUiR.string.common_edit)) }
+                if (saved.hasKey) OutlinedButton(onClick = actions.onClearKey) { Text(stringResource(R.string.aisettings_clear_key)) }
             }
         }
         if (state.onDevice == null && state.onDeviceAvailable) {
-            OutlinedButton(onClick = actions.onOnDevice) { Text("Модель на телефоне (без интернета)") }
+            OutlinedButton(onClick = actions.onOnDevice) { Text(stringResource(R.string.aisettings_phone_model_offline)) }
         }
-        TextButton(onClick = actions.onReset) { Text("Сбросить настройки ИИ") }
+        TextButton(onClick = actions.onReset) { Text(stringResource(R.string.aisettings_reset)) }
         Text(
-            "Ключ хранится зашифрованным ключом Android Keystore и не попадает в бэкап.",
+            stringResource(R.string.aisettings_key_storage),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -170,14 +175,14 @@ private fun SavedSummary(state: AiSettingsUiState, actions: AiSettingsActions, m
 private fun Wizard(state: AiSettingsUiState, actions: AiSettingsActions, modifier: Modifier) {
     Column(modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp)) {
-            item { Text("ИИ-помощник", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp)) }
+            item { Text(stringResource(R.string.aisettings_hub_title), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp)) }
             item { ProviderStep(state.provider, actions.onProvider, state.onDeviceAvailable, actions.onOnDevice, state.onDeviceInOtherBuild) }
             item { ConnectionStep(state, actions) }
-            item { StepTitle("3. Модель", enabled = state.modelStepEnabled) }
+            item { StepTitle(stringResource(R.string.aisettings_step_model), enabled = state.modelStepEnabled) }
             when {
                 !state.modelStepEnabled -> item {
                     Text(
-                        "Сначала проверьте подключение — список моделей придёт с сервера.",
+                        stringResource(R.string.aisettings_model_locked),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                         modifier = Modifier.padding(bottom = 16.dp),
@@ -187,8 +192,8 @@ private fun Wizard(state: AiSettingsUiState, actions: AiSettingsActions, modifie
                     OutlinedTextField(
                         value = state.model,
                         onValueChange = actions.onModel,
-                        label = { Text("ID модели") },
-                        placeholder = { Text("например, qwen2.5-7b-instruct") },
+                        label = { Text(stringResource(R.string.aisettings_model_id)) },
+                        placeholder = { Text(stringResource(R.string.aisettings_model_id_hint)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                     )
@@ -199,9 +204,9 @@ private fun Wizard(state: AiSettingsUiState, actions: AiSettingsActions, modifie
                         OutlinedTextField(
                             value = state.query,
                             onValueChange = actions.onQuery,
-                            label = { Text("Поиск модели") },
+                            label = { Text(stringResource(R.string.aisettings_model_search)) },
                             singleLine = true,
-                            supportingText = { Text("Показано ${state.visibleModels.size} из $total") },
+                            supportingText = { Text(stringResource(R.string.aisettings_models_shown, state.visibleModels.size, total)) },
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -234,7 +239,7 @@ private fun ProviderStep(
     onDeviceInOtherBuild: Boolean = false,
 ) {
     Column {
-        StepTitle("1. Провайдер")
+        StepTitle(stringResource(R.string.aisettings_step_provider))
         Column(Modifier.selectableGroup()) {
             LlmProviderKind.entries.forEach { kind ->
                 Row(
@@ -244,7 +249,7 @@ private fun ProviderStep(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RadioButton(selected = kind == selected, onClick = null)
-                    Text(kind.title, Modifier.padding(start = 8.dp))
+                    Text(providerTitle(kind), Modifier.padding(start = 8.dp))
                 }
             }
             if (onDeviceAvailable) {
@@ -255,9 +260,9 @@ private fun ProviderStep(
                 ) {
                     RadioButton(selected = false, onClick = null)
                     Column(Modifier.padding(start = 8.dp)) {
-                        Text("На устройстве")
+                        Text(stringResource(R.string.aisettings_on_device))
                         Text(
-                            "Модель на телефоне, без интернета: проверка телефона, скачивание и тест скорости",
+                            stringResource(R.string.aisettings_on_device_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -266,7 +271,7 @@ private fun ProviderStep(
             } else if (onDeviceInOtherBuild) {
                 // Cloud build: no item, just one dimmed line (not clickable).
                 Text(
-                    "Локальные модели доступны в сборке «Локально»",
+                    stringResource(R.string.aisettings_on_device_other_build),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 4.dp),
@@ -282,10 +287,10 @@ private fun ConnectionStep(state: AiSettingsUiState, actions: AiSettingsActions)
     val scope = rememberCoroutineScope()
     val checking = state.check is CheckState.Checking
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        StepTitle("2. Подключение")
+        StepTitle(stringResource(R.string.aisettings_step_connection))
         if (state.provider == LlmProviderKind.OLLAMA) {
             Text(
-                "Ollama на этом устройстве (адрес Koog по умолчанию, без ключа). Ollama на ПК в сети — выберите «Другой» и http://IP:11434/v1.",
+                stringResource(R.string.aisettings_ollama_note),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -293,14 +298,11 @@ private fun ConnectionStep(state: AiSettingsUiState, actions: AiSettingsActions)
         if (state.showUrlField) OutlinedTextField(
             value = state.baseUrl,
             onValueChange = actions.onBaseUrl,
-            label = { Text("Адрес API") },
+            label = { Text(stringResource(R.string.aisettings_api_url)) },
             placeholder = { Text("http://192.168.1.5:1234/v1") },
             isError = state.urlError != null,
             supportingText = {
-                Text(
-                    state.urlError
-                        ?: "Полный OpenAI-совместимый адрес: LM Studio http://IP:1234/v1 · Ollama http://IP:11434/v1 · vLLM http://IP:8000/v1",
-                )
+                Text(state.urlError?.asString() ?: stringResource(R.string.aisettings_api_url_help))
             },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false, imeAction = ImeAction.Next),
@@ -309,8 +311,8 @@ private fun ConnectionStep(state: AiSettingsUiState, actions: AiSettingsActions)
         if (state.showKeyField) OutlinedTextField(
             value = state.apiKey,
             onValueChange = actions.onApiKey,
-            label = { Text(if (state.provider.needsKey) "API-ключ" else "API-ключ (если нужен)") },
-            placeholder = { Text(if (state.canReuseSavedKey) "сохранён — можно не вводить" else "вставьте ключ") },
+            label = { Text(stringResource(if (state.provider.needsKey) R.string.aisettings_api_key else R.string.aisettings_api_key_optional)) },
+            placeholder = { Text(stringResource(if (state.canReuseSavedKey) R.string.aisettings_key_saved_hint else R.string.aisettings_key_paste_hint)) },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false, imeAction = ImeAction.Done),
@@ -321,23 +323,23 @@ private fun ConnectionStep(state: AiSettingsUiState, actions: AiSettingsActions)
                         val text = clipboard.getClipEntry()?.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
                         if (!text.isNullOrBlank()) actions.onApiKey(text.trim())
                     }
-                }) { Text("Вставить") }
+                }) { Text(stringResource(R.string.aisettings_paste)) }
             },
-            supportingText = { Text("Хранится зашифрованным ключом Android Keystore и не попадает в бэкап.") },
+            supportingText = { Text(stringResource(R.string.aisettings_key_storage_short)) },
             modifier = Modifier.fillMaxWidth(),
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = actions.onCheck, enabled = !checking) { Text("Проверить подключение") }
+            Button(onClick = actions.onCheck, enabled = !checking) { Text(stringResource(R.string.aisettings_check)) }
             if (checking) {
                 Spacer(Modifier.width(12.dp))
                 CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(8.dp))
-                Text("Проверяю…")
+                Text(stringResource(R.string.aisettings_checking))
             }
         }
         when (val check = state.check) {
-            is CheckState.Passed -> Text("✓ ${check.message}", color = MaterialTheme.colorScheme.primary)
-            is CheckState.Failed -> Text(check.message, color = MaterialTheme.colorScheme.error)
+            is CheckState.Passed -> Text("✓ ${check.message.asString()}", color = MaterialTheme.colorScheme.primary)
+            is CheckState.Failed -> Text(check.message.asString(), color = MaterialTheme.colorScheme.error)
             else -> Unit
         }
     }
@@ -357,9 +359,9 @@ private fun ModelRow(model: ModelInfo, selected: Boolean, onClick: () -> Unit) {
                 Text(model.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = if (model.recommended) FontWeight.Medium else null)
                 val tags = buildList {
                     if (model.name != model.id) add(model.id)
-                    model.contextLength?.let { add("${contextLabel(it)} контекст") }
-                    if (model.isFree == true) add("бесплатно")
-                    if (model.recommended) add("★ рекомендуем")
+                    model.contextLength?.let { add(stringResource(R.string.aisettings_context, contextLabel(it))) }
+                    if (model.isFree == true) add(stringResource(R.string.aisettings_free))
+                    if (model.recommended) add(stringResource(R.string.aisettings_recommended))
                 }
                 if (tags.isNotEmpty()) {
                     Text(
@@ -392,14 +394,20 @@ private fun BottomBar(state: AiSettingsUiState, actions: AiSettingsActions) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                if (state.model.isNotBlank() && state.modelStepEnabled) "Модель: ${state.model}" else "Модель не выбрана",
+                if (state.model.isNotBlank() && state.modelStepEnabled) stringResource(R.string.aisettings_model_selected, state.model)
+                else stringResource(R.string.aisettings_model_none),
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (state.saved != null) TextButton(onClick = actions.onCancelEdit) { Text("Отмена") }
-            Button(onClick = actions.onSave, enabled = state.canSave) { Text("Сохранить") }
+            if (state.saved != null) TextButton(onClick = actions.onCancelEdit) { Text(stringResource(CoreUiR.string.common_cancel)) }
+            Button(onClick = actions.onSave, enabled = state.canSave) { Text(stringResource(CoreUiR.string.common_save)) }
         }
     }
 }
+
+/** Provider names are brand names except «Other», which is localized. */
+@Composable
+internal fun providerTitle(kind: LlmProviderKind): String =
+    if (kind == LlmProviderKind.OTHER) stringResource(R.string.aisettings_provider_other) else kind.title

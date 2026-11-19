@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="service_channel_connection">Подключение к адаптеру</string>
+    <string name="service_channel_connection_description">Показывается, пока приложение подключено к OBD-адаптеру</string>
+    <string name="service_connected_title">ECULense: адаптер подключён</string>
+    <string name="service_connected_text">Опрос ЭБУ продолжается в фоне</string>
+</resources>

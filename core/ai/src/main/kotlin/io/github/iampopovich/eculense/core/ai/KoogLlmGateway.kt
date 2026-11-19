@@ -284,17 +284,18 @@ internal class KoogLlmGateway(
                 // a single role answers by itself, streamed, without the editor
                 route.roles.size == 1 -> {
                     val role = route.roles.single()
-                    send(ChatEvent.Status(role.statusText(route.periodDays)))
+                    send(ChatEvent.Status(role.statusText(route.periodDays), ChatStatus.Role(role.id, route.periodDays)))
                     runAgent(
                         executor, model, tools, conversationId, userText, streaming = true,
                         system = SystemPrompts.direct(role, route), registry = tools.registry(role.tools), label = roleLabel(role, tools),
+                        roleId = role.id,
                     )
-                    send(ChatEvent.Experts(listOf(role.title), emptyList()))
+                    send(ChatEvent.Experts(listOf(role.title), emptyList(), listOf(role.id)))
                 }
                 else -> {
                     val notes = experts(executor, model, tools, route, conversationId, userText)
-                    send(ChatEvent.Experts(route.roles.map { it.title }, notes))
-                    send(ChatEvent.Status(EDITOR_STATUS))
+                    send(ChatEvent.Experts(route.roles.map { it.title }, notes, route.roles.map { it.id }))
+                    send(ChatEvent.Status(EDITOR_STATUS, ChatStatus.Editor))
                     runAgent(executor, model, null, conversationId, userText, streaming = true, system = SystemPrompts.editor(route, notes))
                 }
             }
@@ -321,7 +322,7 @@ internal class KoogLlmGateway(
         val tools = toolbox?.takeIf { useCarData && local.supportsTools && route.roles.isNotEmpty() }
         // Model without tools: car data goes as a summary in the system prompt, the app computes the numbers.
         val digest = if (useCarData && toolbox != null && !local.supportsTools && route.roles.isNotEmpty()) {
-            send(ChatEvent.Status("Приложение собирает данные машины…"))
+            send(ChatEvent.Status("Приложение собирает данные машины…", ChatStatus.CollectingData))
             toolbox.digest(route.digestSections, route.periodDays)
         } else {
             null
@@ -339,7 +340,7 @@ internal class KoogLlmGateway(
         } catch (e: Exception) {
             throw LlmException("Модель на телефоне не ответила: ${e.message ?: e::class.simpleName}", cause = e)
         }
-        if (useCarData && toolbox != null && route.roles.isNotEmpty()) send(ChatEvent.Experts(route.roles.map { it.title }, emptyList()))
+        if (useCarData && toolbox != null && route.roles.isNotEmpty()) send(ChatEvent.Experts(route.roles.map { it.title }, emptyList(), route.roles.map { it.id }))
     }
 
     /**
@@ -369,7 +370,7 @@ internal class KoogLlmGateway(
         return coroutineScope {
             route.roles.map { role ->
                 async {
-                    send(ChatEvent.Status(role.statusText(route.periodDays)))
+                    send(ChatEvent.Status(role.statusText(route.periodDays), ChatStatus.Role(role.id, route.periodDays)))
                     val text = try {
                         withTimeoutOrNull(expertTimeoutMs) {
                             AIAgent(
@@ -382,6 +383,7 @@ internal class KoogLlmGateway(
                                     label = roleLabel(role, tools),
                                     streaming = true,
                                     maxToolRounds = EXPERT_TOOL_ROUNDS,
+                                    roleId = role.id,
                                 ),
                                 toolRegistry = tools.registry(role.tools),
                                 systemPrompt = SystemPrompts.expert(role, route),
@@ -415,6 +417,7 @@ internal class KoogLlmGateway(
         system: String = SystemPrompts.chat(withTools = tools != null),
         registry: ToolRegistry? = null,
         label: (String) -> String = { name -> tools?.progressLabel(name) ?: name },
+        roleId: String? = null,
     ) {
         val agent = AIAgent(
             promptExecutor = executor,
@@ -424,6 +427,7 @@ internal class KoogLlmGateway(
                 emit = { send(it) },
                 label = label,
                 streaming = streaming,
+                roleId = roleId,
             ),
             toolRegistry = registry ?: tools?.registry() ?: ToolRegistry.EMPTY,
             systemPrompt = system,

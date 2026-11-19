@@ -14,22 +14,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.iampopovich.eculense.core.datapacks.PackCatalog
+import io.github.iampopovich.eculense.core.ui.UiText
 
 /** Data source for «О приложении»: what, whose, under which license, where to get it. */
-internal data class Attribution(val title: String, val license: String, val url: String, val note: String)
+internal data class Attribution(val title: UiText, val license: String, val url: String, val note: UiText)
 
 /** All external app data: on-demand packs + bundled code database + OBDb. */
 internal val ATTRIBUTIONS: List<Attribution> =
-    PackCatalog.all.map { Attribution(it.title, it.license, it.sourceUrl, "${it.attribution.trimEnd().removeSuffix(".")}. Зафиксированная версия: ${it.version}.") } + listOf(
+    PackCatalog.all.map {
         Attribution(
-            "Расширенные PID (OBDb)", "CC BY-SA 4.0", "https://github.com/OBDb",
-            "Signalset data: OBDb (obdb.community), CC BY-SA 4.0. Скачивается по марке и модели без изменений.",
+            UiText.Raw(it.title), it.license, it.sourceUrl,
+            UiText.Res(R.string.datapacks_pinned_version, listOf(it.attribution.trimEnd().removeSuffix("."), it.version)),
+        )
+    } + listOf(
+        Attribution(
+            UiText.Res(R.string.datapacks_obdb_title), "CC BY-SA 4.0", "https://github.com/OBDb",
+            UiText.Res(R.string.datapacks_obdb_note),
         ),
         Attribution(
-            "Встроенная база общих кодов", "MIT", "https://github.com/lennykean/OBDII.DTC",
-            "Generic DTC titles converted from lennykean/OBDII.DTC, MIT License (assets/dtc_codes.csv).",
+            UiText.Res(R.string.datapacks_builtin_title), "MIT", "https://github.com/lennykean/OBDII.DTC",
+            UiText.Raw("Generic DTC titles converted from lennykean/OBDII.DTC, MIT License (assets/dtc_codes.csv)."),
         ),
     )
 
@@ -47,20 +54,20 @@ internal fun AboutScreen(version: String?, modifier: Modifier = Modifier) {
         item {
             Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("ECULense", style = MaterialTheme.typography.headlineSmall)
-                version?.let { Text("Версия $it", style = MaterialTheme.typography.bodyMedium) }
-                Text("OBD-II сканер. Данные машины хранятся только на телефоне.", style = MaterialTheme.typography.bodyMedium)
+                version?.let { Text(stringResource(R.string.datapacks_version, it), style = MaterialTheme.typography.bodyMedium) }
+                Text(stringResource(R.string.datapacks_about_tagline), style = MaterialTheme.typography.bodyMedium)
             }
         }
-        item { Text("Источники данных", style = MaterialTheme.typography.titleMedium) }
+        item { Text(stringResource(R.string.datapacks_sources), style = MaterialTheme.typography.titleMedium) }
         items(ATTRIBUTIONS, key = { it.url }) { a ->
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(a.title, style = MaterialTheme.typography.titleSmall)
-                Text("Лицензия: ${a.license}", style = MaterialTheme.typography.bodyMedium)
-                Text(a.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(a.title.asString(), style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.datapacks_license, a.license), style = MaterialTheme.typography.bodyMedium)
+                Text(a.note.asString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = { runCatching { uri.openUri(a.url) } }) { Text(a.url.removePrefix("https://")) }
                 HorizontalDivider()
             }
         }
-        item { Text("Данные справочника моделей собраны проектом gor3a с autoevolution.com; профиль вашей машины от справочника не зависит.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 16.dp)) }
+        item { Text(stringResource(R.string.datapacks_vehicle_db_note), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 16.dp)) }
     }
 }

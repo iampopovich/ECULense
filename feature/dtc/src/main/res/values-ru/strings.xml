@@ -2,4 +2,31 @@
 <resources>
     <string name="dtc_hub_title">Ошибки (DTC)</string>
     <string name="dtc_hub_subtitle">Чтение и сброс кодов с расшифровкой</string>
+    <string name="dtc_read">Прочитать ошибки</string>
+    <string name="dtc_clear">Сбросить</string>
+    <string name="dtc_no_codes">Ошибок нет: ЭБУ не сообщил ни одного кода.</string>
+    <string name="dtc_history_title">История кодов этой машины</string>
+    <plurals name="dtc_history_seen">
+        <item quantity="one">%1$d раз, последний раз %2$s</item>
+        <item quantity="few">%1$d раза, последний раз %2$s</item>
+        <item quantity="many">%1$d раз, последний раз %2$s</item>
+        <item quantity="other">%1$d раза, последний раз %2$s</item>
+    </plurals>
+    <string name="dtc_clear_title">Сбросить ошибки?</string>
+    <string name="dtc_clear_text">Двигатель заглушен, зажигание включено? Сброс сотрёт коды и стоп-кадры, мониторы готовности обнулятся (машина не пройдёт экологический тест до полного ездового цикла). Текущие коды сохранятся в истории.</string>
+    <string name="dtc_ask_ai">Спросить ИИ</string>
+    <string name="dtc_causes">Причины: %1$s</string>
+    <string name="dtc_symptoms">Симптомы: %1$s</string>
+    <string name="dtc_source_obdex">Источник: OBDex (CC0)</string>
+    <string name="dtc_source_builtin">Встроенная база (скачайте OBDex для причин и симптомов)</string>
+    <string name="dtc_source_oem">Заводская база %1$s (Wal33D)</string>
+    <string name="dtc_kind_stored">сохранённая</string>
+    <string name="dtc_kind_pending">ожидающая</string>
+    <string name="dtc_kind_permanent">постоянная</string>
+    <string name="dtc_err_no_connection">Нет подключения к адаптеру</string>
+    <string name="dtc_err_clear_not_confirmed">ЭБУ не подтвердил сброс</string>
+    <string name="dtc_ask_ai_code">Объясни код ошибки %1$s</string>
+    <string name="dtc_ask_ai_oem_unknown">заводской код производителя, расшифровка неизвестна</string>
+    <string name="dtc_ask_ai_causes">Частые причины по базе OBDex: %1$s</string>
+    <string name="dtc_ask_ai_tail">причины, что проверить, насколько срочно.</string>
 </resources>

@@ -16,13 +16,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -48,10 +48,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownTypography
@@ -59,8 +61,9 @@ import com.mikepenz.markdown.model.rememberStreamingMarkdownState
 import io.github.iampopovich.eculense.core.ai.ChatMessage
 import io.github.iampopovich.eculense.core.navigation.AiSettingsDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
+import io.github.iampopovich.eculense.core.ui.UiText
 import io.github.iampopovich.eculense.core.ui.aboveKeyboard
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
@@ -68,7 +71,12 @@ import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
 /** Empty-chat suggestions: inserted into the input field (not sent automatically, since a request costs money). */
-internal val CHAT_SUGGESTIONS = listOf("Как машина вела себя за полгода", "Объясни мои ошибки", "Сколько трачу на топливо", "Что пора обслужить")
+internal val CHAT_SUGGESTIONS = listOf(
+    R.string.aichat_suggestion_half_year,
+    R.string.aichat_suggestion_errors,
+    R.string.aichat_suggestion_fuel,
+    R.string.aichat_suggestion_service,
+)
 
 @Composable
 internal fun ChatRoute(prefill: String?, viewModel: ChatViewModel = koinViewModel { parametersOf(prefill) }) {
@@ -140,26 +148,26 @@ internal fun ChatScreen(
     }
     Column(modifier.fillMaxSize().aboveKeyboard().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("ИИ-помощник", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.aichat_hub_title), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
             IconButton(onClick = { confirmNew = true }, enabled = state.messages.isNotEmpty()) {
-                Icon(painterResource(R.drawable.ic_new_chat), contentDescription = "Новый диалог")
+                Icon(painterResource(R.drawable.ic_new_chat), contentDescription = stringResource(R.string.aichat_new_dialog))
             }
             IconButton(onClick = onOpenSettings) {
-                Icon(painterResource(R.drawable.ic_tune), contentDescription = "Настройки ИИ")
+                Icon(painterResource(R.drawable.ic_tune), contentDescription = stringResource(R.string.aichat_settings))
             }
         }
         if (confirmNew) {
             AlertDialog(
                 onDismissRequest = { confirmNew = false },
-                title = { Text("Начать новый диалог?") },
-                text = { Text("Текущая переписка будет удалена, ИИ перестанет её учитывать.") },
+                title = { Text(stringResource(R.string.aichat_new_dialog_title)) },
+                text = { Text(stringResource(R.string.aichat_new_dialog_text)) },
                 confirmButton = {
                     TextButton(onClick = {
                         confirmNew = false
                         onNewDialog()
-                    }) { Text("Новый диалог") }
+                    }) { Text(stringResource(R.string.aichat_new_dialog)) }
                 },
-                dismissButton = { TextButton(onClick = { confirmNew = false }) { Text("Отмена") } },
+                dismissButton = { TextButton(onClick = { confirmNew = false }) { Text(stringResource(CoreUiR.string.common_cancel)) } },
             )
         }
         if (state.carDataAvailable) {
@@ -169,13 +177,13 @@ internal fun ChatScreen(
                     .toggleable(value = state.useCarData, enabled = !state.streaming, role = Role.Switch, onValueChange = onUseCarData),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Использовать данные моей машины", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.aichat_use_car_data), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                 Switch(checked = state.useCarData, onCheckedChange = null, enabled = !state.streaming)
             }
         }
         if (state.onDevice) {
             Text(
-                "Модель на телефоне: работает без интернета, но отвечает медленнее и ошибается чаще облачных моделей — перепроверяйте советы.",
+                stringResource(R.string.aichat_on_device_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 4.dp),
@@ -190,17 +198,15 @@ internal fun ChatScreen(
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(vertical = 8.dp)) {
                         Text(
-                            if (state.useCarData) {
-                                "Спросите о машине или коде ошибки. ИИ смотрит профиль, поездки, записи датчиков, находки анализа " +
-                                    "и коды ошибок этой машины — без VIN и координат. Ответы — подсказка, а не диагноз."
-                            } else {
-                                "Спросите о машине или коде ошибки. ИИ не видит VIN и координаты; ответы — подсказка, а не диагноз."
-                            },
+                            stringResource(if (state.useCarData) R.string.aichat_empty_with_data else R.string.aichat_empty_no_data),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            CHAT_SUGGESTIONS.forEach { s -> SuggestionChip(onClick = { input = s }, label = { Text(s) }) }
+                            CHAT_SUGGESTIONS.forEach { id ->
+                                val s = stringResource(id)
+                                SuggestionChip(onClick = { input = s }, label = { Text(s) })
+                            }
                         }
                     }
                 }
@@ -223,10 +229,10 @@ internal fun ChatScreen(
             state.error?.let { error ->
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
-                        Text(error, color = MaterialTheme.colorScheme.error)
+                        Text(error.asString(), color = MaterialTheme.colorScheme.error)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (state.canRetry) OutlinedButton(onClick = onRetry) { Text("Повторить") }
-                            TextButton(onClick = onOpenSettings) { Text("Настроить ИИ") }
+                            if (state.canRetry) OutlinedButton(onClick = onRetry) { Text(stringResource(R.string.aichat_retry)) }
+                            TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.aichat_setup_ai)) }
                         }
                     }
                 }
@@ -275,7 +281,7 @@ private fun AssistantMessage(text: String, streaming: Boolean, stopped: Boolean,
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CopyButton(shown)
                 if (stopped) {
-                    Text("Ответ остановлен", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.aichat_answer_stopped), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             experts?.let { ExpertsFooter(it) }
@@ -292,13 +298,13 @@ private fun ExpertsFooter(info: ExpertsInfo) {
     var expanded by rememberSaveable(info) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-            "Над ответом работали: " + info.roles.joinToString(" · "),
+            stringResource(R.string.aichat_worked_on_answer, info.roles.map { it.asString() }.joinToString(" · ")),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (info.notes.isNotEmpty()) {
             TextButton(onClick = { expanded = !expanded }, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(if (expanded) "Скрыть заметки экспертов" else "Заметки экспертов (${info.notes.size})")
+                Text(if (expanded) stringResource(R.string.aichat_hide_notes) else stringResource(R.string.aichat_show_notes, info.notes.size))
             }
             if (expanded) {
                 info.notes.forEach { note ->
@@ -307,9 +313,9 @@ private fun ExpertsFooter(info: ExpertsInfo) {
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
                             .padding(12.dp),
                     ) {
-                        Text(note.title, style = MaterialTheme.typography.titleSmall)
+                        Text(ChatTexts.noteTitle(note).asString(), style = MaterialTheme.typography.titleSmall)
                         if (note.failed) {
-                            Text(note.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                            Text(ChatTexts.noteText(note).asString(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                         } else {
                             AssistantMarkdown(note.text)
                         }
@@ -322,12 +328,14 @@ private fun ExpertsFooter(info: ExpertsInfo) {
 
 /** "Typing" indicator until the first answer chunk: three dots with a running opacity; during a tool call, shows what the AI is looking at. */
 @Composable
-private fun TypingIndicator(status: String? = null) {
+private fun TypingIndicator(status: UiText? = null) {
+    val text = status?.asString()
+    val typing = stringResource(R.string.aichat_typing)
     val transition = rememberInfiniteTransition(label = "typing")
     Row(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(vertical = 12.dp).semantics { contentDescription = status ?: "ИИ печатает" },
+        modifier = Modifier.padding(vertical = 12.dp).semantics { contentDescription = text ?: typing },
     ) {
         repeat(3) { i ->
             val alpha by transition.animateFloat(
@@ -338,8 +346,8 @@ private fun TypingIndicator(status: String? = null) {
             )
             Box(Modifier.size(8.dp).alpha(alpha).background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape))
         }
-        if (status != null) {
-            Text(status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 6.dp))
+        if (text != null) {
+            Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 6.dp))
         }
     }
 }
@@ -379,7 +387,7 @@ private fun CopyButton(text: String) {
     IconButton(onClick = { scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("ECULense", text))) } }) {
         Icon(
             painterResource(R.drawable.ic_copy),
-            contentDescription = "Копировать ответ",
+            contentDescription = stringResource(R.string.aichat_copy),
             modifier = Modifier.size(20.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )

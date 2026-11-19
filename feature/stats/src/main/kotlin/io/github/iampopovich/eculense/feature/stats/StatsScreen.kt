@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -29,25 +30,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.github.iampopovich.eculense.core.navigation.BackupDestination
-import io.github.iampopovich.eculense.core.navigation.LocalNavigator
-import io.github.iampopovich.eculense.core.navigation.RouteHandler
-import org.koin.compose.getKoin
 import io.github.iampopovich.eculense.core.model.FuelMethod
 import io.github.iampopovich.eculense.core.model.StatsPeriod
 import io.github.iampopovich.eculense.core.model.Trip
 import io.github.iampopovich.eculense.core.model.TripSource
 import io.github.iampopovich.eculense.core.model.TripStats
 import io.github.iampopovich.eculense.core.model.UnitsSettings
-import io.github.iampopovich.eculense.feature.stats.StatsFormat.label
-import org.koin.compose.viewmodel.koinViewModel
+import io.github.iampopovich.eculense.core.navigation.BackupDestination
+import io.github.iampopovich.eculense.core.navigation.LocalNavigator
+import io.github.iampopovich.eculense.core.navigation.RouteHandler
 import io.github.iampopovich.eculense.core.ui.CarNames
 import io.github.iampopovich.eculense.core.ui.EcuDates
+import io.github.iampopovich.eculense.feature.stats.StatsFormat.labelRes
+import org.koin.compose.getKoin
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 internal fun StatsRoute(viewModel: StatsViewModel = koinViewModel()) {
@@ -66,12 +67,12 @@ internal fun StatsScreen(state: StatsUiState, onPeriod: (StatsPeriod) -> Unit, m
         if (state.loading) return@Column
         PeriodSelector(state.period, onPeriod)
         if (state.trips.isEmpty()) {
-            EmptyPlaceholder(StatsFormat.emptyTitle(state.period, state.totalTrips), Modifier.weight(1f))
+            EmptyPlaceholder(stringResource(StatsFormat.emptyTitle(state.period, state.totalTrips)), Modifier.weight(1f))
             return@Column
         }
         LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { Summary(state.stats, state.units, state.car?.currency) }
-            item { Text("Поездки", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
+            item { Text(stringResource(R.string.stats_trips), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
             items(state.trips, key = { it.id.takeIf { id -> id != 0L } ?: it.startedAtMs }) { TripRow(it, state.units) }
             item { Text(" ", Modifier.padding(bottom = 8.dp)) }
         }
@@ -87,14 +88,14 @@ private fun Header(carName: String?, onImport: (() -> Unit)?) {
     // The button goes on its own row: on the same row as the title, with a large font «Статистика» wrapped letter by letter.
     Column(Modifier.fillMaxWidth().padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Column {
-            Text("Статистика", style = MaterialTheme.typography.headlineSmall, maxLines = 1)
+            Text(stringResource(R.string.stats_tab), style = MaterialTheme.typography.headlineSmall, maxLines = 1)
             carName?.let { Secondary(it) }
         }
         onImport?.let {
             FilledTonalButton(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) {
                 Icon(painterResource(R.drawable.ic_import), contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Импорт из Car Scanner", maxLines = 1)
+                Text(stringResource(R.string.stats_import), maxLines = 1)
             }
         }
     }
@@ -115,7 +116,7 @@ private fun EmptyPlaceholder(title: String, modifier: Modifier) {
         Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         Spacer(Modifier.height(4.dp))
         Text(
-            StatsFormat.EMPTY_HINT, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
+            stringResource(R.string.stats_empty_hint), style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -135,7 +136,7 @@ private fun PeriodSelector(selected: StatsPeriod, onPeriod: (StatsPeriod) -> Uni
                 // with a large font «Всё время» did not fit and was cut to «Всё»; shrink it rather than clip
                 label = {
                     Text(
-                        p.label,
+                        stringResource(p.labelRes),
                         maxLines = 1,
                         style = MaterialTheme.typography.labelMedium,
                         autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = MaterialTheme.typography.labelMedium.fontSize),
@@ -150,10 +151,10 @@ private fun PeriodSelector(selected: StatsPeriod, onPeriod: (StatsPeriod) -> Uni
 private fun Summary(s: TripStats, u: UnitsSettings, currency: String?) {
     Card {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatRow("Поездок", s.trips.toString(), "Пробег", StatsFormat.distance(s.distanceKm, u))
-            StatRow("Топливо", StatsFormat.volume(s.fuelL, u), "Средний расход", StatsFormat.consumption(s.avgLPer100Km, u))
-            StatRow("В движении", StatsFormat.duration(s.drivingMs), "На месте", StatsFormat.duration(s.standingMs))
-            if (s.fuelCost > 0) StatRow("Затраты на топливо", StatsFormat.money(s.fuelCost, currency), null, null)
+            StatRow(stringResource(R.string.stats_trip_count), s.trips.toString(), stringResource(R.string.stats_distance), StatsFormat.distance(s.distanceKm, u))
+            StatRow(stringResource(R.string.stats_fuel), StatsFormat.volume(s.fuelL, u), stringResource(R.string.stats_avg_consumption), StatsFormat.consumption(s.avgLPer100Km, u))
+            StatRow(stringResource(R.string.stats_driving), StatsFormat.duration(s.drivingMs), stringResource(R.string.stats_standing), StatsFormat.duration(s.standingMs))
+            if (s.fuelCost > 0) StatRow(stringResource(R.string.stats_fuel_cost), StatsFormat.money(s.fuelCost, currency), null, null)
         }
     }
 }
@@ -178,11 +179,11 @@ private fun Stat(label: String, value: String, modifier: Modifier) {
 private fun TripRow(t: Trip, u: UnitsSettings) {
     val stats = TripStats.of(listOf(t))
     val approx = if (t.fuelMethod == FuelMethod.MAF_ESTIMATE) "≈ " else ""
-    val fuel = if (!t.fuelKnown) "топливо: оценка недоступна"
+    val fuel = if (!t.fuelKnown) stringResource(R.string.stats_fuel_unknown)
     else "$approx${StatsFormat.volume(t.fuelL, u)} · $approx${StatsFormat.consumption(stats.avgLPer100Km, u)}"
     Column {
         ListItem(
-            overlineContent = { Text(if (t.source == TripSource.IMPORT_CARSCANNER) "Car Scanner" else "Запись ECULense") },
+            overlineContent = { Text(if (t.source == TripSource.IMPORT_CARSCANNER) "Car Scanner" else stringResource(R.string.stats_source_ecu)) },
             headlineContent = { Text(EcuDates.dateTime(t.startedAtMs)) },
             supportingContent = { Text("${StatsFormat.distance(t.distanceKm, u)} · $fuel") },
             trailingContent = { Text(StatsFormat.duration(t.drivingMs + t.standingMs), style = MaterialTheme.typography.labelMedium) },

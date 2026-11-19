@@ -12,7 +12,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import io.github.iampopovich.eculense.core.ai.ChatMessage
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
+import io.github.iampopovich.eculense.core.ui.UiText
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -22,6 +25,9 @@ import org.junit.runner.RunWith
 class ChatScreenTest {
     @get:Rule
     val rule = createComposeRule()
+
+    private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
+    private fun str(id: Int, vararg args: Any): String = ctx.getString(id, *args)
 
     private fun user(text: String) = ChatMessage(ChatMessage.Role.USER, text)
     private fun assistant(text: String) = ChatMessage(ChatMessage.Role.ASSISTANT, text)
@@ -37,19 +43,19 @@ class ChatScreenTest {
         rule.onNodeWithText("**Подсос", substring = true).assertDoesNotExist()
         // The user message is plain text; asterisks stay as they are.
         rule.onNodeWithText("**P0171?**").assertExists()
-        rule.onNodeWithContentDescription("Копировать ответ").assertExists()
+        rule.onNodeWithContentDescription(str(R.string.aichat_copy)).assertExists()
     }
 
     @Test
     fun composerSendIsDisabledUntilTextIsTyped() {
         val sent = mutableListOf<String>()
         rule.setContent { ChatScreen(ChatUiState(), onSend = { sent += it }, onOpenSettings = {}) }
-        rule.onNodeWithContentDescription("Отправить").assertIsNotEnabled()
+        rule.onNodeWithContentDescription(str(R.string.aichat_send)).assertIsNotEnabled()
         rule.onNodeWithTag("chat-input").performTextInput("P0171?")
-        rule.onNodeWithContentDescription("Отправить").assertIsEnabled().performClick()
+        rule.onNodeWithContentDescription(str(R.string.aichat_send)).assertIsEnabled().performClick()
         assertEquals(listOf("P0171?"), sent)
         // field is cleared, the button is disabled again
-        rule.onNodeWithContentDescription("Отправить").assertIsNotEnabled()
+        rule.onNodeWithContentDescription(str(R.string.aichat_send)).assertIsNotEnabled()
     }
 
     @Test
@@ -57,9 +63,9 @@ class ChatScreenTest {
         var stops = 0
         val waiting = ChatUiState(listOf(user("hi"), assistant("")), streaming = true)
         rule.setContent { ChatScreen(waiting, onSend = {}, onOpenSettings = {}, onStop = { stops++ }) }
-        rule.onNodeWithContentDescription("ИИ печатает").assertExists()
-        rule.onNodeWithContentDescription("Отправить").assertDoesNotExist()
-        rule.onNodeWithContentDescription("Остановить ответ").assertIsEnabled().performClick()
+        rule.onNodeWithContentDescription(str(R.string.aichat_typing)).assertExists()
+        rule.onNodeWithContentDescription(str(R.string.aichat_send)).assertDoesNotExist()
+        rule.onNodeWithContentDescription(str(R.string.aichat_stop)).assertIsEnabled().performClick()
         assertEquals(1, stops)
     }
 
@@ -67,47 +73,51 @@ class ChatScreenTest {
     fun suggestionFillsTheInputWithoutSending() {
         val sent = mutableListOf<String>()
         rule.setContent { ChatScreen(ChatUiState(), onSend = { sent += it }, onOpenSettings = {}) }
-        rule.onNodeWithText("Объясни мои ошибки").performClick()
-        rule.onNodeWithTag("chat-input").assertTextEquals("Объясни мои ошибки")
+        rule.onNodeWithText(str(R.string.aichat_suggestion_errors)).performClick()
+        rule.onNodeWithTag("chat-input").assertTextEquals(str(R.string.aichat_suggestion_errors))
         assertEquals(emptyList<String>(), sent)
-        rule.onNodeWithContentDescription("Отправить").assertIsEnabled()
+        rule.onNodeWithContentDescription(str(R.string.aichat_send)).assertIsEnabled()
     }
 
     @Test
     fun emptyChatOffersFourSuggestionsIncludingHalfAYear() {
         rule.setContent { ChatScreen(ChatUiState(), onSend = {}, onOpenSettings = {}) }
-        listOf("Как машина вела себя за полгода", "Объясни мои ошибки", "Сколько трачу на топливо", "Что пора обслужить")
+        listOf(str(R.string.aichat_suggestion_half_year), str(R.string.aichat_suggestion_errors), str(R.string.aichat_suggestion_fuel), str(R.string.aichat_suggestion_service))
             .forEach { rule.onNodeWithText(it).assertExists() }
-        rule.onNodeWithText("Как машина вела себя за полгода").performClick()
-        rule.onNodeWithTag("chat-input").assertTextEquals("Как машина вела себя за полгода")
+        rule.onNodeWithText(str(R.string.aichat_suggestion_half_year)).performClick()
+        rule.onNodeWithTag("chat-input").assertTextEquals(str(R.string.aichat_suggestion_half_year))
     }
 
     @Test
     fun expertsLineAndCollapsedNotesUnderTheAnswer() {
         val notes = listOf(
-            io.github.iampopovich.eculense.core.ai.ExpertNote("usage", "Аналитик эксплуатации", "- **Поездок** стало 12 в месяц"),
-            io.github.iampopovich.eculense.core.ai.ExpertNote("engine", "Моторист", "Эксперт «Моторист» недоступен", failed = true),
+            io.github.iampopovich.eculense.core.ai.ExpertNote("usage", str(R.string.aichat_role_usage), "- **Поездок** стало 12 в месяц"),
+            io.github.iampopovich.eculense.core.ai.ExpertNote("engine", "legacy title", "legacy text", failed = true),
         )
         val state = ChatUiState(
-            listOf(user("Как машина вела себя за полгода"), assistant("Коротко: всё ровно")),
-            experts = mapOf(1 to ExpertsInfo(listOf("Аналитик эксплуатации", "Моторист", "Диагност"), notes)),
+            listOf(user(str(R.string.aichat_suggestion_half_year)), assistant("Коротко: всё ровно")),
+            experts = mapOf(1 to ExpertsInfo(listOf(R.string.aichat_role_usage, R.string.aichat_role_engine, R.string.aichat_role_diagnostician).map { UiText.Res(it) }, notes)),
         )
         rule.setContent { ChatScreen(state, onSend = {}, onOpenSettings = {}) }
-        rule.onNodeWithText("Над ответом работали: Аналитик эксплуатации · Моторист · Диагност").assertExists()
+        val roles = listOf(R.string.aichat_role_usage, R.string.aichat_role_engine, R.string.aichat_role_diagnostician).joinToString(" · ") { str(it) }
+        rule.onNodeWithText(str(R.string.aichat_worked_on_answer, roles)).assertExists()
         // collapsed by default
         rule.onNodeWithText("Поездок", substring = true).assertDoesNotExist()
-        rule.onNodeWithText("Заметки экспертов (2)").performClick()
+        rule.onNodeWithText(str(R.string.aichat_show_notes, 2)).performClick()
         rule.waitUntil(5_000) { rule.onAllNodesWithText("Поездок", substring = true).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("**Поездок", substring = true).assertDoesNotExist()
-        rule.onNodeWithText("Эксперт «Моторист» недоступен").assertExists()
-        rule.onNodeWithText("Скрыть заметки экспертов").performClick()
-        rule.onNodeWithText("Эксперт «Моторист» недоступен").assertDoesNotExist()
+        // a failed note is our own text: localized and titled by the role id, not by the legacy strings
+        val unavailable = str(R.string.aichat_expert_unavailable, str(R.string.aichat_role_engine))
+        rule.onNodeWithText(unavailable).assertExists()
+        rule.onNodeWithText("legacy text").assertDoesNotExist()
+        rule.onNodeWithText(str(R.string.aichat_hide_notes)).performClick()
+        rule.onNodeWithText(unavailable).assertDoesNotExist()
     }
 
     @Test
     fun answerWithoutExpertsHasNoExpertsLine() {
         rule.setContent { ChatScreen(ChatUiState(listOf(user("hi"), assistant("Привет!"))), onSend = {}, onOpenSettings = {}) }
-        rule.onNodeWithText("Над ответом работали", substring = true).assertDoesNotExist()
+        rule.onNodeWithText(str(R.string.aichat_worked_on_answer, ""), substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -124,12 +134,12 @@ class ChatScreenTest {
         var retries = 0
         rule.setContent {
             ChatScreen(
-                ChatUiState(listOf(user("a"), assistant("част"), user("b")), error = "Нет связи", stoppedIndex = 1),
+                ChatUiState(listOf(user("a"), assistant("част"), user("b")), error = UiText.Raw("Нет связи"), stoppedIndex = 1),
                 onSend = {}, onOpenSettings = {}, onRetry = { retries++ },
             )
         }
-        rule.onNodeWithText("Ответ остановлен").assertExists()
-        rule.onNodeWithText("Повторить").performClick()
+        rule.onNodeWithText(str(R.string.aichat_answer_stopped)).assertExists()
+        rule.onNodeWithText(str(R.string.aichat_retry)).performClick()
         assertEquals(1, retries)
     }
 
@@ -138,25 +148,26 @@ class ChatScreenTest {
         val toggles = mutableListOf<Boolean>()
         val state = mutableStateOf(ChatUiState(carDataAvailable = true, useCarData = true))
         rule.setContent { ChatScreen(state.value, onSend = {}, onOpenSettings = {}, onUseCarData = { toggles += it }) }
-        rule.onNodeWithText("без VIN и координат", substring = true).assertExists()
-        rule.onNodeWithText("Использовать данные моей машины").performClick()
+        rule.onNodeWithText(str(R.string.aichat_empty_with_data)).assertExists()
+        rule.onNodeWithText(str(R.string.aichat_use_car_data)).performClick()
         assertEquals(listOf(false), toggles)
 
-        state.value = ChatUiState(listOf(user("Объясни мои ошибки"), assistant("")), streaming = true, carDataAvailable = true, useCarData = true, toolStatus = "ИИ смотрит ошибки…")
-        rule.onNodeWithText("ИИ смотрит ошибки…").assertExists()
-        rule.onNodeWithContentDescription("ИИ смотрит ошибки…").assertExists()
+        state.value = ChatUiState(listOf(user(str(R.string.aichat_suggestion_errors)), assistant("")), streaming = true, carDataAvailable = true, useCarData = true, toolStatus = UiText.Res(R.string.aichat_tool_dtc_history, listOf(UiText.Res(R.string.aichat_subject_ai))))
+        val looking = str(R.string.aichat_tool_dtc_history, str(R.string.aichat_subject_ai))
+        rule.onNodeWithText(looking).assertExists()
+        rule.onNodeWithContentDescription(looking).assertExists()
     }
 
     @Test
     fun noToggleWithoutToolsModule() {
         rule.setContent { ChatScreen(ChatUiState(carDataAvailable = false), onSend = {}, onOpenSettings = {}) }
-        rule.onNodeWithText("Использовать данные моей машины").assertDoesNotExist()
+        rule.onNodeWithText(str(R.string.aichat_use_car_data)).assertDoesNotExist()
     }
 
     @Test
     fun consentDialogNamesProviderAndDataAndRoutesButtons() {
         val calls = mutableListOf<String>()
-        val request = ConsentRequest(io.github.iampopovich.eculense.core.ai.ProviderInfo("DEEPSEEK", "DeepSeek", "deepseek-chat"), "Объясни мои ошибки")
+        val request = ConsentRequest(io.github.iampopovich.eculense.core.ai.ProviderInfo("DEEPSEEK", "DeepSeek", "deepseek-chat"), str(R.string.aichat_suggestion_errors))
         rule.setContent {
             ChatScreen(
                 ChatUiState(carDataAvailable = true, useCarData = true, consent = request),
@@ -164,12 +175,12 @@ class ChatScreenTest {
                 onConsentAccept = { calls += "accept" }, onConsentDecline = { calls += "decline" }, onConsentCancel = { calls += "cancel" },
             )
         }
-        rule.onNodeWithText("Отправить данные машины ИИ?").assertExists()
-        rule.onNodeWithText("«DeepSeek» (модель deepseek-chat)", substring = true).assertExists()
-        rule.onNodeWithText("VIN, координаты GPS и API-ключ не передаются", substring = true).assertExists()
-        SHARED_DATA.forEach { rule.onNodeWithText("• $it").assertExists() }
-        rule.onNodeWithText("Разрешить").performClick()
-        rule.onNodeWithText("Без данных машины").performClick()
+        rule.onNodeWithText(str(R.string.aichat_consent_title)).assertExists()
+        rule.onNodeWithText(str(R.string.aichat_consent_where, "DeepSeek", "deepseek-chat")).assertExists()
+        rule.onNodeWithText(str(R.string.aichat_consent_not_sent)).assertExists()
+        SHARED_DATA.forEach { rule.onNodeWithText("• " + str(it)).assertExists() }
+        rule.onNodeWithText(str(R.string.aichat_consent_allow)).performClick()
+        rule.onNodeWithText(str(R.string.aichat_consent_decline)).performClick()
         assertEquals(listOf("accept", "decline"), calls)
     }
 
@@ -185,19 +196,19 @@ class ChatScreenTest {
     fun newDialogAsksForConfirmation() {
         var created = 0
         rule.setContent { ChatScreen(ChatUiState(listOf(user("q"), assistant("a"))), onSend = {}, onOpenSettings = {}, onNewDialog = { created++ }) }
-        rule.onNodeWithContentDescription("Новый диалог").performClick()
-        rule.onNodeWithText("Начать новый диалог?").assertExists()
-        rule.onNodeWithText("Отмена").performClick()
+        rule.onNodeWithContentDescription(str(R.string.aichat_new_dialog)).performClick()
+        rule.onNodeWithText(str(R.string.aichat_new_dialog_title)).assertExists()
+        rule.onNodeWithText(str(CoreUiR.string.common_cancel)).performClick()
         assertEquals(0, created)
-        rule.onNodeWithContentDescription("Новый диалог").performClick()
-        rule.onNodeWithText("Новый диалог").performClick()
+        rule.onNodeWithContentDescription(str(R.string.aichat_new_dialog)).performClick()
+        rule.onNodeWithText(str(R.string.aichat_new_dialog)).performClick()
         assertEquals(1, created)
     }
 
     @Test
     fun newDialogDisabledForEmptyChat() {
         rule.setContent { ChatScreen(ChatUiState(), onSend = {}, onOpenSettings = {}) }
-        rule.onNodeWithContentDescription("Новый диалог").assertIsNotEnabled()
+        rule.onNodeWithContentDescription(str(R.string.aichat_new_dialog)).assertIsNotEnabled()
     }
 
     @Test
@@ -205,11 +216,11 @@ class ChatScreenTest {
         val state = mutableStateOf(ChatUiState(listOf(user("hi"), assistant("# Заго")), streaming = true))
         rule.setContent { ChatScreen(state.value, onSend = {}, onOpenSettings = {}) }
         rule.waitUntil(5_000) { rule.onAllNodesWithText("Заго", substring = true).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithContentDescription("Копировать ответ").assertDoesNotExist()
+        rule.onNodeWithContentDescription(str(R.string.aichat_copy)).assertDoesNotExist()
 
         state.value = ChatUiState(listOf(user("hi"), assistant("# Заголовок\n\n1. первый шаг")), streaming = false)
         rule.waitUntil(5_000) { rule.onAllNodesWithText("первый шаг", substring = true).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Заголовок").assertExists()
-        rule.onNodeWithContentDescription("Копировать ответ").assertExists()
+        rule.onNodeWithContentDescription(str(R.string.aichat_copy)).assertExists()
     }
 }

@@ -10,6 +10,7 @@ import io.github.iampopovich.eculense.core.model.DtcKind
 import io.github.iampopovich.eculense.core.navigation.AiChatDestination
 import io.github.iampopovich.eculense.core.navigation.RouteHandler
 import io.github.iampopovich.eculense.core.obd.ConnectionController
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,7 +40,7 @@ internal data class DtcUiState(
     val loading: Boolean = false,
     val items: List<DtcItem> = emptyList(),
     val history: List<DtcHistoryItem> = emptyList(),
-    val error: String? = null,
+    val error: UiText? = null,
     val canAskAi: Boolean = false,
     /** Codes have been read successfully at least once: an empty list then means «ошибок нет» rather than «ещё не читали». */
     val checked: Boolean = false,
@@ -63,7 +64,7 @@ internal class DtcViewModel(
     fun read() = launchGuarded {
         val dtcs = controller.withSession { session -> DtcKind.entries.flatMap { session.readDtcs(it) } }
         if (dtcs == null) {
-            _uiState.update { it.copy(error = "Нет подключения к адаптеру") }
+            _uiState.update { it.copy(error = UiText.Res(R.string.dtc_err_no_connection)) }
         } else {
             val items = describe(dtcs)
             _uiState.update { it.copy(items = items, error = null, checked = true) }
@@ -75,7 +76,7 @@ internal class DtcViewModel(
     fun clear() = launchGuarded {
         repository.recordRead(_uiState.value.items.map { it.dtc })
         val cleared = controller.withSession { it.clearDtcs() }
-        if (cleared != true) _uiState.update { it.copy(error = "ЭБУ не подтвердил сброс") }
+        if (cleared != true) _uiState.update { it.copy(error = UiText.Res(R.string.dtc_err_clear_not_confirmed)) }
         val dtcs = controller.withSession { session -> DtcKind.entries.flatMap { session.readDtcs(it) } }.orEmpty()
         val items = describe(dtcs)
         _uiState.update { it.copy(items = items, checked = true) }
@@ -104,7 +105,7 @@ internal class DtcViewModel(
             try {
                 block()
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
+                _uiState.update { it.copy(error = e.message?.let { m -> UiText.Raw(m) }) }
             } finally {
                 _uiState.update { it.copy(loading = false) }
             }
@@ -112,13 +113,16 @@ internal class DtcViewModel(
     }
 }
 
-/** Text for the chat: the code, what is known about it (briefly), a request to explain. */
-internal fun askAiPrompt(code: String, info: DtcInfo): String = buildString {
-    append("Объясни код ошибки $code")
+/**
+ * Text for the chat: the code, what is known about it (briefly), a request to explain. [str] resolves a string
+ * resource with arguments in the app language (the question is the user's message, so it is localized).
+ */
+internal fun askAiPrompt(code: String, info: DtcInfo, str: (Int, List<Any>) -> String): String = buildString {
+    append(str(R.string.dtc_ask_ai_code, listOf(code)))
     when (info.source) {
-        DtcSource.OEM_UNKNOWN -> append(" (заводской код производителя, расшифровка неизвестна)")
+        DtcSource.OEM_UNKNOWN -> append(" (").append(str(R.string.dtc_ask_ai_oem_unknown, emptyList())).append(")")
         else -> info.title?.let { append(" ($it)") }
     }
-    if (info.causes.isNotEmpty()) append(". Частые причины по базе OBDex: ${info.causes.take(3).joinToString("; ")}")
-    append(": причины, что проверить, насколько срочно.")
+    if (info.causes.isNotEmpty()) append(". ").append(str(R.string.dtc_ask_ai_causes, listOf(info.causes.take(3).joinToString("; "))))
+    append(": ").append(str(R.string.dtc_ask_ai_tail, emptyList()))
 }

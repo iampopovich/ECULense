@@ -1,4 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="stats_tab">Statistics</string>
+    <string name="stats_period_week">Week</string>
+    <string name="stats_period_month">Month</string>
+    <string name="stats_period_year">Year</string>
+    <string name="stats_period_all">All time</string>
+    <string name="stats_no_trips_at_all">No trips yet</string>
+    <string name="stats_empty_hint">Record a trip on the Dashboard or import a Car Scanner backup</string>
+    <string name="stats_no_trips_week">No trips this week</string>
+    <string name="stats_no_trips_month">No trips this month</string>
+    <string name="stats_no_trips_year">No trips this year</string>
+    <string name="stats_no_trips_all">No trips at all</string>
+    <string name="stats_import">Import from Car Scanner</string>
+    <string name="stats_trips">Trips</string>
+    <string name="stats_trip_count">Trips</string>
+    <string name="stats_distance">Distance</string>
+    <string name="stats_fuel">Fuel</string>
+    <string name="stats_avg_consumption">Avg. consumption</string>
+    <string name="stats_driving">Driving</string>
+    <string name="stats_standing">Idle</string>
+    <string name="stats_fuel_cost">Fuel cost</string>
+    <string name="stats_fuel_unknown">fuel: no estimate</string>
+    <string name="stats_source_ecu">ECULense recording</string>
+    <string name="stats_duration_hm">%1$d h %2$02d min</string>
+    <string name="stats_duration_m">%1$d min</string>
 </resources>

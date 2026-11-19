@@ -19,16 +19,21 @@ sealed interface UiText {
     /** Server messages, user input, names: shown as is. */
     data class Raw(val value: String) : UiText
 
+    /** Several texts in one line, e.g. «recordings +3 · trips +1». */
+    data class Joined(val parts: List<UiText>, val separator: String = " · ") : UiText
+
     @Composable
     fun asString(): String = when (this) {
         is Res -> stringResource(id, *args.map { if (it is UiText) it.asString() else it }.toTypedArray())
         is Plural -> pluralStringResource(id, count, *args.map { if (it is UiText) it.asString() else it }.toTypedArray())
         is Raw -> value
+        is Joined -> parts.map { it.asString() }.joinToString(separator)
     }
 
     fun asString(context: Context): String = when (this) {
         is Res -> context.getString(id, *args.map { if (it is UiText) it.asString(context) else it }.toTypedArray())
         is Plural -> context.resources.getQuantityString(id, count, *args.map { if (it is UiText) it.asString(context) else it }.toTypedArray())
         is Raw -> value
+        is Joined -> parts.joinToString(separator) { it.asString(context) }
     }
 }

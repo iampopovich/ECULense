@@ -30,6 +30,7 @@ internal object VehicleChatStrategy {
         streaming: Boolean = true,
         thinkingLabel: String = THINKING,
         maxToolRounds: Int = MAX_TOOL_ROUNDS,
+        roleId: String? = null,
     ): AIAgentFunctionalStrategy<String, String> = functionalStrategy("ecu-chat") { input ->
         llm.writeSession {
             // ChatMemory injects the saved history without the system message, so set the current one again
@@ -52,7 +53,7 @@ internal object VehicleChatStrategy {
                     assistantOf(frames).also { appendPrompt { message(it) } }
                 } else {
                     // The on-device model (Koog LiteRT client) does not stream: the whole answer at once, «Модель думает…» until then.
-                    emit(ChatEvent.Status(thinkingLabel))
+                    emit(ChatEvent.Status(thinkingLabel, ChatStatus.PhoneThinking.takeIf { thinkingLabel == THINKING }))
                     val whole = requestLLM() // the write session adds the response to the prompt itself
                     val text = whole.parts.filterIsInstance<MessagePart.Text>().joinToString("") { it.text }
                     if (text.isNotEmpty()) emit(ChatEvent.Text(text))
@@ -65,7 +66,7 @@ internal object VehicleChatStrategy {
             if (calls.isEmpty()) break
             // separate text between rounds with a paragraph so the answer doesn't run together
             if (text.isNotBlank()) emit(ChatEvent.Text("\n\n"))
-            calls.forEach { emit(ChatEvent.ToolCall(it.tool, label(it.tool))) }
+            calls.forEach { emit(ChatEvent.ToolCall(it.tool, label(it.tool), roleId)) }
             val results = executeTools(calls)
             llm.writeSession { appendPrompt { user { results.forEach { toolResult(it.toMessagePart()) } } } }
         }

@@ -1,4 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="stats_tab">Статистика</string>
+    <string name="stats_period_week">Неделя</string>
+    <string name="stats_period_month">Месяц</string>
+    <string name="stats_period_year">Год</string>
+    <string name="stats_period_all">Всё время</string>
+    <string name="stats_no_trips_at_all">Поездок пока нет</string>
+    <string name="stats_empty_hint">Запишите поездку на Панели или импортируйте бэкап Car Scanner</string>
+    <string name="stats_no_trips_week">Нет поездок за неделю</string>
+    <string name="stats_no_trips_month">Нет поездок за месяц</string>
+    <string name="stats_no_trips_year">Нет поездок за год</string>
+    <string name="stats_no_trips_all">Нет поездок за всё время</string>
+    <string name="stats_import">Импорт из Car Scanner</string>
+    <string name="stats_trips">Поездки</string>
+    <string name="stats_trip_count">Поездок</string>
+    <string name="stats_distance">Пробег</string>
+    <string name="stats_fuel">Топливо</string>
+    <string name="stats_avg_consumption">Средний расход</string>
+    <string name="stats_driving">В движении</string>
+    <string name="stats_standing">На месте</string>
+    <string name="stats_fuel_cost">Затраты на топливо</string>
+    <string name="stats_fuel_unknown">топливо: оценка недоступна</string>
+    <string name="stats_source_ecu">Запись ECULense</string>
+    <string name="stats_duration_hm">%1$d ч %2$02d мин</string>
+    <string name="stats_duration_m">%1$d мин</string>
 </resources>

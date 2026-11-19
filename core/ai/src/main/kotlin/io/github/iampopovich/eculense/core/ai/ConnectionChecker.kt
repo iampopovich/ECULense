@@ -33,7 +33,9 @@ sealed interface ConnectionCheck {
     data class Ok(val models: List<ModelInfo>, val listed: Boolean = true) : ConnectionCheck
     data object NoModels : ConnectionCheck
     data object KeyMissing : ConnectionCheck
-    data class InvalidUrl(val reason: String) : ConnectionCheck
+    data class InvalidUrl(val problem: UrlProblem) : ConnectionCheck {
+        val reason: String get() = problem.message
+    }
     data class Unauthorized(val detail: String?) : ConnectionCheck
     data class Blocked(val detail: String?) : ConnectionCheck
     data class Unreachable(val detail: String?) : ConnectionCheck
@@ -63,7 +65,7 @@ class KoogConnectionChecker(
         // The URL is entered only for «Другого»; presets use the Koog client's default URL.
         val otherUrl = if (provider == LlmProviderKind.OTHER) {
             when (val v = EndpointUrl.validate(baseUrl.orEmpty())) {
-                is EndpointUrl.Result.Invalid -> return ConnectionCheck.InvalidUrl(v.reason)
+                is EndpointUrl.Result.Invalid -> return ConnectionCheck.InvalidUrl(v.problem)
                 is EndpointUrl.Result.Valid -> v.url
             }
         } else {

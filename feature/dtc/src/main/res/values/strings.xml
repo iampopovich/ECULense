@@ -2,4 +2,29 @@
 <resources>
     <string name="dtc_hub_title">Trouble codes (DTC)</string>
     <string name="dtc_hub_subtitle">Read and clear codes with descriptions</string>
+    <string name="dtc_read">Read codes</string>
+    <string name="dtc_clear">Clear</string>
+    <string name="dtc_no_codes">No codes: the ECU reported none.</string>
+    <string name="dtc_history_title">Code history for this car</string>
+    <plurals name="dtc_history_seen">
+        <item quantity="one">%1$d time, last on %2$s</item>
+        <item quantity="other">%1$d times, last on %2$s</item>
+    </plurals>
+    <string name="dtc_clear_title">Clear codes?</string>
+    <string name="dtc_clear_text">Engine off, ignition on? Clearing erases codes and freeze frames and resets readiness monitors (the car won\'t pass an emissions test until a full drive cycle). Current codes are kept in the history.</string>
+    <string name="dtc_ask_ai">Ask AI</string>
+    <string name="dtc_causes">Causes: %1$s</string>
+    <string name="dtc_symptoms">Symptoms: %1$s</string>
+    <string name="dtc_source_obdex">Source: OBDex (CC0)</string>
+    <string name="dtc_source_builtin">Built-in database (download OBDex for causes and symptoms)</string>
+    <string name="dtc_source_oem">%1$s factory database (Wal33D)</string>
+    <string name="dtc_kind_stored">stored</string>
+    <string name="dtc_kind_pending">pending</string>
+    <string name="dtc_kind_permanent">permanent</string>
+    <string name="dtc_err_no_connection">No adapter connection</string>
+    <string name="dtc_err_clear_not_confirmed">The ECU didn\'t confirm the clear</string>
+    <string name="dtc_ask_ai_code">Explain error code %1$s</string>
+    <string name="dtc_ask_ai_oem_unknown">manufacturer-specific code, description unknown</string>
+    <string name="dtc_ask_ai_causes">Common causes per the OBDex database: %1$s</string>
+    <string name="dtc_ask_ai_tail">causes, what to check, how urgent.</string>
 </resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="service_channel_connection">Adapter connection</string>
+    <string name="service_channel_connection_description">Shown while the app is connected to the OBD adapter</string>
+    <string name="service_connected_title">ECULense: adapter connected</string>
+    <string name="service_connected_text">ECU polling continues in the background</string>
+</resources>

@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense.feature.stats
 
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import io.github.iampopovich.eculense.core.model.StatsPeriod
@@ -23,34 +24,35 @@ internal object StatsFormat {
     fun consumption(lPer100: Double?, units: UnitsSettings): String =
         lPer100?.let { units.consumption(it).let { m -> "${number(m.value)} ${stringResource(m.unit.labelRes)}" } } ?: "—"
 
+    @Composable
     fun duration(ms: Long): String {
         val minutes = ms / 60_000
-        return if (minutes >= 60) "${minutes / 60} ч ${"%02d".format(minutes % 60)} мин" else "$minutes мин"
+        return if (minutes >= 60) stringResource(R.string.stats_duration_hm, minutes / 60, minutes % 60)
+        else stringResource(R.string.stats_duration_m, minutes)
     }
 
     fun money(v: Double, currency: String?): String = "${number(v, 0)} ${currency ?: ""}".trim()
 
-    val StatsPeriod.label: String
+    @get:StringRes
+    val StatsPeriod.labelRes: Int
         get() = when (this) {
-            StatsPeriod.WEEK -> "Неделя"
-            StatsPeriod.MONTH -> "Месяц"
-            StatsPeriod.YEAR -> "Год"
-            StatsPeriod.ALL -> "Всё время"
+            StatsPeriod.WEEK -> R.string.stats_period_week
+            StatsPeriod.MONTH -> R.string.stats_period_month
+            StatsPeriod.YEAR -> R.string.stats_period_year
+            StatsPeriod.ALL -> R.string.stats_period_all
         }
 
     /** Order in the toggle — from the shortest period to the longest. */
     val periods = listOf(StatsPeriod.WEEK, StatsPeriod.MONTH, StatsPeriod.YEAR, StatsPeriod.ALL)
 
-    const val NO_TRIPS_AT_ALL = "Поездок пока нет"
-    const val EMPTY_HINT = "Запишите поездку на Панели или импортируйте бэкап Car Scanner"
-
     /** Placeholder title: no trips at all → «пока нет», otherwise for the selected period. */
-    fun emptyTitle(period: StatsPeriod, totalTrips: Int): String =
-        if (totalTrips == 0) NO_TRIPS_AT_ALL
-        else "Нет поездок за " + when (period) {
-            StatsPeriod.WEEK -> "неделю"
-            StatsPeriod.MONTH -> "месяц"
-            StatsPeriod.YEAR -> "год"
-            StatsPeriod.ALL -> "всё время"
+    @StringRes
+    fun emptyTitle(period: StatsPeriod, totalTrips: Int): Int =
+        if (totalTrips == 0) R.string.stats_no_trips_at_all
+        else when (period) {
+            StatsPeriod.WEEK -> R.string.stats_no_trips_week
+            StatsPeriod.MONTH -> R.string.stats_no_trips_month
+            StatsPeriod.YEAR -> R.string.stats_no_trips_year
+            StatsPeriod.ALL -> R.string.stats_no_trips_all
         }
 }

@@ -192,7 +192,7 @@ class ExpertOrchestratorTest {
         assertFalse(system, system.contains("заметку для редактора"))
         assertEquals(listOf("Экономист"), events.filterIsInstance<ChatEvent.Experts>().single().roles)
         assertTrue(events.filterIsInstance<ChatEvent.Text>().joinToString("") { it.delta }.contains("Заметка fuel"))
-        assertEquals(ChatEvent.Status("Экономист считает расход за 6 месяцев…"), events.first())
+        assertEquals(ChatEvent.Status("Экономист считает расход за 6 месяцев…", ChatStatus.Role("fuel", 180)), events.first())
     }
 
     @Test

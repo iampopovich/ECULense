@@ -24,13 +24,16 @@ class ConnectionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Re-created on every start with the same id: after a language change only the name and description update.
         getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Подключение к адаптеру", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL_ID, getString(R.string.service_channel_connection), NotificationManager.IMPORTANCE_LOW).apply {
+                description = getString(R.string.service_channel_connection_description)
+            },
         )
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-            .setContentTitle("ECULense: адаптер подключён")
-            .setContentText("Опрос ЭБУ продолжается в фоне")
+            .setContentTitle(getString(R.string.service_connected_title))
+            .setContentText(getString(R.string.service_connected_text))
             .setOngoing(true)
             .build()
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)

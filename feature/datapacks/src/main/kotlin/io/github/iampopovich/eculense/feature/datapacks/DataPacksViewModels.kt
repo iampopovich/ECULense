@@ -5,8 +5,11 @@ import androidx.lifecycle.viewModelScope
 import io.github.iampopovich.eculense.core.data.CarRepository
 import io.github.iampopovich.eculense.core.datapacks.DataPackService
 import io.github.iampopovich.eculense.core.datapacks.PackState
+import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.obdb.ObdbSignalsets
 import io.github.iampopovich.eculense.core.obdb.SignalsetResult
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,7 +32,7 @@ internal data class DataPacksUiState(
     val packs: List<PackState> = emptyList(),
     val confirm: PackConfirm? = null,
     val checking: Boolean = false,
-    val checkMessage: String? = null,
+    val checkMessage: UiText? = null,
 )
 
 internal class DataPacksViewModel(private val service: DataPackService) : ViewModel() {
@@ -69,8 +72,8 @@ internal class DataPacksViewModel(private val service: DataPackService) : ViewMo
         viewModelScope.launch {
             local.update { it.copy(checking = true, checkMessage = null) }
             val message = runCatching { service.checkUpdates() }.fold(
-                { found -> if (found.isEmpty()) "Обновлений нет" else "Доступны обновления: ${found.size}" },
-                { "Не удалось проверить: ${it.message}" },
+                { found -> if (found.isEmpty()) UiText.Res(R.string.datapacks_no_updates) else UiText.Res(R.string.datapacks_updates_available, listOf(found.size)) },
+                { UiText.Res(R.string.datapacks_check_failed, listOf(it.message.orEmpty())) },
             )
             local.update { it.copy(checking = false, checkMessage = message) }
         }
@@ -78,7 +81,7 @@ internal class DataPacksViewModel(private val service: DataPackService) : ViewMo
 }
 
 internal data class SignalsetUiState(
-    val carTitle: String? = null,
+    val carTitle: UiText? = null,
     val make: String? = null,
     val model: String? = null,
     val carYear: Int? = null,
@@ -86,7 +89,7 @@ internal data class SignalsetUiState(
     val year: String = "",
     val loading: Boolean = false,
     val result: SignalsetResult? = null,
-    val error: String? = null,
+    val error: UiText? = null,
 )
 
 internal class SignalsetViewModel(private val cars: CarRepository, private val obdb: ObdbSignalsets) : ViewModel() {
@@ -97,7 +100,7 @@ internal class SignalsetViewModel(private val cars: CarRepository, private val o
         viewModelScope.launch {
             val car = cars.observeActiveCar().first()
             _state.value = SignalsetUiState(
-                carTitle = car?.let { listOfNotNull(it.brand, it.model, it.year?.toString()).joinToString(" ").ifBlank { it.name } },
+                carTitle = car?.let { carTitle(it) },
                 make = car?.brand, model = car?.model, carYear = car?.year, year = car?.year?.toString().orEmpty(),
             )
             val (make, model, year) = Triple(car?.brand, car?.model, car?.year)
@@ -116,8 +119,18 @@ internal class SignalsetViewModel(private val cars: CarRepository, private val o
             _state.update { it.copy(loading = true, error = null) }
             val result = runCatching { obdb.check(s.make, s.model, s.year.toIntOrNull()) }
             _state.update {
-                it.copy(loading = false, result = result.getOrNull() ?: it.result, error = result.exceptionOrNull()?.let { e -> "Нет связи с OBDb: ${e.message}" })
+                it.copy(loading = false, result = result.getOrNull() ?: it.result, error = result.exceptionOrNull()?.let { e -> UiText.Res(R.string.datapacks_obdb_offline, listOf(e.message.orEmpty())) })
             }
         }
+    }
+}
+
+/** «Kia Sorento 2005»; without make/model/year — the car's name, and the localized default name for an unnamed car. */
+internal fun carTitle(car: CarProfile): UiText {
+    val specs = listOfNotNull(car.brand, car.model, car.year?.toString()).joinToString(" ")
+    return when {
+        specs.isNotBlank() -> UiText.Raw(specs)
+        CarProfile.isDefaultName(car.name) -> UiText.Res(CoreUiR.string.common_car_default_name)
+        else -> UiText.Raw(car.name)
     }
 }

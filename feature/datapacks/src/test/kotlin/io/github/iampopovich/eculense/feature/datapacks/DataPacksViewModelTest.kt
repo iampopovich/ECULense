@@ -4,6 +4,11 @@ import io.github.iampopovich.eculense.core.datapacks.DataPackService
 import io.github.iampopovich.eculense.core.datapacks.PackCatalog
 import io.github.iampopovich.eculense.core.datapacks.PackState
 import io.github.iampopovich.eculense.core.datapacks.PackStore
+import io.github.iampopovich.eculense.core.model.CarProfile
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
+import io.github.iampopovich.eculense.core.ui.UiText
+import java.io.File
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,8 +23,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.io.File
-import java.util.Locale
 
 private class FakePacks(var metered: Boolean = false) : DataPackService {
     val states = MutableStateFlow(PackCatalog.all.map { PackState(it) })
@@ -83,18 +86,22 @@ class DataPacksViewModelTest {
         vm.confirm()
         assertEquals(listOf("download vehicles v1.0.4", "delete vehicles"), packs.calls)
         vm.checkUpdates()
-        assertEquals("Доступны обновления: 1", vm.uiState.value.checkMessage)
+        assertEquals(UiText.Res(R.string.datapacks_updates_available, listOf(1)), vm.uiState.value.checkMessage)
     }
 
     @Test
     fun `status line shows size, progress, version and update`() {
-        assertEquals("Не скачан · 57,3 МБ", statusText(vehicles))
-        assertEquals("Скачивается 42 %", statusText(vehicles.copy(progress = 42)))
-        assertEquals("Скачивается…", statusText(vehicles.copy(progress = -1)))
+        val size = UiText.Res(R.string.datapacks_size_mb, listOf(60_080_128 / 1024.0 / 1024.0))
+        assertEquals(UiText.Res(R.string.datapacks_status_not_downloaded_size, listOf(size)), statusText(vehicles))
+        assertEquals(UiText.Res(R.string.datapacks_status_downloading_pct, listOf(42)), statusText(vehicles.copy(progress = 42)))
+        assertEquals(UiText.Res(R.string.datapacks_status_downloading), statusText(vehicles.copy(progress = -1)))
         val installed = vehicles.copy(installed = PackStore.Installed("vehicles", "v1.0.3", File("x"), 60_080_128))
-        assertEquals("Версия v1.0.3 · 57,3 МБ", statusText(installed))
-        assertEquals("Версия v1.0.3 · 57,3 МБ · доступно обновление v1.0.4", statusText(installed.copy(updateVersion = "v1.0.4")))
-        assertEquals("3,1 МБ", formatSize(3_256_320))
+        assertEquals(UiText.Res(R.string.datapacks_status_installed, listOf("v1.0.3", size)), statusText(installed))
+        assertEquals(
+            UiText.Res(R.string.datapacks_status_installed_update, listOf("v1.0.3", size, "v1.0.4")),
+            statusText(installed.copy(updateVersion = "v1.0.4")),
+        )
+        assertEquals(UiText.Res(R.string.datapacks_size_kb, listOf(512L)), formatSize(524_288))
     }
 
     @Test
@@ -105,5 +112,13 @@ class DataPacksViewModelTest {
         assertEquals("MIT", licenses.getValue("https://github.com/Wal33D/dtc-database"))
         assertEquals("CC BY-SA 4.0", licenses.getValue("https://github.com/OBDb"))
         assertEquals("MIT", licenses.getValue("https://github.com/lennykean/OBDII.DTC"))
+    }
+
+    @Test
+    fun `car title uses make, model and year, else the name, else the localized default name`() {
+        assertEquals(UiText.Raw("Kia Sorento 2005"), carTitle(CarProfile(id = 1, name = "x", brand = "Kia", model = "Sorento", year = 2005)))
+        assertEquals(UiText.Raw("Test"), carTitle(CarProfile(id = 1, name = "Test")))
+        // a fresh install has a blank name
+        assertEquals(UiText.Res(CoreUiR.string.common_car_default_name), carTitle(CarProfile(id = 1, name = "")))
     }
 }

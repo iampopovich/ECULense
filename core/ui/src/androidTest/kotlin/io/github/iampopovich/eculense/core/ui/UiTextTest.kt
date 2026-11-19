@@ -27,4 +27,11 @@ class UiTextTest {
     fun rawIsShownAsIs() {
         assertEquals("ELM327 v1.5", UiText.Raw("ELM327 v1.5").asString(context("en")))
     }
+
+    @Test
+    fun joinedResolvesEachPart() {
+        val joined = UiText.Joined(listOf(UiText.Res(R.string.common_save), UiText.Raw("x")))
+        assertEquals("Save · x", joined.asString(context("en")))
+        assertEquals("Сохранить · x", joined.asString(context("ru")))
+    }
 }

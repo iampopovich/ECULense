@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.backup.EcuBackup
@@ -40,6 +41,8 @@ import io.github.iampopovich.eculense.core.backup.ImportWorkState
 import io.github.iampopovich.eculense.core.data.ImportHistoryItem
 import io.github.iampopovich.eculense.core.data.ImportStatus
 import io.github.iampopovich.eculense.core.ui.EcuDates
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
+import io.github.iampopovich.eculense.core.ui.UiText
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -90,29 +93,26 @@ internal fun BackupScreen(
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text("Импорт и резервные копии", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp)) }
+        item { Text(stringResource(R.string.backup_hub_title), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp)) }
         item { CarScannerCard(state, onPickFile, onPickFolder, onImportNewest, onCancelImport) }
         item { CopyCard(state, onIncludeAiChat, onExport, onRestore) }
-        item { Text("История импортов", style = MaterialTheme.typography.titleMedium) }
+        item { Text(stringResource(R.string.backup_history_title), style = MaterialTheme.typography.titleMedium) }
         if (state.history.isEmpty()) {
-            item { Secondary("Импортов ещё не было.") }
+            item { Secondary(stringResource(R.string.backup_history_empty)) }
         } else {
             items(state.history, key = { it.id }) { HistoryRow(it) }
         }
-        item { Secondary("GPS-трек из бэкапа Car Scanner не переносится.", Modifier.padding(bottom = 16.dp)) }
+        item { Secondary(stringResource(R.string.backup_no_gps), Modifier.padding(bottom = 16.dp)) }
     }
     state.copy.pendingRestore?.let { pending ->
         AlertDialog(
             onDismissRequest = onDismissRestore,
-            title = { Text("Восстановить копию?") },
+            title = { Text(stringResource(R.string.backup_restore_title)) },
             text = {
-                Text(
-                    "Копия от ${EcuDates.dateTime(pending.manifest.createdAtMs)} (версия ${pending.manifest.appVersion}) заменит текущие " +
-                        "записи, поездки, машины и настройки на этом телефоне. Ключи API останутся. После восстановления приложение перезапустится.",
-                )
+                Text(stringResource(R.string.backup_restore_text, EcuDates.dateTime(pending.manifest.createdAtMs), pending.manifest.appVersion))
             },
-            confirmButton = { Button(onClick = onConfirmRestore, enabled = !state.importing) { Text("Заменить данные") } },
-            dismissButton = { TextButton(onClick = onDismissRestore) { Text("Отмена") } },
+            confirmButton = { Button(onClick = onConfirmRestore, enabled = !state.importing) { Text(stringResource(R.string.backup_replace_data)) } },
+            dismissButton = { TextButton(onClick = onDismissRestore) { Text(stringResource(CoreUiR.string.common_cancel)) } },
         )
     }
 }
@@ -122,29 +122,34 @@ private fun CarScannerCard(state: BackupUiState, onPickFile: () -> Unit, onPickF
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Car Scanner", style = MaterialTheme.typography.titleMedium)
-            Secondary("Повторный импорт добавляет только новое: записи, поездки, события ошибок. Ваши правки профиля машины не перезаписываются.")
+            Secondary(stringResource(R.string.backup_cs_note))
             when (val s = state.importState) {
                 is ImportWorkState.Running -> {
-                    Text(if (s.total > 0) "Импорт… записи ${s.done} из ${s.total}" else "Импорт… подготовка бэкапа")
+                    Text(if (s.total > 0) stringResource(R.string.backup_progress, s.done, s.total) else stringResource(R.string.backup_progress_prepare))
                     if (s.total > 0) LinearProgressIndicator(progress = { s.done.toFloat() / s.total }, modifier = Modifier.fillMaxWidth())
                     else LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Secondary("Можно свернуть приложение — импорт продолжится, прогресс в уведомлении.")
-                    OutlinedButton(onClick = onCancel) { Text("Отменить импорт") }
+                    Secondary(stringResource(R.string.backup_background_note))
+                    OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.backup_cancel_import)) }
                 }
-                is ImportWorkState.Finished -> state.history.firstOrNull()?.let { Text(reportText(it)) } ?: s.error?.let { Text(it) }
+                is ImportWorkState.Finished -> state.history.firstOrNull()?.let { Text(reportText(it).asString()) } ?: s.error?.let { Text(it) }
                 ImportWorkState.Idle -> Unit
             }
-            FilledTonalButton(onClick = onPickFile, enabled = !state.importing) { Text("Выбрать файл .cbz") }
+            FilledTonalButton(onClick = onPickFile, enabled = !state.importing) { Text(stringResource(R.string.backup_pick_file)) }
             HorizontalDivider()
-            Text("Папка бэкапов Car Scanner", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.backup_folder_title), style = MaterialTheme.typography.titleSmall)
             Secondary(
-                state.folderUri?.let { "Папка: ${state.folderName ?: "выбрана"}" + (state.newest?.let { n -> "\nНовый бэкап: ${n.name} (${EcuDates.dateTime(n.lastModifiedMs)})" } ?: "\nВ папке нет файлов .cbz") }
-                    ?: "Выберите папку, куда Car Scanner сохраняет бэкапы, — тогда новый бэкап импортируется одной кнопкой.",
+                if (state.folderUri != null) {
+                    stringResource(R.string.backup_folder, state.folderName ?: stringResource(R.string.backup_folder_selected)) + "\n" +
+                        (state.newest?.let { n -> stringResource(R.string.backup_folder_newest, n.name, EcuDates.dateTime(n.lastModifiedMs)) }
+                            ?: stringResource(R.string.backup_folder_no_cbz))
+                } else {
+                    stringResource(R.string.backup_folder_hint)
+                },
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onPickFolder, enabled = !state.importing) { Text(if (state.folderUri == null) "Выбрать папку" else "Сменить папку") }
+                OutlinedButton(onClick = onPickFolder, enabled = !state.importing) { Text(stringResource(if (state.folderUri == null) R.string.backup_pick_folder else R.string.backup_change_folder)) }
                 if (state.folderUri != null) {
-                    Button(onClick = onImportNewest, enabled = !state.importing && state.newest != null) { Text("Импортировать новый бэкап") }
+                    Button(onClick = onImportNewest, enabled = !state.importing && state.newest != null) { Text(stringResource(R.string.backup_import_newest)) }
                 }
             }
         }
@@ -155,19 +160,19 @@ private fun CarScannerCard(state: BackupUiState, onPickFile: () -> Unit, onPickF
 private fun CopyCard(state: BackupUiState, onIncludeAiChat: (Boolean) -> Unit, onExport: () -> Unit, onRestore: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Резервная копия ECULense", style = MaterialTheme.typography.titleMedium)
-            Secondary("Один файл .eculense: записи, поездки, машины, ТО и настройки. Ключи API, токены, скачанные справочники и модели в копию не входят.")
+            Text(stringResource(R.string.backup_copy_title), style = MaterialTheme.typography.titleMedium)
+            Secondary(stringResource(R.string.backup_copy_note))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = state.includeAiChat, onCheckedChange = onIncludeAiChat)
-                Text("Включить историю чата ИИ")
+                Text(stringResource(R.string.backup_include_ai_chat))
             }
             // with large fonts two buttons don't fit on one line, so wrap the second button rather than the text «Восстановит/ь»
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = onExport, enabled = !state.copy.busy) { Text("Сохранить копию") }
-                OutlinedButton(onClick = onRestore, enabled = !state.copy.busy && !state.importing) { Text("Восстановить") }
+                FilledTonalButton(onClick = onExport, enabled = !state.copy.busy) { Text(stringResource(R.string.backup_save_copy)) }
+                OutlinedButton(onClick = onRestore, enabled = !state.copy.busy && !state.importing) { Text(stringResource(R.string.backup_restore)) }
             }
             if (state.copy.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.copy.message?.let { Text(it) }
+            state.copy.message?.let { Text(it.asString()) }
         }
     }
 }
@@ -176,7 +181,7 @@ private fun CopyCard(state: BackupUiState, onIncludeAiChat: (Boolean) -> Unit, o
 private fun HistoryRow(item: ImportHistoryItem) {
     ListItem(
         headlineContent = { Text("${EcuDates.dateTime(item.startedAtMs)} · ${item.fileName}") },
-        supportingContent = { Text(historyLine(item)) },
+        supportingContent = { Text(historyLine(item).asString()) },
     )
 }
 
@@ -186,21 +191,30 @@ private fun Secondary(text: String, modifier: Modifier = Modifier) {
 }
 
 /** Result of the last import: exactly what was added and updated (visibility of system status). */
-internal fun reportText(item: ImportHistoryItem): String = when (item.status) {
-    ImportStatus.DONE -> "Готово: " + historyLine(item)
-    ImportStatus.CANCELLED -> item.message ?: "Импорт отменён"
-    ImportStatus.FAILED -> "Импорт не удался: ${item.message.orEmpty()}"
+internal fun reportText(item: ImportHistoryItem): UiText = when (item.status) {
+    ImportStatus.DONE -> UiText.Res(R.string.backup_report_done, listOf(historyLine(item)))
+    ImportStatus.CANCELLED -> item.message?.let { UiText.Raw(it) } ?: UiText.Res(R.string.backup_report_cancelled)
+    ImportStatus.FAILED -> UiText.Res(R.string.backup_report_failed, listOf(item.message.orEmpty()))
 }
 
-internal fun historyLine(item: ImportHistoryItem): String = when (item.status) {
-    ImportStatus.FAILED -> "Ошибка: ${item.message.orEmpty()}"
-    ImportStatus.CANCELLED -> item.message ?: "Отменён"
-    ImportStatus.DONE -> buildList {
-        add("записи +${item.recordingsAdded}" + if (item.recordingsSkipped > 0) " (уже были ${item.recordingsSkipped})" else "")
-        add("поездки +${item.tripsAdded}" + if (item.tripsUpdated > 0) ", обновлено ${item.tripsUpdated}" else "")
-        add("события ошибок +${item.dtcAdded}")
-        if (item.carFieldsUpdated > 0) add("профиль машины: обновлено полей ${item.carFieldsUpdated}")
-        if (item.unitsUpdated) add("единицы из бэкапа")
-        if (item.errors > 0) add("ошибок ${item.errors}")
-    }.joinToString(" · ")
+internal fun historyLine(item: ImportHistoryItem): UiText = when (item.status) {
+    ImportStatus.FAILED -> UiText.Res(R.string.backup_line_failed, listOf(item.message.orEmpty()))
+    ImportStatus.CANCELLED -> item.message?.let { UiText.Raw(it) } ?: UiText.Res(R.string.backup_line_cancelled)
+    ImportStatus.DONE -> UiText.Joined(historyParts(item))
+}
+
+/** What a finished import changed, one part per kind of data. */
+internal fun historyParts(item: ImportHistoryItem): List<UiText> = buildList {
+    add(
+        if (item.recordingsSkipped > 0) UiText.Res(R.string.backup_line_recordings_skipped, listOf(item.recordingsAdded, item.recordingsSkipped))
+        else UiText.Res(R.string.backup_line_recordings, listOf(item.recordingsAdded)),
+    )
+    add(
+        if (item.tripsUpdated > 0) UiText.Res(R.string.backup_line_trips_updated, listOf(item.tripsAdded, item.tripsUpdated))
+        else UiText.Res(R.string.backup_line_trips, listOf(item.tripsAdded)),
+    )
+    add(UiText.Res(R.string.backup_line_dtc, listOf(item.dtcAdded)))
+    if (item.carFieldsUpdated > 0) add(UiText.Res(R.string.backup_line_car_fields, listOf(item.carFieldsUpdated)))
+    if (item.unitsUpdated) add(UiText.Res(R.string.backup_line_units))
+    if (item.errors > 0) add(UiText.Res(R.string.backup_line_errors, listOf(item.errors)))
 }

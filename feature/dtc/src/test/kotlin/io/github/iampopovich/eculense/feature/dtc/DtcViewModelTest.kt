@@ -14,9 +14,10 @@ import io.github.iampopovich.eculense.core.obd.ObdConnectionManager
 import io.github.iampopovich.eculense.core.obd.ObdTransport
 import io.github.iampopovich.eculense.core.obd.ScriptedTransport
 import io.github.iampopovich.eculense.core.obd.TransportFactory
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -81,9 +82,9 @@ class DtcViewModelTest {
         val info = DtcInfo("P0171", "System Too Lean Bank 1", DtcSource.OBDEX, causes = listOf("Air leak", "MAF", "Fuel pump", "Extra"))
         assertEquals(
             "Объясни код ошибки P0171 (System Too Lean Bank 1). Частые причины по базе OBDex: Air leak; MAF; Fuel pump: причины, что проверить, насколько срочно.",
-            askAiPrompt("P0171", info),
+            askAiPrompt("P0171", info, ruStrings),
         )
-        assertTrue(askAiPrompt("P1847", DtcInfo("P1847", null, DtcSource.OEM_UNKNOWN)).contains("расшифровка неизвестна"))
+        assertTrue(askAiPrompt("P1847", DtcInfo("P1847", null, DtcSource.OEM_UNKNOWN), ruStrings).contains("расшифровка неизвестна"))
     }
 
     @Test
@@ -155,7 +156,19 @@ class DtcViewModelTest {
     fun `not connected gives an error message`() = runTest {
         val vm = DtcViewModel(FakeConnectionController(session = null), descriptions, FakeDtcRepository(), emptyList())
         vm.read()
-        assertEquals("Нет подключения к адаптеру", vm.uiState.value.error)
+        assertEquals(UiText.Res(R.string.dtc_err_no_connection), vm.uiState.value.error)
         assertFalse(vm.uiState.value.checked)
     }
+}
+
+/** The Russian resource texts the prompt test checks (JVM tests have no resources). */
+private val ruStrings: (Int, List<Any>) -> String = { id, args ->
+    val format = when (id) {
+        R.string.dtc_ask_ai_code -> "Объясни код ошибки %1${'$'}s"
+        R.string.dtc_ask_ai_oem_unknown -> "заводской код производителя, расшифровка неизвестна"
+        R.string.dtc_ask_ai_causes -> "Частые причины по базе OBDex: %1${'$'}s"
+        R.string.dtc_ask_ai_tail -> "причины, что проверить, насколько срочно."
+        else -> error("unexpected id ${'$'}id")
+    }
+    format.format(*args.toTypedArray())
 }

@@ -3,11 +3,13 @@ package io.github.iampopovich.eculense.feature.aichat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.iampopovich.eculense.core.ai.ChatEvent
+import io.github.iampopovich.eculense.core.ai.ChatMessage
 import io.github.iampopovich.eculense.core.ai.ChatPrefs
 import io.github.iampopovich.eculense.core.ai.ExpertNote
-import io.github.iampopovich.eculense.core.ai.ProviderInfo
-import io.github.iampopovich.eculense.core.ai.ChatMessage
 import io.github.iampopovich.eculense.core.ai.LlmGateway
+import io.github.iampopovich.eculense.core.ai.ProviderInfo
+import io.github.iampopovich.eculense.core.ui.UiText
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,18 +17,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 /** Question awaiting consent: which data goes to which provider. */
 internal data class ConsentRequest(val provider: ProviderInfo, val text: String)
 
 /** «Над ответом работали: …» and expandable «Заметки экспертов». */
-internal data class ExpertsInfo(val roles: List<String>, val notes: List<ExpertNote>)
+internal data class ExpertsInfo(val roles: List<UiText>, val notes: List<ExpertNote>)
 
 internal data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val streaming: Boolean = false,
-    val error: String? = null,
+    val error: UiText? = null,
     /** Index of the answer the user stopped with the «Стоп» button (label «Ответ остановлен»). */
     val stoppedIndex: Int? = null,
     /** Car data tools are connected: show the toggle. */
@@ -34,7 +35,7 @@ internal data class ChatUiState(
     /** «Использовать данные моей машины». */
     val useCarData: Boolean = false,
     /** What the AI is looking at now («ИИ смотрит ошибки…») while a tool call is running. */
-    val toolStatus: String? = null,
+    val toolStatus: UiText? = null,
     /** Chat runs on the on-phone model: an honest note about quality and speed. */
     val onDevice: Boolean = false,
     /** Waiting for consent to send car data to this provider. */
@@ -190,9 +191,9 @@ internal class ChatViewModel(
                 gateway.chat(conversationId, question, useCarData).collect { event ->
                     _uiState.update { s ->
                         when (event) {
-                            is ChatEvent.ToolCall -> s.copy(toolStatus = event.label)
-                            is ChatEvent.Status -> s.copy(toolStatus = event.label)
-                            is ChatEvent.Experts -> s.copy(experts = s.experts + (s.messages.lastIndex to ExpertsInfo(event.roles, event.notes)))
+                            is ChatEvent.ToolCall -> s.copy(toolStatus = ChatTexts.toolCall(event))
+                            is ChatEvent.Status -> s.copy(toolStatus = ChatTexts.status(event))
+                            is ChatEvent.Experts -> s.copy(experts = s.experts + (s.messages.lastIndex to ChatTexts.experts(event)))
                             is ChatEvent.Text -> {
                                 val last = s.messages.last()
                                 s.copy(messages = s.messages.dropLast(1) + last.copy(text = last.text + event.delta), toolStatus = null)
@@ -203,7 +204,7 @@ internal class ChatViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "Ошибка ИИ", messages = it.messages.filterNot { m -> m.text.isEmpty() }) }
+                _uiState.update { it.copy(error = e.message?.let { m -> UiText.Raw(m) } ?: UiText.Res(R.string.aichat_error_generic), messages = it.messages.filterNot { m -> m.text.isEmpty() }) }
             } finally {
                 // a stopped stream must not reset the state of an already started next request
                 if (gen == generation) _uiState.update { it.copy(streaming = false, toolStatus = null) }

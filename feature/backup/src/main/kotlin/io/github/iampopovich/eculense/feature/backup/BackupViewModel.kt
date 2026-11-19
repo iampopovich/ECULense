@@ -10,6 +10,7 @@ import io.github.iampopovich.eculense.core.backup.ImportService
 import io.github.iampopovich.eculense.core.backup.ImportWorkState
 import io.github.iampopovich.eculense.core.data.ImportHistoryItem
 import io.github.iampopovich.eculense.core.data.ImportHistoryRepository
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +28,7 @@ import kotlinx.coroutines.withContext
 /** «Резервная копия ECULense» block: what is happening now and what to show. */
 internal data class CopyState(
     val busy: Boolean = false,
-    val message: String? = null,
+    val message: UiText? = null,
     /** Backup selected for restore — awaits confirmation «заменит текущие данные». */
     val pendingRestore: PendingRestore? = null,
 )
@@ -98,8 +99,7 @@ internal class BackupViewModel(
 
     fun export(uri: Uri) = copyJob {
         val manifest = backup.export(uri, state.value.includeAiChat)
-        val parts = listOf("база данных") + (if ("ai_chat.db" in manifest.databases) listOf("история чата ИИ") else emptyList()) + "настройки"
-        "Копия сохранена: ${parts.joinToString(", ")}. Ключи API и токены в копию не входят."
+        UiText.Res(if ("ai_chat.db" in manifest.databases) R.string.backup_saved_with_chat else R.string.backup_saved)
     }
 
     fun pickRestore(uri: Uri) = copyJob {
@@ -117,13 +117,13 @@ internal class BackupViewModel(
         copyJob {
             backup.restore(Uri.parse(pending.uri))
             backup.restartApp()
-            "Копия восстановлена, приложение перезапускается…"
+            UiText.Res(R.string.backup_restored)
         }
     }
 
     fun clearMessage() = copy.update { it.copy(message = null) }
 
-    private fun copyJob(block: suspend () -> String?) {
+    private fun copyJob(block: suspend () -> UiText?) {
         if (copy.value.busy) return
         copy.update { it.copy(busy = true, message = null) }
         viewModelScope.launch {
@@ -132,7 +132,7 @@ internal class BackupViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                e.message ?: e.javaClass.simpleName
+                UiText.Raw(e.message ?: e.javaClass.simpleName)
             }
             copy.update { it.copy(busy = false, message = message ?: it.message) }
         }

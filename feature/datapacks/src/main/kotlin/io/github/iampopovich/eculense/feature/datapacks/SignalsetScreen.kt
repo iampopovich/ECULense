@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -40,40 +41,40 @@ internal fun SignalsetScreen(state: SignalsetUiState, onYear: (String) -> Unit, 
     LazyColumn(modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Машина: ${state.carTitle ?: "не выбрана"}", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.datapacks_car, state.carTitle?.asString() ?: stringResource(R.string.datapacks_car_none)), style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Опрос расширенных PID пока не поддерживается: нужны заголовки ЭБУ (ATH1/ATSH) и сервисы 21/22. Здесь — что известно OBDb о вашей модели.",
+                    stringResource(R.string.datapacks_signalset_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = state.year, onValueChange = onYear, label = { Text("Год") }, singleLine = true,
+                        value = state.year, onValueChange = onYear, label = { Text(stringResource(R.string.datapacks_year)) }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.width(120.dp),
                     )
-                    Button(onClick = onCheck, enabled = !state.loading) { Text("Проверить OBDb") }
+                    Button(onClick = onCheck, enabled = !state.loading) { Text(stringResource(R.string.datapacks_check_obdb)) }
                 }
                 if (state.loading) LinearProgressIndicator()
-                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                state.error?.let { Text(it.asString(), color = MaterialTheme.colorScheme.error) }
             }
         }
         when (val r = state.result) {
             null -> Unit
-            is SignalsetResult.NeedsProfile -> item { Text("В профиле машины не указано: ${r.missing.joinToString()}. Заполните в «Автомобиль».") }
-            is SignalsetResult.NoRepository -> item { Text("В OBDb нет репозитория ${r.repo} — для этой модели сигналов пока нет.") }
+            is SignalsetResult.NeedsProfile -> item { Text(stringResource(R.string.datapacks_needs_profile, r.missing.joinToString())) }
+            is SignalsetResult.NoRepository -> item { Text(stringResource(R.string.datapacks_no_repo, r.repo)) }
             is SignalsetResult.NotCovered -> item {
+                val gen = r.generation
                 Text(
-                    "OBDb (${r.repo}) не покрывает ${r.year} год" +
-                        (r.generation?.let { " — поколение «${it.name}», ${it.years}" } ?: "") +
-                        ": для него нет данных с реальных машин. Сигналы OBDb рассчитаны на CAN-машины более поздних поколений; " +
-                        "для этой машины расширенные PID появятся из пользовательских файлов или собственного вклада в OBDb.",
+                    if (gen != null) stringResource(R.string.datapacks_not_covered_gen, r.repo, r.year, gen.name, gen.years)
+                    else stringResource(R.string.datapacks_not_covered, r.repo, r.year),
                 )
             }
             is SignalsetResult.Covered -> {
                 item {
+                    val gen = r.generation
                     Text(
-                        "${r.repo}, ${r.year}" + (r.generation?.let { " (${it.name})" } ?: "") +
-                            ": команд ${r.commands.size}, сигналов ${r.signalCount}, ЭБУ ${r.ecus.size}. Версия ${r.version}. CC BY-SA 4.0.",
+                        if (gen != null) stringResource(R.string.datapacks_covered_gen, r.repo, r.year, r.commands.size, r.signalCount, r.ecus.size, r.version, gen.name)
+                        else stringResource(R.string.datapacks_covered, r.repo, r.year, r.commands.size, r.signalCount, r.ecus.size, r.version),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }

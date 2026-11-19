@@ -105,11 +105,11 @@ class VehicleChatAgentTest {
 
         assertEquals(
             listOf(
-                ChatEvent.Status("Диагност смотрит коды ошибок…"),
-                ChatEvent.ToolCall("dtcHistory", "Диагност смотрит ошибки…"),
+                ChatEvent.Status("Диагност смотрит коды ошибок…", ChatStatus.Role("diagnostician", 180)),
+                ChatEvent.ToolCall("dtcHistory", "Диагност смотрит ошибки…", "diagnostician"),
                 ChatEvent.Text("Код "),
                 ChatEvent.Text("P0171 — бедная смесь"),
-                ChatEvent.Experts(listOf("Диагност"), emptyList()),
+                ChatEvent.Experts(listOf("Диагност"), emptyList(), listOf("diagnostician")),
             ),
             events,
         )
@@ -230,11 +230,11 @@ class VehicleChatAgentTest {
         val events = gateway.chat("c1", "Объясни мои ошибки", useCarData = true).toList()
         assertEquals(
             listOf(
-                ChatEvent.Status(VehicleChatStrategy.THINKING),
+                ChatEvent.Status(VehicleChatStrategy.THINKING, ChatStatus.PhoneThinking),
                 ChatEvent.ToolCall("dtcHistory", "ИИ смотрит ошибки…"),
-                ChatEvent.Status(VehicleChatStrategy.THINKING),
+                ChatEvent.Status(VehicleChatStrategy.THINKING, ChatStatus.PhoneThinking),
                 ChatEvent.Text("P0171 — бедная смесь"),
-                ChatEvent.Experts(listOf("Диагност"), emptyList()),
+                ChatEvent.Experts(listOf("Диагност"), emptyList(), listOf("diagnostician")),
             ),
             events,
         )
@@ -263,7 +263,7 @@ class VehicleChatAgentTest {
         }
         val gateway = KoogLlmGateway(store(), toolbox = toolbox, onDevice = FakeOnDevice(OnDeviceSession(localInfo, localModel, exec, streaming = false, supportsTools = false)))
         val events = gateway.chat("c1", "Объясни мои ошибки", useCarData = true).toList()
-        assertEquals(ChatEvent.Status("Приложение собирает данные машины…"), events.first())
+        assertEquals(ChatEvent.Status("Приложение собирает данные машины…", ChatStatus.CollectingData), events.first())
         val system = exec.prompts.single().messages.first().textContent()
         assertTrue(system, system.contains("\"code\":\"P0171\"") && system.contains("бери только отсюда"))
         // without the «данные машины» toggle there is no digest
@@ -337,7 +337,7 @@ class VehicleChatAgentTest {
         // DeepSeekLLMClient 1.3.0 requires system_fingerprint in frames; without it the parse error is masked by Ktor as «Content-Length mismatch».
         val events = gateway.chat("c1", "Объясни мои ошибки", useCarData = true).toList()
 
-        assertEquals(ChatEvent.ToolCall("dtcHistory", "Диагност смотрит ошибки…"), events.filterIsInstance<ChatEvent.ToolCall>().first())
+        assertEquals(ChatEvent.ToolCall("dtcHistory", "Диагност смотрит ошибки…", "diagnostician"), events.filterIsInstance<ChatEvent.ToolCall>().first())
         assertEquals("P0171 дважды", events.filterIsInstance<ChatEvent.Text>().joinToString("") { it.delta })
         assertEquals(listOf(3), toolbox.calls)
         assertTrue(bodies[0], bodies[0].contains("\"tools\"") && bodies[0].contains("dtcHistory"))

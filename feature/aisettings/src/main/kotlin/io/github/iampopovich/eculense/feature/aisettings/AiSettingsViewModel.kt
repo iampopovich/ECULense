@@ -10,6 +10,8 @@ import io.github.iampopovich.eculense.core.ai.LlmSettingsStore
 import io.github.iampopovich.eculense.core.ai.ModelInfo
 import io.github.iampopovich.eculense.core.ai.OnDeviceLlm
 import io.github.iampopovich.eculense.core.ai.OnDeviceSummary
+import io.github.iampopovich.eculense.core.ai.UrlProblem
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,8 +25,8 @@ internal sealed interface CheckState {
     data object Checking : CheckState
 
     /** [listed] = false: the custom server returned no list, the model is entered manually. */
-    data class Passed(val models: List<ModelInfo>, val listed: Boolean, val message: String) : CheckState
-    data class Failed(val message: String) : CheckState
+    data class Passed(val models: List<ModelInfo>, val listed: Boolean, val message: UiText) : CheckState
+    data class Failed(val message: UiText) : CheckState
 }
 
 internal data class SavedConfig(val provider: LlmProviderKind, val model: String, val baseUrl: String, val hasKey: Boolean)
@@ -41,7 +43,7 @@ internal data class AiSettingsUiState(
     /** The address is entered only for «Другой (свой сервер)»; for presets Koog sets it. */
     val baseUrl: String = "",
     val apiKey: String = "",
-    val urlError: String? = null,
+    val urlError: UiText? = null,
     val check: CheckState = CheckState.Idle,
     val query: String = "",
     val model: String = "",
@@ -134,7 +136,7 @@ internal class AiSettingsViewModel(
         } else {
             when (val v = EndpointUrl.validate(s.baseUrl)) {
                 is EndpointUrl.Result.Invalid -> {
-                    _state.update { it.copy(urlError = v.reason, check = CheckState.Idle) }
+                    _state.update { it.copy(urlError = v.problem.text(), check = CheckState.Idle) }
                     return
                 }
                 is EndpointUrl.Result.Valid -> v.url
@@ -156,7 +158,7 @@ internal class AiSettingsViewModel(
                 current.copy(
                     check = next,
                     model = keep.orEmpty(),
-                    urlError = (result as? ConnectionCheck.InvalidUrl)?.reason,
+                    urlError = (result as? ConnectionCheck.InvalidUrl)?.problem?.text(),
                 )
             }
         }
@@ -224,26 +226,38 @@ internal class AiSettingsViewModel(
 
     private fun ConnectionCheck.toCheckState(provider: LlmProviderKind): CheckState = when (this) {
         is ConnectionCheck.Ok ->
-            if (listed) CheckState.Passed(models, true, "Подключение работает: ${models.size} ${modelsWord(models.size)}")
-            else CheckState.Passed(emptyList(), false, "Сервер отвечает, но не отдаёт список моделей — введите id модели вручную.")
+            if (listed) CheckState.Passed(models, true, UiText.Plural(R.plurals.aisettings_check_ok, models.size))
+            else CheckState.Passed(emptyList(), false, UiText.Res(R.string.aisettings_check_unlisted))
         ConnectionCheck.NoModels ->
-            if (provider == LlmProviderKind.OLLAMA) CheckState.Failed("Ollama отвечает, но моделей нет — скачайте модель на ПК: ollama pull llama3.2")
-            else CheckState.Failed("Сервер ответил, но список моделей пуст.")
-        ConnectionCheck.KeyMissing -> CheckState.Failed("Введите API-ключ.")
-        is ConnectionCheck.InvalidUrl -> CheckState.Failed(reason)
-        is ConnectionCheck.Unauthorized ->
-            CheckState.Failed("Неверный API-ключ (401). Проверьте, что ключ скопирован полностью.".withDetail(detail))
-        is ConnectionCheck.Blocked ->
-            CheckState.Failed("Доступ запрещён (403): провайдер блокирует запросы из этой сети или региона. Включите VPN и проверьте снова.".withDetail(detail))
-        is ConnectionCheck.Unreachable -> CheckState.Failed("Сервер недоступен: ${detail ?: "проверьте адрес и интернет"}.")
-        is ConnectionCheck.Failed -> CheckState.Failed("Сервер ответил ошибкой $status.".withDetail(detail))
+            if (provider == LlmProviderKind.OLLAMA) CheckState.Failed(UiText.Res(R.string.aisettings_err_ollama_empty))
+            else CheckState.Failed(UiText.Res(R.string.aisettings_err_empty_catalog))
+        ConnectionCheck.KeyMissing -> CheckState.Failed(UiText.Res(R.string.aisettings_err_key_missing))
+        is ConnectionCheck.InvalidUrl -> CheckState.Failed(problem.text())
+        is ConnectionCheck.Unauthorized -> CheckState.Failed(UiText.Res(R.string.aisettings_err_401).withDetail(detail))
+        is ConnectionCheck.Blocked -> CheckState.Failed(UiText.Res(R.string.aisettings_err_403).withDetail(detail))
+        is ConnectionCheck.Unreachable -> CheckState.Failed(
+            UiText.Res(
+                R.string.aisettings_err_unreachable,
+                listOf(detail?.let { UiText.Raw(it) } ?: UiText.Res(R.string.aisettings_err_unreachable_hint)),
+            ),
+        )
+        is ConnectionCheck.Failed -> CheckState.Failed(UiText.Res(R.string.aisettings_err_status, listOf(status)).withDetail(detail))
     }
 
-    private fun String.withDetail(detail: String?) = if (detail.isNullOrBlank()) this else "$this Ответ сервера: «$detail»"
-
-    private fun modelsWord(n: Int): String = when {
-        n % 10 == 1 && n % 100 != 11 -> "модель"
-        n % 10 in 2..4 && n % 100 !in 12..14 -> "модели"
-        else -> "моделей"
-    }
+    /** The server's own reason is shown verbatim after our localized explanation. */
+    private fun UiText.withDetail(detail: String?): UiText =
+        if (detail.isNullOrBlank()) this else UiText.Res(R.string.aisettings_with_detail, listOf(this, UiText.Raw(detail)))
 }
+
+internal fun UrlProblem.text(): UiText = UiText.Res(
+    when (this) {
+        UrlProblem.EMPTY -> R.string.aisettings_url_empty
+        UrlProblem.WHITESPACE -> R.string.aisettings_url_whitespace
+        UrlProblem.MALFORMED -> R.string.aisettings_url_malformed
+        UrlProblem.SCHEME -> R.string.aisettings_url_scheme
+        UrlProblem.PORT -> R.string.aisettings_url_port
+        UrlProblem.NO_HOST -> R.string.aisettings_url_no_host
+        UrlProblem.QUERY -> R.string.aisettings_url_query
+        UrlProblem.PUBLIC_HTTP -> R.string.aisettings_url_public_http
+    },
+)

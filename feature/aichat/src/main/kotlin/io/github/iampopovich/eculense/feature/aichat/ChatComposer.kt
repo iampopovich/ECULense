@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 
@@ -61,7 +62,7 @@ internal fun ChatComposer(
                 decorationBox = { inner ->
                     Box(contentAlignment = Alignment.CenterStart) {
                         if (value.isEmpty()) {
-                            Text("Спросите о машине или ошибке", style = textStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.aichat_input_hint), style = textStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         inner()
                     }
@@ -69,11 +70,11 @@ internal fun ChatComposer(
             )
             if (streaming) {
                 FilledTonalIconButton(onClick = onStop) {
-                    Icon(painterResource(R.drawable.ic_stop), contentDescription = "Остановить ответ")
+                    Icon(painterResource(R.drawable.ic_stop), contentDescription = stringResource(R.string.aichat_stop))
                 }
             } else {
                 FilledIconButton(onClick = onSend, enabled = value.isNotBlank()) {
-                    Icon(painterResource(R.drawable.ic_arrow_up), contentDescription = "Отправить")
+                    Icon(painterResource(R.drawable.ic_arrow_up), contentDescription = stringResource(R.string.aichat_send))
                 }
             }
         }

@@ -7,10 +7,12 @@ import io.github.iampopovich.eculense.core.ai.LlmProviderKind
 import io.github.iampopovich.eculense.core.ai.LlmSettings
 import io.github.iampopovich.eculense.core.ai.LlmSettingsStore
 import io.github.iampopovich.eculense.core.ai.ModelInfo
-import io.github.iampopovich.eculense.core.ai.SecretCipher
 import io.github.iampopovich.eculense.core.ai.OnDeviceLlm
 import io.github.iampopovich.eculense.core.ai.OnDeviceSession
 import io.github.iampopovich.eculense.core.ai.OnDeviceSummary
+import io.github.iampopovich.eculense.core.ai.SecretCipher
+import io.github.iampopovich.eculense.core.ui.UiText
+import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +33,6 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import java.io.File
 
 /** Answers with the given result; [gate] lets the check "hang" so the Checking state can be observed. */
 private class FakeChecker(var result: ConnectionCheck) : ConnectionChecker {
@@ -156,7 +157,7 @@ class AiSettingsViewModelTest {
         vm.selectProvider(LlmProviderKind.OTHER)
         vm.setBaseUrl("openrouter.ai")
         vm.check()
-        assertEquals("Адрес должен начинаться с http:// или https://", vm.state.value.urlError)
+        assertEquals(UiText.Res(R.string.aisettings_url_scheme), vm.state.value.urlError)
         assertTrue(checker.calls.isEmpty())
         assertFalse(vm.state.value.modelStepEnabled)
     }
@@ -173,7 +174,7 @@ class AiSettingsViewModelTest {
         waitUntil { vm.state.value.check is CheckState.Passed }
 
         val s = vm.state.value
-        assertEquals("Подключение работает: 3 модели", (s.check as CheckState.Passed).message)
+        assertEquals(UiText.Plural(R.plurals.aisettings_check_ok, 3), (s.check as CheckState.Passed).message)
         // Preset: the address is not passed — the Koog client defines it.
         assertEquals(listOf(Triple(LlmProviderKind.OPENROUTER, null, "sk-or-test")), checker.calls)
         assertTrue(s.modelStepEnabled)
@@ -210,23 +211,36 @@ class AiSettingsViewModelTest {
         vm.setApiKey("sk-or-invalid")
         vm.checkAndWait()
         val unauthorized = (vm.state.value.check as CheckState.Failed).message
-        assertTrue(unauthorized, unauthorized.startsWith("Неверный API-ключ (401)"))
-        assertTrue(unauthorized, unauthorized.contains("User not found."))
+        assertEquals(
+            UiText.Res(R.string.aisettings_with_detail, listOf(UiText.Res(R.string.aisettings_err_401), UiText.Raw("User not found."))),
+            unauthorized,
+        )
         assertFalse(vm.state.value.modelStepEnabled)
 
         checker.result = ConnectionCheck.Blocked("Access denied by security policy.")
         vm.checkAndWait()
         val blocked = (vm.state.value.check as CheckState.Failed).message
-        assertTrue(blocked, blocked.contains("403") && blocked.contains("VPN") && blocked.contains("Access denied by security policy."))
-        assertFalse(blocked, blocked.contains("Неверный"))
+        assertEquals(
+            UiText.Res(R.string.aisettings_with_detail, listOf(UiText.Res(R.string.aisettings_err_403), UiText.Raw("Access denied by security policy."))),
+            blocked,
+        )
 
-        checker.result = ConnectionCheck.Unreachable("сервер не найден (DNS) — проверьте адрес и интернет")
+        checker.result = ConnectionCheck.Unreachable("host not found (DNS)")
         vm.checkAndWait()
-        assertTrue((vm.state.value.check as CheckState.Failed).message.startsWith("Сервер недоступен"))
+        assertEquals(
+            UiText.Res(R.string.aisettings_err_unreachable, listOf(UiText.Raw("host not found (DNS)"))),
+            (vm.state.value.check as CheckState.Failed).message,
+        )
+        checker.result = ConnectionCheck.Unreachable(null)
+        vm.checkAndWait()
+        assertEquals(
+            UiText.Res(R.string.aisettings_err_unreachable, listOf(UiText.Res(R.string.aisettings_err_unreachable_hint))),
+            (vm.state.value.check as CheckState.Failed).message,
+        )
 
         checker.result = ConnectionCheck.NoModels
         vm.checkAndWait()
-        assertEquals("Сервер ответил, но список моделей пуст.", (vm.state.value.check as CheckState.Failed).message)
+        assertEquals(UiText.Res(R.string.aisettings_err_empty_catalog), (vm.state.value.check as CheckState.Failed).message)
         assertFalse(vm.state.value.modelStepEnabled)
     }
 
@@ -331,7 +345,7 @@ class AiSettingsViewModelTest {
         vm.selectProvider(LlmProviderKind.OTHER)
         vm.setBaseUrl("http://example.com/v1")
         vm.check()
-        assertTrue(vm.state.value.urlError.orEmpty(), vm.state.value.urlError.orEmpty().contains("https://"))
+        assertEquals(UiText.Res(R.string.aisettings_url_public_http), vm.state.value.urlError)
         assertTrue(checker.calls.isEmpty())
     }
 
@@ -340,8 +354,7 @@ class AiSettingsViewModelTest {
         val vm = loadedVm(FakeChecker(ConnectionCheck.NoModels))
         vm.selectProvider(LlmProviderKind.OLLAMA)
         vm.checkAndWait()
-        val message = (vm.state.value.check as CheckState.Failed).message
-        assertTrue(message, message.contains("ollama pull"))
+        assertEquals(UiText.Res(R.string.aisettings_err_ollama_empty), (vm.state.value.check as CheckState.Failed).message)
     }
 
     @Test

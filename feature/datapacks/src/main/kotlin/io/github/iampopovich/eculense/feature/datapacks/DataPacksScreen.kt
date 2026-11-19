@@ -21,14 +21,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.datapacks.PackState
 import io.github.iampopovich.eculense.core.navigation.AboutDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import io.github.iampopovich.eculense.core.navigation.SignalsetDestination
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
+import io.github.iampopovich.eculense.core.ui.UiText
 import org.koin.compose.viewmodel.koinViewModel
-import java.util.Locale
 
 @Composable
 internal fun DataPacksRoute(viewModel: DataPacksViewModel = koinViewModel()) {
@@ -67,14 +69,13 @@ internal fun DataPacksScreen(
         item {
             Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Справочники не входят в приложение: скачиваются по запросу из официальных источников без изменений. " +
-                        "Без них всё работает — со встроенной базой общих кодов.",
+                    stringResource(R.string.datapacks_intro),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onCheckUpdates, enabled = !state.checking) { Text(if (state.checking) "Проверка…" else "Проверить обновления") }
+                    OutlinedButton(onClick = onCheckUpdates, enabled = !state.checking) { Text(stringResource(if (state.checking) R.string.datapacks_checking else R.string.datapacks_check_updates)) }
                 }
-                state.checkMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                state.checkMessage?.let { Text(it.asString(), style = MaterialTheme.typography.bodySmall) }
             }
         }
         items(state.packs, key = { it.manifest.id }) { pack ->
@@ -83,18 +84,18 @@ internal fun DataPacksScreen(
         item {
             OutlinedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Расширенные PID (OBDb)", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.datapacks_obdb_title), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Сигналы заводских ЭБУ для марки, модели и года активной машины. Пока только просмотр: опрос расширенных PID появится позже.",
+                        stringResource(R.string.datapacks_obdb_text),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Text("Лицензия: CC BY-SA 4.0", style = MaterialTheme.typography.bodySmall)
-                    TextButton(onClick = onSignalsets) { Text("Открыть для моей машины") }
+                    Text(stringResource(R.string.datapacks_license, "CC BY-SA 4.0"), style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = onSignalsets) { Text(stringResource(R.string.datapacks_open_for_my_car)) }
                 }
             }
         }
         item {
-            TextButton(onClick = onAbout, modifier = Modifier.padding(bottom = 16.dp)) { Text("О приложении и источниках данных") }
+            TextButton(onClick = onAbout, modifier = Modifier.padding(bottom = 16.dp)) { Text(stringResource(R.string.datapacks_about_link)) }
         }
     }
     state.confirm?.let { c ->
@@ -102,17 +103,20 @@ internal fun DataPacksScreen(
         when (c) {
             is PackConfirm.Metered -> AlertDialog(
                 onDismissRequest = onDismiss,
-                title = { Text("Скачать по мобильной сети?") },
-                text = { Text("«$title» — ${c.pack.manifest.sizeBytes?.let(::formatSize) ?: "размер неизвестен"}. Wi-Fi не подключён, трафик может быть платным.") },
-                confirmButton = { TextButton(onClick = onConfirm) { Text("Скачать") } },
-                dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+                title = { Text(stringResource(R.string.datapacks_metered_title)) },
+                text = {
+                    val size = c.pack.manifest.sizeBytes?.let { formatSize(it).asString() } ?: stringResource(R.string.datapacks_size_unknown)
+                    Text(stringResource(R.string.datapacks_metered_text, title, size))
+                },
+                confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(R.string.datapacks_download)) } },
+                dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(CoreUiR.string.common_cancel)) } },
             )
             is PackConfirm.Delete -> AlertDialog(
                 onDismissRequest = onDismiss,
-                title = { Text("Удалить «$title»?") },
-                text = { Text("Файлы удалятся с телефона (${c.pack.installed?.sizeBytes?.let(::formatSize).orEmpty()}). Скачать заново можно в любой момент.") },
-                confirmButton = { TextButton(onClick = onConfirm) { Text("Удалить") } },
-                dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+                title = { Text(stringResource(R.string.datapacks_delete_title, title)) },
+                text = { Text(stringResource(R.string.datapacks_delete_text, c.pack.installed?.sizeBytes?.let { formatSize(it).asString() }.orEmpty())) },
+                confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(CoreUiR.string.common_delete)) } },
+                dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(CoreUiR.string.common_cancel)) } },
             )
         }
     }
@@ -132,21 +136,21 @@ private fun PackCard(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(m.title, style = MaterialTheme.typography.titleMedium)
             Text(m.description, style = MaterialTheme.typography.bodyMedium)
-            Text(statusText(pack), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text(statusText(pack).asString(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             if (pack.downloading) {
                 val p = pack.progress ?: -1
                 if (p >= 0) LinearProgressIndicator(progress = { p / 100f }, modifier = Modifier.fillMaxWidth()) else LinearProgressIndicator(Modifier.fillMaxWidth())
             }
-            pack.error?.let { Text("Ошибка: $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-            Text("Лицензия: ${m.license}", style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = { runCatching { uri.openUri(m.sourceUrl) } }) { Text("Источник: " + m.sourceUrl.removePrefix("https://")) }
+            pack.error?.let { Text(stringResource(R.string.datapacks_error, it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            Text(stringResource(R.string.datapacks_license, m.license), style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = { runCatching { uri.openUri(m.sourceUrl) } }) { Text(stringResource(R.string.datapacks_source, m.sourceUrl.removePrefix("https://"))) }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when {
-                    pack.downloading -> OutlinedButton(onClick = { onCancel(pack) }) { Text("Отменить") }
-                    pack.installed == null -> Button(onClick = { onDownload(pack) }) { Text("Скачать") }
+                    pack.downloading -> OutlinedButton(onClick = { onCancel(pack) }) { Text(stringResource(R.string.datapacks_cancel)) }
+                    pack.installed == null -> Button(onClick = { onDownload(pack) }) { Text(stringResource(R.string.datapacks_download)) }
                     else -> {
-                        if (pack.updateVersion != null) Button(onClick = { onUpdate(pack) }) { Text("Обновить") }
-                        OutlinedButton(onClick = { onDelete(pack) }) { Text("Удалить") }
+                        if (pack.updateVersion != null) Button(onClick = { onUpdate(pack) }) { Text(stringResource(R.string.datapacks_update)) }
+                        OutlinedButton(onClick = { onDelete(pack) }) { Text(stringResource(CoreUiR.string.common_delete)) }
                     }
                 }
             }
@@ -155,18 +159,20 @@ private fun PackCard(
 }
 
 /** «Не скачан · 57,3 МБ», «Скачивается 42 %», «Версия v1.0.3 · 57,3 МБ», «… · доступно обновление v1.0.4». */
-internal fun statusText(pack: PackState): String {
+internal fun statusText(pack: PackState): UiText {
     val p = pack.progress
     val installed = pack.installed
     return when {
-        pack.downloading -> if (p != null && p >= 0) "Скачивается $p %" else "Скачивается…"
-        installed == null -> "Не скачан" + (pack.manifest.sizeBytes?.let { " · ${formatSize(it)}" } ?: "")
-        else -> "Версия ${installed.version} · ${formatSize(installed.sizeBytes)}" +
-            (pack.updateVersion?.let { " · доступно обновление $it" } ?: "")
+        pack.downloading ->
+            if (p != null && p >= 0) UiText.Res(R.string.datapacks_status_downloading_pct, listOf(p)) else UiText.Res(R.string.datapacks_status_downloading)
+        installed == null -> pack.manifest.sizeBytes?.let { UiText.Res(R.string.datapacks_status_not_downloaded_size, listOf(formatSize(it))) }
+            ?: UiText.Res(R.string.datapacks_status_not_downloaded)
+        else -> pack.updateVersion?.let { UiText.Res(R.string.datapacks_status_installed_update, listOf(installed.version, formatSize(installed.sizeBytes), it)) }
+            ?: UiText.Res(R.string.datapacks_status_installed, listOf(installed.version, formatSize(installed.sizeBytes)))
     }
 }
 
-internal fun formatSize(bytes: Long): String {
+internal fun formatSize(bytes: Long): UiText {
     val mb = bytes / 1024.0 / 1024.0
-    return if (mb >= 1) String.format(Locale.getDefault(), "%.1f МБ", mb) else String.format(Locale.getDefault(), "%d КБ", (bytes / 1024).coerceAtLeast(1))
+    return if (mb >= 1) UiText.Res(R.string.datapacks_size_mb, listOf(mb)) else UiText.Res(R.string.datapacks_size_kb, listOf((bytes / 1024).coerceAtLeast(1)))
 }
