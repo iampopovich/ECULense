@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import io.github.iampopovich.eculense.core.model.AppLanguage
 import java.io.IOException
 
 /**
@@ -124,7 +125,7 @@ internal object KoogClients {
         otherBaseUrl: String? = null,
         presetBaseUrlForTests: String? = null,
     ): LLMClient {
-        fun key() = apiKey?.trim()?.takeIf { it.isNotEmpty() } ?: throw IllegalStateException("Не задан API-ключ для ${kind.title}")
+        fun key() = apiKey?.trim()?.takeIf { it.isNotEmpty() } ?: throw LlmException(LlmProblem.KeyMissing)
         val test = presetBaseUrlForTests
         return when (kind) {
             LlmProviderKind.OPENROUTER -> OpenRouterLLMClient(
@@ -174,7 +175,7 @@ internal object KoogClients {
                 // The user's URL already contains the API version (…/v1), so paths are relative to it.
                 settings = OpenAIClientSettings(
                     baseUrl = otherBaseUrl?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() }
-                        ?: throw IllegalStateException("Не задан адрес сервера"),
+                        ?: throw LlmException(LlmProblem.UrlMissing),
                     timeoutConfig = timeouts,
                     chatCompletionsPath = "chat/completions",
                     responsesAPIPath = "responses",
@@ -191,7 +192,7 @@ internal object KoogClients {
         val other = if (settings.provider == LlmProviderKind.OTHER) {
             // The URL may have been saved before the check existed, so plain http to the internet is rejected here too.
             when (val v = EndpointUrl.validate(settings.baseUrl)) {
-                is EndpointUrl.Result.Invalid -> throw IllegalStateException(v.reason)
+                is EndpointUrl.Result.Invalid -> throw LlmException(LlmProblem.InvalidUrl(v.problem))
                 is EndpointUrl.Result.Valid -> v.url
             }
         } else {
@@ -202,31 +203,32 @@ internal object KoogClients {
     }
 }
 
-/** Translates Koog/network exceptions into readable text. The key is stripped if it ever ends up in the server response. */
+/** Translates Koog/network exceptions into a typed [LlmProblem]. The key is stripped if it ever ends up in the server response. */
 internal object LlmErrors {
     private val providerMessage = Regex("\"(?:message|error)\"\\s*:\\s*\"([^\"]{1,200})\"")
 
     fun describe(error: Throwable, apiKey: String?): LlmException {
         if (error is LlmException) return error
         val chain = generateSequence(error) { it.cause }.take(10).toList()
+        chain.firstOrNull { it is LlmException }?.let { return it as LlmException }
         val http = chain.filterIsInstance<KoogHttpClientException>().firstOrNull { it.statusCode != null }
         val status = http?.statusCode
-        val text = when {
-            error is IllegalStateException && chain.none { it is KoogHttpClientException } -> error.message ?: "ИИ не настроен"
-            status == 401 -> "Ошибка авторизации (401): неверный или отозванный API-ключ. Проверьте ключ в Настройки → ИИ-помощник."
-            status == 403 -> "Доступ запрещён (403): у ключа нет прав или провайдер блокирует запросы из этой сети/региона (попробуйте VPN)."
-            status == 402 -> "Недостаточно средств на счёте провайдера (402)."
-            status == 404 -> "Модель или адрес не найдены (404): проверьте название модели."
-            status == 429 -> "Слишком много запросов (429): подождите и повторите."
-            status != null && status >= 500 -> "Сервер провайдера недоступен ($status). Попробуйте позже."
-            status != null -> "Провайдер отклонил запрос ($status)."
-            chain.any { it is IOException } -> "Нет связи с сервером ИИ: проверьте интернет и адрес сервера."
-            else -> "Не удалось получить ответ ИИ (${error::class.simpleName})."
+        fun redact(text: String) = apiKey?.takeIf { it.length >= 4 }?.let { text.replace(it, "***") } ?: text
+        val problem = when {
+            error is IllegalStateException && chain.none { it is KoogHttpClientException } ->
+                LlmProblem.Other(redact(error.message ?: error::class.simpleName.orEmpty()))
+            status == 401 -> LlmProblem.Unauthorized
+            status == 403 -> LlmProblem.Forbidden
+            status == 402 -> LlmProblem.PaymentRequired
+            status == 404 -> LlmProblem.NotFound
+            status == 429 -> LlmProblem.RateLimited
+            status != null && status >= 500 -> LlmProblem.ServerDown(status)
+            status != null -> LlmProblem.Rejected(status)
+            chain.any { it is IOException } -> LlmProblem.Network
+            else -> LlmProblem.Other(error::class.simpleName.orEmpty())
         }
-        val detail = http?.errorBody?.let { providerMessage.find(it)?.groupValues?.get(1) }
-        val full = if (detail != null) "$text Ответ сервера: «$detail»" else text
-        val safe = apiKey?.takeIf { it.length >= 4 }?.let { full.replace(it, "***") } ?: full
-        return LlmException(safe, status, error)
+        val detail = http?.errorBody?.let { providerMessage.find(it)?.groupValues?.get(1) }?.let(::redact)
+        return LlmException(problem, detail, error)
     }
 }
 
@@ -238,9 +240,11 @@ internal class KoogLlmGateway(
     private val onDevice: OnDeviceLlm? = null,
     /** Dispatcher: question → type, experts, period (deterministic, no model). */
     private val router: (String) -> ChatRoute = { ChatRouter.route(it) },
-    /** How long to wait for one cloud expert; if it misses the deadline, the editor gets «эксперт недоступен». */
+    /** How long to wait for one cloud expert; if it misses the deadline, the editor gets «expert unavailable». */
     private val expertTimeoutMs: Long = 120_000,
     private val expertLog: (String) -> Unit = { msg -> runCatching { android.util.Log.w("EcuExperts", msg) } },
+    /** App language; read on every question (the user may switch it between questions). */
+    private val language: AppLanguage = AppLanguage.ENGLISH,
     private val executorFactory: (LlmSettings, String?) -> PromptExecutor = { s, key -> KoogClients.executor(s, key) },
 ) : LlmGateway {
     override val hasVehicleTools: Boolean get() = toolbox != null
@@ -255,19 +259,20 @@ internal class KoogLlmGateway(
 
     override fun chat(conversationId: String, userText: String, useCarData: Boolean): Flow<ChatEvent> = channelFlow {
         val route = router(userText)
+        val lang = language.tag()
         val local = try {
             onDevice?.session()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            throw LlmException("Модель на телефоне не загрузилась: ${e.message ?: e::class.simpleName}", cause = e)
+            throw LlmException(LlmProblem.OnDeviceLoad(e.message ?: e::class.simpleName.orEmpty()), cause = e)
         }
         if (local != null) {
-            chatOnDevice(local, route, conversationId, userText, useCarData)
+            chatOnDevice(local, route, lang, conversationId, userText, useCarData)
             // the executor belongs to :core:ailocal (the engine is kept between questions), so we do not close it
             return@channelFlow
         }
-        val settings = store.settings.first()?.takeIf { it.model.isNotBlank() } ?: throw LlmException(NOT_CONFIGURED)
+        val settings = store.settings.first()?.takeIf { it.model.isNotBlank() } ?: throw LlmException(LlmProblem.NotConfigured)
         val apiKey = store.apiKey()
         val tools = toolbox?.takeIf { useCarData }
         val executor = try {
@@ -278,25 +283,24 @@ internal class KoogLlmGateway(
         val model = KoogClients.model(settings)
         try {
             when {
-                // no car data, or the question is not about the car («привет»): no experts, format by question
+                // no car data, or the question is not about the car (a greeting): no experts, format by question
                 tools == null || route.roles.isEmpty() ->
-                    runAgent(executor, model, null, conversationId, userText, streaming = true, system = SystemPrompts.general(route.intent))
+                    runAgent(executor, model, null, conversationId, userText, streaming = true, system = SystemPrompts.general(route.intent, lang))
                 // a single role answers by itself, streamed, without the editor
                 route.roles.size == 1 -> {
                     val role = route.roles.single()
-                    send(ChatEvent.Status(role.statusText(route.periodDays), ChatStatus.Role(role.id, route.periodDays)))
+                    send(ChatEvent.Status(ChatStatus.Role(role.id, route.periodDays)))
                     runAgent(
                         executor, model, tools, conversationId, userText, streaming = true,
-                        system = SystemPrompts.direct(role, route), registry = tools.registry(role.tools), label = roleLabel(role, tools),
-                        roleId = role.id,
+                        system = SystemPrompts.direct(role, route, lang), registry = tools.registry(role.tools), roleId = role.id,
                     )
-                    send(ChatEvent.Experts(listOf(role.title), emptyList(), listOf(role.id)))
+                    send(ChatEvent.Experts(listOf(role.id), emptyList()))
                 }
                 else -> {
-                    val notes = experts(executor, model, tools, route, conversationId, userText)
-                    send(ChatEvent.Experts(route.roles.map { it.title }, notes, route.roles.map { it.id }))
-                    send(ChatEvent.Status(EDITOR_STATUS, ChatStatus.Editor))
-                    runAgent(executor, model, null, conversationId, userText, streaming = true, system = SystemPrompts.editor(route, notes))
+                    val notes = experts(executor, model, tools, route, lang, conversationId, userText)
+                    send(ChatEvent.Experts(route.roles.map { it.id }, notes))
+                    send(ChatEvent.Status(ChatStatus.Editor))
+                    runAgent(executor, model, null, conversationId, userText, streaming = true, system = SystemPrompts.editor(route, notes, lang))
                 }
             }
         } catch (e: CancellationException) {
@@ -309,28 +313,29 @@ internal class KoogLlmGateway(
     }
 
     /**
-     * On-phone model (≈ 90 s per call): a single call answering "in the roles" of all selected experts at once; data is a summary of only
-     * the sections the question needs (trends for the period for «как машина вела себя»), not everything.
+     * On-phone model (≈ 90 s per call): a single call answering "in the roles" of all selected experts at once; data is a digest of only
+     * the sections the question needs (trends for the period for «how did my car behave»), not everything.
      */
     private suspend fun kotlinx.coroutines.channels.ProducerScope<ChatEvent>.chatOnDevice(
         local: OnDeviceSession,
         route: ChatRoute,
+        lang: String,
         conversationId: String,
         userText: String,
         useCarData: Boolean,
     ) {
         val tools = toolbox?.takeIf { useCarData && local.supportsTools && route.roles.isNotEmpty() }
-        // Model without tools: car data goes as a summary in the system prompt, the app computes the numbers.
+        // Model without tools: car data goes as a digest in the system prompt, the app computes the numbers.
         val digest = if (useCarData && toolbox != null && !local.supportsTools && route.roles.isNotEmpty()) {
-            send(ChatEvent.Status("Приложение собирает данные машины…", ChatStatus.CollectingData))
+            send(ChatEvent.Status(ChatStatus.CollectingData))
             toolbox.digest(route.digestSections, route.periodDays)
         } else {
             null
         }
         val system = when {
-            !useCarData || toolbox == null || route.roles.isEmpty() -> SystemPrompts.general(route.intent)
-            tools != null -> SystemPrompts.onDevice(route, null) + "\n" + SystemPrompts.VEHICLE_DATA
-            else -> SystemPrompts.onDevice(route, digest)
+            !useCarData || toolbox == null || route.roles.isEmpty() -> SystemPrompts.general(route.intent, lang)
+            tools != null -> SystemPrompts.onDevice(route, null, lang) + "\n" + SystemPrompts.VEHICLE_DATA
+            else -> SystemPrompts.onDevice(route, digest, lang)
         }
         val registry = tools?.registry(route.roles.flatMap { it.tools }.toSet())
         try {
@@ -338,55 +343,56 @@ internal class KoogLlmGateway(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            throw LlmException("Модель на телефоне не ответила: ${e.message ?: e::class.simpleName}", cause = e)
+            throw LlmException(LlmProblem.OnDeviceFailed(e.message ?: e::class.simpleName.orEmpty()), cause = e)
         }
-        if (useCarData && toolbox != null && route.roles.isNotEmpty()) send(ChatEvent.Experts(route.roles.map { it.title }, emptyList(), route.roles.map { it.id }))
+        if (useCarData && toolbox != null && route.roles.isNotEmpty()) send(ChatEvent.Experts(route.roles.map { it.id }, emptyList()))
     }
 
     /**
      * Experts in parallel: each has its own role system prompt and only its own tools, ≤ [EXPERT_TOOL_ROUNDS] rounds,
      * no ChatMemory (context is the last two turns of the conversation). Expert text is not streamed to the user; it goes
-     * to the editor and into «Заметки экспертов». An error or timeout of one expert does not fail the answer.
+     * to the editor and into «Expert notes». An error or timeout of one expert does not fail the answer.
      */
     private suspend fun kotlinx.coroutines.channels.ProducerScope<ChatEvent>.experts(
         executor: PromptExecutor,
         model: LLModel,
         tools: VehicleToolbox,
         route: ChatRoute,
+        lang: String,
         conversationId: String,
         userText: String,
     ): List<ExpertNote> {
         val context = runCatching { historyProvider.transcript(conversationId).takeLast(2) }.getOrDefault(emptyList())
         val input = buildString {
             if (context.isNotEmpty()) {
-                appendLine("Контекст диалога (последние реплики):")
+                appendLine("Conversation context (latest turns):")
                 context.forEach { m ->
-                    append(if (m.role == ChatMessage.Role.USER) "Пользователь: " else "Помощник: ").appendLine(m.text.take(CONTEXT_CHARS))
+                    append(if (m.role == ChatMessage.Role.USER) "User: " else "Assistant: ").appendLine(m.text.take(CONTEXT_CHARS))
                 }
                 appendLine()
             }
-            append("Вопрос пользователя: ").append(userText)
+            append("User's question: ").append(userText)
         }
         return coroutineScope {
             route.roles.map { role ->
                 async {
-                    send(ChatEvent.Status(role.statusText(route.periodDays), ChatStatus.Role(role.id, route.periodDays)))
+                    send(ChatEvent.Status(ChatStatus.Role(role.id, route.periodDays)))
+                    val system = SystemPrompts.expert(role, route, lang)
                     val text = try {
                         withTimeoutOrNull(expertTimeoutMs) {
                             AIAgent(
                                 promptExecutor = executor,
                                 llmModel = model,
                                 strategy = VehicleChatStrategy.create(
-                                    system = SystemPrompts.expert(role, route),
+                                    system = system,
                                     // the user sees only which data the role is looking at; the note text goes to the editor
                                     emit = { e -> if (e is ChatEvent.ToolCall) send(e) },
-                                    label = roleLabel(role, tools),
                                     streaming = true,
                                     maxToolRounds = EXPERT_TOOL_ROUNDS,
                                     roleId = role.id,
                                 ),
                                 toolRegistry = tools.registry(role.tools),
-                                systemPrompt = SystemPrompts.expert(role, route),
+                                systemPrompt = system,
                             ).run(input, null)
                         }
                     } catch (e: CancellationException) {
@@ -394,17 +400,11 @@ internal class KoogLlmGateway(
                     } catch (e: Exception) {
                         null.also { expertLog("expert ${role.id} failed: ${e::class.simpleName}") }
                     }
-                    if (text.isNullOrBlank()) ExpertNote(role.id, role.title, "Эксперт «${role.title}» недоступен — его данных в ответе нет.", failed = true)
+                    if (text.isNullOrBlank()) ExpertNote(role.id, role.title, "Expert \"${role.title}\" is unavailable — their data is not in the answer.", failed = true)
                     else ExpertNote(role.id, role.title, text.trim())
                 }
             }.awaitAll()
         }
-    }
-
-    /** «ИИ смотрит ошибки…» → «Диагност смотрит ошибки…». */
-    private fun roleLabel(role: ExpertRole, tools: VehicleToolbox): (String) -> String = { name ->
-        val label = tools.progressLabel(name)
-        if (label.startsWith("ИИ ")) role.title + label.removePrefix("ИИ") else "${role.title}: $label"
     }
 
     private suspend fun kotlinx.coroutines.channels.ProducerScope<ChatEvent>.runAgent(
@@ -414,9 +414,8 @@ internal class KoogLlmGateway(
         conversationId: String,
         userText: String,
         streaming: Boolean,
-        system: String = SystemPrompts.chat(withTools = tools != null),
+        system: String,
         registry: ToolRegistry? = null,
-        label: (String) -> String = { name -> tools?.progressLabel(name) ?: name },
         roleId: String? = null,
     ) {
         val agent = AIAgent(
@@ -425,7 +424,6 @@ internal class KoogLlmGateway(
             strategy = VehicleChatStrategy.create(
                 system = system,
                 emit = { send(it) },
-                label = label,
                 streaming = streaming,
                 roleId = roleId,
             ),
@@ -441,7 +439,7 @@ internal class KoogLlmGateway(
     }
 
     override fun stream(system: String, history: List<ChatMessage>): Flow<String> = flow {
-        val settings = store.settings.first()?.takeIf { it.model.isNotBlank() } ?: throw LlmException(NOT_CONFIGURED)
+        val settings = store.settings.first()?.takeIf { it.model.isNotBlank() } ?: throw LlmException(LlmProblem.NotConfigured)
         val apiKey = store.apiKey()
         val chat = prompt("ecu-chat") {
             system(system)
@@ -471,8 +469,6 @@ internal class KoogLlmGateway(
     }
 
     private companion object {
-        const val NOT_CONFIGURED = "ИИ не настроен: откройте Настройки → ИИ-помощник"
-        const val EDITOR_STATUS = "Редактор собирает ответ из заметок экспертов…"
         const val EXPERT_TOOL_ROUNDS = 3
         const val CONTEXT_CHARS = 400
     }

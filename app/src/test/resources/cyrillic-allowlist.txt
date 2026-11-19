@@ -1,7 +1,8 @@
 # Path prefixes (relative to the repo root) whose main Kotlin sources may contain Cyrillic outside comments.
 # Checked by app/src/test/.../NoCyrillicLiteralsTest.kt. Every entry must still match an offending file.
 
-# Permanent: router keywords match the user's Russian input.
+# Permanent: router keywords (incl. RouterKeywords per expert role and period words like «полгода») match the
+# user's Russian input; never shown and never sent to the model.
 core/ai/src/main/kotlin/io/github/iampopovich/eculense/core/ai/ChatRouter.kt
 # Permanent: Car Scanner backup field and column names.
 core/carscanner/
@@ -11,7 +12,3 @@ core/model/src/main/kotlin/io/github/iampopovich/eculense/core/model/LegacyValue
 # Permanent: Russian spellings of car makes (КИА, ТОЙОТА…) typed into the car profile, mapped to the makes of the
 # manufacturer code database; input data, never shown.
 core/dtcdb/src/main/kotlin/io/github/iampopovich/eculense/core/dtcdb/OemDtc.kt
-
-# Temporary: modules not migrated to string resources yet. Each batch removes its own lines.
-core/ai/               # temporary until B5
-core/aitools/          # temporary until B5

@@ -13,9 +13,6 @@ interface VehicleToolbox {
     /** Only tools whose names are in [only]: each expert has its own set. */
     fun registry(only: Set<String>): ToolRegistry = ToolRegistry { tools(registry().tools.filter { it.name in only }) }
 
-    /** User-facing progress label: «ИИ смотрит ошибки…». */
-    fun progressLabel(toolName: String): String
-
     /**
      * Vehicle data digest as a single text (tool outputs for profile, DTCs, findings, maintenance and the latest recording), for
      * on-phone models that don't call tools: the numbers are still computed by the app. null means no data.

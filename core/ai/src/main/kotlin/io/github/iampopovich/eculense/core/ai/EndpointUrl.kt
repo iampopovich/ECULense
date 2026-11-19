@@ -44,20 +44,20 @@ object EndpointUrl {
 }
 
 /**
- * Why an entered address was rejected. The UI maps each value to a string resource; [message] is the legacy text
- * for non-UI callers (gateway errors) until the AI module moves to English.
+ * Why an entered address was rejected. The UI maps each value to a string resource; [message] is an English
+ * technical text for logs and tests, never shown.
  */
 enum class UrlProblem(val message: String) {
-    EMPTY("Введите адрес сервера"),
-    WHITESPACE("В адресе не должно быть пробелов"),
-    MALFORMED("Некорректный адрес. Пример: https://api.openai.com"),
-    SCHEME("Адрес должен начинаться с http:// или https://"),
-    PORT("Неверный порт в адресе"),
-    NO_HOST("В адресе нет имени сервера"),
-    QUERY("Уберите из адреса параметры (?… и #…)"),
+    EMPTY("server address is empty"),
+    WHITESPACE("address contains whitespace"),
+    MALFORMED("malformed address, e.g. https://api.openai.com"),
+    SCHEME("address must start with http:// or https://"),
+    PORT("invalid port"),
+    NO_HOST("no host name"),
+    QUERY("address must not contain ?query or #fragment"),
     PUBLIC_HTTP(
-        "Незашифрованный http:// разрешён только для локальной сети (127.0.0.1, 10.x, 172.16–31.x, 192.168.x, *.local). " +
-            "Для сервера в интернете используйте https://",
+        "plain http:// is allowed only for the local network (127.0.0.1, 10.x, 172.16-31.x, 192.168.x, *.local); " +
+            "use https:// for internet servers",
     ),
 }
 

@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
  * cloud settings (and key) stay untouched — they can be restored in the wizard.
  */
 interface OnDeviceLlm {
-    /** Selected local model, ready for chat; null — the «На устройстве» provider is not selected. */
+    /** Selected local model, ready for chat; null — the «On device» provider is not selected. */
     suspend fun session(): OnDeviceSession?
 
     /** For the AI wizard summary: what is selected and how the model did in the test; null — nothing selected. */
@@ -34,7 +34,7 @@ enum class OnDeviceRating { COMFORT, SLOW, UNSUITABLE }
 /**
  * Local model ready for chat. [executor] belongs to the model module (the engine takes seconds to load and holds
  * gigabytes); the gateway does not close it. [streaming] = false — the answer arrives whole (the Koog LiteRT client
- * has no streaming): the gateway shows «Модель думает…». [supportsTools] = false — vehicle data tools are not passed.
+ * has no streaming): the gateway shows a thinking status. [supportsTools] = false — vehicle data tools are not passed.
  */
 class OnDeviceSession(
     val info: ProviderInfo,

@@ -64,12 +64,12 @@ class KoogClientsTest {
         }
     }
 
-    @Test(expected = IllegalStateException::class)
+    @Test(expected = LlmException::class)
     fun `cloud provider without key fails fast`() {
         KoogClients.executor(LlmSettings(LlmProviderKind.OPENAI, "gpt-4.1-mini", LlmProviderKind.OPENAI.defaultBaseUrl, false), apiKey = null)
     }
 
-    @Test(expected = IllegalStateException::class)
+    @Test(expected = LlmException::class)
     fun `deepseek without key fails fast`() {
         KoogClients.executor(LlmSettings(LlmProviderKind.DEEPSEEK, "deepseek-chat", LlmProviderKind.DEEPSEEK.defaultBaseUrl, false), apiKey = " ")
     }

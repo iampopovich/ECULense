@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.map
 
 /**
  * Chat settings: consent to send car data (per provider: switch provider and we ask again),
- * the «данные моей машины» toggle and the current conversation.
+ * the «my car data» toggle and the current conversation.
  */
 interface ChatPrefs {
     suspend fun hasConsent(providerKey: String): Boolean

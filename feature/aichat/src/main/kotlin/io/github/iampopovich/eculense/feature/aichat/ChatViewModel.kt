@@ -204,7 +204,7 @@ internal class ChatViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message?.let { m -> UiText.Raw(m) } ?: UiText.Res(R.string.aichat_error_generic), messages = it.messages.filterNot { m -> m.text.isEmpty() }) }
+                _uiState.update { it.copy(error = ChatTexts.error(e), messages = it.messages.filterNot { m -> m.text.isEmpty() }) }
             } finally {
                 // a stopped stream must not reset the state of an already started next request
                 if (gen == generation) _uiState.update { it.copy(streaming = false, toolStatus = null) }

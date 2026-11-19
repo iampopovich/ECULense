@@ -111,3 +111,51 @@ object ChatRouter {
         return null
     }
 }
+
+/**
+ * Router keywords per expert role (regex fragments, RU + EN). Input data matched against the user's question, never
+ * shown or sent to the model — this is why they stay Russian here, in the permanently allowlisted router file.
+ */
+internal object RouterKeywords {
+    val DIAGNOSTICIAN = listOf(
+        "ошибк", "код", "dtc", "check engine", "чек", "[pubc][0-3][0-9a-f]{3}", "лампа", "горит", "диагност", "неисправн",
+        "error", "trouble code", "fault", "warning light", "codes?\\b",
+    )
+
+    val ENGINE = listOf(
+        "смес", "коррекц", "ltft", "stft", "fuel trim", "maf", "дмрв", "лямбд", "кислород", "o2\\b", "пропуск", "троит", "misfire",
+        "холост", "хх\\b", "idle", "оборот", "rpm", "плава", "глохн", "stall", "детонац", "зажиган", "rough",
+    )
+
+    val COOLING = listOf(
+        "охлажд", "температур", "ож\\b", "антифриз", "тосол", "перегр", "грее", "грет", "прогрев", "термостат", "радиатор", "вентилятор",
+        "coolant", "overheat", "temperature", "thermostat", "hot\\b",
+    )
+
+    val ELECTRICAL = listOf(
+        "аккумулятор", "акб", "батаре", "заряд", "напряжен", "генератор", "вольт", "стартер", "не заводит",
+        "battery", "voltage", "alternator", "charging", "starter",
+    )
+
+    val USAGE = listOf(
+        "ве(дет|ла|л|ли|дут) себя", "как (моя |наша )?(машина|машинка|авто)", "поездк", "пробег", "езжу", "езди", "езда", "стиль", "режим",
+        "в целом", "обзор", "итог", "статистик", "тренд", "динамик", "изменил", "простаива", "пробк",
+        "behave", "trips?\\b", "driving", "mileage", "overall", "how (is|did|does|has) my car", "summary", "trend", "usage",
+    )
+
+    val FUEL = listOf(
+        "расход", "топлив", "бензин", "дизел", "солярк", "трач", "затрат", "деньг", "стоимост", "литр", "л/100", "заправ",
+        "fuel", "petrol", "gas\\b", "consumption", "mpg", "spend", "cost", "economy",
+    )
+
+    val SERVICE = listOf(
+        "(пройти|пройду|следующее|очередное|плановое|ближайшее) то\\b", "то-?\\d", "техобслуж", "обслуж", "масл", "замен", "менять",
+        "фильтр", "свеч", "ремен", "грм", "регламент", "интервал", "пора ",
+        "maintenance", "service", "oil", "replace", "filter", "spark plug", "timing belt",
+    )
+
+    val MODEL_EXPERT = listOf(
+        "болячк", "слаб(ые|ое) мест", "типичн", "особенност", "надежн", "ресурс", "известн", "sorento", "соренто", "kia\\b", "киа\\b",
+        "hyundai", "хендай", "хёндай", "g6cu", "common problems", "known (issues|problems)", "weak (spots|points)", "reliab",
+    )
+}

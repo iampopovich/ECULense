@@ -117,7 +117,7 @@ class LlmSettingsStoreTest {
     fun `presets are the Koog starter providers plus Other, OpenRouter first and default`() {
         assertEquals(LlmProviderKind.OPENROUTER, LlmProviderKind.DEFAULT)
         assertEquals(
-            listOf("OpenRouter", "OpenAI", "Anthropic", "Google Gemini", "DeepSeek", "Mistral", "Ollama", "Другой (свой сервер)"),
+            listOf("OpenRouter", "OpenAI", "Anthropic", "Google Gemini", "DeepSeek", "Mistral", "Ollama", "Other (custom server)"),
             LlmProviderKind.entries.map { it.title },
         )
         assertEquals(listOf(LlmProviderKind.OLLAMA), LlmProviderKind.entries.filter { !it.usesKey })

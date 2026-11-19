@@ -109,6 +109,7 @@ dependencies {
     implementation(project(":core:backup"))
     implementation(project(":feature:backup"))
     implementation(project(":core:obd"))
+    implementation(project(":core:model"))
     implementation(project(":core:bluetooth"))
     implementation(project(":core:usb"))
     implementation(project(":core:service"))

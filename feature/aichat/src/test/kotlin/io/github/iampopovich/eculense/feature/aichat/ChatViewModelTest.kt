@@ -2,6 +2,8 @@ package io.github.iampopovich.eculense.feature.aichat
 
 import io.github.iampopovich.eculense.core.ai.ChatEvent
 import io.github.iampopovich.eculense.core.ai.ChatMessage
+import io.github.iampopovich.eculense.core.ai.LlmException
+import io.github.iampopovich.eculense.core.ai.LlmProblem
 import io.github.iampopovich.eculense.core.ai.ChatPrefs
 import io.github.iampopovich.eculense.core.ai.ChatStatus
 import io.github.iampopovich.eculense.core.ai.LlmGateway
@@ -76,7 +78,7 @@ class ChatViewModelTest {
         assertNull(vm.uiState.value.consent)
         assertTrue(vm.uiState.value.onDevice)
         assertTrue(gateway.calls.single().useCarData)
-        events.trySend(ChatEvent.Status("Модель на телефоне думает…", ChatStatus.PhoneThinking))
+        events.trySend(ChatEvent.Status(ChatStatus.PhoneThinking))
         assertEquals(UiText.Res(R.string.aichat_status_phone_thinking), vm.uiState.value.toolStatus)
         events.trySend(ChatEvent.Text("Ответ целиком"))
         events.close()
@@ -99,10 +101,10 @@ class ChatViewModelTest {
         val events = kotlinx.coroutines.channels.Channel<ChatEvent>(kotlinx.coroutines.channels.Channel.UNLIMITED)
         val vm = ChatViewModel(FakeGateway { events.consumeAsFlow() }, FakePrefs(), prefill = null)
         vm.send("Объясни мои ошибки")
-        events.send(ChatEvent.ToolCall("dtcHistory", "ИИ смотрит ошибки…"))
+        events.send(ChatEvent.ToolCall("dtcHistory"))
         assertEquals(UiText.Res(R.string.aichat_tool_dtc_history, listOf(UiText.Res(R.string.aichat_subject_ai))), vm.uiState.value.toolStatus)
         assertTrue(vm.uiState.value.awaitingFirstToken)
-        events.send(ChatEvent.ToolCall("findings", "ИИ смотрит находки анализа…"))
+        events.send(ChatEvent.ToolCall("findings"))
         assertEquals(UiText.Res(R.string.aichat_tool_findings, listOf(UiText.Res(R.string.aichat_subject_ai))), vm.uiState.value.toolStatus)
         events.send(ChatEvent.Text("P0171"))
         assertNull(vm.uiState.value.toolStatus)
@@ -236,8 +238,8 @@ class ChatViewModelTest {
         val gateway = FakeGateway(hasVehicleTools = false) { n ->
             if (n == 1) {
                 flowOf(
-                    ChatEvent.Status("Аналитик эксплуатации смотрит поездки за 6 месяцев…", ChatStatus.Role("usage", 180)),
-                    ChatEvent.Experts(listOf("Аналитик эксплуатации", "Моторист"), notes, listOf("usage", "engine")),
+                    ChatEvent.Status(ChatStatus.Role("usage", 180)),
+                    ChatEvent.Experts(listOf("usage", "engine"), notes),
                     ChatEvent.Text("Коротко: всё ровно"),
                 )
             } else {
@@ -263,9 +265,9 @@ class ChatViewModelTest {
 
     @Test
     fun `error is shown`() = runTest {
-        val vm = ChatViewModel(FakeGateway { flow { throw IllegalStateException("ИИ не настроен") } }, FakePrefs(), prefill = null)
+        val vm = ChatViewModel(FakeGateway { flow { throw LlmException(LlmProblem.NotConfigured) } }, FakePrefs(), prefill = null)
         vm.send("привет")
-        assertEquals(UiText.Raw("ИИ не настроен"), vm.uiState.value.error)
+        assertEquals(UiText.Res(R.string.aichat_err_not_configured), vm.uiState.value.error)
         // The empty answer bubble is removed, the user's question stays.
         assertEquals(listOf(ChatMessage(ChatMessage.Role.USER, "привет")), vm.uiState.value.messages)
     }

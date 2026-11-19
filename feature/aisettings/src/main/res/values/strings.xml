@@ -70,4 +70,11 @@
     <string name="aisettings_rating_comfort">Comfortable</string>
     <string name="aisettings_rating_slow">Slow</string>
     <string name="aisettings_rating_unsuitable">Unsuitable</string>
+    <string name="aisettings_net_no_api">there is no API at this address (404) — check the address</string>
+    <string name="aisettings_net_not_api">the server did not reply in the API format — check the address</string>
+    <string name="aisettings_net_dns">server not found (DNS) — check the address and internet connection</string>
+    <string name="aisettings_net_cleartext">Android blocks unencrypted http to this address — https is required</string>
+    <string name="aisettings_net_connect">could not connect — the server is not running or the address/port is wrong</string>
+    <string name="aisettings_net_timeout">the server did not reply in time</string>
+    <string name="aisettings_net_tls">secure connection error (TLS)</string>
 </resources>

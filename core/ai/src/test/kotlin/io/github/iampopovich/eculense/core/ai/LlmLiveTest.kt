@@ -31,7 +31,7 @@ class LlmLiveTest {
         val dataStore = PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO + SupervisorJob())) { File(tmp.root, "it.preferences_pb") }
         val store = LlmSettingsStore(dataStore, plain)
         store.save(LlmProviderKind.valueOf(provider!!), System.getenv("LLM_IT_MODEL"), System.getenv("LLM_IT_BASEURL"), System.getenv("LLM_IT_KEY"))
-        val answer = KoogLlmGateway(store).stream(SystemPrompts.MECHANIC, listOf(ChatMessage(ChatMessage.Role.USER, "Что значит P0133? Одно предложение."))).toList().joinToString("")
+        val answer = KoogLlmGateway(store).stream(SystemPrompts.mechanic("ru"), listOf(ChatMessage(ChatMessage.Role.USER, "Что значит P0133? Одно предложение."))).toList().joinToString("")
         println("answer=$answer")
         assertTrue(answer.isNotBlank())
     }

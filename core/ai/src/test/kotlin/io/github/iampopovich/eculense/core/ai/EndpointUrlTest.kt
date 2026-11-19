@@ -26,15 +26,15 @@ class EndpointUrlTest {
 
     @Test
     fun `garbage is rejected before any request`() {
-        assertEquals("Введите адрес сервера", invalid("  "))
+        assertEquals("server address is empty", invalid("  "))
         assertTrue(invalid("openrouter.ai/api/v1").contains("http://"))
         assertTrue(invalid("localhost:8080").contains("http://"))
         assertTrue(invalid("ftp://example.com").contains("http://"))
-        assertTrue(invalid("asdf qwer").contains("пробел"))
+        assertTrue(invalid("asdf qwer").contains("whitespace"))
         assertTrue(invalid("http://").isNotBlank())
-        assertTrue(invalid("http://:8080/v1").contains("сервер"))
-        assertTrue(invalid("http://host:99999").contains("порт"))
-        assertTrue(invalid("https://api.openai.com/v1?x=1").contains("параметр"))
+        assertTrue(invalid("http://:8080/v1").contains("host"))
+        assertTrue(invalid("http://host:99999").contains("port"))
+        assertTrue(invalid("https://api.openai.com/v1?x=1").contains("query"))
         assertTrue(invalid("https://exa mple.com").isNotBlank())
     }
 
@@ -76,7 +76,7 @@ class EndpointUrlTest {
         ).forEach { url ->
             val reason = invalid(url)
             assertTrue("$url → $reason", reason.contains("https://"))
-            assertTrue("$url → $reason", reason.contains("локальн"))
+            assertTrue("$url → $reason", reason.contains("local network"))
         }
         // https is allowed to anywhere.
         valid("https://example.com/v1")

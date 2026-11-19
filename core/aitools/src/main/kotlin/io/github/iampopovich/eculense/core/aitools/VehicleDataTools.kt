@@ -110,7 +110,7 @@ internal fun period(value: String?): StatsPeriod = when (value?.lowercase()) {
 internal fun periodFrom(p: StatsPeriod, now: Long): Long = p.days?.let { now - it * 86_400_000L } ?: 0L
 
 /**
- * Period start: [days] (arbitrary, «полгода» = 180) takes priority over the named [period].
+ * Period start: [days] (arbitrary, «half a year» = 180) takes priority over the named [period].
  * Returns (start, period label for the response).
  */
 internal fun periodStart(period: String?, days: Int?, now: Long): Pair<Long, String> {

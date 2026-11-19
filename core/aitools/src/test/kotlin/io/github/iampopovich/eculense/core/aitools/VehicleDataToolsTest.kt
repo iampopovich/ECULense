@@ -261,11 +261,10 @@ class VehicleDataToolsTest {
     }
 
     @Test
-    fun `toolbox registers nine read-only tools with labels and argument schemas`() {
+    fun `toolbox registers nine read-only tools with argument schemas`() {
         val box = VehicleDataToolbox(ctx)
         val tools = box.registry().tools
         assertEquals(setOf("carProfile", "tripStats", "listSessions", "sessionStats", "sensorSummary", "findings", "dtcHistory", "maintenanceDue", "trends"), tools.map { it.name }.toSet())
-        assertEquals("ИИ смотрит ошибки…", box.progressLabel("dtcHistory"))
         val session = tools.single { it.name == "sessionStats" }.descriptor
         assertEquals(listOf("sessionId"), session.requiredParameters.map { it.name })
         val sensor = tools.single { it.name == "sensorSummary" }.descriptor
@@ -312,19 +311,19 @@ class VehicleDataToolsTest {
         analytics.noDtc = true
         val empty = ToolContext(analytics, Cars(car), Trips(emptyList()), clock = { NOW }, zone = { ZoneOffset.UTC }, log = { _, _, _ -> })
         assertTrue(obj(TrendsTool(empty).execute(TrendsArgs(days = 180))).containsKey("no_data"))
-        assertEquals("Тренды: за период нет ни поездок, ни записей, ни ошибок", VehicleDataToolbox(empty).digest(listOf("trends"), 180))
+        assertEquals("Trends: no trips, recordings or trouble codes in the period", VehicleDataToolbox(empty).digest(listOf("trends"), 180))
     }
 
     @Test
-    fun `trends digest is plain Russian lines per month`() = runBlocking {
+    fun `trends digest is plain English lines per month`() = runBlocking {
         val text = VehicleDataToolbox(ctx).digest(listOf("trends", "tripStats"), 180)!!
         println(text)
         assertNoJson(text)
         val lines = text.lines()
-        assertTrue(text, lines.first().startsWith("Тренды за 180 дн. (по месяцам)"))
-        assertTrue(text, lines.any { Regex("^- \\d{4}-\\d{2}: ").containsMatchIn(it) && it.contains("ОЖ медиана") })
-        assertTrue(text, lines.any { it.startsWith("Изменение") && it.contains("ОЖ, медиана") })
-        assertTrue(text, lines.any { it.startsWith("Поездки: период: 180 дн.") })
+        assertTrue(text, lines.first().startsWith("Trends for the last 180 days (by month)"))
+        assertTrue(text, lines.any { Regex("^- \\d{4}-\\d{2}: ").containsMatchIn(it) && it.contains("coolant median") })
+        assertTrue(text, lines.any { it.startsWith("Change") && it.contains("coolant median, °C") })
+        assertTrue(text, lines.any { it.startsWith("Trips: period: last 180 days") })
     }
 
     @Test
@@ -343,44 +342,44 @@ class VehicleDataToolsTest {
         val text = VehicleDataToolbox(described).digest(route.digestSections, route.periodDays)!!
         assertNoJson(text)
         val lines = text.lines()
-        assertTrue(text, lines.first().startsWith("Машина: "))
-        assertTrue(text, lines[1].startsWith("Тренды за 180 дн."))
-        assertTrue(text, lines.indexOfFirst { it.startsWith("Тренды") } < lines.indexOfFirst { it.startsWith("Коды ошибок") })
+        assertTrue(text, lines.first().startsWith("Car: "))
+        assertTrue(text, lines[1].startsWith("Trends for the last 180 days"))
+        assertTrue(text, lines.indexOfFirst { it.startsWith("Trends") } < lines.indexOfFirst { it.startsWith("Trouble codes") })
         // a question about DTCs: no trends or trips
         val dtc = ChatRouter.route("объясни мои ошибки")
         val dtcText = VehicleDataToolbox(described).digest(dtc.digestSections, dtc.periodDays)!!
-        assertFalse(dtcText, dtcText.contains("Тренды") || dtcText.contains("Поездки:"))
-        assertTrue(dtcText, dtcText.contains("Коды ошибок"))
+        assertFalse(dtcText, dtcText.contains("Trends") || dtcText.contains("Trips:"))
+        assertTrue(dtcText, dtcText.contains("Trouble codes"))
     }
 
     /** Signs of JSON in the text for the on-phone model: object/array brackets, quoted keys, snake_case keys. */
     private fun assertNoJson(text: String) {
         listOf("{", "}", "[", "]", "\"").forEach { assertFalse("«$it» в дайджесте:\n$text", text.contains(it)) }
         assertFalse(text, Regex("\\b[a-z]+_[a-z_]+\\b").containsMatchIn(text))
-        assertFalse(text, Regex("\\b(title|code|kind|source|events|severity|evidence|start|readings)\\b").containsMatchIn(text))
+        assertFalse(text, Regex("\\b(title|kind|source|events|severity|evidence|start)\\b").containsMatchIn(text))
     }
 
     @Test
-    fun `digest for the on-device model is plain Russian lines with the DTC codes`() = runBlocking {
+    fun `digest for the on-device model is plain English lines with the DTC codes`() = runBlocking {
         val text = VehicleDataToolbox(described).digest()!!
         println(text)
         assertNoJson(text)
         val lines = text.lines()
-        assertTrue(text, lines.first().startsWith("Машина: "))
+        assertTrue(text, lines.first().startsWith("Car: "))
         assertTrue(text, lines.first().contains("Kia") && lines.first().contains("2005"))
-        assertTrue(text, lines.any { it.startsWith("Коды ошибок") })
+        assertTrue(text, lines.any { it.startsWith("Trouble codes") })
         assertTrue(text, lines.any { it.startsWith("- P0101") })
         assertTrue(text, text.contains("P0102") && text.contains("Mass or Volume Air Flow"))
-        assertTrue(text, text.contains("сохранённый"))
-        assertTrue(text, lines.any { it.startsWith("Находки анализа") })
+        assertTrue(text, text.contains("stored"))
+        assertTrue(text, lines.any { it.startsWith("Analysis findings") })
         assertFalse(text, text.contains(VIN) || text.contains("Тестовая"))
     }
 
     @Test
-    fun `digest without DTC events says so in Russian`() = runBlocking {
+    fun `digest without DTC events says so in plain English`() = runBlocking {
         analytics.noDtc = true
         val text = VehicleDataToolbox(ctx).digest()!!
         assertNoJson(text)
-        assertTrue(text, text.lines().any { it == "Коды ошибок: в истории нет ни одного кода" })
+        assertTrue(text, text.lines().any { it == "Trouble codes: no trouble codes in the history" })
     }
 }

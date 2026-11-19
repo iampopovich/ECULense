@@ -83,7 +83,7 @@ class KoogLlmGatewayTest {
             gateway.stream("sys", listOf(ChatMessage(ChatMessage.Role.USER, "hi"))).toList()
             fail("expected error")
         } catch (e: LlmException) {
-            assertEquals("ИИ не настроен: откройте Настройки → ИИ-помощник", e.message)
+            assertEquals(LlmProblem.NotConfigured, e.problem)
         }
     }
 
@@ -143,7 +143,8 @@ class KoogLlmGatewayTest {
             fail("expected error")
         } catch (e: LlmException) {
             assertEquals(401, e.statusCode)
-            assertTrue(e.message, e.message!!.contains("401"))
+            assertEquals(LlmProblem.Unauthorized, e.problem)
+            assertEquals("No auth credentials found", e.serverDetail)
             assertTrue(e.message, e.message!!.contains("No auth credentials found"))
             assertFalse(e.message, e.message!!.contains("sk-or-invalid"))
         }
@@ -154,17 +155,18 @@ class KoogLlmGatewayTest {
         // This is how OpenRouter (Cloudflare) answers any request from a phone on a blocked network/region.
         val baseUrl = startServer(403, "application/json", """{ "success": false, "error": "Access denied by security policy." }""", mutableListOf())
         val gateway = preset(store(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", null, "sk-or-invalid"), baseUrl)
-        val message = streamError(gateway).message!!
-        assertTrue(message, message.contains("403"))
+        val error = streamError(gateway)
+        val message = error.message!!
+        assertEquals(LlmProblem.Forbidden, error.problem)
+        assertEquals(403, error.statusCode)
         assertTrue(message, message.contains("Access denied by security policy."))
-        assertFalse(message, message.contains("неверный"))
+        assertEquals("Access denied by security policy.", error.serverDetail)
     }
 
     @Test
     fun `unreachable server gives a network error`() = runBlocking {
         val gateway = preset(store(LlmProviderKind.OPENROUTER, "m", null, "k"), "http://127.0.0.1:1")
-        val message = streamError(gateway).message.orEmpty()
-        assertTrue(message, message.startsWith("Нет связи"))
+        assertEquals(LlmProblem.Network, streamError(gateway).problem)
     }
 
     @Test
@@ -183,8 +185,7 @@ class KoogLlmGatewayTest {
     @Test
     fun `Other saved with a public http address is refused before any request`() = runBlocking {
         val gateway = KoogLlmGateway(store(LlmProviderKind.OTHER, "m", "http://example.com/v1", null))
-        val message = streamError(gateway).message.orEmpty()
-        assertTrue(message, message.contains("https://"))
+        assertEquals(LlmProblem.InvalidUrl(UrlProblem.PUBLIC_HTTP), streamError(gateway).problem)
     }
 
     @Test
@@ -226,6 +227,6 @@ class KoogLlmGatewayTest {
     @Test
     fun `saved provider without a model is not configured`() = runBlocking {
         val gateway = KoogLlmGateway(store(LlmProviderKind.OPENROUTER, "", null, "k"))
-        assertEquals("ИИ не настроен: откройте Настройки → ИИ-помощник", streamError(gateway).message)
+        assertEquals(LlmProblem.NotConfigured, streamError(gateway).problem)
     }
 }

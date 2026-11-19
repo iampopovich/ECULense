@@ -32,6 +32,8 @@ import org.koin.core.module.Module
 
 /** Add/remove a feature = add/remove a line here and in settings.gradle.kts. */
 val appModules: List<Module> = listOf(
+    // Current app language (BCP-47) for AI prompts: the answer language follows the in-app language.
+    appLanguageModule,
     obdModule(includeEmulator = BuildConfig.DEBUG),
     bluetoothModule,
     usbModule,

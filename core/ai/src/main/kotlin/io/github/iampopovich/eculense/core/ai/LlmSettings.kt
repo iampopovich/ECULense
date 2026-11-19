@@ -37,7 +37,7 @@ enum class LlmProviderKind(
     OLLAMA("Ollama", Key.NONE, emptyList()),
 
     /** LM Studio, vLLM, llama.cpp server, LocalAI, Ollama on a PC, proxies: full OpenAI-compatible address (…/v1). Key — if required. */
-    OTHER("Другой (свой сервер)", Key.OPTIONAL, emptyList()),
+    OTHER("Other (custom server)", Key.OPTIONAL, emptyList()),
     ;
 
     private enum class Key { REQUIRED, OPTIONAL, NONE }
@@ -74,7 +74,7 @@ class LlmSettingsStore(
         val legacy = name == LEGACY_CUSTOM
         val provider = if (legacy) LlmProviderKind.OTHER else LlmProviderKind.entries.firstOrNull { it.name == name } ?: return@map null
         val url = if (provider == LlmProviderKind.OTHER) {
-            // The former «Свой сервер» did not write its default address to the file — restore it.
+            // The former «custom server» item did not write its default address to the file — restore it.
             p[BASE_URL] ?: if (legacy) LEGACY_CUSTOM_URL else ""
         } else {
             // For presets the address always comes from Koog; a previously saved one (proxy) is ignored and removed on the next save.
@@ -121,7 +121,7 @@ class LlmSettingsStore(
         val BASE_URL = stringPreferencesKey("base_url")
         val API_KEY = stringPreferencesKey("api_key")
 
-        /** Name and default address of the former «Свой сервер (OpenAI-совместимый)» item — read as [LlmProviderKind.OTHER]. */
+        /** Name and default address of the former «custom server (OpenAI-compatible)» item — read as [LlmProviderKind.OTHER]. */
         const val LEGACY_CUSTOM = "OPENAI_COMPATIBLE"
         const val LEGACY_CUSTOM_URL = "http://192.168.1.10:1234/v1"
     }

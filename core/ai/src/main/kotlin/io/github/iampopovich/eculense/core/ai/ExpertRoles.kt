@@ -4,9 +4,11 @@ package io.github.iampopovich.eculense.core.ai
 enum class ChatIntent { DIAGNOSE, OVERVIEW, TREND, FUEL, MAINTENANCE, MODEL, SENSOR, SMALLTALK }
 
 /**
- * Expert role: who looks at the data and from which angle. [tools] — names of :core:aitools tools available to
+ * Expert role: who looks at the data and from which angle. [title], [focus] and [prompt] are model-facing English
+ * (the UI shows role names from feature resources by [id]); [tools] — names of :core:aitools tools available to
  * the role (each expert has its own set); [digestSections] — digest sections for the on-device model;
- * [keywords] — regex fragments for [ChatRouter] (matched from the start of a word, RU + EN).
+ * [keywords] — regex fragments for [ChatRouter] (matched from the start of a word, RU + EN; kept in [RouterKeywords]
+ * because they match the user's input).
  */
 data class ExpertRole(
     val id: String,
@@ -16,181 +18,141 @@ data class ExpertRole(
     val tools: Set<String>,
     val digestSections: List<String>,
     val keywords: List<String>,
-    /** What the role is doing, for the chat status; «%s» is the period («за 6 месяцев»). */
-    val status: String,
-) {
-    fun statusText(days: Int): String = status.replace("%s", ExpertRoles.periodText(days))
-}
+)
 
-/** Expert note for the editor and for the «Заметки экспертов» block under the answer. */
+/**
+ * Expert note for the editor and for the «Expert notes» block under the answer. [title] is the English role title
+ * (for the editor prompt); [failed] notes carry our own English placeholder, the UI shows a localized text instead.
+ */
 data class ExpertNote(val roleId: String, val title: String, val text: String, val failed: Boolean = false)
 
 /**
- * Role registry — data, not code in a when: adding a role = adding an element. The role prompt says who you are,
- * what you look at and what you don't touch; the note format and common rules live in [SystemPrompts].
+ * Role registry — data, not code in a when: adding a role = adding an element (+ its keywords in [RouterKeywords]).
+ * The role prompt says who you are, what you look at and what you don't touch; the note format and common rules
+ * live in [SystemPrompts].
  */
 object ExpertRoles {
     val DIAGNOSTICIAN = ExpertRole(
         id = "diagnostician",
-        title = "Диагност",
-        focus = "коды ошибок, их связь между собой, срочность, Check Engine",
+        title = "Diagnostician",
+        focus = "trouble codes, how they relate to each other, urgency, Check Engine",
         prompt = """
-            Ты — Диагност. Смотришь коды ошибок (DTC): какие были, сколько раз, когда впервые и последний раз, как коды связаны между собой и
-            с находками анализа, насколько это срочно, горит ли Check Engine. Не касаешься расхода, поездок и регламента ТО (см. Экономист,
-            Аналитик эксплуатации, Мастер ТО).
+            You are the Diagnostician. You look at diagnostic trouble codes (DTC): which ones occurred, how many times, when first and last seen,
+            how the codes relate to each other and to the analysis findings, how urgent it is, whether Check Engine is on. You do not touch
+            fuel consumption, trips or the maintenance schedule (see Economist, Operations analyst, Service advisor).
         """.trimIndent(),
         tools = setOf("dtcHistory", "findings", "carProfile"),
         digestSections = listOf("dtcHistory", "findings"),
-        keywords = listOf(
-            "ошибк", "код", "dtc", "check engine", "чек", "[pubc][0-3][0-9a-f]{3}", "лампа", "горит", "диагност", "неисправн",
-            "error", "trouble code", "fault", "warning light", "codes?\\b",
-        ),
-        status = "Диагност смотрит коды ошибок…",
+        keywords = RouterKeywords.DIAGNOSTICIAN,
     )
 
     val ENGINE = ExpertRole(
         id = "engine",
-        title = "Моторист",
-        focus = "смесь, коррекции топлива, MAF, датчики кислорода, пропуски, холостой ход",
+        title = "Engine specialist",
+        focus = "mixture, fuel trims, MAF, oxygen sensors, misfires, idle",
         prompt = """
-            Ты — Моторист. Смотришь работу двигателя: топливные коррекции (LTFT/STFT по банкам), состав смеси, MAF, датчики кислорода,
-            пропуски зажигания, обороты и устойчивость холостого хода — по записям и их изменению за период. Не касаешься кодов как
-            таковых (см. Диагност), охлаждения (см. Специалист по охлаждению) и денег (см. Экономист).
+            You are the Engine specialist. You look at how the engine runs: fuel trims (LTFT/STFT per bank), mixture, MAF, oxygen sensors,
+            misfires, rpm and idle stability — from the recordings and their change over the period. You do not touch codes as such
+            (see Diagnostician), cooling (see Cooling specialist) or money (see Economist).
         """.trimIndent(),
         tools = setOf("sensorSummary", "sessionStats", "findings", "trends"),
         digestSections = listOf("trends", "findings"),
-        keywords = listOf(
-            "смес", "коррекц", "ltft", "stft", "fuel trim", "maf", "дмрв", "лямбд", "кислород", "o2\\b", "пропуск", "троит", "misfire",
-            "холост", "хх\\b", "idle", "оборот", "rpm", "плава", "глохн", "stall", "детонац", "зажиган", "rough",
-        ),
-        status = "Моторист смотрит смесь и холостой ход за %s…",
+        keywords = RouterKeywords.ENGINE,
     )
 
     val COOLING = ExpertRole(
         id = "cooling",
-        title = "Специалист по охлаждению",
-        focus = "температура ОЖ, прогрев, перегрев, термостат",
+        title = "Cooling specialist",
+        focus = "coolant temperature, warm-up, overheating, thermostat",
         prompt = """
-            Ты — Специалист по охлаждению. Смотришь температуру охлаждающей жидкости: медиану и максимумы по месяцам, время прогрева,
-            эпизоды перегрева, признаки неисправного термостата (долгий прогрев, низкая рабочая температура) и вентилятора. Не касаешься
-            смеси и кодов, не связанных с охлаждением (см. Моторист, Диагност).
+            You are the Cooling specialist. You look at the coolant temperature: median and maximums by month, warm-up time,
+            overheating episodes, signs of a faulty thermostat (long warm-up, low operating temperature) and fan. You do not touch
+            the mixture or codes unrelated to cooling (see Engine specialist, Diagnostician).
         """.trimIndent(),
         tools = setOf("sensorSummary", "trends", "findings"),
         digestSections = listOf("trends", "findings"),
-        keywords = listOf(
-            "охлажд", "температур", "ож\\b", "антифриз", "тосол", "перегр", "грее", "грет", "прогрев", "термостат", "радиатор", "вентилятор",
-            "coolant", "overheat", "temperature", "thermostat", "hot\\b",
-        ),
-        status = "Специалист по охлаждению смотрит температуру ОЖ за %s…",
+        keywords = RouterKeywords.COOLING,
     )
 
     val ELECTRICAL = ExpertRole(
         id = "electrical",
-        title = "Электрик",
-        focus = "аккумулятор, зарядка, напряжение бортовой сети",
+        title = "Electrician",
+        focus = "battery, charging, vehicle voltage",
         prompt = """
-            Ты — Электрик. Смотришь напряжение бортовой сети на работающем двигателе (медиана, минимумы, провалы) и его изменение по
-            месяцам: заряжает ли генератор, не садится ли аккумулятор. Помни: напряжение адаптера (ATRV) обычно на 0,2–0,3 В ниже
-            реального. Не касаешься смеси, охлаждения и расхода (см. Моторист, Специалист по охлаждению, Экономист).
+            You are the Electrician. You look at the vehicle voltage with the engine running (median, minimums, dips) and how it changes by
+            month: whether the alternator charges, whether the battery is running down. Remember: the adapter voltage (ATRV) is usually 0.2–0.3 V
+            below the real one. You do not touch the mixture, cooling or fuel consumption (see Engine specialist, Cooling specialist, Economist).
         """.trimIndent(),
         tools = setOf("sensorSummary", "trends", "findings"),
         digestSections = listOf("trends", "findings"),
-        keywords = listOf(
-            "аккумулятор", "акб", "батаре", "заряд", "напряжен", "генератор", "вольт", "стартер", "не заводит",
-            "battery", "voltage", "alternator", "charging", "starter",
-        ),
-        status = "Электрик смотрит напряжение за %s…",
+        keywords = RouterKeywords.ELECTRICAL,
     )
 
     val USAGE = ExpertRole(
         id = "usage",
-        title = "Аналитик эксплуатации",
-        focus = "поездки, пробег, режимы и стиль езды, холостой ход, как машина «ведёт себя» за период",
+        title = "Operations analyst",
+        focus = "trips, mileage, driving modes and style, idling, how the car \"behaves\" over the period",
         prompt = """
-            Ты — Аналитик эксплуатации. Смотришь, как машиной пользуются и как она «ведёт себя» за период: число и длина поездок, пробег,
-            доля времени на месте (пробки, прогрев на месте), режимы, изменения по месяцам (тренды). Не ставишь диагнозов по кодам
-            (см. Диагност) и не считаешь деньги (см. Экономист).
+            You are the Operations analyst. You look at how the car is used and how it "behaves" over the period: number and length of trips, mileage,
+            share of time standing still (traffic jams, warming up in place), driving modes, changes by month (trends). You do not diagnose codes
+            (see Diagnostician) and do not count money (see Economist).
         """.trimIndent(),
         tools = setOf("trends", "tripStats", "listSessions"),
         digestSections = listOf("trends", "tripStats", "listSessions"),
-        keywords = listOf(
-            "ве(дет|ла|л|ли|дут) себя", "как (моя |наша )?(машина|машинка|авто)", "поездк", "пробег", "езжу", "езди", "езда", "стиль", "режим",
-            "в целом", "обзор", "итог", "статистик", "тренд", "динамик", "изменил", "простаива", "пробк",
-            "behave", "trips?\\b", "driving", "mileage", "overall", "how (is|did|does|has) my car", "summary", "trend", "usage",
-        ),
-        status = "Аналитик эксплуатации смотрит поездки за %s…",
+        keywords = RouterKeywords.USAGE,
     )
 
     val FUEL = ExpertRole(
         id = "fuel",
-        title = "Экономист",
-        focus = "расход топлива, траты на топливо, сравнение периодов",
+        title = "Economist",
+        focus = "fuel consumption, fuel spending, comparison of periods",
         prompt = """
-            Ты — Экономист. Смотришь расход топлива (л/100 км) и траты на топливо за период, сравниваешь месяцы между собой, связываешь
-            изменения с режимом езды (доля стоянки, длина поездок). Оговаривай, если расход оценён по MAF, а не измерен. Не касаешься кодов
-            ошибок (см. Диагност).
+            You are the Economist. You look at fuel consumption (l/100 km) and fuel spending over the period, compare months with each other and
+            link changes to the driving mode (share of standing time, trip length). Say so if consumption is estimated from MAF rather than measured.
+            You do not touch trouble codes (see Diagnostician).
         """.trimIndent(),
         tools = setOf("tripStats", "trends"),
         digestSections = listOf("tripStats", "trends"),
-        keywords = listOf(
-            "расход", "топлив", "бензин", "дизел", "солярк", "трач", "затрат", "деньг", "стоимост", "литр", "л/100", "заправ",
-            "fuel", "petrol", "gas\\b", "consumption", "mpg", "spend", "cost", "economy",
-        ),
-        status = "Экономист считает расход за %s…",
+        keywords = RouterKeywords.FUEL,
     )
 
     val SERVICE = ExpertRole(
         id = "service",
-        title = "Мастер ТО",
-        focus = "регламент обслуживания, что пора менять, пробег",
+        title = "Service advisor",
+        focus = "maintenance schedule, what is due for replacement, odometer",
         prompt = """
-            Ты — Мастер ТО. Смотришь план обслуживания: какие работы просрочены, какие скоро, сколько осталось по пробегу и по времени,
-            насколько точен пробег (введён или оценён по поездкам). Не ставишь диагнозов по датчикам (см. Моторист).
+            You are the Service advisor. You look at the maintenance plan: which works are overdue, which are due soon, how much is left by mileage
+            and by time, how accurate the odometer is (entered or estimated from trips). You do not diagnose from sensors (see Engine specialist).
         """.trimIndent(),
         tools = setOf("maintenanceDue", "carProfile"),
         digestSections = listOf("maintenanceDue"),
-        keywords = listOf(
-            "(пройти|пройду|следующее|очередное|плановое|ближайшее) то\\b", "то-?\\d", "техобслуж", "обслуж", "масл", "замен", "менять",
-            "фильтр", "свеч", "ремен", "грм", "регламент", "интервал", "пора ",
-            "maintenance", "service", "oil", "replace", "filter", "spark plug", "timing belt",
-        ),
-        status = "Мастер ТО смотрит план обслуживания…",
+        keywords = RouterKeywords.SERVICE,
     )
 
     val MODEL_EXPERT = ExpertRole(
         id = "model_expert",
-        title = "Знаток модели",
-        focus = "особенности этой марки и двигателя, типичные слабые места",
+        title = "Model expert",
+        focus = "features of this make and engine, typical weak spots",
         prompt = """
-            Ты — Знаток модели. По профилю машины (марка, модель, год, двигатель) рассказываешь об особенностях и типичных слабых местах
-            этой модели и двигателя. Это общие знания, а не данные пользователя: каждое такое утверждение помечай
-            «по общим сведениям, не по вашим данным». Не выдумывай пробеги, цифры и коды пользователя.
+            You are the Model expert. From the car profile (make, model, year, engine) you describe the features and typical weak spots
+            of this model and engine. This is general knowledge, not the user's data: mark every such statement
+            "based on general knowledge, not on your data". Do not invent the user's mileage, numbers or codes.
         """.trimIndent(),
         tools = setOf("carProfile"),
         digestSections = emptyList(),
-        keywords = listOf(
-            "болячк", "слаб(ые|ое) мест", "типичн", "особенност", "надежн", "ресурс", "известн", "sorento", "соренто", "kia\\b", "киа\\b",
-            "hyundai", "хендай", "хёндай", "g6cu", "common problems", "known (issues|problems)", "weak (spots|points)", "reliab",
-        ),
-        status = "Знаток модели вспоминает особенности модели…",
+        keywords = RouterKeywords.MODEL_EXPERT,
     )
 
     val ALL: List<ExpertRole> = listOf(DIAGNOSTICIAN, ENGINE, COOLING, ELECTRICAL, USAGE, FUEL, SERVICE, MODEL_EXPERT)
 
     fun byId(id: String): ExpertRole? = ALL.firstOrNull { it.id == id }
 
-    /** «за 6 месяцев», «за месяц»… — for statuses and prompts. */
+    /** «6 months», «a month»… — the period in model-facing prompts (the UI formats periods from its own resources). */
     fun periodText(days: Int): String = when {
-        days == 7 -> "неделю"
-        days == 30 -> "месяц"
-        days == 365 -> "год"
-        days % 30 == 0 && days in 60..330 -> "${days / 30} ${months(days / 30)}"
-        else -> "$days дн."
-    }
-
-    private fun months(n: Int) = when {
-        n % 10 == 1 && n % 100 != 11 -> "месяц"
-        n % 10 in 2..4 && n % 100 !in 12..14 -> "месяца"
-        else -> "месяцев"
+        days == 7 -> "a week"
+        days == 30 -> "a month"
+        days == 365 -> "a year"
+        days % 30 == 0 && days in 60..330 -> "${days / 30} months"
+        else -> "$days days"
     }
 }

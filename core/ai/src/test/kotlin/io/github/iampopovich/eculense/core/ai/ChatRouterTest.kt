@@ -124,29 +124,29 @@ class ChatRouterTest {
         val trend = route("как моя машина ведет себя последние полгода")
         roles.forEach { r ->
             assertTrue(r.id, r.tools.isNotEmpty() && r.keywords.isNotEmpty())
-            listOf(r.prompt, SystemPrompts.expert(r, trend), SystemPrompts.direct(r, trend)).forEach { p ->
-                assertFalse("${r.id}: $p", p.contains("что проверить самому") || p.contains("когда ехать в сервис"))
+            listOf(r.prompt, SystemPrompts.expert(r, trend, "en"), SystemPrompts.direct(r, trend, "en")).forEach { p ->
+                assertFalse("${r.id}: $p", p.contains("what to check yourself") || p.contains("when to go to a service shop"))
             }
-            assertTrue(r.id, SystemPrompts.expert(r, trend).contains("days=180"))
+            assertTrue(r.id, SystemPrompts.expert(r, trend, "en").contains("days=180"))
         }
         assertEquals(setOf("dtcHistory", "findings", "carProfile"), ExpertRoles.DIAGNOSTICIAN.tools)
         assertEquals(setOf("trends", "tripStats", "listSessions"), ExpertRoles.USAGE.tools)
         assertEquals(setOf("carProfile"), ExpertRoles.MODEL_EXPERT.tools)
         // the old template lives on only in the answer format for fault questions
-        assertTrue(SystemPrompts.answerForm(ChatIntent.DIAGNOSE).contains("что проверить самому"))
+        assertTrue(SystemPrompts.answerForm(ChatIntent.DIAGNOSE).contains("what to check yourself"))
         ChatIntent.entries.filter { it != ChatIntent.DIAGNOSE }.forEach { i ->
-            assertFalse(i.name, SystemPrompts.answerForm(i).contains("что проверить самому"))
+            assertFalse(i.name, SystemPrompts.answerForm(i).contains("what to check yourself"))
         }
-        assertFalse(SystemPrompts.MECHANIC.contains("что проверить самому"))
-        assertTrue("Знаток модели помечает общие знания", ExpertRoles.MODEL_EXPERT.prompt.contains("по общим сведениям, не по вашим данным"))
+        assertFalse(SystemPrompts.mechanic("en").contains("what to check yourself"))
+        assertTrue("Знаток модели помечает общие знания", ExpertRoles.MODEL_EXPERT.prompt.contains("based on general knowledge, not on your data"))
     }
 
     @Test
-    fun `statuses name the role and the period`() {
-        assertEquals("Аналитик эксплуатации смотрит поездки за 6 месяцев…", ExpertRoles.USAGE.statusText(180))
-        assertEquals("Электрик смотрит напряжение за месяц…", ExpertRoles.ELECTRICAL.statusText(30))
-        assertEquals("Диагност смотрит коды ошибок…", ExpertRoles.DIAGNOSTICIAN.statusText(180))
-        assertEquals("2 месяца", ExpertRoles.periodText(60))
-        assertEquals("5 месяцев", ExpertRoles.periodText(150))
+    fun `period text for prompts is English`() {
+        assertEquals("6 months", ExpertRoles.periodText(180))
+        assertEquals("a month", ExpertRoles.periodText(30))
+        assertEquals("a week", ExpertRoles.periodText(7))
+        assertEquals("2 months", ExpertRoles.periodText(60))
+        assertEquals("45 days", ExpertRoles.periodText(45))
     }
 }

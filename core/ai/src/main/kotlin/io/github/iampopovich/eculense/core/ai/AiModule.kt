@@ -11,7 +11,7 @@ val aiModule = module {
     single { LlmSettingsStore(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("llm_settings") }, get()) }
     single { Room.databaseBuilder(androidContext(), AiChatDatabase::class.java, "ai_chat.db").build() }
     single<ChatHistoryStore> { RoomChatHistory(get<AiChatDatabase>().messages()) }
-    single<LlmGateway> { KoogLlmGateway(get(), toolbox = getOrNull(), historyProvider = get(), onDevice = getOrNull()) }
+    single<LlmGateway> { KoogLlmGateway(get(), toolbox = getOrNull(), historyProvider = get(), onDevice = getOrNull(), language = get()) }
     single<ConnectionChecker> { KoogConnectionChecker() }
     single<ChatPrefs> { DataStoreChatPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("ai_chat") }) }
 }

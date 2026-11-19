@@ -31,12 +31,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import io.github.iampopovich.eculense.core.model.AppLanguage
 import java.io.File
 import java.util.Collections
 
 /**
- * Expert orchestrator on a fake executor: the executor recognizes the role from the system prompt («Ты — Диагност»),
- * calls its role's tool in the first round and writes a note in the second; the editor («Ты — Редактор») streams the answer.
+ * Expert orchestrator on a fake executor: the executor recognizes the role from the system prompt («You are the
+ * Diagnostician.»), calls its role's tool in the first round and writes a note in the second; the editor («You are the
+ * Editor.») streams the answer. Every prompt starts with the answer-language line of the current app language.
  */
 class ExpertOrchestratorTest {
     @get:Rule val tmp = TemporaryFolder()
@@ -72,7 +74,6 @@ class ExpertOrchestratorTest {
                 })
             }
         }
-        override fun progressLabel(toolName: String) = if (toolName == "trends") "ИИ смотрит тренды по месяцам…" else "ИИ смотрит $toolName…"
     }
 
     /** Which tool the role calls in the first round. */
@@ -83,7 +84,7 @@ class ExpertOrchestratorTest {
         val offered: MutableMap<String, MutableSet<String>> = Collections.synchronizedMap(mutableMapOf())
         val editorPrompts: MutableList<String> = Collections.synchronizedList(mutableListOf())
 
-        private fun roleOf(system: String) = ExpertRoles.ALL.firstOrNull { system.contains("Ты — ${it.title}.") }
+        private fun roleOf(system: String) = ExpertRoles.ALL.firstOrNull { system.contains("You are the ${it.title}.") }
 
         override suspend fun execute(prompt: Prompt, model: LLModel, tools: List<ToolDescriptor>): Message.Assistant = error("not used")
         override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult = error("not used")
@@ -92,7 +93,7 @@ class ExpertOrchestratorTest {
         override fun executeStreaming(prompt: Prompt, model: LLModel, tools: List<ToolDescriptor>): Flow<StreamFrame> {
             val system = prompt.messages.first().textContent()
             systems += system
-            if (system.contains("Ты — Редактор.")) {
+            if (system.contains("You are the Editor.")) {
                 editorPrompts += system
                 return text("Коротко: машина в целом в порядке. ", "За 6 месяцев расход стабилен.")
             }
@@ -112,8 +113,14 @@ class ExpertOrchestratorTest {
             flowOf(*(chunks.map { StreamFrame.TextDelta(it) } + StreamFrame.TextComplete(chunks.joinToString("")) + StreamFrame.End("stop")).toTypedArray())
     }
 
-    private suspend fun gateway(exec: PromptExecutor, toolbox: VehicleToolbox, timeout: Long = 10_000) =
-        KoogLlmGateway(store(), toolbox = toolbox, executorFactory = { _, _ -> exec }, expertTimeoutMs = timeout, expertLog = {})
+    private suspend fun gateway(exec: PromptExecutor, toolbox: VehicleToolbox, timeout: Long = 10_000, lang: () -> String = { "ru" }) =
+        KoogLlmGateway(
+            store(), toolbox = toolbox, executorFactory = { _, _ -> exec }, expertTimeoutMs = timeout, expertLog = {},
+            language = AppLanguage { lang() },
+        )
+
+    private val russian = "Always answer in Russian (language tag: ru), regardless of the language of the question or the data."
+    private val english = "Always answer in English (language tag: en), regardless of the language of the question or the data."
 
     @Test
     fun `half a year question runs usage, diagnostician and engine in parallel with their own tools, editor gets the notes`() = runBlocking {
@@ -127,20 +134,22 @@ class ExpertOrchestratorTest {
         // each expert gets only its own tools
         exec.offered.forEach { (id, names) -> assertEquals(id, ExpertRoles.byId(id)!!.tools, names) }
         // 180-day period — in the expert prompt and in the tool arguments
-        assertTrue(exec.systems.filter { it.contains("Ты — Аналитик эксплуатации.") }.all { it.contains("days=180") })
+        assertTrue(exec.systems.filter { it.contains("You are the Operations analyst.") }.all { it.contains("days=180") })
         assertEquals(2, toolbox.calls.count { it == ("trends" to 180) })
         assertTrue(toolbox.calls.contains("dtcHistory" to null))
         // the editor got all three notes and the «обзор/тренд» answer form, not «причины → проверить»
         val editor = exec.editorPrompts.single()
         listOf("usage", "diagnostician", "engine").forEach { assertTrue(editor, editor.contains("Заметка $it")) }
-        assertTrue(editor, editor.contains("что изменилось за период"))
-        assertFalse(editor, editor.contains("что проверить самому"))
-        // role statuses with the period, «Над ответом работали», the editor's answer
-        val statuses = events.filterIsInstance<ChatEvent.Status>().map { it.label }
-        assertTrue(statuses.toString(), statuses.contains("Аналитик эксплуатации смотрит поездки за 6 месяцев…"))
-        assertTrue(events.filterIsInstance<ChatEvent.ToolCall>().map { it.label }.contains("Аналитик эксплуатации смотрит тренды по месяцам…"))
+        assertTrue(editor, editor.contains("what changed over the period"))
+        assertFalse(editor, editor.contains("what to check yourself"))
+        // the answer language of the app goes first into every prompt: experts (their notes are shown) and the editor
+        assertTrue(exec.systems.joinToString("\n---\n"), exec.systems.all { it.startsWith(russian + "\n") })
+        // role statuses with the period, «Worked on the answer», the editor's answer
+        val statuses = events.filterIsInstance<ChatEvent.Status>().map { it.key }
+        assertTrue(statuses.toString(), statuses.contains(ChatStatus.Role("usage", 180)))
+        assertTrue(events.filterIsInstance<ChatEvent.ToolCall>().map { it.roleId to it.toolName }.contains("usage" to "trends"))
         val experts = events.filterIsInstance<ChatEvent.Experts>().single()
-        assertEquals(listOf("Аналитик эксплуатации", "Диагност", "Моторист"), experts.roles)
+        assertEquals(listOf("usage", "diagnostician", "engine"), experts.roleIds)
         assertEquals(3, experts.notes.size)
         assertTrue(experts.notes.none { it.failed })
         val answer = events.filterIsInstance<ChatEvent.Text>().joinToString("") { it.delta }
@@ -156,7 +165,7 @@ class ExpertOrchestratorTest {
         val events = gateway(exec, Toolbox()).chat("c1", "как моя машина ведет себя последние полгода", useCarData = true).toList()
         val notes = events.filterIsInstance<ChatEvent.Experts>().single().notes
         assertTrue(notes.single { it.roleId == "engine" }.failed)
-        assertTrue(exec.editorPrompts.single().contains("Эксперт «Моторист» недоступен"))
+        assertTrue(exec.editorPrompts.single().contains("Expert \"Engine specialist\" is unavailable"))
         assertTrue(events.filterIsInstance<ChatEvent.Text>().joinToString("") { it.delta }.startsWith("Коротко"))
     }
 
@@ -169,13 +178,13 @@ class ExpertOrchestratorTest {
             override fun close() = Unit
             override fun executeStreaming(prompt: Prompt, model: LLModel, tools: List<ToolDescriptor>): Flow<StreamFrame> {
                 val sys = prompt.messages.first().textContent()
-                if (sys.contains("Ты — Диагност.")) return flow { delay(60_000) }
+                if (sys.contains("You are the Diagnostician.")) return flow { delay(60_000) }
                 return inner.executeStreaming(prompt, model, tools)
             }
         }
         val events = gateway(slow, Toolbox(), timeout = 300).chat("c1", "как моя машина ведет себя последние полгода", useCarData = true).toList()
         assertTrue(events.filterIsInstance<ChatEvent.Experts>().single().notes.single { it.roleId == "diagnostician" }.failed)
-        assertTrue(slow.inner.editorPrompts.single().contains("Диагност"))
+        assertTrue(slow.inner.editorPrompts.single().contains("Diagnostician"))
     }
 
     @Test
@@ -188,11 +197,12 @@ class ExpertOrchestratorTest {
         assertEquals(ExpertRoles.FUEL.tools, exec.offered.getValue("fuel"))
         // direct role answer — «расход и сравнение» form, not a note for the editor
         val system = exec.systems.first()
-        assertTrue(system, system.contains("цифры расхода и трат"))
-        assertFalse(system, system.contains("заметку для редактора"))
-        assertEquals(listOf("Экономист"), events.filterIsInstance<ChatEvent.Experts>().single().roles)
+        assertTrue(system, system.contains("fuel consumption and spending figures"))
+        assertFalse(system, system.contains("note for the editor"))
+        assertTrue(system, system.startsWith(russian))
+        assertEquals(listOf("fuel"), events.filterIsInstance<ChatEvent.Experts>().single().roleIds)
         assertTrue(events.filterIsInstance<ChatEvent.Text>().joinToString("") { it.delta }.contains("Заметка fuel"))
-        assertEquals(ChatEvent.Status("Экономист считает расход за 6 месяцев…", ChatStatus.Role("fuel", 180)), events.first())
+        assertEquals(ChatEvent.Status(ChatStatus.Role("fuel", 180)), events.first())
     }
 
     @Test
@@ -202,6 +212,18 @@ class ExpertOrchestratorTest {
         assertTrue(exec.offered.isEmpty())
         assertTrue(events.none { it is ChatEvent.Experts || it is ChatEvent.ToolCall })
         assertEquals("Ответ без роли", events.filterIsInstance<ChatEvent.Text>().joinToString("") { it.delta })
+    }
+
+    @Test
+    fun `answer language is read on every question`() = runBlocking {
+        val exec = RoleExecutor(firstTool)
+        var tag = "ru"
+        val gw = gateway(exec, Toolbox(), lang = { tag })
+        gw.chat("c1", "привет", useCarData = true).toList()
+        assertTrue(exec.systems.single(), exec.systems.single().startsWith(russian))
+        tag = "en"
+        gw.chat("c1", "how much do I spend on fuel", useCarData = true).toList()
+        assertTrue(exec.systems.last(), exec.systems.last().startsWith(english))
     }
 
     // --- On-device model: a single call «сразу в ролях», summary only from the relevant sections.
@@ -219,7 +241,6 @@ class ExpertOrchestratorTest {
     private class DigestToolbox : VehicleToolbox {
         val requests = mutableListOf<Pair<List<String>, Int>>()
         override fun registry() = ToolRegistry.EMPTY
-        override fun progressLabel(toolName: String) = toolName
         override suspend fun digest(sections: List<String>, days: Int): String {
             requests += sections to days
             return sections.joinToString("\n") { "Раздел $it" }
@@ -237,7 +258,7 @@ class ExpertOrchestratorTest {
             override val summary = flowOf<OnDeviceSummary?>(null)
             override suspend fun deactivate() = Unit
         }
-        val gw = KoogLlmGateway(store(), toolbox = toolbox, onDevice = onDevice, executorFactory = { _, _ -> error("облако не нужно") })
+        val gw = KoogLlmGateway(store(), toolbox = toolbox, onDevice = onDevice, language = AppLanguage { "ru" }, executorFactory = { _, _ -> error("облако не нужно") })
         val events = gw.chat("c1", "how did my car behave over the last 6 months", useCarData = true).toList()
 
         assertEquals(1, exec.prompts.size)
@@ -245,10 +266,11 @@ class ExpertOrchestratorTest {
         assertEquals(180, days)
         assertEquals(listOf("carProfile", "trends"), sections.take(2))
         val system = exec.prompts.single().messages.first().textContent()
-        assertTrue(system, system.contains("Ты сразу в нескольких ролях") && system.contains("Аналитик эксплуатации"))
-        assertTrue(system, system.contains("что изменилось за период"))
-        assertFalse(system, system.contains("что проверить самому"))
+        assertTrue(system, system.startsWith(russian))
+        assertTrue(system, system.contains("You play several roles at once") && system.contains("Operations analyst"))
+        assertTrue(system, system.contains("what changed over the period"))
+        assertFalse(system, system.contains("what to check yourself"))
         assertTrue(system, system.indexOf("Раздел trends") < system.indexOf("Раздел dtcHistory"))
-        assertEquals(listOf("Аналитик эксплуатации", "Диагност", "Моторист"), events.filterIsInstance<ChatEvent.Experts>().single().roles)
+        assertEquals(listOf("usage", "diagnostician", "engine"), events.filterIsInstance<ChatEvent.Experts>().single().roleIds)
     }
 }

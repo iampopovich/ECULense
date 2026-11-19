@@ -99,7 +99,7 @@ class MaintenanceDueToolTest {
     fun `no list yet and no module are explicit no_data`() = runBlocking {
         val empty = MaintenanceDueTool(ctx(Mem(emptyList(), emptyList()))).execute(NoArgs())
         assertTrue(empty.contains("no_data"))
-        assertTrue(empty.contains("Обслуживание"))
+        assertTrue(empty.contains("Pit stop → Maintenance"))
         assertTrue(MaintenanceDueTool(ctx(null)).execute(NoArgs()).contains("no_data"))
     }
 }

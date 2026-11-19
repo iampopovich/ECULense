@@ -6,6 +6,8 @@ plugins {
 }
 
 dependencies {
+    // AppLanguage: the answer language is read from the current app locale on every question.
+    implementation(project(":core:model"))
     implementation(libs.koog.agents)
     // Provider clients from koog-spring-boot-starter: OpenRouter, Google, DeepSeek, Mistral, Ollama
     // (OpenAI and Anthropic come with koog-agents).

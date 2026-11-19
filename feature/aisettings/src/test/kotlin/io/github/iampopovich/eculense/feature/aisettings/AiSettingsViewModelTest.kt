@@ -2,6 +2,7 @@ package io.github.iampopovich.eculense.feature.aisettings
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.iampopovich.eculense.core.ai.ConnectionCheck
+import io.github.iampopovich.eculense.core.ai.NetworkProblem
 import io.github.iampopovich.eculense.core.ai.ConnectionChecker
 import io.github.iampopovich.eculense.core.ai.LlmProviderKind
 import io.github.iampopovich.eculense.core.ai.LlmSettings
@@ -226,13 +227,19 @@ class AiSettingsViewModelTest {
             blocked,
         )
 
-        checker.result = ConnectionCheck.Unreachable("host not found (DNS)")
+        checker.result = ConnectionCheck.Unreachable(NetworkProblem.DNS)
         vm.checkAndWait()
         assertEquals(
-            UiText.Res(R.string.aisettings_err_unreachable, listOf(UiText.Raw("host not found (DNS)"))),
+            UiText.Res(R.string.aisettings_err_unreachable, listOf(UiText.Res(R.string.aisettings_net_dns))),
             (vm.state.value.check as CheckState.Failed).message,
         )
-        checker.result = ConnectionCheck.Unreachable(null)
+        checker.result = ConnectionCheck.Unreachable(NetworkProblem.OTHER, "socket closed")
+        vm.checkAndWait()
+        assertEquals(
+            UiText.Res(R.string.aisettings_err_unreachable, listOf(UiText.Raw("socket closed"))),
+            (vm.state.value.check as CheckState.Failed).message,
+        )
+        checker.result = ConnectionCheck.Unreachable(NetworkProblem.OTHER)
         vm.checkAndWait()
         assertEquals(
             UiText.Res(R.string.aisettings_err_unreachable, listOf(UiText.Res(R.string.aisettings_err_unreachable_hint))),

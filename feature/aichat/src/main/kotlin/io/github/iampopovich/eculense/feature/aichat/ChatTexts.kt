@@ -5,13 +5,15 @@ import io.github.iampopovich.eculense.core.ai.ChatEvent
 import io.github.iampopovich.eculense.core.ai.ChatStatus
 import io.github.iampopovich.eculense.core.ai.ExpertNote
 import io.github.iampopovich.eculense.core.ai.ExpertRoles
+import io.github.iampopovich.eculense.core.ai.LlmException
+import io.github.iampopovich.eculense.core.ai.LlmProblem
 import io.github.iampopovich.eculense.core.ai.LlmProviderKind
 import io.github.iampopovich.eculense.core.ai.ProviderInfo
 import io.github.iampopovich.eculense.core.ui.UiText
 
 /**
- * Chat labels in the app language. The AI modules report ids (role id, tool name, [ChatStatus]); their own legacy
- * labels are used only for events without an id.
+ * Chat labels in the app language. The AI modules report ids (role id, tool name, [ChatStatus], [LlmProblem]);
+ * the English role title from :core:ai is only a fallback for a role without a resource.
  */
 internal object ChatTexts {
     private val roleNames: Map<String, Int> = mapOf(
@@ -54,17 +56,18 @@ internal object ChatTexts {
 
     fun roleName(roleId: String, fallback: String): UiText = roleNames[roleId]?.let { UiText.Res(it) } ?: UiText.Raw(fallback)
 
+    fun roleName(roleId: String): UiText = roleName(roleId, ExpertRoles.byId(roleId)?.title ?: roleId)
+
     fun toolCall(event: ChatEvent.ToolCall): UiText {
         val subject = event.roleId?.let { id -> roleNames[id]?.let { UiText.Res(it) } } ?: UiText.Res(R.string.aichat_subject_ai)
         return UiText.Res(toolLabels[event.toolName] ?: R.string.aichat_tool_default, listOf(subject))
     }
 
     fun status(event: ChatEvent.Status): UiText = when (val key = event.key) {
-        null -> UiText.Raw(event.label)
         ChatStatus.PhoneThinking -> UiText.Res(R.string.aichat_status_phone_thinking)
         ChatStatus.CollectingData -> UiText.Res(R.string.aichat_status_collecting)
         ChatStatus.Editor -> UiText.Res(R.string.aichat_status_editor)
-        is ChatStatus.Role -> roleStatuses[key.roleId]?.let { UiText.Res(it, listOf(period(key.periodDays))) } ?: UiText.Raw(event.label)
+        is ChatStatus.Role -> roleStatuses[key.roleId]?.let { UiText.Res(it, listOf(period(key.periodDays))) } ?: roleName(key.roleId)
     }
 
     /** Same buckets as the router's period text: week, month, year, whole months, otherwise days. */
@@ -76,20 +79,37 @@ internal object ChatTexts {
         else -> UiText.Plural(R.plurals.aichat_period_days, days)
     }
 
-    fun experts(event: ChatEvent.Experts): ExpertsInfo {
-        val roles = if (event.roleIds.size == event.roles.size) {
-            event.roleIds.zip(event.roles) { id, title -> roleName(id, title) }
-        } else {
-            event.roles.map { UiText.Raw(it) }
-        }
-        return ExpertsInfo(roles, event.notes)
-    }
+    fun experts(event: ChatEvent.Experts): ExpertsInfo = ExpertsInfo(event.roleIds.map { roleName(it) }, event.notes)
 
     fun noteTitle(note: ExpertNote): UiText = roleName(note.roleId, note.title)
 
     /** A failed expert's note is our own text, so it is localized; a real note is model output and shown as is. */
     fun noteText(note: ExpertNote): UiText =
         if (note.failed) UiText.Res(R.string.aichat_expert_unavailable, listOf(noteTitle(note))) else UiText.Raw(note.text)
+
+    /** AI request error in the app language; the provider's own reason is appended verbatim. */
+    fun error(e: Throwable): UiText {
+        if (e !is LlmException) return e.message?.let { UiText.Raw(it) } ?: UiText.Res(R.string.aichat_error_generic)
+        val text = when (val p = e.problem) {
+            LlmProblem.NotConfigured -> UiText.Res(R.string.aichat_err_not_configured)
+            LlmProblem.KeyMissing -> UiText.Res(R.string.aichat_err_key_missing)
+            LlmProblem.UrlMissing -> UiText.Res(R.string.aichat_err_url_missing)
+            is LlmProblem.InvalidUrl -> UiText.Res(R.string.aichat_err_invalid_url)
+            LlmProblem.Unauthorized -> UiText.Res(R.string.aichat_err_401)
+            LlmProblem.Forbidden -> UiText.Res(R.string.aichat_err_403)
+            LlmProblem.PaymentRequired -> UiText.Res(R.string.aichat_err_402)
+            LlmProblem.NotFound -> UiText.Res(R.string.aichat_err_404)
+            LlmProblem.RateLimited -> UiText.Res(R.string.aichat_err_429)
+            is LlmProblem.ServerDown -> UiText.Res(R.string.aichat_err_server, listOf(p.status))
+            is LlmProblem.Rejected -> UiText.Res(R.string.aichat_err_rejected, listOf(p.status))
+            LlmProblem.Network -> UiText.Res(R.string.aichat_err_network)
+            is LlmProblem.OnDeviceLoad -> UiText.Res(R.string.aichat_err_on_device_load, listOf(p.detail))
+            is LlmProblem.OnDeviceFailed -> UiText.Res(R.string.aichat_err_on_device_failed, listOf(p.detail))
+            is LlmProblem.Other -> UiText.Res(R.string.aichat_err_other, listOf(p.detail))
+        }
+        val detail = e.serverDetail
+        return if (detail.isNullOrBlank()) text else UiText.Res(R.string.aichat_err_with_server, listOf(text, detail))
+    }
 
     /** Brand names stay as they are; only «Other» is localized. */
     fun providerTitle(provider: ProviderInfo): UiText =

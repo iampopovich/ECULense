@@ -72,4 +72,11 @@
     <string name="aisettings_rating_comfort">Комфортно</string>
     <string name="aisettings_rating_slow">Медленно</string>
     <string name="aisettings_rating_unsuitable">Не подходит</string>
+    <string name="aisettings_net_no_api">по этому адресу нет API (404) — проверьте адрес</string>
+    <string name="aisettings_net_not_api">сервер ответил не в формате API — проверьте адрес</string>
+    <string name="aisettings_net_dns">сервер не найден (DNS) — проверьте адрес и интернет</string>
+    <string name="aisettings_net_cleartext">Android запрещает незашифрованный http к этому адресу — нужен https</string>
+    <string name="aisettings_net_connect">не удалось подключиться — сервер не запущен или неверный адрес/порт</string>
+    <string name="aisettings_net_timeout">сервер не ответил вовремя</string>
+    <string name="aisettings_net_tls">ошибка защищённого соединения (TLS)</string>
 </resources>

@@ -79,4 +79,20 @@
     <string name="aichat_tool_maintenance_due">%1$s is looking at the maintenance plan…</string>
     <string name="aichat_tool_trends">%1$s is looking at monthly trends…</string>
     <string name="aichat_tool_default">%1$s is looking at car data…</string>
+    <string name="aichat_err_not_configured">AI is not set up: open Settings → AI assistant</string>
+    <string name="aichat_err_key_missing">No API key is set: open Settings → AI assistant</string>
+    <string name="aichat_err_url_missing">No server address is set: open Settings → AI assistant</string>
+    <string name="aichat_err_invalid_url">The saved server address is invalid: fix it in Settings → AI assistant</string>
+    <string name="aichat_err_401">Authorization error (401): invalid or revoked API key. Check the key in Settings → AI assistant.</string>
+    <string name="aichat_err_403">Access denied (403): the key has no rights or the provider blocks requests from this network/region (try a VPN).</string>
+    <string name="aichat_err_402">Not enough funds on the provider account (402).</string>
+    <string name="aichat_err_404">Model or address not found (404): check the model name.</string>
+    <string name="aichat_err_429">Too many requests (429): wait and try again.</string>
+    <string name="aichat_err_server">The provider\'s server is unavailable (%1$d). Try again later.</string>
+    <string name="aichat_err_rejected">The provider rejected the request (%1$d).</string>
+    <string name="aichat_err_network">No connection to the AI server: check the internet and the server address.</string>
+    <string name="aichat_err_on_device_load">The on-device model failed to load: %1$s</string>
+    <string name="aichat_err_on_device_failed">The on-device model did not answer: %1$s</string>
+    <string name="aichat_err_other">Could not get an AI answer (%1$s).</string>
+    <string name="aichat_err_with_server">%1$s Server response: “%2$s”</string>
 </resources>

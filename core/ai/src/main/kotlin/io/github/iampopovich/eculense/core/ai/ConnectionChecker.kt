@@ -27,7 +27,7 @@ data class ModelInfo(
     val recommended: Boolean = false,
 )
 
-/** Result of «Проверить подключение»: whether the key is proven and what the server returned. */
+/** Result of «Check connection»: whether the key is proven and what the server returned. */
 sealed interface ConnectionCheck {
     /** Key and URL confirmed. [listed] = false — a custom server does not return a model list: the id is entered manually. */
     data class Ok(val models: List<ModelInfo>, val listed: Boolean = true) : ConnectionCheck
@@ -38,8 +38,36 @@ sealed interface ConnectionCheck {
     }
     data class Unauthorized(val detail: String?) : ConnectionCheck
     data class Blocked(val detail: String?) : ConnectionCheck
-    data class Unreachable(val detail: String?) : ConnectionCheck
+    /** [problem] — what went wrong on the way; [detail] — raw technical text, only for [NetworkProblem.OTHER]. */
+    data class Unreachable(val problem: NetworkProblem, val detail: String? = null) : ConnectionCheck
     data class Failed(val status: Int, val detail: String?) : ConnectionCheck
+}
+
+/** Why the server could not be reached or did not look like an API; the UI maps each value to a text. */
+enum class NetworkProblem {
+    /** HTTP 404 at a preset: no API at this address. */
+    NO_API,
+
+    /** The server replied, but not in the API format. */
+    NOT_API,
+
+    /** Host name not found. */
+    DNS,
+
+    /** Android blocks cleartext http to this host. */
+    CLEARTEXT,
+
+    /** Connection refused: server not running or wrong address/port. */
+    CONNECT,
+
+    /** No reply in time. */
+    TIMEOUT,
+
+    /** TLS handshake failed. */
+    TLS,
+
+    /** Anything else: see [ConnectionCheck.Unreachable.detail]. */
+    OTHER,
 }
 
 interface ConnectionChecker {
@@ -62,7 +90,7 @@ class KoogConnectionChecker(
 ) : ConnectionChecker {
 
     override suspend fun check(provider: LlmProviderKind, baseUrl: String?, apiKey: String?): ConnectionCheck {
-        // The URL is entered only for «Другого»; presets use the Koog client's default URL.
+        // The URL is entered only for «Other»; presets use the Koog client's default URL.
         val otherUrl = if (provider == LlmProviderKind.OTHER) {
             when (val v = EndpointUrl.validate(baseUrl.orEmpty())) {
                 is EndpointUrl.Result.Invalid -> return ConnectionCheck.InvalidUrl(v.problem)
@@ -75,6 +103,8 @@ class KoogConnectionChecker(
         if (provider.needsKey && key == null) return ConnectionCheck.KeyMissing
         val client = try {
             clientFactory(provider, otherUrl, key)
+        } catch (e: LlmException) {
+            return if (e.problem == LlmProblem.UrlMissing) ConnectionCheck.InvalidUrl(UrlProblem.EMPTY) else ConnectionCheck.KeyMissing
         } catch (e: IllegalStateException) {
             return ConnectionCheck.KeyMissing
         }
@@ -149,7 +179,7 @@ class KoogConnectionChecker(
                 status == 403 -> ConnectionCheck.Blocked(detail)
                 // A custom server may not support /models (old llama.cpp versions etc.) — the model is entered manually.
                 status == 404 && provider == LlmProviderKind.OTHER -> ConnectionCheck.Ok(emptyList(), listed = false)
-                status == 404 -> ConnectionCheck.Unreachable("по этому адресу нет API (404) — проверьте адрес")
+                status == 404 -> ConnectionCheck.Unreachable(NetworkProblem.NO_API)
                 else -> ConnectionCheck.Failed(status, detail)
             }
         }
@@ -158,10 +188,10 @@ class KoogConnectionChecker(
             return if (provider == LlmProviderKind.OTHER) {
                 ConnectionCheck.Ok(emptyList(), listed = false)
             } else {
-                ConnectionCheck.Unreachable("сервер ответил не в формате API — проверьте адрес")
+                ConnectionCheck.Unreachable(NetworkProblem.NOT_API)
             }
         }
-        return ConnectionCheck.Unreachable(redact(networkReason(e), key))
+        return networkReason(e).let { (problem, detail) -> ConnectionCheck.Unreachable(problem, redact(detail, key)) }
     }
 
     companion object {
@@ -187,17 +217,17 @@ class KoogConnectionChecker(
         private fun redact(text: String?, key: String?): String? =
             if (text != null && key != null && key.length >= 4) text.replace(key, "***") else text
 
-        private fun networkReason(e: Throwable): String {
+        private fun networkReason(e: Throwable): Pair<NetworkProblem, String?> {
             val chain = chain(e)
             return when {
-                chain.any { it is UnknownHostException } -> "сервер не найден (DNS) — проверьте адрес и интернет"
+                chain.any { it is UnknownHostException } -> NetworkProblem.DNS to null
                 chain.any { it is UnknownServiceException && it.message.orEmpty().contains("CLEARTEXT", true) } ->
-                    "Android запрещает незашифрованный http к этому адресу — нужен https"
-                chain.any { it is ConnectException } -> "не удалось подключиться — сервер не запущен или неверный адрес/порт"
+                    NetworkProblem.CLEARTEXT to null
+                chain.any { it is ConnectException } -> NetworkProblem.CONNECT to null
                 chain.any { it is HttpRequestTimeoutException || it is ConnectTimeoutException || it is SocketTimeoutException } ->
-                    "сервер не ответил вовремя"
-                chain.any { it is SSLException } -> "ошибка защищённого соединения (TLS)"
-                else -> chain.last().message ?: e.message ?: e::class.simpleName.orEmpty()
+                    NetworkProblem.TIMEOUT to null
+                chain.any { it is SSLException } -> NetworkProblem.TLS to null
+                else -> NetworkProblem.OTHER to (chain.last().message ?: e.message ?: e::class.simpleName.orEmpty())
             }
         }
     }

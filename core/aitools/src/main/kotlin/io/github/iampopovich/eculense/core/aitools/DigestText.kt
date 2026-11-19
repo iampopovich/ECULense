@@ -9,19 +9,20 @@ import kotlinx.serialization.json.booleanOrNull
 
 /**
  * Car data digest for the on-phone model (it doesn't call tools): the same tool responses, but as plain
- * text: short Russian lines «Раздел: метка: значение», lists as «- …» lines. Given JSON, the small model
- * retold it to the user verbatim (raw `carProfile` leaked into the chat).
+ * text: short English lines «Section: label: value», lists as «- …» lines. Only the model reads it; the answer
+ * language is set by the system prompt. Given JSON, the small model retold it to the user verbatim (raw `carProfile`
+ * leaked into the chat).
  */
 internal object DigestText {
     /** Order and headings of digest sections. */
     val SECTIONS: Map<String, String> = linkedMapOf(
-        "carProfile" to "Машина",
-        "trends" to "Тренды",
-        "tripStats" to "Поездки",
-        "dtcHistory" to "Коды ошибок",
-        "findings" to "Находки анализа",
-        "maintenanceDue" to "Обслуживание (ТО)",
-        "listSessions" to "Последняя запись",
+        "carProfile" to "Car",
+        "trends" to "Trends",
+        "tripStats" to "Trips",
+        "dtcHistory" to "Trouble codes",
+        "findings" to "Analysis findings",
+        "maintenanceDue" to "Maintenance",
+        "listSessions" to "Latest recording",
     )
 
     /** Leading field of a list item: written first, without a label. */
@@ -30,47 +31,37 @@ internal object DigestText {
     /** Internal fields useless to a model without tools. */
     private val SKIP = setOf("id", "rule")
 
+    /** Labels that differ from the JSON key with «_» replaced by spaces. */
     private val LABELS = mapOf(
-        "brand" to "марка", "model" to "модель", "generation" to "поколение", "year" to "год",
-        "engine_code" to "код двигателя", "engine_l" to "объём двигателя, л", "cylinders" to "цилиндров", "fuel" to "топливо",
-        "gearbox" to "коробка", "drive" to "привод", "curb_weight_kg" to "масса, кг", "tank_l" to "бак, л",
-        "odometer_km" to "пробег, км", "odometer_date" to "пробег введён", "service_interval_km" to "интервалы ТО, км",
-        "oil" to "масло", "spark_plugs" to "свечи", "air_filter" to "воздушный фильтр", "fuel_filter" to "топливный фильтр",
-        "missing" to "не указано",
-        "kind" to "тип", "events" to "раз", "first" to "впервые", "last" to "последний раз", "source" to "источник",
-        "title" to "описание",
-        "causes" to "причины", "symptoms" to "симптомы", "total_events" to "всего событий", "truncated" to "список сокращён",
-        "computed_at" to "посчитано", "severity" to "важность", "evidence" to "данные", "no_data" to "без данных",
-        "ok" to "в норме",
-        "today" to "сегодня", "odometer" to "пробег", "odometer_estimated" to "пробег оценён по поездкам",
-        "odometer_entered_km" to "введённый пробег, км", "odometer_entered_date" to "пробег введён", "due_now" to "пора сделать работ",
-        "status" to "статус", "interval_km" to "интервал, км", "interval_months" to "интервал, мес", "last_done_date" to "сделано",
-        "last_done_km" to "сделано на пробеге, км", "due_km" to "срок, км", "km_left" to "осталось, км", "due_date" to "срок",
-        "days_left" to "осталось дней", "note" to "заметка",
-        "start" to "начало", "min" to "минут", "readings" to "замеров",
-        "period" to "период", "trips" to "поездок", "km" to "км", "fuel_l" to "топливо, л", "l_per_100km" to "расход, л/100 км",
-        "driving_h" to "в движении, ч", "standing_h" to "на месте, ч", "fuel_cost" to "траты на топливо", "currency" to "валюта",
-        "last_trip" to "последняя поездка", "recent_months" to "по месяцам",
+        "engine_code" to "engine code", "engine_l" to "engine displacement, l", "curb_weight_kg" to "curb weight, kg", "tank_l" to "tank, l",
+        "odometer_km" to "odometer, km", "odometer_date" to "odometer entered on", "service_interval_km" to "service intervals, km",
+        "missing" to "not specified",
+        "kind" to "type", "events" to "times", "first" to "first seen", "last" to "last seen", "source" to "origin",
+        "severity" to "level", "start" to "started",
+        "title" to "description", "total_events" to "total occurrences", "truncated" to "list shortened",
+        "computed_at" to "computed at", "evidence" to "data", "no_data" to "without data",
+        "ok" to "ok", "odometer_estimated" to "odometer estimated from trips",
+        "odometer_entered_km" to "entered odometer, km", "odometer_entered_date" to "odometer entered on", "due_now" to "works due now",
+        "interval_km" to "interval, km", "interval_months" to "interval, months", "last_done_date" to "last done",
+        "last_done_km" to "last done at, km", "due_km" to "due at, km", "km_left" to "km left", "due_date" to "due on",
+        "min" to "minutes", "readings" to "readings",
+        "fuel_l" to "fuel, l", "l_per_100km" to "consumption, l/100 km",
+        "driving_h" to "driving, h", "standing_h" to "standing, h", "fuel_cost" to "fuel spending",
+        "last_trip" to "last trip", "recent_months" to "by month",
     )
 
     private val VALUES = mapOf(
-        "stored" to "сохранённый", "pending" to "ожидающий", "permanent" to "постоянный",
-        "generic" to "стандартный код OBD-II", "oem" to "заводской код марки", "oem_unknown" to "заводской код, расшифровка неизвестна",
-        "critical" to "критично", "warning" to "внимание", "info" to "к сведению",
-        "overdue" to "просрочено", "soon" to "скоро", "ok" to "в норме", "unknown" to "неизвестно",
-        "live" to "запись ECULense", "carscanner" to "импорт Car Scanner",
-        "petrol" to "бензин", "diesel" to "дизель", "lpg" to "газ (пропан)", "cng" to "газ (метан)", "hybrid" to "гибрид",
-        "electric" to "электро", "manual" to "механика", "automatic" to "автомат", "cvt" to "вариатор", "robot" to "робот",
-        "front" to "передний", "rear" to "задний", "all" to "полный", "other" to "другое",
-        "not entered; km-based intervals cannot be checked" to "не введён, интервалы по пробегу проверить нельзя",
+        "generic" to "generic OBD-II code", "oem" to "manufacturer-specific code", "oem_unknown" to "manufacturer-specific code, meaning unknown",
+        "live" to "ECULense recording", "carscanner" to "Car Scanner import",
+        "lpg" to "LPG (propane)", "cng" to "CNG (methane)", "all" to "all-wheel",
     )
 
     private val NO_DATA = mapOf(
-        "no car profile" to "профиль машины не заполнен",
-        "no DTC events recorded" to "в истории нет ни одного кода",
-        "no recordings to analyse" to "записей для анализа нет",
-        "maintenance module is not installed" to "модуль ТО не подключён",
-        "no sessions in this range" to "записей нет",
+        "no car profile" to "car profile is not filled in",
+        "no DTC events recorded" to "no trouble codes in the history",
+        "no recordings to analyse" to "no recordings to analyse",
+        "maintenance module is not installed" to "maintenance module is not installed",
+        "no sessions in this range" to "no recordings",
     )
 
     fun section(name: String, json: JsonObject): String {
@@ -100,8 +91,10 @@ internal object DigestText {
         return listOfNotNull(leadText, rest.joinToString(", ").takeIf { it.isNotEmpty() }).joinToString(" — ")
     }
 
+    private fun label(key: String) = LABELS[key] ?: key.replace('_', ' ')
+
     private fun field(key: String, value: JsonElement): String? {
-        val label = LABELS[key] ?: key.replace('_', ' ')
+        val label = label(key)
         if (key == "period" && value is JsonPrimitive) return "$label: ${periodText(value.content)}"
         return when (value) {
             is JsonNull -> null
@@ -112,7 +105,7 @@ internal object DigestText {
             }
             is JsonArray -> value.filterIsInstance<JsonPrimitive>().takeIf { it.isNotEmpty() }
                 ?.joinToString("; ") { value(it) }?.let { "$label: $it" }
-            is JsonObject -> value.entries.joinToString("; ") { (k, v) -> "${LABELS[k] ?: k.replace('_', ' ')}: ${(v as? JsonPrimitive)?.let(::value) ?: clean(v.toString())}" }
+            is JsonObject -> value.entries.joinToString("; ") { (k, v) -> "${label(k)}: ${(v as? JsonPrimitive)?.let(::value) ?: clean(v.toString())}" }
                 .takeIf { it.isNotEmpty() }?.let { "$label — $it" }
         }
     }
@@ -124,79 +117,76 @@ internal object DigestText {
 
     private fun noDataText(reason: String): String = NO_DATA[reason]
         ?: when {
-            reason.startsWith("maintenance list is empty") -> "список работ ТО пуст (Пит-стоп → Обслуживание)"
-            reason.startsWith("no trips, recordings") -> "за период нет ни поездок, ни записей, ни ошибок"
-            reason.startsWith("no trips") -> "поездок нет (они появляются после записи или импорта Car Scanner)"
-            else -> "нет данных"
+            reason.startsWith("maintenance list is empty") -> "the maintenance list is empty (Pit stop → Maintenance)"
+            reason.startsWith("no trips, recordings") -> "no trips, recordings or trouble codes in the period"
+            reason.startsWith("no trips") -> "no trips (they appear after a recording or a Car Scanner import)"
+            else -> "no data"
         }
 
     private fun periodText(p: String): String = when {
-        p == "week" -> "неделя"
-        p == "month" -> "месяц"
-        p == "year" -> "год"
-        p == "all" -> "всё время"
-        p.endsWith(" days") -> "${p.removeSuffix(" days")} дн."
+        p == "all" -> "all time"
+        p.endsWith(" days") -> "last $p"
         else -> clean(p)
     }
 
     private val METRICS = mapOf(
-        "l_per_100km" to "расход, л/100 км", "avg_trip_km" to "средняя поездка, км", "idle_share" to "доля времени на месте, %",
-        "coolant_median" to "ОЖ, медиана °C", "coolant_max" to "ОЖ, максимум °C", "voltage_median" to "напряжение на ходу, медиана В",
-        "voltage_min_running" to "напряжение на ходу, минимум В", "ltft1_median" to "LTFT банк 1, %", "ltft2_median" to "LTFT банк 2, %",
-        "idle_rpm_median" to "обороты прогретого ХХ",
+        "l_per_100km" to "consumption, l/100 km", "avg_trip_km" to "average trip, km", "idle_share" to "share of time standing, %",
+        "coolant_median" to "coolant median, °C", "coolant_max" to "coolant maximum, °C", "voltage_median" to "voltage while running, median V",
+        "voltage_min_running" to "voltage while running, minimum V", "ltft1_median" to "LTFT bank 1, %", "ltft2_median" to "LTFT bank 2, %",
+        "idle_rpm_median" to "warm idle rpm",
     )
 
     /**
-     * Trends: one line per month/week from oldest to newest, then «Изменение» and «Мало данных». Only numbers from the
-     * [TrendsTool] response, labels in Russian.
+     * Trends: one line per month/week from oldest to newest, then «Change» and «Too little data». Only numbers from the
+     * [TrendsTool] response.
      */
     fun trends(json: JsonObject): String {
         val title = SECTIONS.getValue("trends")
         val noData = json["no_data"]
         if (json.size == 1 && noData is JsonPrimitive) return "$title: ${noDataText(noData.content)}"
         fun JsonObject.n(key: String) = (this[key] as? JsonPrimitive)?.content
-        val bucket = if (json.n("bucket") == "week") "по неделям" else "по месяцам"
+        val bucket = if (json.n("bucket") == "week") "by week" else "by month"
         val totals = json["totals"] as? JsonObject
         return buildString {
-            append(title).append(" за ").append(json.n("days")).append(" дн. (").append(bucket).append(")")
+            append(title).append(" for the last ").append(json.n("days")).append(" days (").append(bucket).append(")")
             totals?.let { t ->
-                append(", всего: поездок ").append(t.n("trips")).append(", ").append(t.n("km")).append(" км")
-                t.n("l_per_100km")?.let { append(", расход ").append(it).append(" л/100 км") }
+                append(", total: trips ").append(t.n("trips")).append(", ").append(t.n("km")).append(" km")
+                t.n("l_per_100km")?.let { append(", consumption ").append(it).append(" l/100 km") }
             }
             append(':')
             (json["buckets"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>().reversed().forEach { b ->
                 append("\n- ").append(b.n("label")).append(": ")
                 if (b["empty"] != null) {
-                    append("нет данных")
+                    append("no data")
                     return@forEach
                 }
                 val parts = buildList {
                     b.n("trips")?.let { trips ->
                         add(buildString {
-                            append("поездок ").append(trips).append(", ").append(b.n("km")).append(" км")
-                            b.n("l_per_100km")?.let { append(", расход ").append(it).append(" л/100 км") }
-                            b.n("idle_pct")?.let { append(", на месте ").append(it).append(" % времени") }
-                            b.n("avg_trip_km")?.let { append(", средняя поездка ").append(it).append(" км") }
+                            append("trips ").append(trips).append(", ").append(b.n("km")).append(" km")
+                            b.n("l_per_100km")?.let { append(", consumption ").append(it).append(" l/100 km") }
+                            b.n("idle_pct")?.let { append(", standing ").append(it).append(" % of the time") }
+                            b.n("avg_trip_km")?.let { append(", average trip ").append(it).append(" km") }
                         })
                     }
-                    b.n("sessions")?.let { add("записей $it") }
-                    b.n("coolant_median")?.let { add("ОЖ медиана $it °C, максимум ${b.n("coolant_max")} °C (замеров ${b.n("coolant_n")})") }
-                    b.n("voltage_median")?.let { add("напряжение на ходу медиана $it В, минимум ${b.n("voltage_min_running")} В") }
-                    val trims = listOf("ltft1_median" to "LTFT банк 1", "ltft2_median" to "LTFT банк 2", "stft1_median" to "STFT банк 1", "stft2_median" to "STFT банк 2")
+                    b.n("sessions")?.let { add("recordings $it") }
+                    b.n("coolant_median")?.let { add("coolant median $it °C, maximum ${b.n("coolant_max")} °C (readings ${b.n("coolant_n")})") }
+                    b.n("voltage_median")?.let { add("voltage while running median $it V, minimum ${b.n("voltage_min_running")} V") }
+                    val trims = listOf("ltft1_median" to "LTFT bank 1", "ltft2_median" to "LTFT bank 2", "stft1_median" to "STFT bank 1", "stft2_median" to "STFT bank 2")
                         .mapNotNull { (k, name) -> b.n(k)?.let { "$name $it %" } }
-                    if (trims.isNotEmpty()) add("коррекции на прогретом: " + trims.joinToString(", "))
-                    b.n("idle_rpm_median")?.let { add("обороты прогретого ХХ $it") }
+                    if (trims.isNotEmpty()) add("warm fuel trims: " + trims.joinToString(", "))
+                    b.n("idle_rpm_median")?.let { add("warm idle rpm $it") }
                     b.n("dtc_events")?.let { ev ->
                         val codes = (b["new_codes"] as? JsonArray)?.joinToString(", ") { (it as JsonPrimitive).content }
-                        val more = b.n("new_codes_more")?.let { " и ещё $it" }.orEmpty()
-                        add("событий ошибок $ev" + (codes?.let { ", новые коды: $it$more" } ?: ""))
+                        val more = b.n("new_codes_more")?.let { " and $it more" }.orEmpty()
+                        add("trouble code occurrences $ev" + (codes?.let { ", new codes: $it$more" } ?: ""))
                     }
                 }
                 append(parts.joinToString("; "))
             }
             val changes = (json["change"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>()
             if (changes.isNotEmpty()) {
-                append("\nИзменение (первый → последний период с достаточными данными): ")
+                append("\nChange (first → last period with enough data): ")
                 append(
                     changes.joinToString("; ") { c ->
                         val delta = c.n("delta").orEmpty()
@@ -206,8 +196,8 @@ internal object DigestText {
                 )
             }
             val few = (json["few_data"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content?.let { m -> METRICS[m] } }
-            if (few.isNotEmpty()) append("\nМало данных для сравнения: ").append(few.joinToString("; "))
-            if (json["truncated"] != null) append("\nСтарые периоды не поместились.")
+            if (few.isNotEmpty()) append("\nToo little data to compare: ").append(few.joinToString("; "))
+            if (json["truncated"] != null) append("\nOlder periods did not fit.")
         }
     }
 

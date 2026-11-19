@@ -31,8 +31,6 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
         tool(TrendsTool(ctx))
     }
 
-    override fun progressLabel(toolName: String): String = LABELS[toolName] ?: "ИИ смотрит данные машины…"
-
     /** The on-device model does not call tools: the same information as plain text (no JSON — it used to just paraphrase it). */
     override suspend fun digest(): String? = digest(DEFAULT_SECTIONS, DEFAULT_DAYS)
 
@@ -62,18 +60,6 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
         /** Digest without question routing: profile, six-month trends, DTCs, findings, maintenance, latest recording. */
         val DEFAULT_SECTIONS = listOf("carProfile", TrendsTool.NAME, "dtcHistory", "findings", "maintenanceDue", "listSessions")
         const val DEFAULT_DAYS = 180
-
-        val LABELS = mapOf(
-            "carProfile" to "ИИ смотрит профиль машины…",
-            "tripStats" to "ИИ смотрит статистику поездок…",
-            "listSessions" to "ИИ смотрит список записей…",
-            "sessionStats" to "ИИ смотрит запись поездки…",
-            "sensorSummary" to "ИИ смотрит показания датчика…",
-            "findings" to "ИИ смотрит находки анализа…",
-            "dtcHistory" to "ИИ смотрит ошибки…",
-            "maintenanceDue" to "ИИ смотрит план ТО…",
-            TrendsTool.NAME to "ИИ смотрит тренды по месяцам…",
-        )
     }
 }
 

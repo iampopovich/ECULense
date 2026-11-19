@@ -9,7 +9,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * «Что по ТО?»: service items with status (overdue/soon/OK/no data), km and days remaining, current mileage
+ * «What about maintenance?»: service items with status (overdue/soon/OK/no data), km and days remaining, current mileage
  * (last manual entry + trips after it — an estimate). Read-only: does not create the service template.
  */
 internal class MaintenanceDueTool(ctx: ToolContext) : VehicleTool<NoArgs>(
@@ -21,7 +21,7 @@ internal class MaintenanceDueTool(ctx: ToolContext) : VehicleTool<NoArgs>(
     override suspend fun answer(args: NoArgs, carId: Long): JsonObject {
         val repo = ctx.maintenance ?: return Compact.noData("maintenance module is not installed")
         val due = repo.evaluate(carId)
-        if (due.isEmpty()) return Compact.noData("maintenance list is empty: the user should open Пит-стоп → Обслуживание to set it up")
+        if (due.isEmpty()) return Compact.noData("maintenance list is empty: the user should open Pit stop → Maintenance to set it up")
         val zone = ctx.zone()
         val estimate = repo.estimate(carId)
         return Compact.fit(due, render = { d -> render(d, zone) }) { works, truncated ->

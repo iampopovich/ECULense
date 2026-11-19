@@ -10,6 +10,7 @@ import io.github.iampopovich.eculense.core.ai.LlmSettingsStore
 import io.github.iampopovich.eculense.core.ai.ModelInfo
 import io.github.iampopovich.eculense.core.ai.OnDeviceLlm
 import io.github.iampopovich.eculense.core.ai.OnDeviceSummary
+import io.github.iampopovich.eculense.core.ai.NetworkProblem
 import io.github.iampopovich.eculense.core.ai.UrlProblem
 import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.Job
@@ -236,10 +237,7 @@ internal class AiSettingsViewModel(
         is ConnectionCheck.Unauthorized -> CheckState.Failed(UiText.Res(R.string.aisettings_err_401).withDetail(detail))
         is ConnectionCheck.Blocked -> CheckState.Failed(UiText.Res(R.string.aisettings_err_403).withDetail(detail))
         is ConnectionCheck.Unreachable -> CheckState.Failed(
-            UiText.Res(
-                R.string.aisettings_err_unreachable,
-                listOf(detail?.let { UiText.Raw(it) } ?: UiText.Res(R.string.aisettings_err_unreachable_hint)),
-            ),
+            UiText.Res(R.string.aisettings_err_unreachable, listOf(problem.text(detail))),
         )
         is ConnectionCheck.Failed -> CheckState.Failed(UiText.Res(R.string.aisettings_err_status, listOf(status)).withDetail(detail))
     }
@@ -261,3 +259,15 @@ internal fun UrlProblem.text(): UiText = UiText.Res(
         UrlProblem.PUBLIC_HTTP -> R.string.aisettings_url_public_http
     },
 )
+
+/** Reason after «Server unreachable:»; an unknown failure shows its technical text or the generic hint. */
+internal fun NetworkProblem.text(detail: String?): UiText = when (this) {
+    NetworkProblem.NO_API -> UiText.Res(R.string.aisettings_net_no_api)
+    NetworkProblem.NOT_API -> UiText.Res(R.string.aisettings_net_not_api)
+    NetworkProblem.DNS -> UiText.Res(R.string.aisettings_net_dns)
+    NetworkProblem.CLEARTEXT -> UiText.Res(R.string.aisettings_net_cleartext)
+    NetworkProblem.CONNECT -> UiText.Res(R.string.aisettings_net_connect)
+    NetworkProblem.TIMEOUT -> UiText.Res(R.string.aisettings_net_timeout)
+    NetworkProblem.TLS -> UiText.Res(R.string.aisettings_net_tls)
+    NetworkProblem.OTHER -> detail?.takeIf { it.isNotBlank() }?.let { UiText.Raw(it) } ?: UiText.Res(R.string.aisettings_err_unreachable_hint)
+}

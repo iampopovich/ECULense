@@ -83,4 +83,20 @@
     <string name="aichat_tool_maintenance_due">%1$s смотрит план ТО…</string>
     <string name="aichat_tool_trends">%1$s смотрит тренды по месяцам…</string>
     <string name="aichat_tool_default">%1$s смотрит данные машины…</string>
+    <string name="aichat_err_not_configured">ИИ не настроен: откройте Настройки → ИИ-помощник</string>
+    <string name="aichat_err_key_missing">Не задан API-ключ: откройте Настройки → ИИ-помощник</string>
+    <string name="aichat_err_url_missing">Не задан адрес сервера: откройте Настройки → ИИ-помощник</string>
+    <string name="aichat_err_invalid_url">Сохранённый адрес сервера некорректен: исправьте его в Настройки → ИИ-помощник</string>
+    <string name="aichat_err_401">Ошибка авторизации (401): неверный или отозванный API-ключ. Проверьте ключ в Настройки → ИИ-помощник.</string>
+    <string name="aichat_err_403">Доступ запрещён (403): у ключа нет прав или провайдер блокирует запросы из этой сети/региона (попробуйте VPN).</string>
+    <string name="aichat_err_402">Недостаточно средств на счёте провайдера (402).</string>
+    <string name="aichat_err_404">Модель или адрес не найдены (404): проверьте название модели.</string>
+    <string name="aichat_err_429">Слишком много запросов (429): подождите и повторите.</string>
+    <string name="aichat_err_server">Сервер провайдера недоступен (%1$d). Попробуйте позже.</string>
+    <string name="aichat_err_rejected">Провайдер отклонил запрос (%1$d).</string>
+    <string name="aichat_err_network">Нет связи с сервером ИИ: проверьте интернет и адрес сервера.</string>
+    <string name="aichat_err_on_device_load">Модель на телефоне не загрузилась: %1$s</string>
+    <string name="aichat_err_on_device_failed">Модель на телефоне не ответила: %1$s</string>
+    <string name="aichat_err_other">Не удалось получить ответ ИИ (%1$s).</string>
+    <string name="aichat_err_with_server">%1$s Ответ сервера: «%2$s»</string>
 </resources>
