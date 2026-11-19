@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalLayoutApi::class)
+
 package io.github.iampopovich.eculense.feature.backup
 
 import android.content.Intent
@@ -6,6 +8,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -64,7 +68,7 @@ internal fun BackupRoute(viewModel: BackupViewModel = koinViewModel()) {
         onImportNewest = viewModel::importNewest,
         onCancelImport = viewModel::cancelImport,
         onIncludeAiChat = viewModel::setIncludeAiChat,
-        onExport = { createCopy.launch("ECULense-${EcuDates.date(System.currentTimeMillis()).replace('.', '-')}.${EcuBackup.EXTENSION}") },
+        onExport = { createCopy.launch("ECULense-${java.time.LocalDate.now()}.${EcuBackup.EXTENSION}") },
         onRestore = { pickCopy.launch(arrayOf("*/*")) },
         onConfirmRestore = viewModel::confirmRestore,
         onDismissRestore = viewModel::dismissRestore,
@@ -137,7 +141,7 @@ private fun CarScannerCard(state: BackupUiState, onPickFile: () -> Unit, onPickF
                 state.folderUri?.let { "Папка: ${state.folderName ?: "выбрана"}" + (state.newest?.let { n -> "\nНовый бэкап: ${n.name} (${EcuDates.dateTime(n.lastModifiedMs)})" } ?: "\nВ папке нет файлов .cbz") }
                     ?: "Выберите папку, куда Car Scanner сохраняет бэкапы, — тогда новый бэкап импортируется одной кнопкой.",
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onPickFolder, enabled = !state.importing) { Text(if (state.folderUri == null) "Выбрать папку" else "Сменить папку") }
                 if (state.folderUri != null) {
                     Button(onClick = onImportNewest, enabled = !state.importing && state.newest != null) { Text("Импортировать новый бэкап") }
@@ -157,7 +161,8 @@ private fun CopyCard(state: BackupUiState, onIncludeAiChat: (Boolean) -> Unit, o
                 Checkbox(checked = state.includeAiChat, onCheckedChange = onIncludeAiChat)
                 Text("Включить историю чата ИИ")
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // на крупном шрифте две кнопки не помещаются в строку — переносим вторую, а не текст «Восстановит/ь»
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(onClick = onExport, enabled = !state.copy.busy) { Text("Сохранить копию") }
                 OutlinedButton(onClick = onRestore, enabled = !state.copy.busy && !state.importing) { Text("Восстановить") }
             }

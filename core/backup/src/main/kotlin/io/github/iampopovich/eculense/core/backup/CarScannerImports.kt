@@ -104,11 +104,20 @@ class CarScannerImportWorker(context: Context, params: WorkerParameters) : Corou
         runCatching { setForeground(foregroundInfo(ImportProgress(0, 0))) }
             .onFailure { Log.w(CarScannerImports.TAG, "foreground not allowed, importing in background: ${it.javaClass.simpleName}") }
         var shown = -1
+        var lastNotifyMs = 0L
+        var lastProgressMs = 0L
         return try {
             val item = runner.run(uri, name) { p ->
-                setProgressAsync(workDataOf(CarScannerImports.KEY_DONE to p.done, CarScannerImports.KEY_TOTAL to p.total))
-                if (p.done != shown) {
+                // Android режет обновления уведомлений чаще ~5 в секунду (уже импортированные .brc пролетают за
+                // миллисекунды) — тогда пропадает и итоговое уведомление. Прогресс — не чаще раза в секунду.
+                val now = System.currentTimeMillis()
+                if (now - lastProgressMs >= PROGRESS_EVERY_MS || p.done == p.total) {
+                    lastProgressMs = now
+                    setProgressAsync(workDataOf(CarScannerImports.KEY_DONE to p.done, CarScannerImports.KEY_TOTAL to p.total))
+                }
+                if (p.done != shown && now - lastNotifyMs >= NOTIFY_EVERY_MS) {
                     shown = p.done
+                    lastNotifyMs = now
                     runCatching { setForegroundAsync(foregroundInfo(p)) }
                 }
             }
@@ -136,6 +145,11 @@ class CarScannerImportWorker(context: Context, params: WorkerParameters) : Corou
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo = foregroundInfo(ImportProgress(0, 0))
+
+    private companion object {
+        const val NOTIFY_EVERY_MS = 1_000L
+        const val PROGRESS_EVERY_MS = 250L
+    }
 
     private fun foregroundInfo(p: ImportProgress): ForegroundInfo {
         val n = ImportNotifications.progress(applicationContext, p, WorkManager.getInstance(applicationContext).createCancelPendingIntent(id))
