@@ -25,10 +25,10 @@ object PrefsFile {
         while (i < bytes.size) {
             val start = i
             val (tag, afterTag) = varint(bytes, i)
-            require(tag == 0x0AL) { "неизвестное поле $tag" }
+            require(tag == 0x0AL) { "unknown field $tag" }
             val (len, afterLen) = varint(bytes, afterTag)
             val end = afterLen + len.toInt()
-            require(len >= 0 && end <= bytes.size) { "обрезанная запись" }
+            require(len >= 0 && end <= bytes.size) { "truncated entry" }
             val key = entryKey(bytes, afterLen, end)
             val target = if (isSecret(key)) { secrets++; sec } else { keys += key; pub }
             target.write(bytes, start, end - start)
@@ -58,7 +58,7 @@ object PrefsFile {
                 else -> throw IllegalArgumentException("wire type $wire")
             }
         }
-        throw IllegalArgumentException("запись без ключа")
+        throw IllegalArgumentException("entry without a key")
     }
 
     private fun varint(b: ByteArray, from: Int): Pair<Long, Int> {
@@ -66,7 +66,7 @@ object PrefsFile {
         var shift = 0
         var i = from
         while (true) {
-            require(i < b.size && shift < 64) { "обрезанный varint" }
+            require(i < b.size && shift < 64) { "truncated varint" }
             val v = b[i++].toInt() and 0xFF
             result = result or ((v and 0x7F).toLong() shl shift)
             if (v and 0x80 == 0) return result to i

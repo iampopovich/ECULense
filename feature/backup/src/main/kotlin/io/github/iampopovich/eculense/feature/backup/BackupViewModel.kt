@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.iampopovich.eculense.core.backup.BackupManifest
 import io.github.iampopovich.eculense.core.backup.BackupPrefs
+import io.github.iampopovich.eculense.core.backup.BackupRejectedException
 import io.github.iampopovich.eculense.core.backup.BackupService
 import io.github.iampopovich.eculense.core.backup.ImportService
 import io.github.iampopovich.eculense.core.backup.ImportWorkState
@@ -131,6 +132,8 @@ internal class BackupViewModel(
                 block()
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: BackupRejectedException) {
+                BackupTexts.problem(e.problem)
             } catch (e: Exception) {
                 UiText.Raw(e.message ?: e.javaClass.simpleName)
             }

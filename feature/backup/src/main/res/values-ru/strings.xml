@@ -44,4 +44,14 @@
     <string name="backup_saved">Копия сохранена: база данных, настройки. Ключи API и токены в копию не входят.</string>
     <string name="backup_saved_with_chat">Копия сохранена: база данных, история чата ИИ, настройки. Ключи API и токены в копию не входят.</string>
     <string name="backup_restored">Копия восстановлена, приложение перезапускается…</string>
+    <string name="backup_rejected_not_eculense">Это не резервная копия ECULense</string>
+    <string name="backup_rejected_unknown_format">Неизвестный формат копии</string>
+    <string name="backup_rejected_newer">Копия сделана более новой версией приложения (схема %1$d, у этой версии %2$d). Обновите ECULense.</string>
+    <string name="backup_rejected_no_database">В копии нет базы данных</string>
+    <string name="backup_rejected_version_mismatch">Копия повреждена: версия базы не совпадает с манифестом</string>
+    <string name="backup_rejected_bad_settings">Копия повреждена: настройки %1$s</string>
+    <string name="backup_rejected_not_sqlite">Копия повреждена: база не SQLite</string>
+    <string name="backup_file_create_failed">Не удалось создать файл</string>
+    <string name="backup_file_unavailable">Не удалось открыть файл</string>
+    <string name="backup_cancelled_progress">Отменено: обработано записей %1$d из %2$d</string>
 </resources>

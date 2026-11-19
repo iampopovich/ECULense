@@ -131,7 +131,8 @@ private fun CarScannerCard(state: BackupUiState, onPickFile: () -> Unit, onPickF
                     Secondary(stringResource(R.string.backup_background_note))
                     OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.backup_cancel_import)) }
                 }
-                is ImportWorkState.Finished -> state.history.firstOrNull()?.let { Text(reportText(it).asString()) } ?: s.error?.let { Text(it) }
+                is ImportWorkState.Finished -> (state.history.firstOrNull()?.let { reportText(it) } ?: s.error?.let { BackupTexts.message(it) }
+                    ?: UiText.Res(R.string.backup_report_cancelled).takeIf { s.cancelled })?.let { Text(it.asString()) }
                 ImportWorkState.Idle -> Unit
             }
             FilledTonalButton(onClick = onPickFile, enabled = !state.importing) { Text(stringResource(R.string.backup_pick_file)) }
@@ -193,13 +194,13 @@ private fun Secondary(text: String, modifier: Modifier = Modifier) {
 /** Result of the last import: exactly what was added and updated (visibility of system status). */
 internal fun reportText(item: ImportHistoryItem): UiText = when (item.status) {
     ImportStatus.DONE -> UiText.Res(R.string.backup_report_done, listOf(historyLine(item)))
-    ImportStatus.CANCELLED -> item.message?.let { UiText.Raw(it) } ?: UiText.Res(R.string.backup_report_cancelled)
-    ImportStatus.FAILED -> UiText.Res(R.string.backup_report_failed, listOf(item.message.orEmpty()))
+    ImportStatus.CANCELLED -> item.message?.let { BackupTexts.message(it) } ?: UiText.Res(R.string.backup_report_cancelled)
+    ImportStatus.FAILED -> UiText.Res(R.string.backup_report_failed, listOf(BackupTexts.message(item.message.orEmpty())))
 }
 
 internal fun historyLine(item: ImportHistoryItem): UiText = when (item.status) {
-    ImportStatus.FAILED -> UiText.Res(R.string.backup_line_failed, listOf(item.message.orEmpty()))
-    ImportStatus.CANCELLED -> item.message?.let { UiText.Raw(it) } ?: UiText.Res(R.string.backup_line_cancelled)
+    ImportStatus.FAILED -> UiText.Res(R.string.backup_line_failed, listOf(BackupTexts.message(item.message.orEmpty())))
+    ImportStatus.CANCELLED -> item.message?.let { BackupTexts.message(it) } ?: UiText.Res(R.string.backup_line_cancelled)
     ImportStatus.DONE -> UiText.Joined(historyParts(item))
 }
 

@@ -35,7 +35,7 @@ internal class RoomDbSource(private val db: () -> EcuDatabase) : DbSource {
         } else {
             // old SQLite without VACUUM INTO: after checkpoint(TRUNCATE) the main file contains everything
             sdb.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
-            File(sdb.path ?: error("нет пути базы")).copyTo(target, overwrite = true)
+            File(sdb.path ?: error("database has no path")).copyTo(target, overwrite = true)
         }
         return EcuBackup.sqliteUserVersion(target)
     }
@@ -54,7 +54,7 @@ internal class FileDbSource(private val file: File) : DbSource {
     }
 }
 
-/** Car Scanner backup folder (SAF tree with persistent access) and the «история чата ИИ» flag for the ECULense copy. */
+/** Car Scanner backup folder (SAF tree with persistent access) and the «AI chat history» flag for the ECULense copy. */
 class BackupPrefs(private val store: DataStore<Preferences>) {
     val folderUri: Flow<String?> = store.data.map { it[FOLDER] }
     val includeAiChat: Flow<Boolean> = store.data.map { it[AI_CHAT] ?: false }
@@ -73,7 +73,7 @@ class BackupPrefs(private val store: DataStore<Preferences>) {
     }
 }
 
-/** ECULense copy via SAF: Uri from «Сохранить как» / the picked file. */
+/** ECULense copy via SAF: Uri from «Save as» / the picked file. */
 interface BackupService {
     suspend fun export(uri: Uri, includeAiChat: Boolean): BackupManifest
     suspend fun inspect(uri: Uri): BackupManifest
@@ -84,15 +84,15 @@ interface BackupService {
 
 internal class AndroidBackupService(private val context: Context, private val backup: EcuBackup) : BackupService {
     override suspend fun export(uri: Uri, includeAiChat: Boolean): BackupManifest = withContext(Dispatchers.IO) {
-        (context.contentResolver.openOutputStream(uri, "wt") ?: error("Не удалось создать файл")).use { backup.export(it, includeAiChat) }
+        (context.contentResolver.openOutputStream(uri, "wt") ?: throw BackupRejectedException(BackupProblem.CannotCreateFile)).use { backup.export(it, includeAiChat) }
     }
 
     override suspend fun inspect(uri: Uri): BackupManifest = withContext(Dispatchers.IO) {
-        (context.contentResolver.openInputStream(uri) ?: error("Не удалось открыть файл")).use { backup.inspect(it) }
+        (context.contentResolver.openInputStream(uri) ?: throw BackupRejectedException(BackupProblem.CannotOpenFile)).use { backup.inspect(it) }
     }
 
     override suspend fun restore(uri: Uri): RestoreResult = withContext(Dispatchers.IO) {
-        (context.contentResolver.openInputStream(uri) ?: error("Не удалось открыть файл")).use { backup.restore(it) }
+        (context.contentResolver.openInputStream(uri) ?: throw BackupRejectedException(BackupProblem.CannotOpenFile)).use { backup.restore(it) }
     }
 
     override fun restartApp() {

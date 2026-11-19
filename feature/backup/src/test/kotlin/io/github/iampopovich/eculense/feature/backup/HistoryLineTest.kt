@@ -1,6 +1,7 @@
 package io.github.iampopovich.eculense.feature.backup
 
 import io.github.iampopovich.eculense.core.data.ImportHistoryItem
+import io.github.iampopovich.eculense.core.data.ImportMessage
 import io.github.iampopovich.eculense.core.data.ImportStatus
 import io.github.iampopovich.eculense.core.ui.UiText
 import org.junit.Assert.assertEquals
@@ -45,11 +46,15 @@ class HistoryLineTest {
     @Test
     fun `failed and cancelled imports say so`() {
         val failed = base.copy(status = ImportStatus.FAILED, message = "broken archive")
-        assertEquals(res(R.string.backup_line_failed, "broken archive"), historyLine(failed))
-        assertEquals(res(R.string.backup_report_failed, "broken archive"), reportText(failed))
-        // the worker's own cancel message is shown as is
-        val cancelled = base.copy(status = ImportStatus.CANCELLED, message = "Cancelled: 1 of 5")
-        assertEquals(UiText.Raw("Cancelled: 1 of 5"), historyLine(cancelled))
+        assertEquals(res(R.string.backup_line_failed, UiText.Raw("broken archive")), historyLine(failed))
+        assertEquals(res(R.string.backup_report_failed, UiText.Raw("broken archive")), reportText(failed))
+        // the runner stores a cancel code, rendered in the app language; old free-text rows are shown as is
+        val cancelled = base.copy(status = ImportStatus.CANCELLED, message = ImportMessage.Cancelled(1, 5).code)
+        assertEquals(res(R.string.backup_cancelled_progress, 1, 5), historyLine(cancelled))
+        val legacy = base.copy(status = ImportStatus.CANCELLED, message = "old text")
+        assertEquals(UiText.Raw("old text"), historyLine(legacy))
+        val unavailable = base.copy(status = ImportStatus.FAILED, message = ImportMessage.FileUnavailable.code)
+        assertEquals(res(R.string.backup_line_failed, res(R.string.backup_file_unavailable)), historyLine(unavailable))
         assertEquals(res(R.string.backup_report_cancelled), reportText(base.copy(status = ImportStatus.CANCELLED)))
         assertEquals(res(R.string.backup_report_done, historyLine(base)), reportText(base))
     }

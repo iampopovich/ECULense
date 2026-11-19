@@ -103,7 +103,7 @@ class CarScannerIncrementalImportTest {
         assertEquals("Granta", car.model)
         assertEquals("цену пользователь не трогал — обновилась", 62.0, car.fuelPrice!!, 1e-9)
         assertEquals(2011, car.year)
-        assertEquals(listOf("год", "цена топлива"), r2.carFieldsUpdated)
+        assertEquals(listOf("year", "fuelPrice"), r2.carFieldsUpdated)
         assertFalse("единицы пользователь менял — бэкап их не перетирает", r2.unitsImported)
         assertFalse(units.units.value.celsius)
         assertTrue(units.units.value.metricDistance)

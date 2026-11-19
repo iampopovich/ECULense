@@ -187,7 +187,7 @@ class EcuBackupTest {
         val restore = EcuBackup(emptyList(), mapOf("ecu.db" to bDb), File(b, "datastore"), File(b, "cache"), 6, "0.1.0-test", { closed = true })
 
         val e = assertThrows(BackupRejectedException::class.java) { restore.restore(ByteArrayInputStream(out.toByteArray())) }
-        assertTrue(e.message!!.contains("более новой"))
+        assertTrue(e.problem.toString(), e.problem is BackupProblem.NewerVersion)
         assertFalse(closed)
         assertEquals(1, count(bDb, "sessions"))
     }

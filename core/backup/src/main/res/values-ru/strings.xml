@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="import_notif_channel">Импорт данных</string>
+    <string name="import_notif_title">Импорт из Car Scanner</string>
+    <string name="import_notif_progress">Записи %1$d из %2$d</string>
+    <string name="import_notif_preparing">Подготовка бэкапа…</string>
+    <string name="import_notif_cancel">Отменить</string>
+    <string name="import_notif_done">Импорт завершён</string>
+    <string name="import_notif_failed">Импорт не удался</string>
+    <string name="import_notif_file_unavailable">Не удалось открыть файл</string>
+    <string name="import_notif_recordings">записи +%1$d</string>
+    <string name="import_notif_trips">поездки +%1$d</string>
+    <string name="import_notif_trips_updated">поездки +%1$d (обновлено %2$d)</string>
+    <string name="import_notif_dtc">события DTC +%1$d</string>
+    <string name="import_notif_errors">ошибок %1$d</string>
+</resources>

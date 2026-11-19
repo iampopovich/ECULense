@@ -23,6 +23,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import io.github.iampopovich.eculense.core.data.ImportHistoryItem
+import io.github.iampopovich.eculense.core.data.ImportMessage
 import io.github.iampopovich.eculense.core.data.ImportProgress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -35,7 +36,8 @@ sealed interface ImportWorkState {
     data object Idle : ImportWorkState
     /** total = 0: file still being copied / archive being read. */
     data class Running(val done: Int, val total: Int) : ImportWorkState
-    data class Finished(val ok: Boolean, val error: String? = null) : ImportWorkState
+    /** error: why it failed ([ImportMessage]); cancelled: stopped by the user. */
+    data class Finished(val ok: Boolean, val error: ImportMessage? = null, val cancelled: Boolean = false) : ImportWorkState
 }
 
 /** What the screen needs from the background import; an interface so the ViewModel is testable without WorkManager. */
@@ -60,8 +62,8 @@ class CarScannerImports(private val context: Context) : ImportService {
             WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> ImportWorkState.Running(0, 0)
             WorkInfo.State.RUNNING -> ImportWorkState.Running(info.progress.getInt(KEY_DONE, 0), info.progress.getInt(KEY_TOTAL, 0))
             WorkInfo.State.SUCCEEDED -> ImportWorkState.Finished(ok = true)
-            WorkInfo.State.FAILED -> ImportWorkState.Finished(ok = false, error = info.outputData.getString(KEY_ERROR))
-            WorkInfo.State.CANCELLED -> ImportWorkState.Finished(ok = false, error = "Импорт отменён")
+            WorkInfo.State.FAILED -> ImportWorkState.Finished(ok = false, error = info.outputData.getString(KEY_ERROR)?.let(ImportMessage::parse))
+            WorkInfo.State.CANCELLED -> ImportWorkState.Finished(ok = false, cancelled = true)
         }
     }
 
@@ -93,7 +95,7 @@ class CarScannerImports(private val context: Context) : ImportService {
     }
 }
 
-/** Import of one .cbz/.brc: foreground notification «Записи 23 из 73» with «Отменить»; result is a notification and a history row. */
+/** Import of one .cbz/.brc: foreground notification «Recording 23 of 73» with «Cancel»; result is a notification and a history row. */
 class CarScannerImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params), KoinComponent {
     private val runner: ImportRunner by inject()
 
@@ -135,8 +137,9 @@ class CarScannerImportWorker(context: Context, params: WorkerParameters) : Corou
             throw e
         } catch (e: Exception) {
             Log.w(CarScannerImports.TAG, "import failed after ${System.currentTimeMillis() - started} ms: ${e.javaClass.simpleName}")
-            ImportNotifications.failed(applicationContext, e.message ?: e.javaClass.simpleName)
-            Result.failure(workDataOf(CarScannerImports.KEY_ERROR to (e.message ?: e.javaClass.simpleName)))
+            val message = ImportMessage.of(e)
+            ImportNotifications.failed(applicationContext, message)
+            Result.failure(workDataOf(CarScannerImports.KEY_ERROR to message.code))
         } finally {
             if (inputData.getBoolean(CarScannerImports.KEY_RELEASE, false)) {
                 runCatching { applicationContext.contentResolver.releasePersistableUriPermission(Uri.parse(uri), Intent.FLAG_GRANT_READ_URI_PERMISSION) }
@@ -166,7 +169,7 @@ internal object ImportNotifications {
     private fun channel(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CHANNEL) == null) {
-            nm.createNotificationChannel(NotificationChannel(CHANNEL, "Импорт данных", NotificationManager.IMPORTANCE_LOW))
+            nm.createNotificationChannel(NotificationChannel(CHANNEL, context.getString(R.string.import_notif_channel), NotificationManager.IMPORTANCE_LOW))
         }
     }
 
@@ -174,26 +177,37 @@ internal object ImportNotifications {
         channel(context)
         return NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
-            .setContentTitle("Импорт из Car Scanner")
-            .setContentText(if (p.total > 0) "Записи ${p.done} из ${p.total}" else "Подготовка бэкапа…")
+            .setContentTitle(context.getString(R.string.import_notif_title))
+            .setContentText(if (p.total > 0) context.getString(R.string.import_notif_progress, p.done, p.total) else context.getString(R.string.import_notif_preparing))
             .setProgress(p.total.coerceAtLeast(1), p.done, p.total == 0)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(launch(context))
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Отменить", cancel)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, context.getString(R.string.import_notif_cancel), cancel)
             .build()
     }
 
     fun finished(context: Context, item: ImportHistoryItem) =
-        post(context, "Импорт завершён", summary(item))
+        post(context, context.getString(R.string.import_notif_done), summary(context, item))
 
-    fun failed(context: Context, message: String) = post(context, "Импорт не удался", message)
+    fun failed(context: Context, message: ImportMessage) = post(
+        context,
+        context.getString(R.string.import_notif_failed),
+        when (message) {
+            ImportMessage.FileUnavailable -> context.getString(R.string.import_notif_file_unavailable)
+            is ImportMessage.Text -> message.value
+            is ImportMessage.Cancelled -> message.code // the worker never fails with a cancel code
+        },
+    )
 
-    fun summary(item: ImportHistoryItem): String = buildList {
-        add("записи +${item.recordingsAdded}")
-        add("поездки +${item.tripsAdded}" + if (item.tripsUpdated > 0) " (обновлено ${item.tripsUpdated})" else "")
-        if (item.dtcAdded > 0) add("события DTC +${item.dtcAdded}")
-        if (item.errors > 0) add("ошибок ${item.errors}")
+    fun summary(context: Context, item: ImportHistoryItem): String = buildList {
+        add(context.getString(R.string.import_notif_recordings, item.recordingsAdded))
+        add(
+            if (item.tripsUpdated > 0) context.getString(R.string.import_notif_trips_updated, item.tripsAdded, item.tripsUpdated)
+            else context.getString(R.string.import_notif_trips, item.tripsAdded),
+        )
+        if (item.dtcAdded > 0) add(context.getString(R.string.import_notif_dtc, item.dtcAdded))
+        if (item.errors > 0) add(context.getString(R.string.import_notif_errors, item.errors))
     }.joinToString(" · ")
 
     private fun post(context: Context, title: String, text: String) {

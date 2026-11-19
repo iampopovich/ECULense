@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense.core.backup
 
+import io.github.iampopovich.eculense.core.data.ImportMessage
 import io.github.iampopovich.eculense.core.data.ImportProgress
 import io.github.iampopovich.eculense.core.data.ImportReport
 import io.github.iampopovich.eculense.core.data.ImportStatus
@@ -38,6 +39,6 @@ class ImportRunnerTest {
         runCatching { job.await() }
         val cancelled = history.history.value.first()
         assertEquals(ImportStatus.CANCELLED, cancelled.status)
-        assertEquals("Отменено: обработано записей 1 из 5", cancelled.message)
+        assertEquals(ImportMessage.Cancelled(1, 5), ImportMessage.parse(cancelled.message!!))
     }
 }

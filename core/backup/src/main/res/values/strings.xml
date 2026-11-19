@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="import_notif_channel">Data import</string>
+    <string name="import_notif_title">Import from Car Scanner</string>
+    <string name="import_notif_progress">Recording %1$d of %2$d</string>
+    <string name="import_notif_preparing">Preparing the backup…</string>
+    <string name="import_notif_cancel">Cancel</string>
+    <string name="import_notif_done">Import finished</string>
+    <string name="import_notif_failed">Import failed</string>
+    <string name="import_notif_file_unavailable">Couldn\'t open the file</string>
+    <string name="import_notif_recordings">recordings +%1$d</string>
+    <string name="import_notif_trips">trips +%1$d</string>
+    <string name="import_notif_trips_updated">trips +%1$d (%2$d updated)</string>
+    <string name="import_notif_dtc">DTC events +%1$d</string>
+    <string name="import_notif_errors">errors %1$d</string>
+</resources>

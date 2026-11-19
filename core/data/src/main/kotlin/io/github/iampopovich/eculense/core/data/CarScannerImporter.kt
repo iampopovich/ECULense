@@ -54,7 +54,7 @@ data class ImportReport(
     val tripsUpdated: Int = 0,
     /** Of [skippedDuplicates]: .brc files fully imported earlier (name+size+CRC) — skipped without extraction. */
     val recordingsUnchanged: Int = 0,
-    /** Profile fields of an already known car updated from the backup (the user had not edited them): «год», «цена топлива»… */
+    /** Profile fields of an already known car updated from the backup (the user had not edited them); field ids like "year", "fuelPrice". */
     val carFieldsUpdated: List<String> = emptyList(),
 )
 
@@ -77,7 +77,7 @@ data class ImportProgress(val done: Int, val total: Int)
  * drivecyclesv2.db (the car is needed before the recordings), then the .brc recordings.
  *
  * Repeat import is incremental (1.27): recordings by externalId; fully imported .brc files (name+size+CRC in
- * [ImportLedger]) are not even extracted; trips by externalId «carscanner:<машина>:<начало>», changed ones
+ * [ImportLedger]) are not even extracted; trips by externalId «carscanner:<car>:<start>», changed ones
  * are updated; DTCs use the 5 s twin rule; car profile and units: a field changes only if it is empty or
  * the user has not touched it since the previous import (current value == previous import snapshot).
  */
@@ -118,7 +118,7 @@ class CarScannerImporter internal constructor(
     suspend fun import(uri: Uri, fileName: String, onProgress: (ImportProgress) -> Unit = {}): ImportReport = withContext(Dispatchers.IO) {
         val copy = File.createTempFile("import-", if (fileName.endsWith(".brc", true)) ".brc" else ".cbz", tempDir)
         val report = try {
-            (open(uri) ?: error("Не удалось открыть файл")).use { input -> copy.outputStream().use { input.copyTo(it) } }
+            (open(uri) ?: throw ImportFileUnavailableException()).use { input -> copy.outputStream().use { input.copyTo(it) } }
             importFile(copy, fileName, onProgress)
         } finally {
             copy.delete()
@@ -147,7 +147,7 @@ class CarScannerImporter internal constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                failed += "настройки и поездки: ${e.message}"
+                failed += "settings and trips: ${e.message}"
                 null
             }
             val carMapping = meta?.let { importCars(it) } ?: CarMapping.EMPTY
@@ -301,12 +301,12 @@ class CarScannerImporter internal constructor(
                     return value
                 }
                 existing.copy(
-                    name = field("имя", existing.name, incoming.name, previous?.name) ?: existing.name,
-                    brand = field("марка", existing.brand, incoming.brand, previous?.brand),
-                    year = field("год", existing.year, incoming.year, previous?.year),
-                    diagProfile = field("профиль диагностики", existing.diagProfile, incoming.diagProfile, previous?.diagProfile),
-                    fuelPrice = field("цена топлива", existing.fuelPrice, incoming.fuelPrice, previous?.fuelPrice),
-                    currency = field("валюта", existing.currency, incoming.currency, previous?.currency),
+                    name = field("name", existing.name, incoming.name, previous?.name) ?: existing.name,
+                    brand = field("brand", existing.brand, incoming.brand, previous?.brand),
+                    year = field("year", existing.year, incoming.year, previous?.year),
+                    diagProfile = field("diagProfile", existing.diagProfile, incoming.diagProfile, previous?.diagProfile),
+                    fuelPrice = field("fuelPrice", existing.fuelPrice, incoming.fuelPrice, previous?.fuelPrice),
+                    currency = field("currency", existing.currency, incoming.currency, previous?.currency),
                 )
             }
             val id = if (existing != null && changed.isEmpty()) existing.id else cars.save(merged)
@@ -460,7 +460,7 @@ private fun unitsJson(u: UnitsSettings): String = buildJsonObject {
 
 private fun parseUnits(json: String): UnitsSettings? = runCatching {
     val o: JsonObject = Json.parseToJsonElement(json).jsonObject
-    fun b(k: String) = o[k]?.jsonPrimitive?.booleanOrNull ?: error("нет $k")
+    fun b(k: String) = o[k]?.jsonPrimitive?.booleanOrNull ?: error("missing $k")
     UnitsSettings(b("km"), b("celsius"), b("l100"), b("liters"), b("usGallon"), b("kpa"), b("hp"), b("nm"), b("gs"), b("g"))
 }.getOrNull()
 

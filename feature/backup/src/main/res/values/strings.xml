@@ -44,4 +44,14 @@
     <string name="backup_saved">Backup saved: database, settings. API keys and tokens are not included.</string>
     <string name="backup_saved_with_chat">Backup saved: database, AI chat history, settings. API keys and tokens are not included.</string>
     <string name="backup_restored">Backup restored, restarting the app…</string>
+    <string name="backup_rejected_not_eculense">This is not an ECULense backup</string>
+    <string name="backup_rejected_unknown_format">Unknown backup format</string>
+    <string name="backup_rejected_newer">The backup was made by a newer app version (schema %1$d, this version %2$d). Update ECULense.</string>
+    <string name="backup_rejected_no_database">The backup has no database</string>
+    <string name="backup_rejected_version_mismatch">The backup is damaged: the database version doesn\'t match the manifest</string>
+    <string name="backup_rejected_bad_settings">The backup is damaged: settings %1$s</string>
+    <string name="backup_rejected_not_sqlite">The backup is damaged: the database is not SQLite</string>
+    <string name="backup_file_create_failed">Couldn\'t create the file</string>
+    <string name="backup_file_unavailable">Couldn\'t open the file</string>
+    <string name="backup_cancelled_progress">Cancelled: %1$d of %2$d recordings processed</string>
 </resources>

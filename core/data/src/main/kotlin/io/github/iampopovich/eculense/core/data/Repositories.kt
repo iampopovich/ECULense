@@ -45,7 +45,7 @@ interface DtcRepository {
     suspend fun hasEvent(code: String, fromMs: Long, toMs: Long): Boolean = false
 
     companion object {
-        /** Pressing «Прочитать» again and the snapshot before clearing do not create duplicate events. */
+        /** Pressing «Read codes» again and the snapshot before clearing do not create duplicate events. */
         const val DEDUP_WINDOW_MS = 5 * 60_000L
     }
 }

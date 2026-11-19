@@ -23,7 +23,39 @@ interface ImportLedger {
 
 enum class ImportStatus { DONE, FAILED, CANCELLED }
 
-/** Import history row on the «Импорт и резервные копии» screen. */
+/** The picked file could not be opened (SAF returned no stream). */
+class ImportFileUnavailableException : java.io.IOException("cannot open the file")
+
+/**
+ * Meaning of [ImportHistoryItem.message]: the app's own outcomes are stored as short codes and rendered in the UI language;
+ * anything else is a technical error text shown as is (rows from before localization may hold Russian text).
+ */
+sealed interface ImportMessage {
+    data class Cancelled(val done: Int, val total: Int) : ImportMessage
+    data object FileUnavailable : ImportMessage
+    data class Text(val value: String) : ImportMessage
+
+    val code: String
+        get() = when (this) {
+            is Cancelled -> "cancelled:$done/$total"
+            FileUnavailable -> FILE_UNAVAILABLE
+            is Text -> value
+        }
+
+    companion object {
+        private const val FILE_UNAVAILABLE = "error:file-unavailable"
+        private val CANCELLED = Regex("cancelled:(\\d+)/(\\d+)")
+
+        fun parse(message: String): ImportMessage {
+            CANCELLED.matchEntire(message)?.let { return Cancelled(it.groupValues[1].toInt(), it.groupValues[2].toInt()) }
+            return if (message == FILE_UNAVAILABLE) FileUnavailable else Text(message)
+        }
+
+        fun of(e: Throwable): ImportMessage = if (e is ImportFileUnavailableException) FileUnavailable else Text(e.message ?: e.javaClass.simpleName)
+    }
+}
+
+/** Import history row on the «Import and backups» screen. [message]: see [ImportMessage]. */
 data class ImportHistoryItem(
     val id: Long = 0,
     val fileName: String,

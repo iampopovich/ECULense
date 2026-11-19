@@ -2,6 +2,7 @@ package io.github.iampopovich.eculense.core.backup
 
 import io.github.iampopovich.eculense.core.data.ImportHistoryItem
 import io.github.iampopovich.eculense.core.data.ImportHistoryRepository
+import io.github.iampopovich.eculense.core.data.ImportMessage
 import io.github.iampopovich.eculense.core.data.ImportProgress
 import io.github.iampopovich.eculense.core.data.ImportReport
 import io.github.iampopovich.eculense.core.data.ImportStatus
@@ -27,12 +28,12 @@ class ImportRunner(
         } catch (e: CancellationException) {
             withContext(NonCancellable) {
                 history.add(ImportHistoryItem(fileName = fileName, startedAtMs = started, finishedAtMs = clock(), status = ImportStatus.CANCELLED,
-                    message = "Отменено: обработано записей ${last.done} из ${last.total}"))
+                    message = ImportMessage.Cancelled(last.done, last.total).code))
             }
             throw e
         } catch (e: Exception) {
             history.add(ImportHistoryItem(fileName = fileName, startedAtMs = started, finishedAtMs = clock(), status = ImportStatus.FAILED, errors = 1,
-                message = e.message ?: e.javaClass.simpleName))
+                message = ImportMessage.of(e).code))
             throw e
         }
     }

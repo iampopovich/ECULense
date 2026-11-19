@@ -30,7 +30,20 @@ interface DbSource {
     fun snapshotTo(target: File): Int
 }
 
-class BackupRejectedException(message: String) : Exception(message)
+/** Why a backup file was refused; the UI renders it (:feature:backup). */
+sealed interface BackupProblem {
+    data object NotEculense : BackupProblem
+    data object UnknownFormat : BackupProblem
+    data class NewerVersion(val backupSchema: Int, val appSchema: Int) : BackupProblem
+    data object NoDatabase : BackupProblem
+    data object VersionMismatch : BackupProblem
+    data class BadSettings(val name: String) : BackupProblem
+    data object NotSqlite : BackupProblem
+    data object CannotCreateFile : BackupProblem
+    data object CannotOpenFile : BackupProblem
+}
+
+class BackupRejectedException(val problem: BackupProblem) : Exception("backup rejected: $problem")
 
 data class RestoreResult(val manifest: BackupManifest, val migratesFrom: Int?)
 
@@ -70,7 +83,7 @@ class EcuBackup(
                 if (db.fileName == MAIN_DB) version = v
                 dbFiles += target
             }
-            check(version >= 0) { "нет базы $MAIN_DB" }
+            check(version >= 0) { "no database $MAIN_DB" }
             var secrets = 0
             val prefs = mutableListOf<Pair<String, ByteArray>>()
             dataStoreDir.listFiles().orEmpty().filter { it.isFile && it.name.endsWith(PREFS_SUFFIX) && it.name.removeSuffix(PREFS_SUFFIX) !in EXCLUDED_STORES }
@@ -140,18 +153,18 @@ class EcuBackup(
                 }
             }
             val manifest = manifestBytes?.let { runCatching { json.decodeFromString(BackupManifest.serializer(), it.decodeToString()) }.getOrNull() }
-                ?: throw BackupRejectedException("Это не резервная копия ECULense")
-            if (manifest.app != APP || manifest.format > FORMAT) throw BackupRejectedException("Неизвестный формат копии")
+                ?: throw BackupRejectedException(BackupProblem.NotEculense)
+            if (manifest.app != APP || manifest.format > FORMAT) throw BackupRejectedException(BackupProblem.UnknownFormat)
             if (manifest.schemaVersion > schemaVersion) {
-                throw BackupRejectedException("Копия сделана более новой версией приложения (схема ${manifest.schemaVersion}, у этой версии $schemaVersion). Обновите ECULense.")
+                throw BackupRejectedException(BackupProblem.NewerVersion(manifest.schemaVersion, schemaVersion))
             }
             val db = File(dir, "$DB_DIR/$MAIN_DB")
-            if (MAIN_DB !in manifest.databases || !db.exists()) throw BackupRejectedException("В копии нет базы данных")
-            if (sqliteUserVersion(db) != manifest.schemaVersion) throw BackupRejectedException("Копия повреждена: версия базы не совпадает с манифестом")
+            if (MAIN_DB !in manifest.databases || !db.exists()) throw BackupRejectedException(BackupProblem.NoDatabase)
+            if (sqliteUserVersion(db) != manifest.schemaVersion) throw BackupRejectedException(BackupProblem.VersionMismatch)
             manifest.datastore.forEach { name ->
                 val f = File(dir, "$PREFS_DIR/$name")
                 if (!f.exists() || runCatching { PrefsFile.split(f.readBytes()).secretCount }.getOrDefault(1) != 0) {
-                    throw BackupRejectedException("Копия повреждена: настройки $name")
+                    throw BackupRejectedException(BackupProblem.BadSettings(name))
                 }
             }
             return manifest to dir
@@ -185,7 +198,7 @@ class EcuBackup(
         /** PRAGMA user_version from the SQLite header (offset 60, big-endian) — without opening the database. */
         fun sqliteUserVersion(file: File): Int = RandomAccessFile(file, "r").use { f ->
             val magic = ByteArray(16).also { f.readFully(it) }
-            if (!magic.decodeToString().startsWith("SQLite format 3")) throw BackupRejectedException("Копия повреждена: база не SQLite")
+            if (!magic.decodeToString().startsWith("SQLite format 3")) throw BackupRejectedException(BackupProblem.NotSqlite)
             f.seek(60)
             f.readInt()
         }
