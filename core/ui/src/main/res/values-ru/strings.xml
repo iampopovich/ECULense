@@ -13,4 +13,5 @@
     <string name="common_unit_gal_us">гал (US)</string>
     <string name="common_unit_gal_imp">гал (Imp)</string>
     <string name="common_unit_l_per_100km">л/100 км</string>
+    <string name="common_years_open">%1$d–н. в.</string>
 </resources>

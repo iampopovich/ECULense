@@ -3,7 +3,7 @@ package io.github.iampopovich.eculense.core.dtcdb
 /**
  * Code description that takes the active car's make into account.
  * Generic codes: OBDex (if the pack is downloaded) → bundled CSV. Manufacturer codes: only the car make's database; otherwise an honest
- * «Заводской код производителя, расшифровка неизвестна»; another make's description is worse than none.
+ * «Manufacturer-specific code, description unknown»; another make's description is worse than none.
  */
 class DtcCatalog(
     private val generic: GenericDtcSource?,

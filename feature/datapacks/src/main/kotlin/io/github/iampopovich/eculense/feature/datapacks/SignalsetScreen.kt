@@ -23,7 +23,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.iampopovich.eculense.core.obdb.ProfileField
 import io.github.iampopovich.eculense.core.obdb.SignalsetResult
+import io.github.iampopovich.eculense.core.ui.YearRange
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -60,12 +62,12 @@ internal fun SignalsetScreen(state: SignalsetUiState, onYear: (String) -> Unit, 
         }
         when (val r = state.result) {
             null -> Unit
-            is SignalsetResult.NeedsProfile -> item { Text(stringResource(R.string.datapacks_needs_profile, r.missing.joinToString())) }
+            is SignalsetResult.NeedsProfile -> item { Text(stringResource(R.string.datapacks_needs_profile, r.missing.map { stringResource(it.labelRes()) }.joinToString())) }
             is SignalsetResult.NoRepository -> item { Text(stringResource(R.string.datapacks_no_repo, r.repo)) }
             is SignalsetResult.NotCovered -> item {
                 val gen = r.generation
                 Text(
-                    if (gen != null) stringResource(R.string.datapacks_not_covered_gen, r.repo, r.year, gen.name, gen.years)
+                    if (gen != null) stringResource(R.string.datapacks_not_covered_gen, r.repo, r.year, gen.name, YearRange.of(gen.startYear, gen.endYear)!!.asString())
                     else stringResource(R.string.datapacks_not_covered, r.repo, r.year),
                 )
             }
@@ -92,4 +94,10 @@ internal fun SignalsetScreen(state: SignalsetUiState, onYear: (String) -> Unit, 
             }
         }
     }
+}
+
+private fun ProfileField.labelRes(): Int = when (this) {
+    ProfileField.MAKE -> R.string.datapacks_field_make
+    ProfileField.MODEL -> R.string.datapacks_field_model
+    ProfileField.YEAR -> R.string.datapacks_field_year
 }

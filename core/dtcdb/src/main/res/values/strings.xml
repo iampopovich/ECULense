@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dtcdb_oem_unknown">Manufacturer-specific code, description unknown</string>
+    <string name="dtcdb_no_description">No description found</string>
+</resources>

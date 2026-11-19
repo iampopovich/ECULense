@@ -7,10 +7,8 @@ import io.github.iampopovich.eculense.core.model.Gearbox
 
 data class VehicleMake(val id: Long, val name: String)
 data class VehicleModel(val id: Long, val name: String, val yearStart: Int?, val yearEnd: Int?)
-data class VehicleGeneration(val id: Long, val name: String, val yearStart: Int?, val yearEnd: Int?, val bodyType: String?) {
-    /** «2002–2006», «2020–н. в.». */
-    val years: String get() = listOfNotNull(yearStart?.toString(), yearEnd?.toString() ?: yearStart?.let { "н. в." }).joinToString("–")
-}
+/** yearEnd = null: still in production (the UI formats the range in the app language). */
+data class VehicleGeneration(val id: Long, val name: String, val yearStart: Int?, val yearEnd: Int?, val bodyType: String?)
 
 /** A trim (engine + gearbox + drivetrain) with normalized fields and tank size from raw specs. */
 data class VehicleEngine(
@@ -41,7 +39,7 @@ class VehicleDb(private val db: PackDb) : AutoCloseable {
     /** Missing tables/columns; an empty list if the schema is the one the code was written for. */
     fun schemaProblems(): List<String> = EXPECTED.flatMap { (table, columns) ->
         val actual = db.query("SELECT name FROM pragma_table_info(?)", listOf(table)) { it.string(0) }.toSet()
-        if (actual.isEmpty()) listOf("нет таблицы $table") else columns.filter { it !in actual }.map { "нет колонки $table.$it" }
+        if (actual.isEmpty()) listOf("missing table $table") else columns.filter { it !in actual }.map { "missing column $table.$it" }
     }
 
     fun makes(query: String = ""): List<VehicleMake> =

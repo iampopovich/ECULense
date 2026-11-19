@@ -32,14 +32,14 @@ import org.koin.core.component.inject
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-/** Pack state for the «Данные и справочники» screen. progress: null — not downloading, -1 — downloading, size unknown. */
+/** Pack state for the «Data and references» screen. progress: null — not downloading, -1 — downloading, size unknown. */
 data class PackState(
     val manifest: PackManifest,
     val installed: PackStore.Installed? = null,
     val progress: Int? = null,
     val updateVersion: String? = null,
     val error: String? = null,
-    /** Bytes already downloaded (download in progress or a partial file is present — «Продолжить»). */
+    /** Bytes already downloaded (download in progress or a partial file is present — «Resume»). */
     val downloadedBytes: Long = 0,
     /** Download is waiting for a retry after an interruption (WorkManager retries by itself). */
     val retrying: Boolean = false,
@@ -116,7 +116,7 @@ class DataPacks(
         )
     }
 
-    /** version = null — the pinned version (or, for «Обновить», the one found by the check). */
+    /** version = null — the pinned version (or, for «Update», the one found by the check). */
     override fun download(id: String, version: String?) {
         val resumable = manifest(id)?.resumable == true
         // A user tap replaces a task waiting for retry with a new one (expedited, from the open app); the download
@@ -169,7 +169,7 @@ class DataPacks(
     companion object {
         /**
          * Multi-gigabyte packs (models) use an expedited task: it starts immediately while the user is still in the app
-         * (they just tapped «Скачать») and manages to become a foreground service — Android 12+/16 forbids starting
+         * (they just tapped «Download») and manages to become a foreground service — Android 12+/16 forbids starting
          * a foreground service from the background (`mAllowStartForeground false`). If there is no expedited quota — a regular
          * task; without a foreground service the system stops it after ~10 minutes and WorkManager resumes where it broke off (Range).
          * Network/DNS failure — Result.retry() with exponential backoff from [BACKOFF_SECONDS].
@@ -200,7 +200,7 @@ class PackDownloadWorker(context: Context, params: WorkerParameters) : Coroutine
 
     override suspend fun doWork(): Result {
         val id = inputData.getString(DataPacks.KEY_ID) ?: return Result.failure()
-        val manifest = packs.manifest(id) ?: return Result.failure(workDataOf(DataPacks.KEY_ERROR to "неизвестный пакет $id"))
+        val manifest = packs.manifest(id) ?: return Result.failure(workDataOf(DataPacks.KEY_ERROR to "unknown pack $id"))
         val started = System.currentTimeMillis()
         var lastPct = -2
         var lastDone = 0L
@@ -208,19 +208,19 @@ class PackDownloadWorker(context: Context, params: WorkerParameters) : Coroutine
             // Multi-gigabyte file: foreground task (WorkManager gives a regular one 10 minutes) with a progress notification.
             // Allowed while the app is on screen (started by a tap — expedited); Android 12+ won't let a retry from the
             // background into the foreground — then we download as a regular task in chunks until the system stops it, and resume.
-            if (manifest.resumable) runCatching { setForeground(foregroundInfo(manifest.title, -1)) }
+            if (manifest.resumable) runCatching { setForeground(foregroundInfo(titleOf(manifest), -1)) }
                 .onSuccess { Log.i(DataPacks.LOG, "pack $id: foreground download (attempt $runAttemptCount)") }
                 .onFailure { Log.w(DataPacks.LOG, "foreground not allowed, continuing in background: ${it.message}") }
             setProgress(workDataOf(DataPacks.KEY_PROGRESS to -1))
             val installed = packs.installer.install(manifest, inputData.getString(DataPacks.KEY_VERSION)) { done, total ->
                 val pct = total?.takeIf { it > 0 }?.let { (done * 100 / it).toInt().coerceIn(0, 100) } ?: -1
-                // bytes — for «1,2 из 2,6 ГБ»; at most once per 4 MB so as not to hammer the WorkManager database
+                // bytes — for «1.2 of 2.6 GB»; at most once per 4 MB so as not to hammer the WorkManager database
                 if (pct != lastPct || done - lastDone >= 4L shl 20) {
                     val pctChanged = pct != lastPct
                     lastPct = pct
                     lastDone = done
                     setProgressAsync(workDataOf(DataPacks.KEY_PROGRESS to pct, DataPacks.KEY_DONE to done))
-                    if (manifest.resumable && pctChanged) runCatching { setForegroundAsync(foregroundInfo(manifest.title, pct)) }
+                    if (manifest.resumable && pctChanged) runCatching { setForegroundAsync(foregroundInfo(titleOf(manifest), pct)) }
                 }
             }
             Log.i(DataPacks.LOG, "pack $id ${installed.version} installed: ${installed.sizeBytes} bytes in ${System.currentTimeMillis() - started} ms")
@@ -240,17 +240,19 @@ class PackDownloadWorker(context: Context, params: WorkerParameters) : Coroutine
 
     /** Before Android 12 an expedited task runs as a foreground service — WorkManager asks for the notification here. */
     override suspend fun getForegroundInfo(): ForegroundInfo =
-        foregroundInfo(inputData.getString(DataPacks.KEY_ID)?.let { packs.manifest(it)?.title } ?: "данные", -1)
+        foregroundInfo(inputData.getString(DataPacks.KEY_ID)?.let { packs.manifest(it) }?.let { titleOf(it) } ?: applicationContext.getString(R.string.pack_notif_fallback_title), -1)
+
+    private fun titleOf(m: PackManifest): String = if (m.titleRes != 0) applicationContext.getString(m.titleRes) else m.title
 
     private fun foregroundInfo(title: String, pct: Int): ForegroundInfo {
         val nm = applicationContext.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CHANNEL) == null) {
-            nm.createNotificationChannel(NotificationChannel(CHANNEL, "Загрузки", NotificationManager.IMPORTANCE_LOW))
+            nm.createNotificationChannel(NotificationChannel(CHANNEL, applicationContext.getString(R.string.pack_notif_channel), NotificationManager.IMPORTANCE_LOW))
         }
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("Загрузка: $title")
-            .setContentText(if (pct >= 0) "$pct %" else "подготовка…")
+            .setContentTitle(applicationContext.getString(R.string.pack_notif_title, title))
+            .setContentText(if (pct >= 0) "$pct %" else applicationContext.getString(R.string.pack_notif_preparing))
             .setProgress(100, pct.coerceAtLeast(0), pct < 0)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

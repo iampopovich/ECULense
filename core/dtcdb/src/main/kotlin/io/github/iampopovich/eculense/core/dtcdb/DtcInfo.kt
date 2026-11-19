@@ -25,16 +25,13 @@ data class DtcInfo(
     /** Make in the manufacturer code database under which the description was found. */
     val manufacturer: String? = null,
 ) {
-    /** List line: the title or an honest «не знаем». */
-    val text: String
-        get() = title ?: when (source) {
-            DtcSource.OEM_UNKNOWN -> OEM_UNKNOWN_TEXT
-            else -> "Расшифровка не найдена"
+    /** String resource of the honest «unknown» line when there is no [title] (manufacturer code vs no description); null if known. */
+    val unknownTextRes: Int?
+        get() = when {
+            title != null -> null
+            source == DtcSource.OEM_UNKNOWN -> R.string.dtcdb_oem_unknown
+            else -> R.string.dtcdb_no_description
         }
-
-    companion object {
-        const val OEM_UNKNOWN_TEXT = "Заводской код производителя, расшифровка неизвестна"
-    }
 }
 
 object DtcCodes {

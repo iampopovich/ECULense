@@ -118,10 +118,11 @@ private fun askAi(enabled: Boolean, onClick: () -> Unit): (@Composable () -> Uni
 @Composable
 internal fun DtcInfoText(info: DtcInfo) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        if (info.source == DtcSource.OEM_UNKNOWN || info.title == null) {
-            Text(info.text, fontStyle = FontStyle.Italic)
+        val unknown = info.unknownTextRes
+        if (unknown != null) {
+            Text(stringResource(unknown), fontStyle = FontStyle.Italic)
         } else {
-            Text(info.text)
+            Text(info.title.orEmpty())
         }
         if (info.causes.isNotEmpty()) {
             Text(stringResource(R.string.dtc_causes, info.causes.take(2).joinToString("; ")), style = MaterialTheme.typography.bodySmall)

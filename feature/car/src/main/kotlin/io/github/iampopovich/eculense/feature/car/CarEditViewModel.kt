@@ -8,6 +8,8 @@ import io.github.iampopovich.eculense.core.datapacks.PackCatalog
 import io.github.iampopovich.eculense.core.datapacks.PackState
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.ui.UiText
+import io.github.iampopovich.eculense.core.ui.YearRange
+import io.github.iampopovich.eculense.core.vehicledb.VehicleDbFormatException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -184,7 +186,7 @@ internal class CarEditViewModel(
         pickerJob?.cancel()
         _state.update { it.copy(picker = start.copy(loading = true, error = null)) }
         pickerJob = viewModelScope.launch {
-            val next = runCatching { block() }.getOrElse { e -> start.copy(loading = false, error = e.message?.let { UiText.Raw(it) } ?: UiText.Res(R.string.car_picker_error)) }
+            val next = runCatching { block() }.getOrElse { e -> start.copy(loading = false, error = pickerError(e)) }
             _state.update { it.copy(picker = next.copy(loading = false)) }
         }
     }
@@ -197,7 +199,7 @@ internal class CarEditViewModel(
     private suspend fun loadModels(p: PickerState, query: String): PickerState {
         val make = p.make ?: return loadMakes("")
         val models = catalog?.models(make.id, query) ?: return notDownloaded()
-        return PickerState(PickerStep.MODEL, query, make = make, options = models.map { PickerOption(it.id, it.name, years(it.yearStart, it.yearEnd)) })
+        return PickerState(PickerStep.MODEL, query, make = make, options = models.map { PickerOption(it.id, it.name, YearRange.of(it.yearStart, it.yearEnd)) })
     }
 
     private suspend fun loadGenerations(p: PickerState, query: String = ""): PickerState {
@@ -205,8 +207,12 @@ internal class CarEditViewModel(
         val gens = catalog?.generations(model.id) ?: return notDownloaded()
         val q = query.trim()
         val year = _state.value.form.year.toIntOrNull()
-        val options = gens.filter { q.isEmpty() || it.name.contains(q, true) || it.years.contains(q) }
-            .map { PickerOption(it.id, it.name, if (year != null && year in (it.yearStart ?: 0)..(it.yearEnd ?: 9999)) UiText.Res(R.string.car_your_year, listOf(it.years)) else UiText.Raw(it.years)) }
+        val options = gens.filter { g -> q.isEmpty() || g.name.contains(q, true) || listOfNotNull(g.yearStart, g.yearEnd).any { it.toString().contains(q) } }
+            .map {
+                val range = YearRange.of(it.yearStart, it.yearEnd)
+                val yours = range != null && year != null && year in (it.yearStart ?: 0)..(it.yearEnd ?: 9999)
+                PickerOption(it.id, it.name, if (yours) UiText.Res(R.string.car_your_year, listOf(range)) else range)
+            }
         return PickerState(PickerStep.GENERATION, query, make = p.make, model = model, options = options)
     }
 
@@ -219,11 +225,11 @@ internal class CarEditViewModel(
         )
     }
 
-    private fun notDownloaded() = PickerState(error = UiText.Res(R.string.car_catalog_not_downloaded))
-
-    private fun years(from: Int?, to: Int?): UiText? = when {
-        from == null -> null
-        to == null -> UiText.Res(R.string.car_years_open, listOf(from))
-        else -> UiText.Res(R.string.car_years_range, listOf(from, to))
+    private fun pickerError(e: Throwable): UiText = when {
+        e is VehicleDbFormatException -> UiText.Res(R.string.car_picker_format_changed, listOf(e.problems.joinToString()))
+        e.message != null -> UiText.Raw(e.message!!)
+        else -> UiText.Res(R.string.car_picker_error)
     }
+
+    private fun notDownloaded() = PickerState(error = UiText.Res(R.string.car_catalog_not_downloaded))
 }

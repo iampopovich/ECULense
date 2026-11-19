@@ -74,7 +74,7 @@ class DtcViewModelTest {
         val vm = DtcViewModel(FakeConnectionController(session = null), descriptions, FakeDtcRepository(), emptyList(), history)
         val items = vm.uiState.value.history
         assertEquals(listOf("P0133" to 2, "P1847" to 1), items.map { it.code to it.count })
-        assertEquals("Заводской код производителя, расшифровка неизвестна", items.last().info.text)
+        assertEquals(DtcInfo("P1847", null, DtcSource.OEM_UNKNOWN), items.last().info)
     }
 
     @Test

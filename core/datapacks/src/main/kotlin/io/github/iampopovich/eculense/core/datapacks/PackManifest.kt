@@ -38,11 +38,18 @@ data class PackManifest(
     val license: String,
     val licenseUrl: String,
     val sourceUrl: String,
-    /** Attribution line for «О приложении». */
+    /** Attribution line for «About» (English, as the sources publish it). */
     val attribution: String,
     val update: UpdateSource = UpdateSource.None,
-    /** Reference packs are shown on the «Данные и справочники» screen; AI models have their own screen (:core:ailocal). */
+    /** Reference packs are shown on the «Data and references» screen; AI models have their own screen (:core:ailocal). */
     val group: PackGroup = PackGroup.REFERENCE,
+    /**
+     * Localized title/description/license of the built-in reference packs (0 — none: user/AI model packs show [title],
+     * [description] and [license] as is). The plain fields stay English for logs and tests.
+     */
+    val titleRes: Int = 0,
+    val descriptionRes: Int = 0,
+    val licenseRes: Int = 0,
     /**
      * Multi-gigabyte files: `.part` survives drops/stops and resumes where it left off (HTTP Range); the worker runs
      * as a foreground task and retries. For reference packs it's false: on error everything starts over.

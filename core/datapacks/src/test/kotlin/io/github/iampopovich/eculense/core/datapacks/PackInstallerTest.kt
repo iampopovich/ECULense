@@ -89,7 +89,7 @@ class PackInstallerTest {
             installer().install(bad.copy(id = "db"), version = null)
             fail("должна быть ошибка контрольной суммы")
         } catch (e: IOException) {
-            assertTrue(e.message!!.contains("контрольная сумма"))
+            assertTrue(e.toString(), e is PackIntegrityException && e.message!!.contains("checksum mismatch"))
         }
         assertEquals("первая", store.file("db", "data.db")!!.readText())
         assertEquals(listOf("current", "v1"), root.resolve("db").list()!!.sorted())

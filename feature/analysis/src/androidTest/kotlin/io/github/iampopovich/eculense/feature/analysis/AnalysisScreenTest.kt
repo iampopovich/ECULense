@@ -22,6 +22,7 @@ import io.github.iampopovich.eculense.core.data.SessionSummary
 import io.github.iampopovich.eculense.core.data.StoredFinding
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.SessionSource
+import io.github.iampopovich.eculense.core.ui.UiText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -119,7 +120,7 @@ class AnalysisScreenTest {
         )
         rule.setContent {
             FindingScreen(
-                FindingUiState(loading = false, finding = f, dtc = mapOf("P0171" to DtcNote("System Too Lean Bank 1", listOf("Air leak after the MAF")))),
+                FindingUiState(loading = false, finding = f, dtc = mapOf("P0171" to DtcNote(UiText.Raw("System Too Lean Bank 1"), listOf("Air leak after the MAF")))),
                 onAskAi = {},
                 onOpenSession = {},
             )

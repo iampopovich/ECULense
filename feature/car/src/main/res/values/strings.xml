@@ -102,10 +102,9 @@
     <string name="car_picker_fill_hint">Displacement, cylinders, fuel, transmission, drive, tank and weight will be filled in. Your name, make and year stay; everything can be edited.</string>
     <string name="car_picker_fill">Fill in</string>
     <string name="car_picker_source">Data: gor3a/vehicle-makes-models (ODbL 1.0)</string>
+    <string name="car_picker_format_changed">The catalog format has changed: %1$s</string>
     <string name="car_picker_error">Catalog error</string>
     <string name="car_catalog_not_downloaded">The model catalog isn’t downloaded</string>
-    <string name="car_years_open">%1$d–present</string>
-    <string name="car_years_range" translatable="false">%1$d–%2$d</string>
     <string name="car_your_year">%1$s · your year</string>
     <string name="car_spec_volume">Displacement</string>
     <string name="car_spec_volume_value">%1$d cc (%2$s L)</string>

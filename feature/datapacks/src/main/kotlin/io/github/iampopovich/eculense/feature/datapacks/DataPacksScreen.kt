@@ -99,7 +99,7 @@ internal fun DataPacksScreen(
         }
     }
     state.confirm?.let { c ->
-        val title = c.pack.manifest.title
+        val title = PackTexts.title(c.pack.manifest).asString()
         when (c) {
             is PackConfirm.Metered -> AlertDialog(
                 onDismissRequest = onDismiss,
@@ -134,15 +134,15 @@ private fun PackCard(
     val uri = LocalUriHandler.current
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(m.title, style = MaterialTheme.typography.titleMedium)
-            Text(m.description, style = MaterialTheme.typography.bodyMedium)
+            Text(PackTexts.title(m).asString(), style = MaterialTheme.typography.titleMedium)
+            Text(PackTexts.description(m).asString(), style = MaterialTheme.typography.bodyMedium)
             Text(statusText(pack).asString(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             if (pack.downloading) {
                 val p = pack.progress ?: -1
                 if (p >= 0) LinearProgressIndicator(progress = { p / 100f }, modifier = Modifier.fillMaxWidth()) else LinearProgressIndicator(Modifier.fillMaxWidth())
             }
             pack.error?.let { Text(stringResource(R.string.datapacks_error, it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-            Text(stringResource(R.string.datapacks_license, m.license), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.datapacks_license, PackTexts.license(m).asString()), style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = { runCatching { uri.openUri(m.sourceUrl) } }) { Text(stringResource(R.string.datapacks_source, m.sourceUrl.removePrefix("https://"))) }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when {

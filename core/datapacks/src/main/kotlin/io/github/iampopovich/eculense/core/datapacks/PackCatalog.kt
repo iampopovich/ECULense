@@ -12,8 +12,11 @@ object PackCatalog {
     /** gor3a/vehicle-makes-models: weekly versioned releases; `vehicles.sqlite` is used unmodified. */
     val vehicles = PackManifest(
         id = VEHICLES,
-        title = "Справочник моделей и ТТХ",
-        description = "216 марок, модели, поколения и модификации с объёмом, мощностью, баком и массой — для «Заполнить из справочника».",
+        title = "Vehicle models and specs",
+        description = "216 makes with models, generations and trims: displacement, power, tank and weight.",
+        titleRes = R.string.pack_vehicles_title,
+        descriptionRes = R.string.pack_vehicles_description,
+        licenseRes = R.string.pack_vehicles_license,
         version = "v1.0.3",
         files = listOf(
             PackFile(
@@ -23,11 +26,11 @@ object PackCatalog {
                 sha256 = "56b7a311caba0007c782c415d090aaa7aa0b7312d120bcc00d388241a49d70e2",
             ),
         ),
-        license = "ODbL 1.0 (данные), MIT (код)",
+        license = "ODbL 1.0 (data), MIT (code)",
         licenseUrl = "https://opendatacommons.org/licenses/odbl/1-0/",
         sourceUrl = "https://github.com/gor3a/vehicle-makes-models",
         attribution = "Vehicle data: gor3a/vehicle-makes-models (data compiled from autoevolution.com), ODbL 1.0. " +
-            "Скачивается без изменений из официального релиза.",
+            "Downloaded unmodified from the official release.",
         update = UpdateSource.GithubRelease(
             "gor3a/vehicle-makes-models",
             mapOf("vehicles.sqlite" to "https://github.com/gor3a/vehicle-makes-models/releases/download/{tag}/vehicles.sqlite"),
@@ -40,8 +43,11 @@ object PackCatalog {
      */
     val obdex = PackManifest(
         id = OBDEX,
-        title = "Общие коды ошибок (OBDex)",
-        description = "9 533 общих кода OBD-II с описанием, причинами и симптомами (англ.).",
+        title = "Generic trouble codes (OBDex)",
+        description = "9,533 generic OBD-II codes with descriptions, causes and symptoms (in English).",
+        titleRes = R.string.pack_obdex_title,
+        descriptionRes = R.string.pack_obdex_description,
+        licenseRes = R.string.pack_obdex_license,
         version = "2026-11-07T13:44:03.324Z",
         files = listOf(
             PackFile(
@@ -51,7 +57,7 @@ object PackCatalog {
                 sha256 = "b160e9ea689a1c0aebb67867c7b8c98c0287897ef929efc071683b6a27364a71",
             ),
         ),
-        license = "CC0 1.0 (данные), MIT (инструменты)",
+        license = "CC0 1.0 (data), MIT (tools)",
         licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/",
         sourceUrl = "https://github.com/foerbsnavi/OBDex",
         attribution = "OBD-II code data: obdex (https://github.com/foerbsnavi/obdex), CC0-1.0",
@@ -61,8 +67,10 @@ object PackCatalog {
     /** Wal33D/dtc-database: the SQLite file lives in the repository, release v0.1.0 has no assets → raw link to the tag. */
     val oemDtc = PackManifest(
         id = OEM_DTC,
-        title = "Заводские коды ошибок",
-        description = "Расшифровки заводских кодов 33 марок. Показываются только для марки активной машины.",
+        title = "Manufacturer trouble codes",
+        description = "Manufacturer-specific code descriptions for 33 makes. Shown only for the active car's make.",
+        titleRes = R.string.pack_oem_dtc_title,
+        descriptionRes = R.string.pack_oem_dtc_description,
         version = "v0.1.0",
         files = listOf(
             PackFile(

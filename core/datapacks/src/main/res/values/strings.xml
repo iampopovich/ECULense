@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pack_vehicles_title">Vehicle models and specs</string>
+    <string name="pack_vehicles_description">216 makes with models, generations and trims: displacement, power, tank and weight — for “Fill in from the catalog”.</string>
+    <string name="pack_vehicles_license">ODbL 1.0 (data), MIT (code)</string>
+    <string name="pack_obdex_title">Generic trouble codes (OBDex)</string>
+    <string name="pack_obdex_description">9,533 generic OBD-II codes with descriptions, causes and symptoms (in English).</string>
+    <string name="pack_obdex_license">CC0 1.0 (data), MIT (tools)</string>
+    <string name="pack_oem_dtc_title">Manufacturer trouble codes</string>
+    <string name="pack_oem_dtc_description">Manufacturer-specific code descriptions for 33 makes. Shown only for the active car\'s make.</string>
+    <string name="pack_notif_channel">Downloads</string>
+    <string name="pack_notif_title">Downloading: %1$s</string>
+    <string name="pack_notif_preparing">preparing…</string>
+    <string name="pack_notif_fallback_title">data</string>
+</resources>

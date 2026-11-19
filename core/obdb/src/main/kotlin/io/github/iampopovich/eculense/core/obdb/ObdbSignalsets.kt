@@ -8,10 +8,13 @@ import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
 
+/** Car profile fields the OBDb lookup needs. */
+enum class ProfileField { MAKE, MODEL, YEAR }
+
 /** Result of the OBDb check for the user's car. */
 sealed interface SignalsetResult {
     /** The profile has no make/model/year: nothing to look up. */
-    data class NeedsProfile(val missing: List<String>) : SignalsetResult
+    data class NeedsProfile(val missing: List<ProfileField>) : SignalsetResult
 
     /** No `OBDb/<Make>-<Model>` repository. */
     data class NoRepository(val repo: String) : SignalsetResult
@@ -50,9 +53,9 @@ class ObdbSignalsets(
 
     suspend fun check(make: String?, model: String?, year: Int?): SignalsetResult = withContext(Dispatchers.IO) {
         val missing = buildList {
-            if (make.isNullOrBlank()) add("марка")
-            if (model.isNullOrBlank()) add("модель")
-            if (year == null) add("год")
+            if (make.isNullOrBlank()) add(ProfileField.MAKE)
+            if (model.isNullOrBlank()) add(ProfileField.MODEL)
+            if (year == null) add(ProfileField.YEAR)
         }
         if (missing.isNotEmpty()) return@withContext SignalsetResult.NeedsProfile(missing)
         val repo = repoName(make!!, model!!)

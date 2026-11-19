@@ -102,9 +102,9 @@
     <string name="car_picker_fill_hint">Заполнятся объём, цилиндры, топливо, КПП, привод, бак и масса. Название, марка и год останутся вашими; всё можно поправить.</string>
     <string name="car_picker_fill">Заполнить</string>
     <string name="car_picker_source">Данные: gor3a/vehicle-makes-models (ODbL 1.0)</string>
+    <string name="car_picker_format_changed">Формат справочника изменился: %1$s</string>
     <string name="car_picker_error">Ошибка справочника</string>
     <string name="car_catalog_not_downloaded">Справочник моделей не скачан</string>
-    <string name="car_years_open">%1$d–н. в.</string>
     <string name="car_your_year">%1$s · ваш год</string>
     <string name="car_spec_volume">Объём</string>
     <string name="car_spec_volume_value">%1$d см³ (%2$s л)</string>

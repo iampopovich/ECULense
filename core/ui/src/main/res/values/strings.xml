@@ -17,4 +17,6 @@
     <string name="common_unit_l_per_100km">L/100 km</string>
     <string name="common_unit_mpg_us" translatable="false">mpg (US)</string>
     <string name="common_unit_mpg_imp" translatable="false">mpg (Imp)</string>
+    <string name="common_years_open">%1$d–present</string>
+    <string name="common_years_range" translatable="false">%1$d–%2$d</string>
 </resources>

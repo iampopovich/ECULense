@@ -83,14 +83,14 @@ class UrlConnectionHttp(private val connectTimeoutMs: Int = 15_000, private val 
                 code in 300..399 -> {
                     val location = c.getHeaderField("Location")
                     c.disconnect()
-                    current = URL(URL(current), location ?: throw IOException("HTTP $code без Location")).toString()
+                    current = URL(URL(current), location ?: throw IOException("HTTP $code without Location")).toString()
                 }
                 code == 206 -> {
                     val range = c.getHeaderField("Content-Range")
                     val start = range?.let { parseRangeStart(it) }
                     if (start != offset) {
                         c.disconnect()
-                        throw IOException("сервер вернул не тот диапазон: $range")
+                        throw IOException("server returned a wrong range: $range")
                     }
                     return HttpResponse(code, c.contentLengthLong, c.inputStream, onClose = { c.disconnect() }, rangeStart = start)
                 }
@@ -102,7 +102,7 @@ class UrlConnectionHttp(private val connectTimeoutMs: Int = 15_000, private val 
                 }
             }
         }
-        throw IOException("слишком много редиректов: $url")
+        throw IOException("too many redirects: $url")
     }
 
     override fun head(url: String, headers: Map<String, String>): HttpHead {

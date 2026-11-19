@@ -107,11 +107,13 @@ class DataPacksViewModelTest {
     @Test
     fun `about lists every data source with its license`() {
         val licenses = ATTRIBUTIONS.associate { it.url to it.license }
-        assertTrue(licenses.getValue("https://github.com/gor3a/vehicle-makes-models").startsWith("ODbL"))
-        assertTrue(licenses.getValue("https://github.com/foerbsnavi/OBDex").startsWith("CC0"))
-        assertEquals("MIT", licenses.getValue("https://github.com/Wal33D/dtc-database"))
-        assertEquals("CC BY-SA 4.0", licenses.getValue("https://github.com/OBDb"))
-        assertEquals("MIT", licenses.getValue("https://github.com/lennykean/OBDII.DTC"))
+        assertEquals(UiText.Res(PackCatalog.vehicles.licenseRes), licenses.getValue("https://github.com/gor3a/vehicle-makes-models"))
+        assertTrue(PackCatalog.vehicles.license.startsWith("ODbL"))
+        assertEquals(UiText.Res(PackCatalog.obdex.licenseRes), licenses.getValue("https://github.com/foerbsnavi/OBDex"))
+        assertTrue(PackCatalog.obdex.license.startsWith("CC0"))
+        assertEquals(UiText.Raw("MIT"), licenses.getValue("https://github.com/Wal33D/dtc-database"))
+        assertEquals(UiText.Raw("CC BY-SA 4.0"), licenses.getValue("https://github.com/OBDb"))
+        assertEquals(UiText.Raw("MIT"), licenses.getValue("https://github.com/lennykean/OBDII.DTC"))
     }
 
     @Test

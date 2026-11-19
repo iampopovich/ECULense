@@ -53,7 +53,7 @@ class PackInstaller(
                 else -> manifest.version
             }
             val files = manifest.filesFor(target)
-            require(files.isNotEmpty()) { "нет файлов для версии $target" }
+            require(files.isNotEmpty()) { "no files for version $target" }
             val staging = store.staging(manifest.id, target, keep = manifest.resumable)
             try {
                 val total = files.map { it.sizeBytes ?: return@map null }.let { l -> if (l.any { it == null }) null else l.sumOf { it!! } }
@@ -128,18 +128,18 @@ class PackInstaller(
             progress.onProgress(done, total)
         }
         file.sizeBytes?.let {
-            if (done > it) throw PackIntegrityException("${file.name}: ожидалось $it байт, получено $done")
+            if (done > it) throw PackIntegrityException("${file.name}: expected $it bytes, got $done")
             // incomplete: connection dropped — for resumable packs the partial file is kept for the next attempt
-            if (done < it) throw IOException("${file.name}: ожидалось $it байт, получено $done")
+            if (done < it) throw IOException("${file.name}: expected $it bytes, got $done")
         }
         val sha = md.digest().joinToString("") { "%02x".format(it) }
         file.sha256?.let {
             if (!it.equals(sha, ignoreCase = true)) {
                 part.delete()
-                throw PackIntegrityException("${file.name}: контрольная сумма не совпала")
+                throw PackIntegrityException("${file.name}: checksum mismatch")
             }
         }
-        if (!part.renameTo(dest)) throw IOException("не удалось сохранить ${file.name}")
+        if (!part.renameTo(dest)) throw IOException("could not save ${file.name}")
         return done
     }
 

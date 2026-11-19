@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dtcdb_oem_unknown">Заводской код производителя, расшифровка неизвестна</string>
+    <string name="dtcdb_no_description">Расшифровка не найдена</string>
+</resources>

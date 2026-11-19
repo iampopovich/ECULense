@@ -39,6 +39,9 @@
     <string name="datapacks_signalset_note">Опрос расширенных PID пока не поддерживается: нужны заголовки ЭБУ (ATH1/ATSH) и сервисы 21/22. Здесь — что известно OBDb о вашей модели.</string>
     <string name="datapacks_year">Год</string>
     <string name="datapacks_check_obdb">Проверить OBDb</string>
+    <string name="datapacks_field_make">марка</string>
+    <string name="datapacks_field_model">модель</string>
+    <string name="datapacks_field_year">год</string>
     <string name="datapacks_needs_profile">В профиле машины не указано: %1$s. Заполните в «Автомобиль».</string>
     <string name="datapacks_no_repo">В OBDb нет репозитория %1$s — для этой модели сигналов пока нет.</string>
     <string name="datapacks_not_covered">OBDb (%1$s) не покрывает %2$d год: для него нет данных с реальных машин. Сигналы OBDb рассчитаны на CAN-машины более поздних поколений; для этой машины расширенные PID появятся из пользовательских файлов или собственного вклада в OBDb.</string>

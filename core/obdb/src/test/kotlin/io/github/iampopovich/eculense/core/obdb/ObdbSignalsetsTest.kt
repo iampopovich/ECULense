@@ -115,7 +115,7 @@ class ObdbSignalsetsTest {
         assertEquals(Generation("First Generation (AA)", 2002, 2009), g[0])
         assertEquals(null, g[2].endYear)
         assertTrue(g[2].contains(2030))
-        assertEquals("2002–2009", g[0].years)
+        assertEquals(Generation(g[0].name, 2002, 2009), g[0])
     }
 
     @Test
@@ -146,7 +146,7 @@ class ObdbSignalsetsTest {
     fun `missing repository and incomplete profile`() = runTest {
         val obdb = ObdbSignalsets(MapHttp(emptyMap()), store, base) { 2026 }
         assertEquals(SignalsetResult.NoRepository("OBDb/Lada-Niva-Legend"), obdb.check("Lada", "Niva Legend", 2020))
-        assertEquals(SignalsetResult.NeedsProfile(listOf("модель", "год")), obdb.check("Lada", " ", null))
+        assertEquals(SignalsetResult.NeedsProfile(listOf(ProfileField.MODEL, ProfileField.YEAR)), obdb.check("Lada", " ", null))
     }
 
     /** OBDB_LIVE=1 — real OBDb/Kia-Sorento over the network: BL (2005) is not covered, 2012 is. */

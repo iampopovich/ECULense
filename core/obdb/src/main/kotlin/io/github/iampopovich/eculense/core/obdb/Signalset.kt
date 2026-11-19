@@ -120,7 +120,6 @@ object SignalsetParser {
 /** Generation from `generations.yaml`: years inclusive, end = null means still in production. */
 data class Generation(val name: String, val startYear: Int, val endYear: Int?) {
     fun contains(year: Int) = year >= startYear && (endYear == null || year <= endYear)
-    val years: String get() = "$startYear–${endYear ?: "н. в."}"
 }
 
 /** Minimal parser for OBDb `generations.yaml` (flat list of name/start_year/end_year), without a YAML library. */

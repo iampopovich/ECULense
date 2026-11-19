@@ -111,10 +111,10 @@ class CarScreenTest {
     @Test
     fun pickerListsOptionsAndChooses() {
         val chosen = mutableListOf<Long>()
-        val state = PickerState(PickerStep.MODEL, make = VehicleMake(1, "Kia"), options = listOf(PickerOption(10, "Sorento", UiText.Res(R.string.car_years_open, listOf(2002)))))
+        val state = PickerState(PickerStep.MODEL, make = VehicleMake(1, "Kia"), options = listOf(PickerOption(10, "Sorento", UiText.Res(CoreUiR.string.common_years_open, listOf(2002)))))
         rule.setContent { VehiclePickerDialog(state, onSearch = {}, onChoose = { chosen += it.id }, onBack = {}, onFill = {}, onClose = {}) }
         rule.onNodeWithText(str(R.string.car_picker_title, str(R.string.car_picker_step_model).lowercase())).assertExists()
-        rule.onNodeWithText(str(R.string.car_years_open, 2002)).assertExists()
+        rule.onNodeWithText(str(CoreUiR.string.common_years_open, 2002)).assertExists()
         rule.onNodeWithText("Sorento").performClick()
         assertEquals(listOf(10L), chosen)
     }

@@ -88,9 +88,8 @@ class DtcCatalogTest {
     fun `P1847 on a Kia is not described with the GM shift-solenoid text`() {
         val info = catalog().describe("P1847", "Kia")
         assertEquals(DtcSource.OEM_UNKNOWN, info.source)
-        assertEquals("Заводской код производителя, расшифровка неизвестна", info.text)
-        assertFalse(info.text.contains("Shift Solenoid"))
-        assertFalse(info.text.contains("Transfer Case"))
+        assertNull(info.title)
+        assertEquals(R.string.dtcdb_oem_unknown, info.unknownTextRes)
     }
 
     @Test

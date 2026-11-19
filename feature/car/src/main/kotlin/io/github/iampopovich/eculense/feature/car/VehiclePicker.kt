@@ -2,6 +2,7 @@ package io.github.iampopovich.eculense.feature.car
 
 import androidx.annotation.StringRes
 import io.github.iampopovich.eculense.core.ui.UiText
+import io.github.iampopovich.eculense.core.ui.YearRange
 import io.github.iampopovich.eculense.core.vehicledb.VehicleEngine
 import io.github.iampopovich.eculense.core.vehicledb.VehicleGeneration
 import io.github.iampopovich.eculense.core.vehicledb.VehicleMake
@@ -48,8 +49,13 @@ internal data class PickerState(
     val loading: Boolean = false,
     val error: UiText? = null,
 ) {
-    /** «Kia › Sorento › 2002–2006». */
-    val path: String get() = listOfNotNull(make?.name, model?.name, generation?.let { "${it.name} (${it.years})" }).joinToString(" › ")
+    /** «Kia › Sorento › BL (2002–2006)»; null before a make is picked. */
+    val path: UiText?
+        get() = listOfNotNull(
+            make?.name?.let { UiText.Raw(it) },
+            model?.name?.let { UiText.Raw(it) },
+            generation?.let { g -> YearRange.of(g.yearStart, g.yearEnd)?.let { UiText.Joined(listOf(UiText.Raw(g.name), UiText.Raw("("), it, UiText.Raw(")")), "") } ?: UiText.Raw(g.name) },
+        ).takeIf { it.isNotEmpty() }?.let { UiText.Joined(it, " › ") }
 }
 
 /**

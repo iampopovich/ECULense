@@ -196,7 +196,7 @@ internal fun FindingScreen(
                     Text(AnalyticsText.label(context, e), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(AnalyticsText.value(context, e), style = MaterialTheme.typography.bodyLarge)
                     e.rawLabel?.let { state.dtc[it] }?.let { note ->
-                        Text(note.text, style = MaterialTheme.typography.bodyMedium)
+                        Text(note.text.asString(), style = MaterialTheme.typography.bodyMedium)
                         if (note.causes.isNotEmpty()) {
                             Text(stringResource(R.string.analysis_common_causes, note.causes.joinToString("; ")), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

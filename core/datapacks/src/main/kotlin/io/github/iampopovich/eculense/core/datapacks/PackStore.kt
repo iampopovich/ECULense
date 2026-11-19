@@ -44,12 +44,12 @@ class PackStore(val root: File) {
         if (target.exists()) {
             // reinstalling the same version: move the old directory aside first so the rename is atomic
             val old = File(packDir(id), ".old-${versionDir(version)}-${System.nanoTime()}")
-            check(target.renameTo(old)) { "не удалось убрать старую версию $target" }
+            check(target.renameTo(old)) { "could not move the old version $target" }
         }
-        check(staged.renameTo(target)) { "не удалось переименовать $staged → $target" }
+        check(staged.renameTo(target)) { "could not rename $staged → $target" }
         val tmp = File(packDir(id), "current.tmp")
         tmp.writeText(version)
-        check(tmp.renameTo(currentFile(id))) { "не удалось переключить версию $id" }
+        check(tmp.renameTo(currentFile(id))) { "could not switch the version of $id" }
         packDir(id).listFiles().orEmpty()
             .filter { it.isDirectory && it != target }
             .forEach { it.deleteRecursively() }

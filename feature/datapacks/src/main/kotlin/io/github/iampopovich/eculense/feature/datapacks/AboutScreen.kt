@@ -19,23 +19,23 @@ import androidx.compose.ui.unit.dp
 import io.github.iampopovich.eculense.core.datapacks.PackCatalog
 import io.github.iampopovich.eculense.core.ui.UiText
 
-/** Data source for «О приложении»: what, whose, under which license, where to get it. */
-internal data class Attribution(val title: UiText, val license: String, val url: String, val note: UiText)
+/** Data source for «About»: what, whose, under which license, where to get it. */
+internal data class Attribution(val title: UiText, val license: UiText, val url: String, val note: UiText)
 
 /** All external app data: on-demand packs + bundled code database + OBDb. */
 internal val ATTRIBUTIONS: List<Attribution> =
     PackCatalog.all.map {
         Attribution(
-            UiText.Raw(it.title), it.license, it.sourceUrl,
+            PackTexts.title(it), PackTexts.license(it), it.sourceUrl,
             UiText.Res(R.string.datapacks_pinned_version, listOf(it.attribution.trimEnd().removeSuffix("."), it.version)),
         )
     } + listOf(
         Attribution(
-            UiText.Res(R.string.datapacks_obdb_title), "CC BY-SA 4.0", "https://github.com/OBDb",
+            UiText.Res(R.string.datapacks_obdb_title), UiText.Raw("CC BY-SA 4.0"), "https://github.com/OBDb",
             UiText.Res(R.string.datapacks_obdb_note),
         ),
         Attribution(
-            UiText.Res(R.string.datapacks_builtin_title), "MIT", "https://github.com/lennykean/OBDII.DTC",
+            UiText.Res(R.string.datapacks_builtin_title), UiText.Raw("MIT"), "https://github.com/lennykean/OBDII.DTC",
             UiText.Raw("Generic DTC titles converted from lennykean/OBDII.DTC, MIT License (assets/dtc_codes.csv)."),
         ),
     )
@@ -62,7 +62,7 @@ internal fun AboutScreen(version: String?, modifier: Modifier = Modifier) {
         items(ATTRIBUTIONS, key = { it.url }) { a ->
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(a.title.asString(), style = MaterialTheme.typography.titleSmall)
-                Text(stringResource(R.string.datapacks_license, a.license), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.datapacks_license, a.license.asString()), style = MaterialTheme.typography.bodyMedium)
                 Text(a.note.asString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = { runCatching { uri.openUri(a.url) } }) { Text(a.url.removePrefix("https://")) }
                 HorizontalDivider()

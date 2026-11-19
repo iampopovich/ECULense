@@ -6,6 +6,7 @@ import io.github.iampopovich.eculense.core.navigation.AnalysisDestination
 import io.github.iampopovich.eculense.core.navigation.FindingDestination
 import io.github.iampopovich.eculense.core.navigation.Hub
 import io.github.iampopovich.eculense.core.navigation.HubEntry
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.flow.first
 import org.koin.core.annotation.KoinExperimentalAPI
 import org.koin.core.module.dsl.viewModel
@@ -21,7 +22,7 @@ val analysisModule = module {
         val descriptions = get<DtcDescriptions>()
         val cars = get<CarRepository>()
         FindingViewModel(findingId, get(), getAll()) { codes ->
-            descriptions.describeAll(codes, cars.observeActiveCar().first()?.brand).mapValues { (_, info) -> DtcNote(info.text, info.causes.take(2)) }
+            descriptions.describeAll(codes, cars.observeActiveCar().first()?.brand).mapValues { (_, info) -> DtcNote(info.unknownTextRes?.let { UiText.Res(it) } ?: UiText.Raw(info.title.orEmpty()), info.causes.take(2)) }
         }
     }
     navigation<AnalysisDestination> { AnalysisRoute() }

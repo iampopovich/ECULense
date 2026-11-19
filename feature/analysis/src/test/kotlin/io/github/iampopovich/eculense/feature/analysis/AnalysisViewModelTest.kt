@@ -18,6 +18,7 @@ import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.SessionSource
 import io.github.iampopovich.eculense.core.navigation.AiChatDestination
 import io.github.iampopovich.eculense.core.navigation.RouteHandler
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -122,9 +123,9 @@ class AnalysisViewModelTest {
         )
         val analytics = FakeAnalytics(listOf(StoredFinding(3, 1, f, 10)))
         val asked = mutableListOf<Collection<String>>()
-        val vm = FindingViewModel(3, analytics, emptyList()) { codes -> asked += codes; codes.associateWith { DtcNote("OEM code") } }
+        val vm = FindingViewModel(3, analytics, emptyList()) { codes -> asked += codes; codes.associateWith { DtcNote(UiText.Raw("OEM code")) } }
         assertEquals(listOf(listOf("P1847")), asked.map { it.toList() })
-        assertEquals("OEM code", vm.uiState.value.dtc["P1847"]?.text)
+        assertEquals(UiText.Raw("OEM code"), vm.uiState.value.dtc["P1847"]?.text)
         // only raw DTC labels are looked up: a typed label whose value happens to look like a code is not
         assertEquals(1, vm.uiState.value.dtc.size)
     }

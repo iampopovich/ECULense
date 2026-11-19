@@ -39,6 +39,9 @@
     <string name="datapacks_signalset_note">Polling extended PIDs isn\'t supported yet: it needs ECU headers (ATH1/ATSH) and services 21/22. Here is what OBDb knows about your model.</string>
     <string name="datapacks_year">Year</string>
     <string name="datapacks_check_obdb">Check OBDb</string>
+    <string name="datapacks_field_make">make</string>
+    <string name="datapacks_field_model">model</string>
+    <string name="datapacks_field_year">year</string>
     <string name="datapacks_needs_profile">The car profile is missing: %1$s. Fill it in under “Car”.</string>
     <string name="datapacks_no_repo">OBDb has no repository %1$s — no signals for this model yet.</string>
     <string name="datapacks_not_covered">OBDb (%1$s) doesn\'t cover %2$d: there\'s no data from real cars for it. OBDb signals target CAN cars of later generations; for this car, extended PIDs will come from user files or your own contribution to OBDb.</string>

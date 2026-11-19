@@ -56,9 +56,9 @@ class DataPacksScreenTest {
     fun packsShowStatusLicenseAndActions() {
         val calls = mutableListOf<String>()
         show(DataPacksUiState(packs = packs), calls)
-        rule.onNodeWithText(PackCatalog.vehicles.title).assertExists()
+        rule.onNodeWithText(str(PackCatalog.vehicles.titleRes)).assertExists()
         rule.onNodeWithText(str(R.string.datapacks_status_downloading_pct, 42)).assertExists()
-        rule.onNodeWithText(str(R.string.datapacks_license, PackCatalog.vehicles.license)).assertExists()
+        rule.onNodeWithText(str(R.string.datapacks_license, str(PackCatalog.vehicles.licenseRes))).assertExists()
         rule.onNodeWithText(str(R.string.datapacks_cancel)).performClick()
         rule.onRoot().performScrollToNode(hasText("2026-11-07T13:44:03.324Z", substring = true))
         rule.onNodeWithText("2026-12-01T00:00:00Z", substring = true).assertExists()
@@ -84,7 +84,7 @@ class DataPacksScreenTest {
     fun aboutListsAllSourcesAndLicenses() {
         rule.setContent { AboutScreen("1.0") }
         rule.onNodeWithText(str(R.string.datapacks_version, "1.0")).assertExists()
-        listOf(PackCatalog.vehicles.title, PackCatalog.obdex.title, PackCatalog.oemDtc.title, str(R.string.datapacks_obdb_title), str(R.string.datapacks_builtin_title)).forEach {
+        listOf(str(PackCatalog.vehicles.titleRes), str(PackCatalog.obdex.titleRes), str(PackCatalog.oemDtc.titleRes), str(R.string.datapacks_obdb_title), str(R.string.datapacks_builtin_title)).forEach {
             rule.onRoot().performScrollToNode(hasText(it))
             rule.onNodeWithText(it).assertExists()
         }
@@ -97,7 +97,7 @@ class DataPacksScreenTest {
     fun uncoveredGenerationIsExplained() {
         val r = SignalsetResult.NotCovered("OBDb/Test-Model", 2005, Generation("First Generation (AA)", 2002, 2009), emptyList())
         rule.setContent { SignalsetScreen(SignalsetUiState(carTitle = UiText.Raw("Test 2005"), year = "2005", result = r), onYear = {}, onCheck = {}) }
-        rule.onNodeWithText(str(R.string.datapacks_not_covered_gen, "OBDb/Test-Model", 2005, "First Generation (AA)", r.generation!!.years)).assertExists()
+        rule.onNodeWithText(str(R.string.datapacks_not_covered_gen, "OBDb/Test-Model", 2005, "First Generation (AA)", "2002–2009")).assertExists()
         rule.onNodeWithText(str(R.string.datapacks_signalset_note)).assertExists()
     }
 

@@ -35,7 +35,7 @@ class VehicleDbTest {
         }
         VehicleDb(JdbcPackDb(other)).use { broken ->
             val problems = broken.schemaProblems()
-            assertTrue(problems.toString(), "нет колонки makes.group" in problems && "нет таблицы engines" in problems)
+            assertTrue(problems.toString(), "missing column makes.group" in problems && "missing table engines" in problems)
         }
         other.delete()
     }
@@ -48,7 +48,7 @@ class VehicleDbTest {
         val kia = db.makeByName("kia")!!
         assertEquals(listOf("Sorento"), db.models(kia.id, "sor").map { it.name })
         val gens = db.generations(db.models(kia.id, "Sorento").single().id)
-        assertEquals(listOf("2002–2006", "2006–2009", "2020–н. в."), gens.map { it.years })
+        assertEquals(listOf(2002 to 2006, 2006 to 2009, 2020 to null), gens.map { it.yearStart to it.yearEnd })
         assertEquals(listOf("3.5L V6 4AT AWD (195 HP)"), db.engines(gens.first().id, "V6").map { it.label })
     }
 
@@ -94,7 +94,7 @@ class VehicleDbTest {
             val kia = assertNotNullAnd(real.makeByName("Kia"))
             val sorento = real.models(kia.id, "Sorento").first { it.name == "Sorento" }
             val gen = real.generations(sorento.id).first { it.yearStart == 2002 }
-            assertEquals("2002–2006", gen.years)
+            assertEquals(2002 to 2006, gen.yearStart to gen.yearEnd)
             val e = real.engine(real.engines(gen.id).single { it.label == "3.5L V6 4AT AWD (195 HP)" }.id)!!
             assertEquals(3497, e.displacementCc)
             assertEquals(194.0, e.powerHp!!, 0.0)

@@ -57,7 +57,7 @@ internal fun VehiclePickerDialog(
                     )
                     TextButton(onClick = onClose) { Text(stringResource(R.string.car_picker_close)) }
                 }
-                if (state.path.isNotEmpty()) Text(state.path, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                state.path?.let { Text(it.asString(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 state.error?.let { Text(it.asString(), color = MaterialTheme.colorScheme.error) }
                 val engine = state.engine
                 if (engine != null) {

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pack_vehicles_title">Справочник моделей и ТТХ</string>
+    <string name="pack_vehicles_description">216 марок, модели, поколения и модификации с объёмом, мощностью, баком и массой — для «Заполнить из справочника».</string>
+    <string name="pack_vehicles_license">ODbL 1.0 (данные), MIT (код)</string>
+    <string name="pack_obdex_title">Общие коды ошибок (OBDex)</string>
+    <string name="pack_obdex_description">9 533 общих кода OBD-II с описанием, причинами и симптомами (англ.).</string>
+    <string name="pack_obdex_license">CC0 1.0 (данные), MIT (инструменты)</string>
+    <string name="pack_oem_dtc_title">Заводские коды ошибок</string>
+    <string name="pack_oem_dtc_description">Расшифровки заводских кодов 33 марок. Показываются только для марки активной машины.</string>
+    <string name="pack_notif_channel">Загрузки</string>
+    <string name="pack_notif_title">Загрузка: %1$s</string>
+    <string name="pack_notif_preparing">подготовка…</string>
+    <string name="pack_notif_fallback_title">данные</string>
+</resources>

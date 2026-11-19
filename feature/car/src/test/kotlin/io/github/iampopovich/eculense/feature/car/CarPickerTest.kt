@@ -7,6 +7,7 @@ import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.DriveType
 import io.github.iampopovich.eculense.core.model.FuelType
 import io.github.iampopovich.eculense.core.model.Gearbox
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
 import io.github.iampopovich.eculense.core.vehicledb.VehicleEngine
 import io.github.iampopovich.eculense.core.vehicledb.VehicleGeneration
 import io.github.iampopovich.eculense.core.vehicledb.VehicleMake
@@ -78,7 +79,7 @@ class CarPickerTest {
         assertEquals(listOf("Sorento"), vm.state.value.picker!!.options.map { it.title })
         vm.choose(vm.state.value.picker!!.options.single())
         val gens = vm.state.value.picker!!.options
-        assertEquals(UiText.Res(R.string.car_your_year, listOf("2002–2006")), gens.first { it.id == 101L }.subtitle)
+        assertEquals(UiText.Res(R.string.car_your_year, listOf(UiText.Res(CoreUiR.string.common_years_range, listOf(2002, 2006)))), gens.first { it.id == 101L }.subtitle)
         vm.choose(gens.first { it.id == 101L })
         vm.search("V6")
         assertEquals(listOf("3.5L V6 4AT AWD (195 HP)"), vm.state.value.picker!!.options.map { it.title })

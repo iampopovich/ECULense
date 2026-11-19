@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <!-- downloading packs and the «мобильная сеть или Wi-Fi» check before downloading -->
+    <!-- downloading packs and the «mobile network or Wi-Fi» check before downloading -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- multi-gigabyte packs (AI models) are downloaded by a WorkManager foreground task: longer than 10 minutes and with a notification -->

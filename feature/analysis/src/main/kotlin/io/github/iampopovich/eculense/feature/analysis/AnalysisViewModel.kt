@@ -13,6 +13,7 @@ import io.github.iampopovich.eculense.core.data.StoredFinding
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.navigation.AiChatDestination
 import io.github.iampopovich.eculense.core.navigation.RouteHandler
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -82,7 +83,7 @@ internal data class FindingUiState(
 )
 
 /** What to show under the code: the title (or «OEM code, description unknown») and a couple of common causes. */
-internal data class DtcNote(val text: String, val causes: List<String> = emptyList())
+internal data class DtcNote(val text: UiText, val causes: List<String> = emptyList())
 
 internal class FindingViewModel(
     private val findingId: Long,

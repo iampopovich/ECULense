@@ -13,6 +13,9 @@ import kotlinx.coroutines.withContext
 import org.koin.dsl.module
 import java.io.File
 
+/** The downloaded vehicle database has an unexpected schema; [problems] are technical (English) details. */
+class VehicleDbFormatException(val problems: List<String>) : IllegalStateException("vehicle database format changed: ${problems.joinToString()}")
+
 /** The reference is available only if the pack is downloaded; the database is opened lazily and reopened after a version update. */
 class VehicleRepository(private val packs: DataPacks, private val opener: PackDbOpener) {
     private val mutex = Mutex()
@@ -37,7 +40,7 @@ class VehicleRepository(private val packs: DataPacks, private val opener: PackDb
                     val problems = db.schemaProblems()
                     if (problems.isNotEmpty()) {
                         db.close()
-                        throw IllegalStateException("Формат справочника изменился: ${problems.joinToString()}")
+                        throw VehicleDbFormatException(problems)
                     }
                     open = file to db
                 }
