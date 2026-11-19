@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense.core.ailocal
 
+import androidx.annotation.StringRes
 import kotlinx.serialization.Serializable
 
 /** LiteRT-LM backend. */
@@ -8,13 +9,15 @@ enum class BackendKind(val label: String) { CPU("CPU"), GPU("GPU"), NPU("NPU") }
 
 /**
  * Measurement of one backend (LiteRT-LM `benchmark()` in a separate `:bench` process). ok = false means the backend failed:
- * init error, out of memory (process killed) or a native crash; [error] explains which.
+ * init error, out of memory (process killed) or a native crash. [failure] is our own reason (shown from resources),
+ * [error] the engine's message (shown as is; older reports keep their stored text there).
  */
 @Serializable
 data class BackendRun(
     val backend: BackendKind,
     val ok: Boolean,
     val error: String? = null,
+    val failure: BenchFailure? = null,
     val initSeconds: Double = 0.0,
     val ttftSeconds: Double = 0.0,
     val prefillTokensPerSecond: Double = 0.0,
@@ -27,10 +30,14 @@ data class BackendRun(
     val comfortable: Boolean get() = ok && decodeTokensPerSecond >= BenchVerdict.COMFORT_DECODE_TPS && ttftSeconds <= BenchVerdict.COMFORT_TTFT_S
 }
 
-enum class Verdict(val label: String) {
-    COMFORT("Комфортно"),
-    SLOW("Медленно"),
-    UNSUITABLE("Не подходит"),
+/** Why a backend run failed on our side (not an engine error). */
+@Serializable
+enum class BenchFailure { TIMEOUT, CRASHED, NOT_STARTED }
+
+enum class Verdict(@param:StringRes val labelRes: Int) {
+    COMFORT(R.string.ailocal_verdict_comfort),
+    SLOW(R.string.ailocal_verdict_slow),
+    UNSUITABLE(R.string.ailocal_verdict_unsuitable),
 }
 
 /**

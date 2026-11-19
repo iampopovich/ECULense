@@ -44,7 +44,7 @@ object HfApi {
         val repo = o["id"]?.jsonPrimitive?.contentOrNull ?: return emptyList()
         val sha = o["sha"]?.jsonPrimitive?.contentOrNull ?: "main"
         val gated = gated(body) == true
-        val license = (o["cardData"] as? JsonObject)?.get("license")?.let { (it as? JsonPrimitive)?.contentOrNull } ?: "см. страницу модели"
+        val license = (o["cardData"] as? JsonObject)?.get("license")?.let { (it as? JsonPrimitive)?.contentOrNull }.orEmpty()
         val siblings = o["siblings"] as? JsonArray ?: return emptyList()
         return siblings.mapNotNull { s ->
             val f = s as? JsonObject ?: return@mapNotNull null
@@ -56,7 +56,7 @@ object HfApi {
                 packId = LocalModelCatalog.customId(repo, fileName),
                 fileName = fileName,
                 title = fileName.removeSuffix(".litertlm"),
-                description = "Модель из Hugging Face ($repo). Не проверена ни Google, ни нами — скачивание на ваш риск.",
+                description = "Hugging Face model ($repo). Verified neither by Google nor by us — download at your own risk.",
                 url = "https://huggingface.co/$repo/resolve/$sha/$name",
                 sizeBytes = f["size"]?.jsonPrimitive?.longOrNull ?: lfs?.get("size")?.jsonPrimitive?.longOrNull,
                 sha256 = lfs?.get("sha256")?.jsonPrimitive?.contentOrNull?.takeIf { it.matches(Regex("[0-9a-f]{64}")) },

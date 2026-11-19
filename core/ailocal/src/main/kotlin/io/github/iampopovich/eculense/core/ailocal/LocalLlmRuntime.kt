@@ -11,15 +11,16 @@ import ai.koog.prompt.llm.LLModel
 import android.util.Log
 import com.google.ai.edge.litertlm.Backend
 import io.github.iampopovich.eculense.core.ai.OnDeviceLlm
+import io.github.iampopovich.eculense.core.ai.OnDeviceRating
 import io.github.iampopovich.eculense.core.ai.OnDeviceSession
 import io.github.iampopovich.eculense.core.ai.OnDeviceSummary
 import io.github.iampopovich.eculense.core.ai.ProviderInfo
+import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.io.File
 
 /**
  * Execution via Koog: `LiteRTLLMClient` (prompt-executor-litert-client 1.3.0-beta, LiteRT-LM 0.11) behind
@@ -44,18 +45,19 @@ class LocalLlmRuntime(
         val model = list.firstOrNull { it.packId == active.packId } ?: return@combine null
         val run = reports[active.packId]?.runs?.firstOrNull { it.backend == active.backend && it.ok }
         val verdict = reports[active.packId]?.verdict
-        val detail = listOfNotNull(
-            active.backend.label,
-            run?.let { String.format(java.util.Locale.getDefault(), "%.1f ток/с", it.decodeTokensPerSecond) },
-            verdict?.label,
-        ).joinToString(" · ")
-        OnDeviceSummary(model.title, detail)
+        val rating = when (verdict) {
+            Verdict.COMFORT -> OnDeviceRating.COMFORT
+            Verdict.SLOW -> OnDeviceRating.SLOW
+            Verdict.UNSUITABLE -> OnDeviceRating.UNSUITABLE
+            null -> null
+        }
+        OnDeviceSummary(model.title, active.backend.label, run?.decodeTokensPerSecond, rating)
     }
 
     override suspend fun session(): OnDeviceSession? = lock.withLock {
         val active = store.active.first() ?: return@withLock null
         val model = models.find(active.packId) ?: return@withLock null
-        val file = models.file(active.packId) ?: throw IllegalStateException("файл модели «${model.title}» удалён — скачайте её снова или выберите другую")
+        val file = models.file(active.packId) ?: throw IllegalStateException("model file of '${model.title}' was deleted — download it again or pick another model")
         val llm = LiteRTLLModels.models.firstOrNull { it.id == file.name }
             ?: LLModel(LiteRTLLMProvider, file.name, listOf(LLMCapability.Tools, LLMCapability.Completion), contextLength = 4_096)
         val wanted = active.packId to active.backend
@@ -75,7 +77,7 @@ class LocalLlmRuntime(
             Log.i(BenchService.TAG, "client for ${file.name} on ${active.backend}")
         }
         OnDeviceSession(
-            info = ProviderInfo(PROVIDER_KEY, "На устройстве", "${model.title} (${active.backend.label})", onDevice = true),
+            info = ProviderInfo(PROVIDER_KEY, "On device", "${model.title} (${active.backend.label})", onDevice = true),
             model = llm,
             executor = executor!!,
             streaming = false,

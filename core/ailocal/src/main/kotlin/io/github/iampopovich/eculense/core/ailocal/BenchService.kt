@@ -106,9 +106,9 @@ class BenchService : Service() {
 
 /** Runs one backend in the `:bench` process and waits for a reply or process death. */
 class BenchRunner(private val context: Context) {
-    suspend fun run(model: File, backend: BackendKind, cacheDir: File, timeoutMs: Long = 8 * 60_000L): BackendRun {
-        val result = withTimeoutOrNull(timeoutMs) { runOnce(model, backend, cacheDir) }
-        return result ?: BackendRun(backend, ok = false, error = "тест не уложился в ${timeoutMs / 60_000} мин — слишком медленно")
+    suspend fun run(model: File, backend: BackendKind, cacheDir: File): BackendRun {
+        val result = withTimeoutOrNull(TIMEOUT_MINUTES * 60_000L) { runOnce(model, backend, cacheDir) }
+        return result ?: BackendRun(backend, ok = false, failure = BenchFailure.TIMEOUT)
     }
 
     private suspend fun runOnce(model: File, backend: BackendKind, cacheDir: File): BackendRun = suspendCancellableCoroutine { cont ->
@@ -124,8 +124,8 @@ class BenchRunner(private val context: Context) {
             cont.resume(run)
         }
         val main = Handler(Looper.getMainLooper())
-        val crashed = "процесс теста завершился аварийно — нехватка памяти или сбой драйвера"
-        fun died() = finish(answered ?: BackendRun(backend, ok = false, error = crashed))
+        val crashed = BackendRun(backend, ok = false, failure = BenchFailure.CRASHED)
+        fun died() = finish(answered ?: crashed)
         val replies = Messenger(Handler(Looper.getMainLooper()) { msg ->
             val d = msg.data
             val peak = d.getLong(BenchService.KEY_PEAK).takeIf { it > 0 }
@@ -163,7 +163,7 @@ class BenchRunner(private val context: Context) {
                     }
                     replyTo = replies
                 }
-                runCatching { Messenger(binder).send(request) }.onFailure { finish(BackendRun(backend, ok = false, error = crashed)) }
+                runCatching { Messenger(binder).send(request) }.onFailure { finish(crashed) }
             }
 
             // The process died before replying (a reply, if it made it, is already handled; finish is idempotent).
@@ -177,12 +177,14 @@ class BenchRunner(private val context: Context) {
         // BIND_IMPORTANT: the test process gets visible-screen priority, otherwise MIUI kills a «background» process with
         // gigabytes of PSS (on the 14T Pro the E4B GPU run died this way, though it passes in the test process).
         val bound = app.bindService(Intent(app, BenchService::class.java), connection, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
-        if (!bound) finish(BackendRun(backend, ok = false, error = "не удалось запустить процесс теста"))
+        if (!bound) finish(BackendRun(backend, ok = false, failure = BenchFailure.NOT_STARTED))
         cont.invokeOnCancellation { connection?.let { runCatching { app.unbindService(it) } } }
     }
 
-    private companion object {
-        const val PROCESS_EXIT_WAIT_MS = 3_000L
+    companion object {
+        /** A backend that hasn't answered within this time counts as too slow. */
+        const val TIMEOUT_MINUTES = 8
+        private const val PROCESS_EXIT_WAIT_MS = 3_000L
     }
 }
 

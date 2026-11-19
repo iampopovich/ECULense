@@ -46,9 +46,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.ai.LlmProviderKind
 import io.github.iampopovich.eculense.core.ai.ModelInfo
+import io.github.iampopovich.eculense.core.ai.OnDeviceRating
+import io.github.iampopovich.eculense.core.ai.OnDeviceSummary
 import io.github.iampopovich.eculense.core.navigation.LocalModelDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import io.github.iampopovich.eculense.core.ui.R as CoreUiR
+import java.util.Locale
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -109,6 +112,24 @@ internal fun AiSettingsScreen(state: AiSettingsUiState, actions: AiSettingsActio
     }
 }
 
+private fun oneDecimal(v: Double): String = String.format(Locale.getDefault(), "%.1f", v)
+
+/** «GPU · 13.2 tok/s · Comfortable». */
+@Composable
+private fun onDeviceDetail(local: OnDeviceSummary): String = listOfNotNull(
+    local.backend,
+    local.decodeTokensPerSecond?.let { stringResource(R.string.aisettings_tokens_per_second, oneDecimal(it)) },
+    local.rating?.let {
+        stringResource(
+            when (it) {
+                OnDeviceRating.COMFORT -> R.string.aisettings_rating_comfort
+                OnDeviceRating.SLOW -> R.string.aisettings_rating_slow
+                OnDeviceRating.UNSUITABLE -> R.string.aisettings_rating_unsuitable
+            },
+        )
+    },
+).joinToString(" · ")
+
 @Composable
 private fun SavedSummary(state: AiSettingsUiState, actions: AiSettingsActions, modifier: Modifier) {
     val saved = state.saved
@@ -121,7 +142,7 @@ private fun SavedSummary(state: AiSettingsUiState, actions: AiSettingsActions, m
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(stringResource(R.string.aisettings_current_on_device, local.model), style = MaterialTheme.typography.titleMedium)
-                    Text(local.detail, style = MaterialTheme.typography.bodyMedium)
+                    Text(onDeviceDetail(local), style = MaterialTheme.typography.bodyMedium)
                     Text(
                         stringResource(R.string.aisettings_on_device_note),
                         style = MaterialTheme.typography.bodySmall,

@@ -17,14 +17,20 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import io.github.iampopovich.eculense.core.ui.UiText
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.Locale
 
 @RunWith(AndroidJUnit4::class)
 class LocalModelScreenTest {
     @get:Rule val rule = createComposeRule()
+
+    private fun str(id: Int, vararg args: Any): String = InstrumentationRegistry.getInstrumentation().targetContext.getString(id, *args)
+    private fun num(v: Double) = String.format(Locale.getDefault(), "%.1f", v)
 
     private val gb = 1L shl 30
     private val device = DeviceProfile(
@@ -45,7 +51,7 @@ class LocalModelScreenTest {
         listOf(
             BackendRun(BackendKind.CPU, ok = true, initSeconds = 2.6, ttftSeconds = 11.3, prefillTokensPerSecond = 22.7, decodeTokensPerSecond = 11.4, peakRssBytes = 2 * gb),
             BackendRun(BackendKind.GPU, ok = true, initSeconds = 26.3, ttftSeconds = 1.2, prefillTokensPerSecond = 230.2, decodeTokensPerSecond = 13.2, peakRssBytes = 2 * gb),
-            BackendRun(BackendKind.NPU, ok = false, error = "процесс теста завершился аварийно"),
+            BackendRun(BackendKind.NPU, ok = false, failure = BenchFailure.CRASHED),
         ),
         1L,
     )
@@ -55,17 +61,17 @@ class LocalModelScreenTest {
         var asked: String? = null
         rule.setContent {
             LocalModelScreen(
-                LocalModelUiState(device = device, nano = NanoStatus(false, "Gemini Nano недоступен: тестовая причина."), rows = rows),
+                LocalModelUiState(device = device, nano = NanoStatus(false, UiText.Raw("Gemini Nano: test reason.")), rows = rows),
                 LocalModelActions(onDownload = { asked = it }),
             )
         }
-        rule.onNodeWithText("Ваше устройство").assertIsDisplayed()
-        rule.onNodeWithText("Gemini Nano недоступен: тестовая причина.").assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.ailocal_device_title)).assertIsDisplayed()
+        rule.onNodeWithText("Gemini Nano: test reason.").assertIsDisplayed()
         // smallest first: FunctionGemma (Koog, actions only)
         rule.onNode(hasTestTag("local-model-list")).performScrollToNode(hasTestTag("model-${catalog.first().packId}"))
-        rule.onNodeWithText("только действия", useUnmergedTree = true).assertIsDisplayed()
-        rule.onNode(hasTestTag("local-model-list")).performScrollToNode(hasContentDescription("Скачать ${e2b.title}"))
-        rule.onNodeWithContentDescription("Скачать ${e2b.title}").performClick()
+        rule.onNodeWithText(str(R.string.ailocal_badge_actions_only), useUnmergedTree = true).assertIsDisplayed()
+        rule.onNode(hasTestTag("local-model-list")).performScrollToNode(hasContentDescription(str(R.string.ailocal_cd_download, e2b.title)))
+        rule.onNodeWithContentDescription(str(R.string.ailocal_cd_download, e2b.title)).performClick()
         assertEquals(e2b.packId, asked)
     }
 
@@ -81,9 +87,9 @@ class LocalModelScreenTest {
         assertEquals(e4b.packId, selected)
         rule.onNodeWithTag("model-sheet").assertExists()
         // Gallery wants 12 GB for E4B → tight on an 11 GB phone
-        rule.onNodeWithText("Gallery рекомендует от 12 ГБ ОЗУ").assertExists()
-        rule.onNodeWithText("Оценка: Впритык").assertExists()
-        rule.onNodeWithText("Ускорители: GPU, CPU").assertExists()
+        rule.onNodeWithText(str(R.string.ailocal_gallery_min_ram, 12)).assertExists()
+        rule.onNodeWithText(str(R.string.ailocal_estimate, str(R.string.ailocal_fit_tight))).assertExists()
+        rule.onNodeWithText(str(R.string.ailocal_accelerators, "GPU, CPU")).assertExists()
     }
 
     @Test
@@ -95,9 +101,9 @@ class LocalModelScreenTest {
                 LocalModelActions(onConfirmDownload = { confirmed = true }),
             )
         }
-        rule.onNodeWithText("Скачиваете на свой риск", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("Вы на мобильной сети", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("Скачать по мобильной сети").performClick()
+        rule.onNodeWithText(str(R.string.ailocal_confirm_risk), substring = true).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.ailocal_confirm_metered), substring = true).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.ailocal_download_metered)).performClick()
         assertEquals(true, confirmed)
     }
 
@@ -106,11 +112,11 @@ class LocalModelScreenTest {
         rule.setContent {
             LocalModelScreen(LocalModelUiState(device = device, rows = listOf(row(e2b, installed = true, report = report, active = BackendKind.GPU), row(e4b)), selected = e2b.packId), LocalModelActions())
         }
-        rule.onNodeWithText("Вердикт: Комфортно").assertExists()
-        rule.onNodeWithText("Лучший бэкенд: GPU").assertExists()
-        rule.onNodeWithText("GPU: первый токен 1,2 с", substring = true).assertExists()
-        rule.onNodeWithText("NPU: не подходит", substring = true).assertExists()
-        rule.onNodeWithText("Используется в чате: GPU").assertExists()
+        rule.onNodeWithText(str(R.string.ailocal_verdict, str(R.string.ailocal_verdict_comfort))).assertExists()
+        rule.onNodeWithText(str(R.string.ailocal_best_backend, "GPU")).assertExists()
+        rule.onNodeWithText(str(R.string.ailocal_run_ok, "GPU", num(1.2), num(13.2), num(230.2), num(26.3)), substring = true).assertExists()
+        rule.onNodeWithText(str(R.string.ailocal_run_failed, "NPU", str(R.string.ailocal_bench_crashed)), substring = true).assertExists()
+        rule.onNodeWithText(str(R.string.ailocal_in_use, "GPU")).assertExists()
     }
 
     /**
@@ -128,7 +134,7 @@ class LocalModelScreenTest {
             rule.onNode(hasTestTag("local-model-list")).performTouchInput { swipeUp() }
             rule.waitForIdle()
         }
-        rule.onNodeWithText("Сохранить токен").assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.ailocal_token_save)).assertIsDisplayed()
     }
 
     @Test

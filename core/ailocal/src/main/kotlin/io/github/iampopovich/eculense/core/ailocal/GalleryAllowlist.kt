@@ -90,7 +90,7 @@ object GalleryAllowlist {
                 sha256 = null, // the allowlist provides no hash; size is checked
                 gated = gated[m.modelId] ?: (m.modelId in KNOWN_GATED),
                 origin = ModelOrigin.GALLERY,
-                license = "см. страницу модели",
+                license = "",
                 sourceUrl = m.learnMoreUrl ?: "https://huggingface.co/${m.modelId}",
                 version = m.commitHash.take(12),
                 repo = m.modelId,

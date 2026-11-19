@@ -5,12 +5,20 @@ import ai.koog.prompt.llm.LLModel
 import io.github.iampopovich.eculense.core.datapacks.PackFile
 import io.github.iampopovich.eculense.core.datapacks.PackGroup
 import io.github.iampopovich.eculense.core.datapacks.PackManifest
+import androidx.annotation.StringRes
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.serialization.Serializable
 import java.net.URI
 import java.security.MessageDigest
 
 @Serializable
-enum class ModelOrigin(val badge: String) { KOOG("Koog"), GALLERY("Gallery"), HF("HF"), CUSTOM_LINK("своя"), CUSTOM_FILE("файл") }
+enum class ModelOrigin(@param:StringRes val badgeRes: Int) {
+    KOOG(R.string.ailocal_origin_koog),
+    GALLERY(R.string.ailocal_origin_gallery),
+    HF(R.string.ailocal_origin_hf),
+    CUSTOM_LINK(R.string.ailocal_origin_custom_link),
+    CUSTOM_FILE(R.string.ailocal_origin_custom_file),
+}
 
 /**
  * A model for the «На устройстве» screen. [fileName] = the model id in Koog (`LiteRTLLModels`): the Koog client opens
@@ -40,6 +48,20 @@ data class LocalModel(
     val supportsImage: Boolean = false,
 ) {
     val key: Pair<String?, String> get() = repo to fileName
+
+    /**
+     * Text for the screen. Gallery descriptions come from Google's catalog and stay in its language; our own
+     * descriptions are resources, so models stored by older versions also show in the app language.
+     */
+    val descriptionText: UiText
+        get() = when (origin) {
+            ModelOrigin.GALLERY -> UiText.Raw(description)
+            ModelOrigin.HF -> UiText.Res(R.string.ailocal_desc_hf, listOf(repo ?: sourceUrl.removePrefix(HF_URL)))
+            ModelOrigin.CUSTOM_LINK -> UiText.Res(R.string.ailocal_desc_custom_link, listOf(sourceUrl.removePrefix(HF_URL)))
+            ModelOrigin.CUSTOM_FILE -> UiText.Res(R.string.ailocal_desc_custom_file)
+            ModelOrigin.KOOG -> LocalModelCatalog.descriptionRes(fileName)?.let { UiText.Res(it) }
+                ?: if (url == null) UiText.Res(R.string.ailocal_desc_koog_no_link) else UiText.Raw(description)
+        }
     fun toPack(): PackManifest? {
         val link = url ?: return null
         return PackManifest(
@@ -69,6 +91,7 @@ object LocalModelCatalog {
         val revision: String,
         val title: String,
         val description: String,
+        @param:StringRes val descriptionRes: Int,
         val sizeBytes: Long,
         val sha256: String?,
         val gated: Boolean,
@@ -80,7 +103,8 @@ object LocalModelCatalog {
             repo = "litert-community/functiongemma-270m-ft-mobile-actions",
             revision = "322205aa5b7b724bd3afa025a760a7577078ac6a",
             title = "FunctionGemma 270M",
-            description = "Крошечная модель Google для вызова функций (обучена на действиях телефона). Нужен токен Hugging Face и принятая лицензия Gemma.",
+            description = "Tiny Google model for function calling (trained on phone actions). Needs a Hugging Face token and the accepted Gemma license.",
+            descriptionRes = R.string.ailocal_desc_functiongemma,
             sizeBytes = 288_964_608L,
             sha256 = null, // the file is gated without a token — hash not published; size is checked
             gated = true,
@@ -90,7 +114,8 @@ object LocalModelCatalog {
             repo = "litert-community/gemma-4-E2B-it-litert-lm",
             revision = "2d74ac41a33d7da82f39f7d5720a04c68514a103",
             title = "Gemma 4 E2B",
-            description = "Google Gemma 4, ≈2 млрд эффективных параметров, понимает инструменты. Открыта без токена.",
+            description = "Google Gemma 4, ≈2B effective parameters, understands tools. Open, no token needed.",
+            descriptionRes = R.string.ailocal_desc_gemma4_e2b,
             sizeBytes = 2_588_147_712L,
             sha256 = "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c",
             gated = false,
@@ -100,7 +125,8 @@ object LocalModelCatalog {
             repo = "litert-community/gemma-4-E4B-it-litert-lm",
             revision = "f254b5ba6e36f7d89cc7892e268e9877bc20f0a0",
             title = "Gemma 4 E4B",
-            description = "Старшая Gemma 4 (≈4 млрд эффективных параметров): точнее E2B, но медленнее и тяжелее. Открыта без токена.",
+            description = "The larger Gemma 4 (≈4B effective parameters): more accurate than E2B, but slower and heavier. Open, no token needed.",
+            descriptionRes = R.string.ailocal_desc_gemma4_e4b,
             sizeBytes = 3_659_530_240L,
             sha256 = "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0",
             gated = false,
@@ -114,7 +140,7 @@ object LocalModelCatalog {
             packId = "model-" + slug(m.id.removeSuffix(".litertlm")),
             fileName = m.id,
             title = s?.title ?: m.id.removeSuffix(".litertlm"),
-            description = s?.description ?: "Модель из каталога Koog; ссылка для скачивания неизвестна — добавьте её как свою модель.",
+            description = s?.description ?: "A model from the Koog catalog; download link unknown — add it as a custom model.",
             url = s?.let { "https://huggingface.co/${it.repo}/resolve/${it.revision}/${m.id}" },
             sizeBytes = s?.sizeBytes,
             sha256 = s?.sha256,
@@ -128,6 +154,10 @@ object LocalModelCatalog {
             actionsOnly = m.id == LiteRTLLModels.FunctionGemma.id,
         )
     }
+
+    /** Our own description of a Koog catalog model, by its file name. */
+    @StringRes
+    fun descriptionRes(fileName: String): Int? = sources[fileName]?.descriptionRes
 
     /** Pack id of a catalog model: derived from the file name (same as the Koog entries had — started downloads are not lost). */
     fun catalogId(fileName: String): String = "model-" + slug(fileName.removeSuffix(".litertlm"))
@@ -168,15 +198,17 @@ object LocalModelCatalog {
     internal fun slug(s: String) = s.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 }
 
+internal const val HF_URL = "https://huggingface.co/"
+
 /** Link to a `.litertlm` file on Hugging Face (resolve/blob, with revision). */
 data class HfLink(val repo: String, val revision: String, val path: String) {
     val fileName: String get() = path.substringAfterLast('/')
     val resolveUrl: String get() = "https://huggingface.co/$repo/resolve/$revision/$path"
     val repoUrl: String get() = "https://huggingface.co/$repo"
 
-    enum class Problem(val message: String) {
-        NOT_HF("Нужна ссылка https://huggingface.co/…/resolve/… или …/blob/… на файл"),
-        NOT_LITERTLM("Нужен файл .litertlm (формат LiteRT-LM); GGUF и другие форматы не подойдут"),
+    enum class Problem(@param:StringRes val messageRes: Int) {
+        NOT_HF(R.string.ailocal_link_not_hf),
+        NOT_LITERTLM(R.string.ailocal_link_not_litertlm),
     }
 
     companion object {

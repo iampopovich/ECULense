@@ -1,6 +1,8 @@
 package io.github.iampopovich.eculense.core.ailocal
 
-import kotlin.math.roundToInt
+import androidx.annotation.StringRes
+import io.github.iampopovich.eculense.core.ui.UiText
+import java.util.Locale
 
 /**
  * What the phone can offer a local model (probed before download, see [DeviceProbe]).
@@ -20,18 +22,19 @@ data class DeviceProfile(
     val sdk: Int,
 ) {
     val arm64: Boolean get() = "arm64-v8a" in abis
-    val soc: String get() = listOfNotNull(socManufacturer, socModel).joinToString(" ").ifBlank { "неизвестен" }
+    /** Chip name; null when the phone reports none. */
+    val soc: String? get() = listOfNotNull(socManufacturer, socModel).joinToString(" ").ifBlank { null }
 }
 
 /** Preliminary estimate before download. UNKNOWN: file size is unknown (custom link without size). */
-enum class Fit(val label: String) {
-    OK("Потянет"),
-    TIGHT("Впритык"),
-    UNLIKELY("Скорее всего нет"),
-    UNKNOWN("Не знаю"),
+enum class Fit(@param:StringRes val labelRes: Int) {
+    OK(R.string.ailocal_fit_ok),
+    TIGHT(R.string.ailocal_fit_tight),
+    UNLIKELY(R.string.ailocal_fit_unlikely),
+    UNKNOWN(R.string.ailocal_fit_unknown),
 }
 
-data class FitEstimate(val fit: Fit, val reasons: List<String>, val needRamBytes: Long?)
+data class FitEstimate(val fit: Fit, val reasons: List<UiText>, val needRamBytes: Long?)
 
 /**
  * "Will it run" heuristic from file size and phone memory, before download, with a margin. Only the test after
@@ -52,13 +55,13 @@ object FitEstimator {
 
     fun estimate(sizeBytes: Long?, device: DeviceProfile, downloaded: Boolean = false, minRamGb: Int? = null): FitEstimate {
         if (!device.arm64) {
-            return FitEstimate(Fit.UNLIKELY, listOf("Нет arm64-v8a: рантайм LiteRT-LM собран только под 64-битные ARM-процессоры."), null)
+            return FitEstimate(Fit.UNLIKELY, listOf(UiText.Res(R.string.ailocal_fit_no_arm64)), null)
         }
         if (sizeBytes == null) {
-            return FitEstimate(Fit.UNKNOWN, listOf("Размер файла неизвестен — оценить заранее нельзя, покажет тест после скачивания."), null)
+            return FitEstimate(Fit.UNKNOWN, listOf(UiText.Res(R.string.ailocal_fit_size_unknown)), null)
         }
         val need = sizeBytes + RUNTIME_OVERHEAD
-        val reasons = mutableListOf<String>()
+        val reasons = mutableListOf<UiText>()
         val ratio = device.totalRamBytes.toDouble() / need
         var fit = when {
             ratio >= OK_RATIO -> Fit.OK
@@ -66,9 +69,9 @@ object FitEstimator {
             else -> Fit.UNLIKELY
         }
         reasons += when (fit) {
-            Fit.OK -> "Модели нужно ≈ ${gb(need)} ГБ ОЗУ, в телефоне ${gb(device.totalRamBytes)} ГБ — запас есть."
-            Fit.TIGHT -> "Модели нужно ≈ ${gb(need)} ГБ ОЗУ, в телефоне ${gb(device.totalRamBytes)} ГБ — система может закрывать другие приложения или саму модель."
-            else -> "Модели нужно ≈ ${gb(need)} ГБ ОЗУ, а в телефоне всего ${gb(device.totalRamBytes)} ГБ — вероятна нехватка памяти."
+            Fit.OK -> UiText.Res(R.string.ailocal_fit_ram_ok, listOf(gb(need), gb(device.totalRamBytes)))
+            Fit.TIGHT -> UiText.Res(R.string.ailocal_fit_ram_tight, listOf(gb(need), gb(device.totalRamBytes)))
+            else -> UiText.Res(R.string.ailocal_fit_ram_low, listOf(gb(need), gb(device.totalRamBytes)))
         }
         // Minimum RAM from the Google AI Edge Gallery allowlist (in GiB, as totalMem/1024³). "12 GB" phones report
         // ≈ 11 GiB, so below the minimum is not a ban but "tight"; far below (< 75 %) means "most likely not".
@@ -77,22 +80,21 @@ object FitEstimator {
             if (totalGib < minRamGb) {
                 val capped = if (totalGib < minRamGb * MIN_RAM_FAR_BELOW) Fit.UNLIKELY else Fit.TIGHT
                 if (capped.ordinal > fit.ordinal) fit = capped
-                reasons += "Google AI Edge Gallery рекомендует для неё от $minRamGb ГБ ОЗУ."
+                reasons += UiText.Res(R.string.ailocal_fit_gallery_min, listOf(minRamGb))
             }
         }
         if (!downloaded && device.freeStorageBytes < sizeBytes + STORAGE_MARGIN) {
             fit = Fit.UNLIKELY
-            reasons += "Не хватит места: нужно ≈ ${gb(sizeBytes + STORAGE_MARGIN)} ГБ, свободно ${gb(device.freeStorageBytes)} ГБ."
+            reasons += UiText.Res(R.string.ailocal_fit_storage, listOf(gb(sizeBytes + STORAGE_MARGIN), gb(device.freeStorageBytes)))
         }
         return FitEstimate(fit, reasons, need)
     }
 
-    /** «2,6»: GB (decimal, as in Android settings and on Hugging Face) with one decimal, Russian formatting. */
-    fun gb(bytes: Long): String {
-        val tenths = (bytes / 1e8).roundToInt()
-        return "${tenths / 10},${tenths % 10}"
-    }
+    /** «2.6» / «2,6»: GB (decimal, as in Android settings and on Hugging Face) with one decimal, in the current locale. */
+    fun gb(bytes: Long, locale: Locale = Locale.getDefault()): String = String.format(locale, "%.1f", Math.round(bytes / 1e8) / 10.0)
 
-    /** Human-readable size: below 0.1 GB in MB («73 МБ»), above that «2,6 ГБ». */
-    fun size(bytes: Long): String = if (bytes < 100_000_000L) "${(bytes / 1_000_000L).coerceAtLeast(0)} МБ" else "${gb(bytes)} ГБ"
+    /** Human-readable size: below 0.1 GB in MB («73 MB»), above that «2.6 GB». */
+    fun size(bytes: Long): UiText =
+        if (bytes < 100_000_000L) UiText.Res(R.string.ailocal_size_mb, listOf((bytes / 1_000_000L).coerceAtLeast(0).toInt()))
+        else UiText.Res(R.string.ailocal_size_gb, listOf(gb(bytes)))
 }

@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -66,6 +67,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.iampopovich.eculense.core.ui.UiText
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Screen actions; empty by default, handy in UI tests. */
@@ -143,9 +146,10 @@ internal fun LocalModelRoute(viewModel: LocalModelViewModel = koinViewModel()) {
 @Composable
 internal fun LocalModelScreen(state: LocalModelUiState, actions: LocalModelActions, modifier: Modifier = Modifier) {
     val snackbar = remember { SnackbarHostState() }
+    val context = LocalContext.current
     LaunchedEffect(state.message) {
         state.message?.let {
-            snackbar.showSnackbar(it)
+            snackbar.showSnackbar(it.asString(context))
             actions.onMessageShown()
         }
     }
@@ -153,11 +157,10 @@ internal fun LocalModelScreen(state: LocalModelUiState, actions: LocalModelActio
         LazyColumn(Modifier.fillMaxSize().testTag("local-model-list")) {
             item {
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Модель на телефоне", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp))
+                    Text(stringResource(R.string.ailocal_title), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp))
                     DeviceCard(state.device, state.nano)
                     Text(
-                        "Работает без интернета, данные машины не уходят. Но медленнее и ошибается чаще облачных — перепроверяйте советы. " +
-                            "Скачивание — на ваш риск; тянет ли телефон, покажет тест после загрузки.",
+                        stringResource(R.string.ailocal_intro),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -165,15 +168,15 @@ internal fun LocalModelScreen(state: LocalModelUiState, actions: LocalModelActio
             }
             item { CatalogHeader(state, actions) }
             items(state.rows, key = { it.model.packId }) { row -> ModelListRow(row, state.hasToken, actions) }
-            item { SectionTitle("Другие модели (Hugging Face)") }
+            item { SectionTitle(stringResource(R.string.ailocal_section_hf)) }
             item { SearchBox(state, actions) }
             state.searchResults?.let { results ->
                 if (results.isEmpty() && !state.searchBusy) {
-                    item { Text("Ничего нового не найдено.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp)) }
+                    item { Text(stringResource(R.string.ailocal_search_empty), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp)) }
                 }
                 items(results, key = { "hf-" + it.model.packId }) { row -> ModelListRow(row, state.hasToken, actions) }
             }
-            item { SectionTitle("Своя модель") }
+            item { SectionTitle(stringResource(R.string.ailocal_section_custom)) }
             item { Box(Modifier.padding(horizontal = 16.dp)) { CustomModelCard(state, actions) } }
             item { Box(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) { TokenCard(state, actions) } }
             item { Box(Modifier.padding(bottom = 24.dp)) }
@@ -194,9 +197,9 @@ private fun SectionTitle(text: String) {
 private fun CatalogHeader(state: LocalModelUiState, actions: LocalModelActions) {
     Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text("Модели", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.ailocal_catalog_title), style = MaterialTheme.typography.titleMedium)
             Text(
-                "Google AI Edge Gallery ${state.catalogVersion.replace('_', '.')} + Koog · по размеру",
+                stringResource(R.string.ailocal_catalog_source, state.catalogVersion.replace('_', '.')),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -204,7 +207,7 @@ private fun CatalogHeader(state: LocalModelUiState, actions: LocalModelActions) 
         if (state.catalogRefreshing) {
             CircularProgressIndicator(Modifier.padding(12.dp).size(24.dp), strokeWidth = 2.dp)
         } else {
-            IconButton(onClick = actions.onRefreshCatalog) { Icon(painterResource(R.drawable.ic_model_refresh), contentDescription = "Обновить каталог") }
+            IconButton(onClick = actions.onRefreshCatalog) { Icon(painterResource(R.drawable.ic_model_refresh), contentDescription = stringResource(R.string.ailocal_catalog_refresh)) }
         }
     }
 }
@@ -213,24 +216,31 @@ private fun CatalogHeader(state: LocalModelUiState, actions: LocalModelActions) 
 private fun DeviceCard(device: DeviceProfile?, nano: NanoStatus?) {
     Card(Modifier.fillMaxWidth().testTag("device-card")) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Ваше устройство", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.ailocal_device_title), style = MaterialTheme.typography.titleSmall)
             if (device == null) {
-                Text("Проверяем…", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.ailocal_checking), style = MaterialTheme.typography.bodySmall)
                 return@Column
             }
             Text(
-                "ОЗУ ${FitEstimator.gb(device.totalRamBytes)} ГБ (свободно ${FitEstimator.gb(device.availRamBytes)}) · место ${FitEstimator.gb(device.freeStorageBytes)} ГБ",
+                stringResource(
+                    R.string.ailocal_device_memory,
+                    FitEstimator.gb(device.totalRamBytes),
+                    FitEstimator.gb(device.availRamBytes),
+                    FitEstimator.gb(device.freeStorageBytes),
+                ),
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(
                 listOf(
-                    device.soc + if (device.arm64) "" else " — нет arm64, модели не запустятся",
-                    if (device.gpu) "GPU есть" else "GPU нет",
-                    device.npu?.let { "NPU $it" } ?: "NPU нет",
+                    (device.soc ?: stringResource(R.string.ailocal_unknown)).let { soc ->
+                        if (device.arm64) soc else stringResource(R.string.ailocal_device_no_arm64, soc)
+                    },
+                    stringResource(if (device.gpu) R.string.ailocal_device_gpu_yes else R.string.ailocal_device_gpu_no),
+                    device.npu?.let { stringResource(R.string.ailocal_device_npu, it) } ?: stringResource(R.string.ailocal_device_npu_no),
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
             )
-            nano?.let { Text(it.text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            nano?.let { Text(it.text.asString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }
@@ -253,7 +263,7 @@ private fun verdictColor(v: Verdict, scheme: ColorScheme): Color = when (v) {
     Verdict.UNSUITABLE -> scheme.error
 }
 
-/** Small badge: source, «только действия», «нужен токен HF», estimate. */
+/** Small badge: source, «actions only», «HF token needed», estimate. */
 @Composable
 private fun Badge(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant, strong: Boolean = false) {
     Surface(shape = MaterialTheme.shapes.extraSmall, color = MaterialTheme.colorScheme.surfaceVariant) {
@@ -272,11 +282,11 @@ private fun ModelBadges(row: ModelRow, hasToken: Boolean, withFit: Boolean = tru
     val m = row.model
     val scheme = MaterialTheme.colorScheme
     FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Badge(m.origin.badge)
-        if (m.koog && m.origin != ModelOrigin.KOOG) Badge(ModelOrigin.KOOG.badge)
-        if (m.actionsOnly) Badge("только действия", scheme.tertiary)
-        if (m.gated && !hasToken && !row.installed) Badge("нужен токен HF", scheme.error)
-        if (withFit && !row.installed) Badge(row.fit.fit.label.lowercase(), fitColor(row.fit.fit, scheme), strong = true)
+        Badge(stringResource(m.origin.badgeRes))
+        if (m.koog && m.origin != ModelOrigin.KOOG) Badge(stringResource(ModelOrigin.KOOG.badgeRes))
+        if (m.actionsOnly) Badge(stringResource(R.string.ailocal_badge_actions_only), scheme.tertiary)
+        if (m.gated && !hasToken && !row.installed) Badge(stringResource(R.string.ailocal_badge_needs_token), scheme.error)
+        if (withFit && !row.installed) Badge(stringResource(row.fit.fit.labelRes).lowercase(), fitColor(row.fit.fit, scheme), strong = true)
     }
 }
 
@@ -296,7 +306,7 @@ private fun ModelListRow(row: ModelRow, hasToken: Boolean, actions: LocalModelAc
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(m.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                Text(m.sizeBytes?.let { FitEstimator.size(it) } ?: "?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(m.sizeBytes?.let { FitEstimator.size(it).asString() } ?: "?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             ModelBadges(row, hasToken)
         }
@@ -308,28 +318,32 @@ private fun ModelListRow(row: ModelRow, hasToken: Boolean, actions: LocalModelAc
 @Composable
 private fun RowTrailing(row: ModelRow, actions: LocalModelActions) {
     val m = row.model
+    val downloading = stringResource(R.string.ailocal_cd_downloading)
     when {
         row.downloading -> {
             if (row.progress != null && row.progress >= 0) {
                 // Lambda is stable and the value is read at draw time: frequent progress updates don't recompose
                 // the indicator (otherwise list scroll gestures got stuck on the phone).
                 val pct by rememberUpdatedState(row.progress / 100f)
-                CircularProgressIndicator(progress = { pct }, modifier = Modifier.size(32.dp).semantics { contentDescription = "Скачивание" }, strokeWidth = 3.dp)
+                CircularProgressIndicator(progress = { pct }, modifier = Modifier.size(32.dp).semantics { contentDescription = downloading }, strokeWidth = 3.dp)
             } else {
-                CircularProgressIndicator(Modifier.size(32.dp).semantics { contentDescription = "Скачивание" }, strokeWidth = 3.dp)
+                CircularProgressIndicator(Modifier.size(32.dp).semantics { contentDescription = downloading }, strokeWidth = 3.dp)
             }
         }
-        row.installed && row.benching -> CircularProgressIndicator(Modifier.size(24.dp).semantics { contentDescription = "Идёт тест скорости" }, strokeWidth = 2.dp)
+        row.installed && row.benching -> {
+            val benching = stringResource(R.string.ailocal_cd_benching)
+            CircularProgressIndicator(Modifier.size(24.dp).semantics { contentDescription = benching }, strokeWidth = 2.dp)
+        }
         row.installed && row.report != null -> {
             val v = row.report.verdict
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (row.activeBackend != null) Icon(painterResource(R.drawable.ic_model_check), contentDescription = "Используется в чате", tint = MaterialTheme.colorScheme.good(), modifier = Modifier.size(18.dp))
-                Text(v.label, color = verdictColor(v, MaterialTheme.colorScheme), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                if (row.activeBackend != null) Icon(painterResource(R.drawable.ic_model_check), contentDescription = stringResource(R.string.ailocal_cd_in_use), tint = MaterialTheme.colorScheme.good(), modifier = Modifier.size(18.dp))
+                Text(stringResource(v.labelRes), color = verdictColor(v, MaterialTheme.colorScheme), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
             }
         }
-        row.installed -> Icon(painterResource(R.drawable.ic_model_check), contentDescription = "Скачана", tint = MaterialTheme.colorScheme.primary)
+        row.installed -> Icon(painterResource(R.drawable.ic_model_check), contentDescription = stringResource(R.string.ailocal_cd_downloaded), tint = MaterialTheme.colorScheme.primary)
         m.url != null -> IconButton(onClick = { actions.onDownload(m.packId) }) {
-            Icon(painterResource(R.drawable.ic_model_download), contentDescription = if (row.partial) "Продолжить загрузку ${m.title}" else "Скачать ${m.title}")
+            Icon(painterResource(R.drawable.ic_model_download), contentDescription = stringResource(if (row.partial) R.string.ailocal_cd_resume else R.string.ailocal_cd_download, m.title))
         }
     }
 }
@@ -338,22 +352,22 @@ private fun RowTrailing(row: ModelRow, actions: LocalModelActions) {
 private fun SearchBox(state: LocalModelUiState, actions: LocalModelActions) {
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-            "Поиск по litert-community: Qwen3, Phi-4-mini, SmolLM, TinyLlama и др. Эти модели не проверены ни Google, ни нами — на ваш риск.",
+            stringResource(R.string.ailocal_search_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
             value = state.searchQuery,
             onValueChange = actions.onSearchQuery,
-            label = { Text("Найти модель") },
+            label = { Text(stringResource(R.string.ailocal_search_label)) },
             singleLine = true,
             isError = state.searchError != null,
-            supportingText = state.searchError?.let { { Text(it) } },
+            supportingText = state.searchError?.let { { Text(it.asString()) } },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { actions.onSearch() }),
             trailingIcon = {
                 if (state.searchBusy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                else IconButton(onClick = actions.onSearch, enabled = state.searchQuery.isNotBlank()) { Icon(painterResource(R.drawable.ic_model_search), contentDescription = "Искать") }
+                else IconButton(onClick = actions.onSearch, enabled = state.searchQuery.isNotBlank()) { Icon(painterResource(R.drawable.ic_model_search), contentDescription = stringResource(R.string.ailocal_search_action)) }
             },
             modifier = Modifier.fillMaxWidth(),
         )
@@ -373,27 +387,31 @@ private fun ModelSheet(row: ModelRow, hasToken: Boolean, actions: LocalModelActi
             Text(m.title, style = MaterialTheme.typography.titleLarge)
             ModelBadges(row, hasToken, withFit = false)
             Text(
-                listOfNotNull(m.sizeBytes?.let { FitEstimator.size(it) } ?: "размер неизвестен", m.fileName).joinToString(" · "),
+                listOfNotNull(m.sizeBytes?.let { FitEstimator.size(it).asString() } ?: stringResource(R.string.ailocal_size_unknown), m.fileName).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (m.description.isNotBlank()) Text(m.description, style = MaterialTheme.typography.bodyMedium)
-            if (m.actionsOnly) Text("Только вызов функций (действия телефона), для разговора о машине не подходит.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+            m.descriptionText.asString().takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            if (m.actionsOnly) Text(stringResource(R.string.ailocal_actions_only_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
             val facts = listOfNotNull(
-                m.accelerators.takeIf { it.isNotEmpty() }?.let { "Ускорители: " + it.joinToString(", ") { a -> a.uppercase() } },
-                m.minRamGb?.let { "Gallery рекомендует от $it ГБ ОЗУ" },
-                m.license.takeIf { it.isNotBlank() }?.let { "Лицензия: $it" },
+                m.accelerators.takeIf { it.isNotEmpty() }?.let { stringResource(R.string.ailocal_accelerators, it.joinToString(", ") { a -> a.uppercase() }) },
+                m.minRamGb?.let { stringResource(R.string.ailocal_gallery_min_ram, it) },
+                when {
+                    m.license.isNotBlank() -> stringResource(R.string.ailocal_license, m.license)
+                    m.sourceUrl.isNotBlank() -> stringResource(R.string.ailocal_license, stringResource(R.string.ailocal_license_see_page))
+                    else -> null
+                },
             )
             facts.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
             if (m.sourceUrl.isNotBlank()) {
-                TextButton(onClick = { runCatching { uri.openUri(m.sourceUrl) } }) { Text("Страница модели") }
+                TextButton(onClick = { runCatching { uri.openUri(m.sourceUrl) } }) { Text(stringResource(R.string.ailocal_model_page)) }
             }
             if (row.report == null) {
-                Text("Оценка: ${row.fit.fit.label}", color = fitColor(row.fit.fit, MaterialTheme.colorScheme), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
-                row.fit.reasons.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+                Text(stringResource(R.string.ailocal_estimate, stringResource(row.fit.fit.labelRes)), color = fitColor(row.fit.fit, MaterialTheme.colorScheme), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
+                row.fit.reasons.forEach { Text(it.asString(), style = MaterialTheme.typography.bodySmall) }
             }
             if (m.gated && !hasToken && !row.installed) {
-                Text("Закрытая модель: введите токен Hugging Face внизу экрана и примите лицензию на странице модели.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.ailocal_gated_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
             HorizontalDivider()
             when {
@@ -405,27 +423,28 @@ private fun ModelSheet(row: ModelRow, hasToken: Boolean, actions: LocalModelActi
                     } else {
                         LinearProgressIndicator(Modifier.fillMaxWidth())
                     }
+                    val done = FitEstimator.size(row.downloadedBytes).asString()
+                    val amount = total?.let { stringResource(R.string.ailocal_size_of, done, FitEstimator.size(it).asString()) } ?: done
                     Text(
-                        (if (row.retrying) "Связь прервалась, повтор с места обрыва… " else "Скачивание: ") +
-                            FitEstimator.size(row.downloadedBytes) + (total?.let { " из ${FitEstimator.size(it)}" } ?: ""),
+                        stringResource(if (row.retrying) R.string.ailocal_download_retrying else R.string.ailocal_download_progress, amount),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         // Waiting to retry after a drop: tapping restarts the download immediately (from the open app).
-                        if (row.retrying) Button(onClick = { actions.onDownload(m.packId) }) { Text("Повторить сейчас") }
-                        OutlinedButton(onClick = { actions.onCancelDownload(m.packId) }) { Text("Остановить") }
+                        if (row.retrying) Button(onClick = { actions.onDownload(m.packId) }) { Text(stringResource(R.string.ailocal_retry_now)) }
+                        OutlinedButton(onClick = { actions.onCancelDownload(m.packId) }) { Text(stringResource(R.string.ailocal_stop)) }
                     }
                 }
                 !row.installed -> {
-                    row.error?.let { Text("Ошибка загрузки: $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                    row.error?.let { Text(stringResource(R.string.ailocal_download_error, it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                     if (m.url == null) {
-                        Text("Ссылка для скачивания неизвестна — добавьте файл как свою модель.", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.ailocal_no_link), style = MaterialTheme.typography.bodySmall)
                     } else {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Button(onClick = { actions.onDownload(m.packId) }) {
-                                Text(if (row.partial) "Продолжить (${FitEstimator.size(row.downloadedBytes)} уже есть)" else "Скачать")
+                                Text(if (row.partial) stringResource(R.string.ailocal_resume, FitEstimator.size(row.downloadedBytes).asString()) else stringResource(R.string.ailocal_download))
                             }
-                            if (row.partial) TextButton(onClick = { actions.onDelete(m.packId) }) { Text("Удалить") }
+                            if (row.partial) TextButton(onClick = { actions.onDelete(m.packId) }) { Text(stringResource(CoreUiR.string.common_delete)) }
                         }
                     }
                 }
@@ -439,21 +458,21 @@ private fun ModelSheet(row: ModelRow, hasToken: Boolean, actions: LocalModelActi
 private fun InstalledPart(row: ModelRow, actions: LocalModelActions) {
     val m = row.model
     if (row.benching) {
-        Text("Тест скорости: " + (row.benchingBackend?.let { "${it.label}…" } ?: "…"), fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.ailocal_bench_running, row.benchingBackend?.let { "${it.label}…" } ?: "…"), fontWeight = FontWeight.SemiBold)
         LinearProgressIndicator(Modifier.fillMaxWidth())
         row.benchDone.forEach { RunLine(it) }
-        Text("Каждый бэкенд проверяется в отдельном процессе: если он упадёт или не хватит памяти, приложение не закроется.", style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.ailocal_bench_isolated), style = MaterialTheme.typography.bodySmall)
         return
     }
-    row.report?.let { VerdictCard(it, row, actions) } ?: Text("Модель скачана. Тест скорости ещё не проводился.", style = MaterialTheme.typography.bodyMedium)
+    row.report?.let { VerdictCard(it, row, actions) } ?: Text(stringResource(R.string.ailocal_not_benched), style = MaterialTheme.typography.bodyMedium)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (row.activeBackend == null) {
-            Button(onClick = { actions.onUse(m.packId) }) { Text("Использовать в чате") }
+            Button(onClick = { actions.onUse(m.packId) }) { Text(stringResource(R.string.ailocal_use)) }
         } else {
-            OutlinedButton(onClick = actions.onStopUsing) { Text("Не использовать") }
+            OutlinedButton(onClick = actions.onStopUsing) { Text(stringResource(R.string.ailocal_stop_using)) }
         }
-        OutlinedButton(onClick = { actions.onBench(m.packId) }) { Text(if (row.report == null) "Тест скорости" else "Повторить тест") }
-        TextButton(onClick = { actions.onDelete(m.packId) }) { Text("Удалить") }
+        OutlinedButton(onClick = { actions.onBench(m.packId) }) { Text(stringResource(if (row.report == null) R.string.ailocal_bench else R.string.ailocal_bench_again)) }
+        TextButton(onClick = { actions.onDelete(m.packId) }) { Text(stringResource(CoreUiR.string.common_delete)) }
     }
 }
 
@@ -462,24 +481,26 @@ private fun VerdictCard(report: BenchReport, row: ModelRow, actions: LocalModelA
     val verdict = report.verdict
     Card(Modifier.fillMaxWidth().testTag("verdict-${row.model.packId}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Вердикт: ${verdict.label}", color = verdictColor(verdict, MaterialTheme.colorScheme), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.ailocal_verdict, stringResource(verdict.labelRes)), color = verdictColor(verdict, MaterialTheme.colorScheme), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             Text(
-                when (verdict) {
-                    Verdict.COMFORT -> "Отвечает быстро: первые слова через пару секунд, дальше ≥ 8 токенов в секунду."
-                    Verdict.SLOW -> "Работает, но медленно: короткий ответ — десятки секунд, с данными машины — дольше."
-                    Verdict.UNSUITABLE -> "Ни один бэкенд не заработал на этом телефоне."
-                },
+                stringResource(
+                    when (verdict) {
+                        Verdict.COMFORT -> R.string.ailocal_verdict_comfort_desc
+                        Verdict.SLOW -> R.string.ailocal_verdict_slow_desc
+                        Verdict.UNSUITABLE -> R.string.ailocal_verdict_unsuitable_desc
+                    },
+                ),
                 style = MaterialTheme.typography.bodySmall,
             )
-            report.best?.let { Text("Лучший бэкенд: ${it.backend.label}", fontWeight = FontWeight.SemiBold) }
+            report.best?.let { Text(stringResource(R.string.ailocal_best_backend, it.backend.label), fontWeight = FontWeight.SemiBold) }
             report.runs.forEach { RunLine(it) }
-            Text("Тест: запрос ${report.runs.firstOrNull { it.ok }?.prefillTokens ?: BenchService.PREFILL_TOKENS} токенов, ответ ${BenchService.DECODE_TOKENS} токенов.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.ailocal_bench_params, report.runs.firstOrNull { it.ok }?.prefillTokens ?: BenchService.PREFILL_TOKENS, BenchService.DECODE_TOKENS), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             row.activeBackend?.let { active ->
-                Text("Используется в чате: ${active.label}", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.ailocal_in_use, active.label), fontWeight = FontWeight.SemiBold)
                 val others = report.runs.filter { it.ok && it.backend != active }
                 if (others.isNotEmpty()) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        others.forEach { r -> AssistChip(onClick = { actions.onUseBackend(row.model.packId, r.backend) }, label = { Text("Перейти на ${r.backend.label}") }) }
+                        others.forEach { r -> AssistChip(onClick = { actions.onUseBackend(row.model.packId, r.backend) }, label = { Text(stringResource(R.string.ailocal_switch_to, r.backend.label)) }) }
                     }
                 }
             }
@@ -490,10 +511,18 @@ private fun VerdictCard(report: BenchReport, row: ModelRow, actions: LocalModelA
 @Composable
 private fun RunLine(run: BackendRun) {
     val text = if (run.ok) {
-        "${run.backend.label}: первый токен ${sec(run.ttftSeconds)} с · ${num(run.decodeTokensPerSecond)} ток/с · чтение запроса ${num(run.prefillTokensPerSecond)} ток/с · " +
-            "загрузка ${sec(run.initSeconds)} с" + (run.peakRssBytes?.let { " · память ${FitEstimator.gb(it)} ГБ" } ?: "")
+        listOfNotNull(
+            stringResource(R.string.ailocal_run_ok, run.backend.label, sec(run.ttftSeconds), num(run.decodeTokensPerSecond), num(run.prefillTokensPerSecond), sec(run.initSeconds)),
+            run.peakRssBytes?.let { stringResource(R.string.ailocal_run_memory, FitEstimator.gb(it)) },
+        ).joinToString(" · ")
     } else {
-        "${run.backend.label}: не подходит — ${run.error ?: "ошибка"}"
+        val reason = when (run.failure) {
+            BenchFailure.TIMEOUT -> stringResource(R.string.ailocal_bench_timeout, BenchRunner.TIMEOUT_MINUTES)
+            BenchFailure.CRASHED -> stringResource(R.string.ailocal_bench_crashed)
+            BenchFailure.NOT_STARTED -> stringResource(R.string.ailocal_bench_not_started)
+            null -> run.error ?: stringResource(R.string.ailocal_run_error)
+        }
+        stringResource(R.string.ailocal_run_failed, run.backend.label, reason)
     }
     Text(text, style = MaterialTheme.typography.bodySmall, color = if (run.ok) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error)
 }
@@ -504,38 +533,38 @@ private fun num(v: Double) = String.format(java.util.Locale.getDefault(), "%.1f"
 @Composable
 private fun CustomModelCard(state: LocalModelUiState, actions: LocalModelActions) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Любой файл LiteRT-LM (.litertlm): ссылка на Hugging Face или файл с телефона.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.ailocal_custom_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedTextField(
             value = state.linkInput,
             onValueChange = actions.onLinkInput,
-            label = { Text("Ссылка Hugging Face") },
+            label = { Text(stringResource(R.string.ailocal_link_label)) },
             placeholder = { Text("https://huggingface.co/…/resolve/main/model.litertlm") },
             singleLine = true,
             isError = state.linkError != null,
-            supportingText = state.linkError?.let { { Text(it) } },
+            supportingText = state.linkError?.let { { Text(it.asString()) } },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = actions.onAddLink, enabled = state.linkInput.isNotBlank() && !state.linkBusy) { Text(if (state.linkBusy) "Проверяем…" else "Проверить ссылку") }
-            OutlinedButton(onClick = actions.onPickFile, enabled = state.importProgress == null) { Text("Файл с телефона") }
+            Button(onClick = actions.onAddLink, enabled = state.linkInput.isNotBlank() && !state.linkBusy) { Text(stringResource(if (state.linkBusy) R.string.ailocal_checking else R.string.ailocal_check_link)) }
+            OutlinedButton(onClick = actions.onPickFile, enabled = state.importProgress == null) { Text(stringResource(R.string.ailocal_pick_file)) }
         }
-        state.importProgress?.let { Text("Копирование: ${FitEstimator.size(it)}…", style = MaterialTheme.typography.bodySmall) }
+        state.importProgress?.let { Text(stringResource(R.string.ailocal_copying, FitEstimator.size(it).asString()), style = MaterialTheme.typography.bodySmall) }
     }
 }
 
 @Composable
 private fun TokenCard(state: LocalModelUiState, actions: LocalModelActions) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Токен Hugging Face (необязательно)", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.ailocal_token_title), style = MaterialTheme.typography.titleSmall)
         Text(
-            "Нужен только для закрытых моделей (Gemma 3, Gemma 3n, FunctionGemma). Хранится зашифрованным ключом Android Keystore и уходит только на huggingface.co.",
+            stringResource(R.string.ailocal_token_desc),
             style = MaterialTheme.typography.bodySmall,
         )
         if (state.hasToken) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Токен сохранён", modifier = Modifier.weight(1f))
-                TextButton(onClick = actions.onDeleteToken) { Text("Удалить токен") }
+                Text(stringResource(R.string.ailocal_token_saved), modifier = Modifier.weight(1f))
+                TextButton(onClick = actions.onDeleteToken) { Text(stringResource(R.string.ailocal_token_delete)) }
             }
         } else {
             OutlinedTextField(
@@ -547,7 +576,7 @@ private fun TokenCard(state: LocalModelUiState, actions: LocalModelActions) {
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth(),
             )
-            Button(onClick = actions.onSaveToken, enabled = state.tokenInput.isNotBlank()) { Text("Сохранить токен") }
+            Button(onClick = actions.onSaveToken, enabled = state.tokenInput.isNotBlank()) { Text(stringResource(R.string.ailocal_token_save)) }
         }
     }
 }
@@ -556,18 +585,18 @@ private fun TokenCard(state: LocalModelUiState, actions: LocalModelActions) {
 private fun ConfirmDialog(c: DownloadConfirm, actions: LocalModelActions) {
     AlertDialog(
         onDismissRequest = actions.onDismissConfirm,
-        title = { Text("Скачать «${c.title}»?") },
+        title = { Text(stringResource(R.string.ailocal_confirm_title, c.title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Размер: " + (c.sizeBytes?.let { FitEstimator.size(it) } ?: "неизвестен") + ". Оценка: ${c.fit.fit.label}.")
-                c.fit.reasons.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
-                Text("Скачиваете на свой риск: модель может не запуститься или работать медленно — это покажет тест после скачивания. Загрузку можно остановить и продолжить позже.")
-                if (c.adopt != null) Text("Модель из Hugging Face не проверена ни Google, ни нами.", style = MaterialTheme.typography.bodySmall)
-                if (c.metered) Text("Вы на мобильной сети: загрузка израсходует трафик.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
-                if (c.gatedWithoutToken) Text("Модель закрыта: без токена Hugging Face загрузка завершится ошибкой 401.", color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.ailocal_confirm_size, c.sizeBytes?.let { FitEstimator.size(it).asString() } ?: stringResource(R.string.ailocal_unknown), stringResource(c.fit.fit.labelRes)))
+                c.fit.reasons.forEach { Text(it.asString(), style = MaterialTheme.typography.bodySmall) }
+                Text(stringResource(R.string.ailocal_confirm_risk))
+                if (c.adopt != null) Text(stringResource(R.string.ailocal_confirm_hf_unverified), style = MaterialTheme.typography.bodySmall)
+                if (c.metered) Text(stringResource(R.string.ailocal_confirm_metered), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+                if (c.gatedWithoutToken) Text(stringResource(R.string.ailocal_confirm_gated), color = MaterialTheme.colorScheme.error)
             }
         },
-        confirmButton = { TextButton(onClick = actions.onConfirmDownload) { Text(if (c.metered) "Скачать по мобильной сети" else "Скачать") } },
-        dismissButton = { TextButton(onClick = actions.onDismissConfirm) { Text("Отмена") } },
+        confirmButton = { TextButton(onClick = actions.onConfirmDownload) { Text(stringResource(if (c.metered) R.string.ailocal_download_metered else R.string.ailocal_download)) } },
+        dismissButton = { TextButton(onClick = actions.onDismissConfirm) { Text(stringResource(CoreUiR.string.common_cancel)) } },
     )
 }

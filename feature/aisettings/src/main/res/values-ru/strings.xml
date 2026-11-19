@@ -68,4 +68,8 @@
     <string name="aisettings_url_no_host">В адресе нет имени сервера</string>
     <string name="aisettings_url_query">Уберите из адреса параметры (?… и #…)</string>
     <string name="aisettings_url_public_http">Незашифрованный http:// разрешён только для локальной сети (127.0.0.1, 10.x, 172.16–31.x, 192.168.x, *.local). Для сервера в интернете используйте https://</string>
+    <string name="aisettings_tokens_per_second">%1$s ток/с</string>
+    <string name="aisettings_rating_comfort">Комфортно</string>
+    <string name="aisettings_rating_slow">Медленно</string>
+    <string name="aisettings_rating_unsuitable">Не подходит</string>
 </resources>

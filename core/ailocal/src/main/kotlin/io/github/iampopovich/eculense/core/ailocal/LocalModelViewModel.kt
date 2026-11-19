@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.iampopovich.eculense.core.datapacks.DataPacks
 import io.github.iampopovich.eculense.core.datapacks.PackGroup
 import io.github.iampopovich.eculense.core.datapacks.PackState
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,7 +49,7 @@ internal data class LocalModelUiState(
     val catalogRefreshing: Boolean = false,
     val searchQuery: String = "",
     val searchBusy: Boolean = false,
-    val searchError: String? = null,
+    val searchError: UiText? = null,
     /** null — no search was done. */
     val searchResults: List<ModelRow>? = null,
     /** Model opened in the bottom details sheet. */
@@ -57,10 +58,10 @@ internal data class LocalModelUiState(
     val tokenInput: String = "",
     val linkInput: String = "",
     val linkBusy: Boolean = false,
-    val linkError: String? = null,
+    val linkError: UiText? = null,
     val importProgress: Long? = null,
     val confirm: DownloadConfirm? = null,
-    val message: String? = null,
+    val message: UiText? = null,
 )
 
 internal class LocalModelViewModel(
@@ -177,7 +178,7 @@ internal class LocalModelViewModel(
         _state.update { it.copy(catalogRefreshing = true) }
         viewModelScope.launch {
             val v = runCatching { models.refreshCatalog() }.getOrNull()
-            _state.update { it.copy(catalogRefreshing = false, catalogVersion = models.catalogVersion, message = if (v == null && !silent) "Не удалось обновить каталог — показан сохранённый" else it.message) }
+            _state.update { it.copy(catalogRefreshing = false, catalogVersion = models.catalogVersion, message = if (v == null && !silent) UiText.Res(R.string.ailocal_msg_catalog_failed) else it.message) }
         }
     }
 
@@ -194,7 +195,7 @@ internal class LocalModelViewModel(
                     val rows = list.map { m -> ModelRow(m, FitEstimator.estimate(m.sizeBytes, device), installed = false) }
                     _state.update { it.copy(searchBusy = false, searchResults = rows) }
                 }
-                .onFailure { e -> _state.update { it.copy(searchBusy = false, searchError = "Поиск не удался: ${e.message ?: "нет связи с Hugging Face"}") } }
+                .onFailure { e -> _state.update { it.copy(searchBusy = false, searchError = UiText.Res(R.string.ailocal_search_failed, listOf(e.message?.let { m -> UiText.Raw(m) } ?: UiText.Res(R.string.ailocal_search_no_connection)))) } }
         }
     }
 
@@ -210,7 +211,7 @@ internal class LocalModelViewModel(
             models.delete(packId)
             autoBenched -= packId
             refreshDevice()
-            _state.update { it.copy(message = "Модель удалена") }
+            _state.update { it.copy(message = UiText.Res(R.string.ailocal_msg_deleted)) }
         }
     }
 
@@ -226,7 +227,7 @@ internal class LocalModelViewModel(
             val backend = report?.best?.backend ?: BackendKind.CPU
             runtime.release()
             store.activate(packId, backend)
-            _state.update { it.copy(message = "Чат ИИ теперь работает на телефоне (${backend.label})") }
+            _state.update { it.copy(message = UiText.Res(R.string.ailocal_msg_using, listOf(backend.label))) }
         }
     }
 
@@ -241,7 +242,7 @@ internal class LocalModelViewModel(
     fun stopUsing() {
         viewModelScope.launch {
             runtime.deactivate()
-            _state.update { it.copy(message = "Модель на телефоне больше не используется в чате") }
+            _state.update { it.copy(message = UiText.Res(R.string.ailocal_msg_stopped)) }
         }
     }
 
@@ -252,14 +253,14 @@ internal class LocalModelViewModel(
         if (token.isEmpty()) return
         viewModelScope.launch {
             store.setToken(token)
-            _state.update { it.copy(tokenInput = "", message = "Токен Hugging Face сохранён") }
+            _state.update { it.copy(tokenInput = "", message = UiText.Res(R.string.ailocal_msg_token_saved)) }
         }
     }
 
     fun deleteToken() {
         viewModelScope.launch {
             store.setToken(null)
-            _state.update { it.copy(message = "Токен удалён") }
+            _state.update { it.copy(message = UiText.Res(R.string.ailocal_msg_token_deleted)) }
         }
     }
 
@@ -273,7 +274,7 @@ internal class LocalModelViewModel(
             when (val r = models.checkLink(link)) {
                 is LinkCheck.Ok -> {
                     models.add(r.model)
-                    _state.update { it.copy(linkBusy = false, linkInput = "", message = "Модель «${r.model.title}» добавлена в список") }
+                    _state.update { it.copy(linkBusy = false, linkInput = "", message = UiText.Res(R.string.ailocal_msg_link_added, listOf(r.model.title))) }
                 }
                 is LinkCheck.Failed -> _state.update { it.copy(linkBusy = false, linkError = r.message) }
             }
@@ -282,11 +283,15 @@ internal class LocalModelViewModel(
 
     fun importFile(uri: Uri, name: String, size: Long?) {
         if (_state.value.importProgress != null) return
+        if (!name.endsWith(".litertlm")) {
+            _state.update { it.copy(linkError = UiText.Res(HfLink.Problem.NOT_LITERTLM.messageRes)) }
+            return
+        }
         _state.update { it.copy(importProgress = 0, linkError = null) }
         viewModelScope.launch {
             runCatching { models.importFile(uri, name, size) { done -> _state.update { s -> s.copy(importProgress = done) } } }
-                .onSuccess { m -> _state.update { it.copy(importProgress = null, message = "Модель «${m.title}» скопирована") } }
-                .onFailure { e -> _state.update { it.copy(importProgress = null, linkError = "Не удалось скопировать файл: ${e.message}") } }
+                .onSuccess { m -> _state.update { it.copy(importProgress = null, message = UiText.Res(R.string.ailocal_msg_copied, listOf(m.title))) } }
+                .onFailure { e -> _state.update { it.copy(importProgress = null, linkError = UiText.Res(R.string.ailocal_copy_failed, listOf(e.message.orEmpty()))) } }
             refreshDevice()
         }
     }

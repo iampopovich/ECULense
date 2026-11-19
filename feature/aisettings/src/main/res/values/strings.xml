@@ -66,4 +66,8 @@
     <string name="aisettings_url_no_host">The address has no server name</string>
     <string name="aisettings_url_query">Remove parameters from the address (?… and #…)</string>
     <string name="aisettings_url_public_http">Unencrypted http:// is allowed only on the local network (127.0.0.1, 10.x, 172.16–31.x, 192.168.x, *.local). Use https:// for a server on the internet</string>
+    <string name="aisettings_tokens_per_second">%1$s tok/s</string>
+    <string name="aisettings_rating_comfort">Comfortable</string>
+    <string name="aisettings_rating_slow">Slow</string>
+    <string name="aisettings_rating_unsuitable">Unsuitable</string>
 </resources>

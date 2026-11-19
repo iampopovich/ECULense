@@ -7,6 +7,11 @@ import io.github.iampopovich.eculense.core.datapacks.PackAuth
 import io.github.iampopovich.eculense.core.datapacks.PackHttp
 import io.github.iampopovich.eculense.core.datapacks.PackManifest
 import io.github.iampopovich.eculense.core.datapacks.PackSource
+import io.github.iampopovich.eculense.core.ui.UiText
+import java.io.File
+import java.io.IOException
+import java.net.URL
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,15 +27,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.IOException
-import java.net.URL
-import kotlin.coroutines.coroutineContext
 
 /** Link checked: the model can be added; or a clear reason why not. */
 sealed interface LinkCheck {
     data class Ok(val model: LocalModel) : LinkCheck
-    data class Failed(val message: String) : LinkCheck
+    data class Failed(val message: UiText) : LinkCheck
 }
 
 /**
@@ -131,12 +132,12 @@ class LocalModels(
      * `x-linked-etag`), revision (`x-repo-commit`, the link is pinned to it), 401/403 — gated model.
      */
     suspend fun checkLink(raw: String): LinkCheck = withContext(Dispatchers.IO) {
-        HfLink.check(raw)?.let { return@withContext LinkCheck.Failed(it.message) }
+        HfLink.check(raw)?.let { return@withContext LinkCheck.Failed(UiText.Res(it.messageRes)) }
         val link = HfLink.parse(raw)!!
         val head = try {
             http.head(link.resolveUrl, headersFor(link.resolveUrl))
         } catch (e: IOException) {
-            return@withContext LinkCheck.Failed("Нет связи с Hugging Face: ${e.message}")
+            return@withContext LinkCheck.Failed(UiText.Res(R.string.ailocal_link_no_connection, listOf(e.message.orEmpty())))
         }
         when (head.code) {
             in 200..399 -> {
@@ -149,24 +150,24 @@ class LocalModels(
                         packId = LocalModelCatalog.customId(link.repo, link.fileName),
                         fileName = link.fileName,
                         title = link.fileName.removeSuffix(".litertlm"),
-                        description = "Своя модель: ${link.repo}",
+                        description = "Custom model: ${link.repo}",
                         url = pinned.resolveUrl,
                         sizeBytes = size,
                         sha256 = sha,
                         gated = false,
                         origin = ModelOrigin.CUSTOM_LINK,
-                        license = "см. страницу модели",
+                        license = "",
                         sourceUrl = link.repoUrl,
                         version = revision.take(12),
                     ),
                 )
             }
             401, 403 -> LinkCheck.Failed(
-                if (store.token() == null) "Модель закрыта (gated): нужен токен Hugging Face и принятая лицензия на странице модели."
-                else "Hugging Face отказал (${head.code}): примите лицензию модели на её странице или проверьте токен.",
+                if (store.token() == null) UiText.Res(R.string.ailocal_link_gated)
+                else UiText.Res(R.string.ailocal_link_denied, listOf(head.code)),
             )
-            404 -> LinkCheck.Failed("Файл не найден (404): проверьте ссылку.")
-            else -> LinkCheck.Failed("Hugging Face ответил ${head.code}.")
+            404 -> LinkCheck.Failed(UiText.Res(R.string.ailocal_link_not_found))
+            else -> LinkCheck.Failed(UiText.Res(R.string.ailocal_link_status, listOf(head.code)))
         }
     }
 
@@ -191,12 +192,12 @@ class LocalModels(
 
     /** «Файл с телефона»: copy into model storage (atomically, via the pack staging). */
     suspend fun importFile(uri: Uri, displayName: String, sizeBytes: Long?, progress: (Long) -> Unit): LocalModel = withContext(Dispatchers.IO) {
-        require(displayName.endsWith(".litertlm")) { HfLink.Problem.NOT_LITERTLM.message }
+        require(displayName.endsWith(".litertlm")) { "not a .litertlm file: $displayName" }
         val model = LocalModel(
             packId = LocalModelCatalog.customId("file", displayName),
             fileName = displayName,
             title = displayName.removeSuffix(".litertlm"),
-            description = "Своя модель из файла на телефоне",
+            description = "Custom model from a file on the phone",
             url = null,
             sizeBytes = sizeBytes,
             sha256 = null,
@@ -208,7 +209,7 @@ class LocalModels(
         )
         val staging = packs.store.staging(model.packId, model.version)
         try {
-            val input = context.contentResolver.openInputStream(uri) ?: throw IOException("не удалось открыть файл")
+            val input = context.contentResolver.openInputStream(uri) ?: throw IOException("cannot open the file")
             input.use { src ->
                 File(staging, displayName).outputStream().buffered(1 shl 20).use { out ->
                     val buf = ByteArray(1 shl 20)

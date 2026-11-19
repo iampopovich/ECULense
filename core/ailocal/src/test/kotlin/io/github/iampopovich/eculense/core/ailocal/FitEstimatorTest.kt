@@ -1,8 +1,10 @@
 package io.github.iampopovich.eculense.core.ailocal
 
+import io.github.iampopovich.eculense.core.ui.UiText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class FitEstimatorTest {
     private val gb = 1L shl 30
@@ -25,6 +27,8 @@ class FitEstimatorTest {
     private val e4b = 3_659_530_240L
     private val small = 289 * mb
 
+    private fun List<UiText>.has(id: Int) = any { it is UiText.Res && it.id == id }
+
     @Test
     fun `flagship with 11 GB handles both Gemma 4 models`() {
         assertEquals(Fit.OK, FitEstimator.estimate(e2b, phone(10.9)).fit)
@@ -35,7 +39,7 @@ class FitEstimatorTest {
     fun `3_6 GB phone is told Gemma 4 E2B will most likely not work and why`() {
         val r = FitEstimator.estimate(e2b, phone(3.6))
         assertEquals(Fit.UNLIKELY, r.fit)
-        assertTrue(r.reasons.joinToString(), r.reasons.any { "ОЗУ" in it })
+        assertTrue(r.reasons.joinToString(), r.reasons.has(R.string.ailocal_fit_ram_low))
     }
 
     @Test
@@ -52,7 +56,7 @@ class FitEstimatorTest {
     fun `not enough storage beats enough memory`() {
         val r = FitEstimator.estimate(e2b, phone(12.0, freeGb = 2.0))
         assertEquals(Fit.UNLIKELY, r.fit)
-        assertTrue(r.reasons.joinToString(), r.reasons.any { "места" in it })
+        assertTrue(r.reasons.joinToString(), r.reasons.has(R.string.ailocal_fit_storage))
     }
 
     @Test
@@ -64,7 +68,7 @@ class FitEstimatorTest {
     fun `no arm64 means the runtime cannot load at all`() {
         val r = FitEstimator.estimate(small, phone(8.0, arm64 = false))
         assertEquals(Fit.UNLIKELY, r.fit)
-        assertTrue(r.reasons.any { "arm64" in it })
+        assertTrue(r.reasons.has(R.string.ailocal_fit_no_arm64))
     }
 
     @Test
@@ -73,11 +77,19 @@ class FitEstimatorTest {
         assertEquals(Fit.OK, FitEstimator.estimate(e2b, phone(10.9), minRamGb = 8).fit)
         val e4bOnFlagship = FitEstimator.estimate(e4b, phone(10.9), minRamGb = 12)
         assertEquals(Fit.TIGHT, e4bOnFlagship.fit)
-        assertTrue(e4bOnFlagship.reasons.any { "12 ГБ" in it && "Gallery" in it })
+        assertTrue(UiText.Res(R.string.ailocal_fit_gallery_min, listOf(12)) in e4bOnFlagship.reasons)
         // 3.6 GB phone vs a 1 GB model the Gallery wants 6 GB for
         assertEquals(Fit.UNLIKELY, FitEstimator.estimate(584_417_280L, phone(3.6), minRamGb = 6).fit)
         // no minimum known: plain heuristic
         assertEquals(Fit.OK, FitEstimator.estimate(e4b, phone(10.9), minRamGb = null).fit)
+    }
+
+    @Test
+    fun `sizes follow the locale and switch to MB below 0_1 GB`() {
+        assertEquals("2.6", FitEstimator.gb(2_588_147_712L, Locale.US))
+        assertEquals("2,6", FitEstimator.gb(2_588_147_712L, Locale.forLanguageTag("ru")))
+        assertEquals(UiText.Res(R.string.ailocal_size_mb, listOf(73)), FitEstimator.size(73_000_000L))
+        assertEquals(R.string.ailocal_size_gb, (FitEstimator.size(2_588_147_712L) as UiText.Res).id)
     }
 
     @Test

@@ -20,8 +20,16 @@ interface OnDeviceLlm {
     suspend fun deactivate()
 }
 
-/** Summary of the selected local model: «Gemma 4 E2B», «GPU · 13 ток/с · Комфортно». */
-data class OnDeviceSummary(val model: String, val detail: String)
+/** Summary of the selected local model: «Gemma 4 E2B» on «GPU», 13 tok/s, comfortable; the UI formats it. */
+data class OnDeviceSummary(
+    val model: String,
+    val backend: String,
+    val decodeTokensPerSecond: Double? = null,
+    val rating: OnDeviceRating? = null,
+)
+
+/** Speed test verdict of the selected local model. */
+enum class OnDeviceRating { COMFORT, SLOW, UNSUITABLE }
 
 /**
  * Local model ready for chat. [executor] belongs to the model module (the engine takes seconds to load and holds

@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.StatFs
 import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.prompt.Generation
+import io.github.iampopovich.eculense.core.ui.UiText
 import java.io.File
 
 /** Captures a [DeviceProfile]: memory, SoC, ABI, storage, OpenCL driver for GPU, vendor NPU libraries, AICore. */
@@ -47,23 +48,23 @@ class DeviceProbe(private val context: Context) {
 }
 
 /** Gemini Nano via AICore: whether it is available and why not. */
-data class NanoStatus(val available: Boolean, val text: String)
+data class NanoStatus(val available: Boolean, val text: UiText)
 
 class NanoProbe {
     suspend fun status(aicoreInstalled: Boolean): NanoStatus {
-        if (!aicoreInstalled) return NanoStatus(false, "Gemini Nano недоступен: на телефоне нет Google AICore.")
-        val model = runCatching { Generation.getClient() }.getOrElse { return NanoStatus(false, "Gemini Nano недоступен: ${it.message}") }
+        if (!aicoreInstalled) return NanoStatus(false, UiText.Res(R.string.ailocal_nano_no_aicore))
+        val model = runCatching { Generation.getClient() }.getOrElse { return NanoStatus(false, UiText.Res(R.string.ailocal_nano_error, listOf(it.message.orEmpty()))) }
         return try {
             when (val s = model.checkStatus()) {
-                FeatureStatus.AVAILABLE -> NanoStatus(true, "Gemini Nano доступен (встроенная модель телефона).")
+                FeatureStatus.AVAILABLE -> NanoStatus(true, UiText.Res(R.string.ailocal_nano_available))
                 FeatureStatus.DOWNLOADABLE, FeatureStatus.DOWNLOADING ->
-                    NanoStatus(true, "Gemini Nano поддерживается, модель скачивает система (AICore).")
+                    NanoStatus(true, UiText.Res(R.string.ailocal_nano_downloadable))
                 FeatureStatus.UNAVAILABLE ->
-                    NanoStatus(false, "Gemini Nano недоступен: AICore есть, но для этого телефона Google не включил модель (статус UNAVAILABLE).")
-                else -> NanoStatus(false, "Gemini Nano: неизвестный статус $s.")
+                    NanoStatus(false, UiText.Res(R.string.ailocal_nano_unavailable))
+                else -> NanoStatus(false, UiText.Res(R.string.ailocal_nano_unknown, listOf(s)))
             }
         } catch (e: Exception) {
-            NanoStatus(false, "Gemini Nano недоступен: ${e.message ?: e::class.simpleName}")
+            NanoStatus(false, UiText.Res(R.string.ailocal_nano_error, listOf(e.message ?: e::class.simpleName.orEmpty())))
         } finally {
             runCatching { model.close() }
         }

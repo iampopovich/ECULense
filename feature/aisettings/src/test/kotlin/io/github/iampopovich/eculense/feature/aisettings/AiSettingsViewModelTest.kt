@@ -8,6 +8,7 @@ import io.github.iampopovich.eculense.core.ai.LlmSettings
 import io.github.iampopovich.eculense.core.ai.LlmSettingsStore
 import io.github.iampopovich.eculense.core.ai.ModelInfo
 import io.github.iampopovich.eculense.core.ai.OnDeviceLlm
+import io.github.iampopovich.eculense.core.ai.OnDeviceRating
 import io.github.iampopovich.eculense.core.ai.OnDeviceSession
 import io.github.iampopovich.eculense.core.ai.OnDeviceSummary
 import io.github.iampopovich.eculense.core.ai.SecretCipher
@@ -103,7 +104,7 @@ class AiSettingsViewModelTest {
     @Test
     fun `on-device entry appears only with the module and an active local model shows as the summary`() {
         assertFalse(loadedVm(FakeChecker(ConnectionCheck.Ok(catalog))).state.value.onDeviceAvailable)
-        val local = FakeOnDevice(OnDeviceSummary("Тестовая модель", "GPU · 13,2 ток/с · Комфортно"))
+        val local = FakeOnDevice(OnDeviceSummary("Тестовая модель", "GPU", 13.2, OnDeviceRating.COMFORT))
         val vm = AiSettingsViewModel(store, FakeChecker(ConnectionCheck.Ok(catalog)), local, onDeviceRoute = true).also { v -> waitUntil { v.state.value.loaded } }
         assertTrue(vm.state.value.onDeviceAvailable)
         assertEquals("Тестовая модель", vm.state.value.onDevice?.model)
