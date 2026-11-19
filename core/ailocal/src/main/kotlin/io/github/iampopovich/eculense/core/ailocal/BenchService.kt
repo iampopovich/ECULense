@@ -24,10 +24,10 @@ import java.io.File
 import kotlin.coroutines.resume
 
 /**
- * Тест скорости в отдельном процессе `:bench` (манифест): нативный LiteRT-LM может упасть (SIGSEGV в драйвере GPU/NPU)
- * или исчерпать память — тогда умирает только этот процесс, а приложение показывает «бэкенд не подходит».
- * Один запуск = один бэкенд в свежем процессе: пик памяти (VmHWM) относится только к нему, после ответа процесс
- * завершается сам. Внутри — `benchmark()` из LiteRT-LM 0.11 (рантайм клиента Koog): init, TTFT, prefill/decode ток/с.
+ * Speed test in a separate `:bench` process (manifest): native LiteRT-LM may crash (SIGSEGV in the GPU/NPU driver)
+ * or run out of memory, and then only this process dies while the app shows «бэкенд не подходит».
+ * One run = one backend in a fresh process: peak memory (VmHWM) belongs to it alone; after replying the process
+ * exits by itself. Inside is `benchmark()` from LiteRT-LM 0.11 (the Koog client runtime): init, TTFT, prefill/decode tok/s.
  */
 class BenchService : Service() {
     private lateinit var worker: HandlerThread
@@ -76,7 +76,7 @@ class BenchService : Service() {
         reply.putLong(KEY_PEAK, peakRss())
         Log.w(TAG, "bench $backend done in ${SystemClock.elapsedRealtime() - started} ms ok=${reply.getBoolean(KEY_OK)}")
         runCatching { replyTo.send(Message.obtain().apply { this.data = reply }) }
-        // Свежий процесс на каждый бэкенд: память движка и VmHWM не переходят в следующий замер.
+        // A fresh process per backend: engine memory and VmHWM don't carry over into the next measurement.
         Handler(Looper.getMainLooper()).postDelayed({ Process.killProcess(Process.myPid()) }, 300)
     }
 
@@ -86,7 +86,7 @@ class BenchService : Service() {
 
     companion object {
         const val TAG = "EcuLocalLlm"
-        /** Промпт теста: короткий вопрос с системной подсказкой ≈ 256 токенов; ответ — 128 токенов. */
+        /** Test prompt: a short question with a system prompt of ≈ 256 tokens; answer is 128 tokens. */
         const val PREFILL_TOKENS = 256
         const val DECODE_TOKENS = 128
         internal const val KEY_MODEL = "model"
@@ -104,7 +104,7 @@ class BenchService : Service() {
     }
 }
 
-/** Запуск одного бэкенда в процессе `:bench` и ожидание ответа или гибели процесса. */
+/** Runs one backend in the `:bench` process and waits for a reply or process death. */
 class BenchRunner(private val context: Context) {
     suspend fun run(model: File, backend: BackendKind, cacheDir: File, timeoutMs: Long = 8 * 60_000L): BackendRun {
         val result = withTimeoutOrNull(timeoutMs) { runOnce(model, backend, cacheDir) }
@@ -114,9 +114,9 @@ class BenchRunner(private val context: Context) {
     private suspend fun runOnce(model: File, backend: BackendKind, cacheDir: File): BackendRun = suspendCancellableCoroutine { cont ->
         val app = context.applicationContext
         var connection: ServiceConnection? = null
-        // Ответ процесса теста. Возобновляемся только после гибели процесса (он завершается сам через 300 мс после
-        // ответа): иначе следующий бэкенд привязывается к ещё живому, умирающему процессу и «падает» сразу — так на
-        // 14T Pro GPU-прогон выглядел аварийным через 0,4 с после ответа CPU.
+        // Reply from the test process. Resume only after the process dies (it exits by itself 300 ms after
+        // replying): otherwise the next backend binds to the still-alive, dying process and «fails» immediately; that's how on
+        // the 14T Pro the GPU run looked crashed 0.4 s after the CPU reply.
         var answered: BackendRun? = null
         fun finish(run: BackendRun) {
             if (!cont.isActive) return
@@ -144,7 +144,7 @@ class BenchRunner(private val context: Context) {
                 } else {
                     BackendRun(backend, ok = false, error = d.getString(BenchService.KEY_ERROR), peakRssBytes = peak)
                 }
-            // страховка, если сообщение о гибели процесса не придёт
+            // safety net in case the process-death message never arrives
             main.postDelayed({ answered?.let { finish(it) } }, PROCESS_EXIT_WAIT_MS)
             true
         })
@@ -166,7 +166,7 @@ class BenchRunner(private val context: Context) {
                 runCatching { Messenger(binder).send(request) }.onFailure { finish(BackendRun(backend, ok = false, error = crashed)) }
             }
 
-            // Процесс умер до ответа (ответ, если успел, уже обработан — finish идемпотентен).
+            // The process died before replying (a reply, if it made it, is already handled; finish is idempotent).
             override fun onServiceDisconnected(name: ComponentName?) {
                 main.postDelayed({ died() }, 500)
             }
@@ -174,8 +174,8 @@ class BenchRunner(private val context: Context) {
             override fun onBindingDied(name: ComponentName?) = died()
         }
         cacheDir.mkdirs()
-        // BIND_IMPORTANT: процесс теста получает приоритет видимого экрана — иначе MIUI убирает «фоновый» процесс с
-        // гигабайтами PSS (на 14T Pro так погибал GPU-прогон E4B, хотя в тестовом процессе он проходит).
+        // BIND_IMPORTANT: the test process gets visible-screen priority, otherwise MIUI kills a «background» process with
+        // gigabytes of PSS (on the 14T Pro the E4B GPU run died this way, though it passes in the test process).
         val bound = app.bindService(Intent(app, BenchService::class.java), connection, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
         if (!bound) finish(BackendRun(backend, ok = false, error = "не удалось запустить процесс теста"))
         cont.invokeOnCancellation { connection?.let { runCatching { app.unbindService(it) } } }

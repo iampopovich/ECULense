@@ -23,7 +23,7 @@ import org.koin.dsl.module
 import java.io.File
 import kotlin.system.exitProcess
 
-/** Своя база приложения — через соединение Room: checkpoint WAL и VACUUM INTO без второго писателя. */
+/** The app's own database, via the Room connection: WAL checkpoint and VACUUM INTO without a second writer. */
 internal class RoomDbSource(private val db: () -> EcuDatabase) : DbSource {
     override val fileName = EcuDatabase.FILE_NAME
     override fun snapshotTo(target: File): Int {
@@ -33,7 +33,7 @@ internal class RoomDbSource(private val db: () -> EcuDatabase) : DbSource {
         if (Build.VERSION.SDK_INT >= 30) {
             sdb.execSQL("VACUUM INTO '${target.path.replace("'", "''")}'") // SQLite ≥ 3.27 (Android 11+)
         } else {
-            // старый SQLite без VACUUM INTO: после checkpoint(TRUNCATE) основной файл содержит всё
+            // old SQLite without VACUUM INTO: after checkpoint(TRUNCATE) the main file contains everything
             sdb.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
             File(sdb.path ?: error("нет пути базы")).copyTo(target, overwrite = true)
         }
@@ -41,7 +41,7 @@ internal class RoomDbSource(private val db: () -> EcuDatabase) : DbSource {
     }
 }
 
-/** Чужая для этого модуля база (история чата ИИ из :core:ai) — только чтение: журнал Room не трогаем. */
+/** A database foreign to this module (AI chat history from :core:ai): read-only, we don't touch the Room journal. */
 internal class FileDbSource(private val file: File) : DbSource {
     override val fileName: String = file.name
     override fun snapshotTo(target: File): Int {
@@ -54,7 +54,7 @@ internal class FileDbSource(private val file: File) : DbSource {
     }
 }
 
-/** Папка бэкапов Car Scanner (SAF-дерево с постоянным доступом) и флажок «история чата ИИ» для копии ECULense. */
+/** Car Scanner backup folder (SAF tree with persistent access) and the «история чата ИИ» flag for the ECULense copy. */
 class BackupPrefs(private val store: DataStore<Preferences>) {
     val folderUri: Flow<String?> = store.data.map { it[FOLDER] }
     val includeAiChat: Flow<Boolean> = store.data.map { it[AI_CHAT] ?: false }
@@ -73,12 +73,12 @@ class BackupPrefs(private val store: DataStore<Preferences>) {
     }
 }
 
-/** Копия ECULense через SAF: Uri «Сохранить как» / выбранного файла. */
+/** ECULense copy via SAF: Uri from «Сохранить как» / the picked file. */
 interface BackupService {
     suspend fun export(uri: Uri, includeAiChat: Boolean): BackupManifest
     suspend fun inspect(uri: Uri): BackupManifest
     suspend fun restore(uri: Uri): RestoreResult
-    /** Перезапуск после восстановления: база и настройки уже другие, процесс начинается заново. */
+    /** Restart after restore: database and settings have changed, the process starts over. */
     fun restartApp()
 }
 

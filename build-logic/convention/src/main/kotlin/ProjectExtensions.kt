@@ -11,7 +11,7 @@ internal val Project.libs: VersionCatalog
 internal fun Project.lib(alias: String): Provider<MinimalExternalModuleDependency> =
     libs.findLibrary(alias).get()
 
-/** ":core:obd" -> "io.github.iampopovich.eculense.core.obd". Имена модулей — без дефисов. */
+/** ":core:obd" -> "io.github.iampopovich.eculense.core.obd". Module names have no hyphens. */
 internal fun Project.namespaceFromPath(): String =
     "io.github.iampopovich.eculense." + path.removePrefix(":").replace(':', '.')
 

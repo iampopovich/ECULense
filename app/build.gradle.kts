@@ -13,15 +13,15 @@ android {
         applicationId = "io.github.iampopovich.eculense"
         minSdk = 26
         targetSdk = 37
-        // CI релиза передаёт версию из тега: -Pecu.versionName=0.1.0 -Pecu.versionCode=100 (.github/workflows/release.yml).
+        // Release CI passes the version from the tag: -Pecu.versionName=0.1.0 -Pecu.versionCode=100 (.github/workflows/release.yml).
         versionCode = providers.gradleProperty("ecu.versionCode").map(String::toInt).getOrElse(1)
         versionName = providers.gradleProperty("ecu.versionName").getOrElse("0.1.0")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // Ключ релиза — только из окружения (секреты CI); без него release подписывается отладочным ключом,
-    // чтобы APK ставился, а CI помечает такие файлы суффиксом -debugkey.
+    // Release key comes only from the environment (CI secrets); without it, release is signed with the debug key
+    // so the APK still installs, and CI marks such files with the -debugkey suffix.
     val releaseKeystore = providers.environmentVariable("ECU_KEYSTORE_FILE").orNull
     signingConfigs {
         if (releaseKeystore != null) {
@@ -51,9 +51,9 @@ android {
         compose = true
         buildConfig = true
     }
-    // 3.10 п.11: две сборки одного приложения (один applicationId, разные APK). cloud — только облачные провайдеры
-    // (≈ 10 МБ), local — плюс модель на телефоне (:core:ailocal, LiteRT-LM, ≈ 35 МБ). Различие — только в source set
-    // флейвора (OnDeviceModules.kt) и зависимости localImplementation; общий код типов :core:ailocal не видит.
+    // 3.10 item 11: two builds of one app (same applicationId, different APKs). cloud — cloud providers only
+    // (≈ 10 MB), local — plus the on-device model (:core:ailocal, LiteRT-LM, ≈ 35 MB). The only difference is the flavor
+    // source set (OnDeviceModules.kt) and the localImplementation dependency; shared code never sees :core:ailocal types.
     flavorDimensions += "ai"
     productFlavors {
         create("cloud") {
@@ -67,8 +67,8 @@ android {
 }
 
 androidComponents {
-    // LiteRT-LM (только в local) — ~25 МБ нативных библиотек на ABI. Рантайм работает только на arm64 (телефоны);
-    // x86_64-копии (эмулятор) в APK не кладём.
+    // LiteRT-LM (local only) — ~25 MB of native libraries per ABI. The runtime works only on arm64 (phones);
+    // x86_64 copies (emulator) are not packed into the APK.
     onVariants(selector().withFlavor("ai" to "local")) { variant ->
         variant.packaging.jniLibs.excludes.addAll("lib/x86_64/libLiteRt.so", "lib/x86_64/libLiteRtClGlAccelerator.so", "lib/x86_64/liblitertlm_jni.so")
     }
@@ -87,7 +87,7 @@ dependencies {
     implementation(project(":feature:stats"))
     implementation(project(":feature:analysis"))
     implementation(project(":feature:maintenance"))
-    // 1.27 импорт бэкапов Car Scanner в фоне и резервная копия ECULense
+    // 1.27 background import of Car Scanner backups and ECULense backup
     implementation(project(":core:backup"))
     implementation(project(":feature:backup"))
     implementation(project(":core:obd"))
@@ -106,7 +106,7 @@ dependencies {
     implementation(project(":feature:datapacks"))
     implementation(project(":feature:aisettings"))
     implementation(project(":feature:aichat"))
-    // 3.10 модель на телефоне (LiteRT-LM через Koog) — только в сборке local; подключение — app/src/local/.../OnDeviceModules.kt.
+    // 3.10 on-device model (LiteRT-LM via Koog) — local build only; wired in app/src/local/.../OnDeviceModules.kt.
     "localImplementation"(project(":core:ailocal"))
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)

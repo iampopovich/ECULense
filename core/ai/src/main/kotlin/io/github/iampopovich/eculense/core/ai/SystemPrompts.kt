@@ -1,9 +1,9 @@
 package io.github.iampopovich.eculense.core.ai
 
 /**
- * Системные промпты. Общие правила — один префикс [COMMON] для всех ролей; форма ответа зависит от типа вопроса
- * ([answerForm]): шаблон «причины → проверить → сервис» живёт только в форме для вопросов о неисправности, иначе любой
- * вопрос («как машина вела себя полгода») превращался в поиск неисправности.
+ * System prompts. Shared rules are a single [COMMON] prefix for all roles; the answer form depends on the question type
+ * ([answerForm]): the «причины → проверить → сервис» template lives only in the form for fault questions, otherwise any
+ * question («как машина вела себя полгода») turned into a fault hunt.
  */
 object SystemPrompts {
     val COMMON = """
@@ -15,10 +15,10 @@ object SystemPrompts {
         4. VIN и координат у тебя нет, они не нужны.
     """.trimIndent()
 
-    /** Общий промпт без роли (без данных машины, приветствия). Шаблона ответа здесь нет — форма по вопросу. */
+    /** Generic prompt without a role (no car data, no greeting). No answer template here — the form follows the question. */
     val MECHANIC = COMMON
 
-    /** Правила работы с инструментами данных машины: числа считает приложение, модель объясняет. */
+    /** Rules for using car-data tools: the app computes the numbers, the model explains them. */
     val VEHICLE_DATA = """
         У тебя есть инструменты только для чтения данных машины пользователя (профиль, поездки, тренды по месяцам, записи датчиков, находки анализа, история кодов ошибок, план ТО и пробег).
         5. Перед ответом о машине вызови нужные инструменты: ошибки — dtcHistory и findings; как машина вела себя за период — trends (days) и tripStats (days); последняя поездка — listSessions(limit=1), затем sessionStats; конкретный датчик — sensorSummary; марка и двигатель — carProfile; ТО, замена масла, пробег — maintenanceDue.
@@ -35,10 +35,10 @@ object SystemPrompts {
         Данные:
     """.trimIndent()
 
-    /** Модель на телефоне инструменты не вызывает (проверено на Gemma 4): данные приложение кладёт в промпт само. */
+    /** The on-device model does not call tools (verified on Gemma 4): the app puts the data into the prompt itself. */
     fun chatWithDigest(digest: String): String = COMMON + "\n" + DIGEST_RULES + "\n" + digest
 
-    /** Форма ответа пользователю по типу вопроса. */
+    /** Form of the user-facing answer by question type. */
     fun answerForm(intent: ChatIntent): String = "Форма ответа: " + when (intent) {
         ChatIntent.OVERVIEW, ChatIntent.TREND ->
             "1) коротко — как машина в целом за период (1–2 предложения); 2) что изменилось за период — с числами «было → стало» и месяцами; " +
@@ -51,10 +51,10 @@ object SystemPrompts {
         ChatIntent.SMALLTALK -> "коротко и дружелюбно; предложи спросить о машине (поездки, ошибки, расход, ТО)."
     } + "\nПроблему вне вопроса упоминай максимум одной строкой и только уровня «внимание» или «критично»."
 
-    /** Без данных машины или без экспертов: общий промпт + форма по вопросу. */
+    /** No car data or no experts: generic prompt + form by question. */
     fun general(intent: ChatIntent, withTools: Boolean = false): String = chat(withTools) + "\n" + answerForm(intent)
 
-    /** Формат заметки эксперта для редактора (пользователь видит её только в «Заметках экспертов»). */
+    /** Format of an expert's note for the editor (the user sees it only in «Заметках экспертов»). */
     val EXPERT_NOTE = """
         Ты пишешь заметку для редактора, не ответ пользователю. Формат заметки (markdown):
         - 2–6 пунктов «факт с числом из инструмента → что это значит»;
@@ -66,15 +66,15 @@ object SystemPrompts {
     private fun periodRule(days: Int) =
         "Период вопроса — последние $days дн. (${ExpertRoles.periodText(days)}): в инструментах trends, tripStats и sensorSummary передавай days=$days."
 
-    /** Эксперт в облаке: своя роль, свои инструменты, заметка для редактора. */
+    /** Cloud expert: its own role, its own tools, a note for the editor. */
     fun expert(role: ExpertRole, route: ChatRoute): String =
         listOf(COMMON, role.prompt, VEHICLE_DATA, periodRule(route.periodDays), EXPERT_NOTE).joinToString("\n")
 
-    /** Один эксперт — сразу отвечает пользователю (без редактора), форма — по вопросу. */
+    /** Single expert — answers the user directly (no editor), form by question. */
     fun direct(role: ExpertRole, route: ChatRoute): String =
         listOf(COMMON, role.prompt, VEHICLE_DATA, periodRule(route.periodDays), answerForm(route.intent)).joinToString("\n")
 
-    /** Редактор: из заметок экспертов — один ответ на заданный вопрос. */
+    /** Editor: turns the experts' notes into one answer to the question asked. */
     fun editor(route: ChatRoute, notes: List<ExpertNote>): String = buildString {
         appendLine(COMMON)
         appendLine(
@@ -88,8 +88,8 @@ object SystemPrompts {
     }.trimEnd()
 
     /**
-     * Модель на телефоне: один вызов (≈ 90 с на вызов — несколько ролей по очереди не дождаться), поэтому она «сразу в
-     * ролях» выбранных экспертов, данные — сводкой из нужных разделов.
+     * On-device model: a single call (≈ 90 s per call — running several roles in turn takes too long), so it is "in the
+     * roles" of the selected experts at once («сразу в ролях»), with data as a summary of the relevant sections.
      */
     fun onDevice(route: ChatRoute, digest: String?): String = buildString {
         appendLine(COMMON)

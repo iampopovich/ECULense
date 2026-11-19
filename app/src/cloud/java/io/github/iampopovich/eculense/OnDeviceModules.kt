@@ -5,8 +5,8 @@ import org.koin.core.module.Module
 import org.koin.dsl.module
 
 /**
- * Облачная сборка (флейвор `cloud`): без :core:ailocal и нативных библиотек LiteRT. Мастер ИИ вместо пункта
- * «На устройстве» пишет, что локальные модели есть в сборке «Локально».
+ * Cloud build (`cloud` flavor): no :core:ailocal and no LiteRT native libraries. Instead of the «На устройстве»
+ * option, the AI wizard says that local models are available in the «Локально» build.
  */
 val onDeviceModules: List<Module> = listOf(
     module { single { BuildCapabilities(onDeviceModels = false) } },

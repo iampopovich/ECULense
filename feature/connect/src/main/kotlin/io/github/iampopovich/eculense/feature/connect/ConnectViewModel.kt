@@ -16,7 +16,7 @@ internal class ConnectViewModel(private val controller: ConnectionController) : 
     val state: StateFlow<ConnectionState> = controller.state
 
     fun refresh() {
-        // Спаренные BT — первыми, затем Wi-Fi/USB, демо-режим — всегда последним (порядок getAll() в Koin не гарантирован).
+        // Paired BT first, then Wi-Fi/USB, demo mode always last (Koin getAll() order is not guaranteed).
         viewModelScope.launch { _endpoints.value = controller.discover().sortedBy { kindRank(it.kind) } }
     }
 

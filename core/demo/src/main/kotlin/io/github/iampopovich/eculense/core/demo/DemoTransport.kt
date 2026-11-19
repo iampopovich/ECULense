@@ -13,10 +13,10 @@ import kotlin.math.roundToInt
 import kotlin.random.Random
 
 /**
- * Виртуальный ELM327 v1.5 на CAN 11/500 (протокол 6), подключённый к «заведённой машине» [DemoEngine].
- * Понимает ровно то, что шлёт Elm327Session, и отвечает как настоящий адаптер:
- * эхо/пробелы/заголовки/перевод строки по ATE/ATS/ATH/ATL, SEARCHING... на первом запросе,
- * маски 0100/0120/0140, NO DATA на неподдержанные PID, DTC в CAN-формате со счётчиком, VIN многокадровым ответом.
+ * Virtual ELM327 v1.5 on CAN 11/500 (protocol 6), connected to the "running car" [DemoEngine].
+ * Understands exactly what Elm327Session sends and answers like a real adapter:
+ * echo/spaces/headers/linefeeds per ATE/ATS/ATH/ATL, SEARCHING... on the first request,
+ * masks 0100/0120/0140, NO DATA for unsupported PIDs, DTCs in CAN format with a count, VIN as a multi-frame response.
  */
 class DemoTransport internal constructor(
     private val clock: () -> Long,
@@ -75,7 +75,7 @@ class DemoTransport internal constructor(
         if (raw.isEmpty()) return
         val command = raw.replace(" ", "").uppercase()
         val wasSearching = !protocolFound
-        val echoed = echo // ATE0 ещё эхоится сам
+        val echoed = echo // ATE0 itself is still echoed
         val body = handle(command)
         val searching = wasSearching && protocolFound
         delay(latencyMs(command) + if (searching) SEARCH_DELAY_MS else 0)
@@ -150,13 +150,13 @@ class DemoTransport internal constructor(
 
     private fun elapsed(): Long = clock() - startMs
 
-    /** Ответ одним CAN-кадром. hex — байты сообщения без пробелов. */
+    /** Single CAN frame response. hex — message bytes without spaces. */
     private fun singleFrame(hex: String): String {
         val data = if (headers) "7E8%02X".format(hex.length / 2) + hex else hex
         return format(data, firstHeaderLength = if (headers) 3 else 0)
     }
 
-    /** ISO-TP: First Frame + Consecutive Frames. С ATH0 ELM печатает длину и «N:» перед каждым кадром. */
+    /** ISO-TP: First Frame + Consecutive Frames. With ATH0 the ELM prints the length and «N:» before each frame. */
     private fun multiFrame(hex: String): String {
         val bytes = hex.chunked(2)
         val first = bytes.take(6)
@@ -197,14 +197,14 @@ class DemoTransport internal constructor(
         private const val HEX = "0123456789ABCDEF"
         private val VIN_HEX = DemoEngine.VIN.encodeToByteArray().joinToString("") { "%02X".format(it) }
 
-        /** Все PID сервиса 01, на которые отвечает демо (кроме масок): 0x01 + всё из StandardPids. */
+        /** All service 01 PIDs the demo answers (except masks): 0x01 + everything from StandardPids. */
         private val ANSWERED: Set<Int> = StandardPids.all.map { it.code }.toSet() + 0x01
 
-        /** Задержка как у BT-клона ELM327: 30–60 мс на ответ, сброс дольше. */
+        /** Latency like a BT ELM327 clone: 30–60 ms per response, reset takes longer. */
         fun defaultLatency(command: String): Long =
             Random.nextLong(30, 61) + if (command == "ATZ") 300 else 0
 
-        /** Обратные SAE-формулы к StandardPids: значение → ответ «41 PID данные» (hex без пробелов). */
+        /** Inverse SAE formulas for StandardPids: value → response "41 PID data" (hex without spaces). */
         internal fun encodePid(pid: Int, values: Map<Int, Double>): String? {
             val v = values[pid] ?: return null
             val data = when (pid) {
@@ -228,7 +228,7 @@ class DemoTransport internal constructor(
     }
 }
 
-/** Единственный «адаптер» демо-режима: создаёт свежую симуляцию на каждое подключение. */
+/** The only demo-mode "adapter": creates a fresh simulation for each connection. */
 class DemoTransportFactory(
     private val clock: () -> Long = System::currentTimeMillis,
     private val latencyMs: (String) -> Long = DemoTransport.Companion::defaultLatency,

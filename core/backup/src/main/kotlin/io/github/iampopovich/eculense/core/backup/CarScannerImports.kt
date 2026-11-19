@@ -30,26 +30,26 @@ import kotlinx.coroutines.flow.map
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
-/** Состояние фонового импорта для экрана. */
+/** Background import state for the screen. */
 sealed interface ImportWorkState {
     data object Idle : ImportWorkState
-    /** total = 0 — ещё копируется файл / читается архив. */
+    /** total = 0: file still being copied / archive being read. */
     data class Running(val done: Int, val total: Int) : ImportWorkState
     data class Finished(val ok: Boolean, val error: String? = null) : ImportWorkState
 }
 
-/** Что нужно экрану от фонового импорта — интерфейс, чтобы ViewModel тестировалась без WorkManager. */
+/** What the screen needs from the background import; an interface so the ViewModel is testable without WorkManager. */
 interface ImportService {
     val state: Flow<ImportWorkState>
-    /** releaseUri — отдать постоянный доступ SAF к файлу после импорта (одиночный выбор файла, не папка). */
+    /** releaseUri: release the persistent SAF access to the file after import (single file pick, not a folder). */
     fun start(uri: String, fileName: String, releaseUri: Boolean)
     fun cancel()
 }
 
 /**
- * Импорт бэкапа Car Scanner в WorkManager (1.27 п.2): переживает уход с экрана и сворачивание. Запуск — expedited
- * прямо из нажатия, пока приложение на экране: так воркер успевает стать foreground-службой (Android 12+/16 не
- * разрешает её из фона, см. DataPacks). Нет квоты expedited — обычная задача (импорт короче 10 минут).
+ * Car Scanner backup import in WorkManager (1.27 item 2): survives leaving the screen and backgrounding. Started as expedited
+ * right from the tap while the app is on screen, so the worker manages to become a foreground service (Android 12+/16 doesn't
+ * allow it from the background, see DataPacks). No expedited quota: a regular job (import takes under 10 minutes).
  */
 class CarScannerImports(private val context: Context) : ImportService {
     private val work get() = WorkManager.getInstance(context)
@@ -93,7 +93,7 @@ class CarScannerImports(private val context: Context) : ImportService {
     }
 }
 
-/** Импорт одного .cbz/.brc: foreground-уведомление «Записи 23 из 73» с «Отменить», итог — уведомление и строка в истории. */
+/** Import of one .cbz/.brc: foreground notification «Записи 23 из 73» with «Отменить»; result is a notification and a history row. */
 class CarScannerImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params), KoinComponent {
     private val runner: ImportRunner by inject()
 
@@ -108,8 +108,8 @@ class CarScannerImportWorker(context: Context, params: WorkerParameters) : Corou
         var lastProgressMs = 0L
         return try {
             val item = runner.run(uri, name) { p ->
-                // Android режет обновления уведомлений чаще ~5 в секунду (уже импортированные .brc пролетают за
-                // миллисекунды) — тогда пропадает и итоговое уведомление. Прогресс — не чаще раза в секунду.
+                // Android throttles notification updates above ~5 per second (already imported .brc fly by in
+                // milliseconds), and then the final notification gets lost too. Progress at most once per second.
                 val now = System.currentTimeMillis()
                 if (now - lastProgressMs >= PROGRESS_EVERY_MS || p.done == p.total) {
                     lastProgressMs = now
@@ -121,7 +121,7 @@ class CarScannerImportWorker(context: Context, params: WorkerParameters) : Corou
                     runCatching { setForegroundAsync(foregroundInfo(p)) }
                 }
             }
-            // только счётчики: без имён файлов и путей пользователя
+            // counters only: no file names or user paths
             Log.i(
                 CarScannerImports.TAG,
                 "import finished in ${System.currentTimeMillis() - started} ms: recordings +${item.recordingsAdded} skipped=${item.recordingsSkipped} " +

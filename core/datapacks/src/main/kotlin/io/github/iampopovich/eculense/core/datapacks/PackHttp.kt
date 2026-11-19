@@ -8,8 +8,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Ответ GET. contentLength = -1, если сервер не сообщил длину (или отдаёт gzip).
- * [rangeStart] — с какого байта файла начинается тело (206 Partial Content); null — тело с начала файла.
+ * GET response. contentLength = -1 if the server didn't report the length (or serves gzip).
+ * [rangeStart] — the file byte the body starts at (206 Partial Content); null — the body starts at the beginning of the file.
  */
 class HttpResponse(
     val code: Int,
@@ -24,28 +24,28 @@ class HttpResponse(
     }
 }
 
-/** Ответ HEAD без следования редиректу: код и заголовки (имена в нижнем регистре). */
+/** HEAD response without following redirects: status code and headers (lowercase names). */
 class HttpHead(val code: Int, val headers: Map<String, String>, val location: String?)
 
-/** HTTP для пакетов. Отдельный интерфейс — JVM-тесты гоняют настоящий клиент против локального HttpServer. */
+/** HTTP for packs. A separate interface — JVM tests run the real client against a local HttpServer. */
 interface PackHttp {
-    /** GET со следованием редиректам (github.com → release-assets.githubusercontent.com). */
+    /** GET following redirects (github.com → release-assets.githubusercontent.com). */
     fun get(url: String): HttpResponse
 
     /**
-     * GET с заголовками (только исходному хосту — не CDN после редиректа) и с байта [offset] (Range). Сервер вправе
-     * проигнорировать Range и отдать 200 с начала — тогда [HttpResponse.rangeStart] = null. По умолчанию (фейки) —
-     * обычный GET с начала.
+     * GET with headers (only to the original host — not the CDN after a redirect) and from byte [offset] (Range). The server may
+     * ignore Range and return 200 from the start — then [HttpResponse.rangeStart] = null. By default (fakes) —
+     * a plain GET from the start.
      */
     fun get(url: String, headers: Map<String, String>, offset: Long): HttpResponse = get(url)
 
-    /** HEAD без следования редиректу (размер и хэш LFS-файла Hugging Face — в `x-linked-size`/`x-linked-etag`). */
+    /** HEAD without following redirects (size and hash of a Hugging Face LFS file are in `x-linked-size`/`x-linked-etag`). */
     fun head(url: String, headers: Map<String, String> = emptyMap()): HttpHead = throw UnsupportedOperationException("HEAD")
 
-    /** Location ответа без следования редиректу (`/releases/latest` → `/releases/tag/<tag>`); null — редиректа нет. */
+    /** Response Location without following the redirect (`/releases/latest` → `/releases/tag/<tag>`); null — no redirect. */
     fun redirectLocation(url: String): String?
 
-    /** HTTP-код HEAD-запроса (200 — файл есть, 404 — нет). */
+    /** HTTP status of a HEAD request (200 — file exists, 404 — it doesn't). */
     fun status(url: String): Int
 }
 
@@ -69,8 +69,8 @@ class UrlConnectionHttp(private val connectTimeoutMs: Int = 15_000, private val 
     }
 
     /**
-     * Редиректы — вручную: заголовки авторизации уходят только на хост исходного URL (Hugging Face), подписанная
-     * ссылка CDN их не получает. Range передаётся на каждом шаге.
+     * Redirects are handled manually: auth headers go only to the original URL's host (Hugging Face); the signed
+     * CDN link doesn't get them. Range is passed on every hop.
      */
     override fun get(url: String, headers: Map<String, String>, offset: Long): HttpResponse {
         var current = url
@@ -97,7 +97,7 @@ class UrlConnectionHttp(private val connectTimeoutMs: Int = 15_000, private val 
                 code in 200..299 -> return HttpResponse(code, c.contentLengthLong, c.inputStream, onClose = { c.disconnect() })
                 else -> {
                     c.disconnect()
-                    // в тексте — только исходный адрес: подписанная ссылка CDN длинная и временная
+                    // only the original address in the message: the signed CDN link is long and temporary
                     throw HttpStatusException(code, url)
                 }
             }
@@ -152,10 +152,10 @@ class UrlConnectionHttp(private val connectTimeoutMs: Int = 15_000, private val 
     }
 }
 
-/** Ответ с ошибочным кодом (401/403 — нужен токен, 404 — нет файла, 416 — диапазон вне файла). */
+/** Response with an error status (401/403 — token required, 404 — no file, 416 — range outside the file). */
 class HttpStatusException(val code: Int, url: String) : IOException("HTTP $code: $url")
 
-/** Сколько байт скачано и сколько всего (null — неизвестно). */
+/** Bytes downloaded and the total (null — unknown). */
 fun interface DownloadProgress {
     fun onProgress(done: Long, total: Long?)
 }

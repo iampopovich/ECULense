@@ -6,7 +6,7 @@ import io.github.iampopovich.eculense.core.carscanner.SqliteOpener
 import io.github.iampopovich.eculense.core.carscanner.SqliteSource
 import java.io.File
 
-/** SQLite из бэкапа Car Scanner через android.database.sqlite. Открываем временную копию, поэтому READWRITE не страшен (WAL-заголовок). */
+/** SQLite from a Car Scanner backup via android.database.sqlite. We open a temporary copy, so READWRITE is harmless (WAL header). */
 internal object AndroidSqlite : SqliteOpener {
     override fun open(file: File): SqliteSource {
         val db = SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.NO_LOCALIZED_COLLATORS)

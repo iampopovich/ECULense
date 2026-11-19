@@ -106,7 +106,7 @@ private fun askAi(enabled: Boolean, onClick: () -> Unit): (@Composable () -> Uni
         null
     }
 
-/** Название, а для OBDex — ещё две частые причины и симптомы; источник подписан (чья расшифровка). */
+/** Name, plus for OBDex two common causes and symptoms; the source is labeled (whose decoding it is). */
 @Composable
 internal fun DtcInfoText(info: DtcInfo) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

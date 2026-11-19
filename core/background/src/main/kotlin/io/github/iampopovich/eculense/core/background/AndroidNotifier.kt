@@ -20,7 +20,7 @@ import io.github.iampopovich.eculense.core.navigation.DeepLinks
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
-/** Ключи показанных уведомлений в SharedPreferences: отдельный файл на вид, чтобы задачи не затирали друг друга. */
+/** Keys of shown notifications in SharedPreferences: a separate file per kind so jobs don't overwrite each other. */
 internal class PrefsAlertLedger(context: Context, private val name: String) : AlertLedger {
     private val prefs = context.getSharedPreferences("alerts", Context.MODE_PRIVATE)
     override suspend fun load(): Set<String> = prefs.getStringSet(name, emptySet()).orEmpty().toSet()
@@ -30,8 +30,8 @@ internal class PrefsAlertLedger(context: Context, private val name: String) : Al
 }
 
 /**
- * Уведомления: канал «Анализ» (новые находки) и «Обслуживание» (пора ТО). Нажатие открывает нужный экран
- * через [DeepLinks]. Без разрешения POST_NOTIFICATIONS (API 33+) молча пропускаем — анализ всё равно в БД.
+ * Notifications: channel «Анализ» (new findings) and «Обслуживание» (maintenance due). Tapping opens the right screen
+ * via [DeepLinks]. Without the POST_NOTIFICATIONS permission (API 33+) we silently skip — the analysis is in the DB anyway.
  */
 internal class AndroidNotifier(private val context: Context) : Notifier {
     override fun findings(carName: String, items: List<Finding>) {
@@ -110,7 +110,7 @@ internal val Severity.label: String
         Severity.OK -> "В норме"
     }
 
-/** «просрочено на 300 км», «через 9 дн.», «осталось 800 км» — что наступит раньше. */
+/** «просрочено на 300 км», «через 9 дн.», «осталось 800 км» — whichever comes first. */
 internal fun MaintenanceDue.describe(): String {
     val parts = buildList {
         kmLeft?.let { km -> val v = abs(km).roundToLong(); add(if (km <= 0) "просрочено на $v км" else "осталось $v км") }

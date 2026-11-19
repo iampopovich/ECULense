@@ -19,7 +19,7 @@ internal data class CarUiState(
     val units: UnitsSettings = UnitsSettings(),
 )
 
-/** Список машин, активная машина и единицы. Статистика — отдельная вкладка (:feature:stats). */
+/** Car list, active car and units. Statistics is a separate tab (:feature:stats). */
 internal class CarViewModel(
     private val cars: CarRepository,
     private val unitsRepository: UnitsRepository,

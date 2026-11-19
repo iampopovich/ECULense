@@ -21,50 +21,50 @@ import io.github.iampopovich.eculense.core.model.SensorReading
 import kotlin.math.roundToInt
 
 /**
- * Сжатая сводка одной сессии — всё, что нужно правилам. Считается одним проходом по значениям,
- * отсортированным по времени; между сессиями складывается через [Agg]/[Histogram], поэтому пересчёт
- * по всей истории не держит в памяти миллион значений.
+ * Compact summary of one session: everything the rules need. Computed in a single pass over values
+ * sorted by time; combined across sessions via [Agg]/[Histogram], so recomputing
+ * over the whole history does not hold a million values in memory.
  */
 data class SessionDigest(
     val sessionId: Long,
     val startedAtMs: Long,
     val coolant: Agg = Agg.EMPTY,
-    /** Самый долгий отрезок подряд с ОЖ ≥ 105 °C. */
+    /** Longest continuous stretch with coolant ≥ 105 °C. */
     val overheatWarnMs: Long = 0,
-    /** Самый долгий отрезок подряд с ОЖ ≥ 110 °C. */
+    /** Longest continuous stretch with coolant ≥ 110 °C. */
     val overheatCritMs: Long = 0,
-    /** Чьё напряжение использовано: [MODULE_VOLTAGE], если есть, иначе [ELM_VOLTAGE]. */
+    /** Whose voltage was used: [MODULE_VOLTAGE] if present, otherwise [ELM_VOLTAGE]. */
     val voltageSensor: String? = null,
     val runningVoltage: Agg = Agg.EMPTY,
     val runningVoltageHist: Histogram = Histogram.EMPTY,
     val lowVoltageMs: Long = 0,
     val highVoltageMs: Long = 0,
-    /** Коррекции 01.06–01.09 на прогретом двигателе. */
+    /** Fuel trims 01.06–01.09 on a warm engine. */
     val warmTrims: Map<String, Agg> = emptyMap(),
-    /** MAF на прогретом холостом ходу (скорость 0, обороты 400–1100). */
+    /** MAF at warm idle (speed 0, RPM 400–1100). */
     val warmIdleMaf: Agg = Agg.EMPTY,
     val milDistanceKm: Agg = Agg.EMPTY,
-    /** ОЖ в первом замере записи. */
+    /** Coolant at the first sample of the recording. */
     val coldStartC: Double? = null,
-    /** От первого замера ОЖ до 80 °C — только для холодного пуска (≤ 30 °C). */
+    /** From the first coolant sample to 80 °C: cold starts only (≤ 30 °C). */
     val warmupMs: Long? = null,
-    /** Распределения для медиан между сессиями (тренды): ОЖ, коррекции на прогретом, обороты прогретого ХХ. */
+    /** Distributions for cross-session medians (trends): coolant, warm-engine trims, warm idle RPM. */
     val coolantHist: Histogram = Histogram.EMPTY,
     val warmTrimHist: Map<String, Histogram> = emptyMap(),
-    /** Обороты прогретого холостого хода: скорость 0, обороты 400–1100. */
+    /** Warm idle RPM: speed 0, RPM 400–1100. */
     val warmIdleRpm: Agg = Agg.EMPTY,
     val warmIdleRpmHist: Histogram = Histogram.EMPTY,
 )
 
 object SessionDigester {
-    /** [readings] — только нужные правилам датчики ([SensorIds.FOR_RULES]), отсортированные по времени. */
+    /** [readings]: only the sensors the rules need ([SensorIds.FOR_RULES]), sorted by time. */
     fun digest(sessionId: Long, startedAtMs: Long, readings: Iterable<SensorReading>): SessionDigest {
         val acc = Accumulator()
         readings.forEach(acc::accept)
         return acc.build(sessionId, startedAtMs)
     }
 
-    /** Изменяемый накопитель: один проход, без копий коллекций на каждом значении. */
+    /** Mutable accumulator: single pass, no collection copies per value. */
     class Accumulator {
         private var rpm = Double.NaN
         private var rpmAt = Long.MIN_VALUE
@@ -95,7 +95,7 @@ object SessionDigester {
 
         fun accept(r: SensorReading) = accept(r.sensorId, r.value, r.timestampMs)
 
-        /** Без промежуточных объектов: пересчёт по истории — это миллион значений. */
+        /** No intermediate objects: recomputing over the history means a million values. */
         fun accept(sensorId: String, v: Double, t: Long) {
             if (v.isNaN() || v.isInfinite()) return
             when (sensorId) {
@@ -155,7 +155,7 @@ object SessionDigester {
         }
     }
 
-    /** Изменяемая гистограмма с шагом 0,1 (как [Histogram]) — без копии карты на каждом значении. */
+    /** Mutable histogram with a 0.1 step (like [Histogram]), without copying the map per value. */
     private class Bins {
         private val bins = HashMap<Int, Int>()
         fun add(v: Double) {
@@ -174,7 +174,7 @@ object SessionDigester {
         fun toAgg() = Agg(count, sum, min, max)
     }
 
-    /** Самый длинный отрезок, на котором условие выполнялось на каждом замере подряд. */
+    /** Longest stretch where the condition held on every consecutive sample. */
     private class RunTracker {
         private var start = Long.MIN_VALUE
         var longest = 0L
@@ -187,7 +187,7 @@ object SessionDigester {
         }
     }
 
-    /** Напряжение считается только на работающем двигателе: стартер и выключенное зажигание — не недозаряд. */
+    /** Voltage counts only with the engine running: cranking and ignition off are not undercharging. */
     private class VoltageAcc {
         val agg = MutableAgg()
         val low = RunTracker()

@@ -25,10 +25,10 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 
 /**
- * Поле ввода чата в стиле Material 3 (Gemini/ChatGPT): одна «пилюля» surfaceContainerHigh, внутри — растущее поле
- * без своей рамки (до 6 строк) и круглая кнопка справа внизу. Пустое поле → «Отправить» недоступна (предупреждение
- * ошибок); пока идёт ответ — та же кнопка становится «Стоп» и обрывает поток (видимость состояния).
- * Кнопки 40 dp с зоной касания 48 dp (minimumInteractiveComponentSize внутри IconButton).
+ * Material 3-style chat input (Gemini/ChatGPT): a single surfaceContainerHigh "pill" containing a growing field
+ * without its own border (up to 6 lines) and a round button at the bottom right. Empty field → «Отправить» is disabled (error
+ * prevention); while a response is streaming, the same button becomes «Стоп» and cuts the stream (visibility of system status).
+ * 40 dp buttons with a 48 dp touch target (minimumInteractiveComponentSize inside IconButton).
  */
 @Composable
 internal fun ChatComposer(

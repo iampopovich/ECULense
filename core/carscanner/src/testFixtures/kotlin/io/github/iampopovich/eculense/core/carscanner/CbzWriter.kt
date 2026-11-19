@@ -7,7 +7,7 @@ import java.sql.DriverManager
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/** SQLite на JVM (sqlite-jdbc) для тестов: тот же контракт, что у android.database.sqlite в :core:data. */
+/** SQLite on the JVM (sqlite-jdbc) for tests: same contract as android.database.sqlite in :core:data. */
 object JdbcSqlite : SqliteOpener {
     override fun open(file: File): SqliteSource {
         val connection = DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}")
@@ -25,8 +25,8 @@ object JdbcSqlite : SqliteOpener {
 }
 
 /**
- * Синтетический бэкап .cbz: ключи настроек в формате Car Scanner + drivecyclesv2.db.bak с таблицами cars/trips + записи .brc.
- * Только выдуманные значения — данные реального бэкапа в репозиторий не попадают.
+ * Synthetic .cbz backup: settings keys in Car Scanner format + drivecyclesv2.db.bak with cars/trips tables + .brc recordings.
+ * Only made-up values — real backup data never gets into the repository.
  */
 class CbzWriter {
     private val settings = linkedMapOf<String, ByteArray>()

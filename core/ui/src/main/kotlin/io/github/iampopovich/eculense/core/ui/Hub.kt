@@ -21,7 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
 
-/** Экран вкладки-хаба: заголовок и список карточек-пунктов. */
+/** Hub tab screen: title and a list of item cards. */
 @Composable
 fun HubScaffold(title: String, modifier: Modifier = Modifier, content: LazyListScope.() -> Unit) {
     LazyColumn(
@@ -35,7 +35,7 @@ fun HubScaffold(title: String, modifier: Modifier = Modifier, content: LazyListS
     }
 }
 
-/** Карточка пункта хаба. onClick = null → информационная (не нажимается). */
+/** Hub item card. onClick = null → informational (not clickable). */
 @Composable
 fun HubCard(
     title: String,
@@ -62,7 +62,7 @@ fun HubCard(
     }
 }
 
-/** Пустой хаб: короткое объяснение вместо пустого экрана. */
+/** Empty hub: a short explanation instead of an empty screen. */
 @Composable
 fun HubEmptyText(text: String, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth().padding(vertical = 8.dp)) {

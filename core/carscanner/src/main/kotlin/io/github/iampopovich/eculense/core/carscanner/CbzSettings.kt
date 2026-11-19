@@ -6,9 +6,9 @@ import java.io.InputStream
 import java.util.zip.ZipInputStream
 
 /**
- * Настройки Car Scanner из корня .cbz: один файл = один ключ.
- * Строки — UTF-8 без длины (короткие «RUB», «Kia», «57.3» легко принять за число — это НЕ int),
- * числа — 4 байта big-endian, флаги — 1 байт. Тип берём из списка известных ключей, а не угадываем по длине.
+ * Car Scanner settings from the .cbz root: one file = one key.
+ * Strings are UTF-8 without a length (short ones like «RUB», «Kia», «57.3» are easily mistaken for numbers; they are NOT ints),
+ * numbers are 4-byte big-endian, flags are 1 byte. The type comes from the list of known keys, not guessed from the length.
  */
 data class CarScannerSettings(
     val brand: String? = null,
@@ -30,17 +30,17 @@ data class CarScannerSettings(
     val ioTimeout: Int? = null,
     val sendDelay: Int? = null,
 ) {
-    /** Есть ли в бэкапе хоть один флаг единиц измерения. */
+    /** Whether the backup has at least one unit-of-measure flag. */
     val hasUnits: Boolean
         get() = listOf(useKm, useCelsius, useL100, useLiters, useUsGallon, pressureKpa, horsePower, torqueNm, flowGramsPerSecond, accelerationG)
             .any { it != null }
 }
 
-/** Машина из таблицы cars (drivecyclesv2.db). settings_string не читаем: это закрытый закодированный блоб. */
+/** A car from the cars table (drivecyclesv2.db). settings_string is not read: it's a closed encoded blob. */
 data class CarScannerCar(val id: Long, val name: String, val year: Int?)
 
 /**
- * Строка таблицы trips. *_ticks — .NET ticks (100 нс): total_ticks / (finished − started) ≈ 10 000 на реальном бэкапе.
+ * A row of the trips table. *_ticks are .NET ticks (100 ns): total_ticks / (finished − started) ≈ 10 000 on a real backup.
  */
 data class CarScannerTrip(
     val carId: Long?,
@@ -52,7 +52,7 @@ data class CarScannerTrip(
     val drivingTicks: Long,
     val standingTicks: Long,
     val totalTicks: Long,
-    /** trips.id в drivecyclesv2.db (autoincrement Car Scanner); null — синтетика без id. Только для отчёта/диагностики. */
+    /** trips.id in drivecyclesv2.db (Car Scanner autoincrement); null for synthetic data without an id. For reporting/diagnostics only. */
     val id: Long? = null,
 ) {
     val distanceKm: Double get() = distanceMm / 1_000_000.0
@@ -66,16 +66,16 @@ data class CarScannerTrip(
     }
 }
 
-/** Всё, что кроме записей .brc: настройки, машины, поездки. */
+/** Everything except the .brc recordings: settings, cars, trips. */
 data class CarScannerBackupMeta(
     val settings: CarScannerSettings,
     val cars: List<CarScannerCar>,
     val trips: List<CarScannerTrip>,
 )
 
-/** Минимальный доступ к SQLite: на Android — android.database.sqlite, в JVM-тестах — sqlite-jdbc. */
+/** Minimal SQLite access: android.database.sqlite on Android, sqlite-jdbc in JVM tests. */
 interface SqliteSource : Closeable {
-    /** Значения колонок в порядке SELECT: Long, Double, String, ByteArray или null. */
+    /** Column values in SELECT order: Long, Double, String, ByteArray or null. */
     fun rows(sql: String): List<List<Any?>>
 }
 
@@ -84,7 +84,7 @@ fun interface SqliteOpener {
 }
 
 object CbzSettingsReader {
-    /** entries — файлы из корня архива (имя без «/») → содержимое. */
+    /** entries: files from the archive root (name without "/") → contents. */
     fun parse(entries: Map<String, ByteArray>): CarScannerSettings {
         fun str(key: String) = entries[key]?.takeIf { it.isNotEmpty() }?.toString(Charsets.UTF_8)?.trim()
         fun bool(key: String) = entries[key]?.takeIf { it.size == 1 }?.let { it[0].toInt() != 0 }
@@ -95,7 +95,7 @@ object CbzSettingsReader {
             brand = str("SelectedBrand"),
             diagProfile = str("SelectedProfileV2Name"),
             currency = str("Currency"),
-            // «57.3» или «57,3» в зависимости от локали телефона, где делали бэкап
+            // «57.3» or «57,3» depending on the locale of the phone where the backup was made
             fuelPricePerL = str("FuelPriceForLitre")?.replace(',', '.')?.toDoubleOrNull(),
             useKm = bool("Use_km"),
             useCelsius = bool("Use_celcium"),
@@ -142,8 +142,8 @@ object CbzSettingsReader {
     }.getOrDefault(emptyList())
 
     /**
-     * Один проход по архиву: настройки из корня + drivecyclesv2.db.bak (во временный файл — SQLite читает только с диска).
-     * Записи .brc пропускаются без чтения в память.
+     * A single pass over the archive: settings from the root + drivecyclesv2.db.bak (to a temp file, since SQLite reads only from disk).
+     * .brc entries are skipped without being read into memory.
      */
     fun readMeta(input: InputStream, tempDir: File, sqlite: SqliteOpener): CarScannerBackupMeta {
         val settings = mutableMapOf<String, ByteArray>()

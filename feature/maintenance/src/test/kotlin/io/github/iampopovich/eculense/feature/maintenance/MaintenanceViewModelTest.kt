@@ -45,7 +45,7 @@ private class OneCar(car: CarProfile) : CarRepository {
     override suspend fun setActive(id: Long) = Unit
 }
 
-/** ТО в памяти поверх настоящих правил (MaintenanceRule, OdometerEstimator). */
+/** In-memory maintenance on top of the real rules (MaintenanceRule, OdometerEstimator). */
 private class MemMaintenance(private val now: Long) : MaintenanceRepository {
     val items = MutableStateFlow<List<MaintenanceItem>>(emptyList())
     val log = MutableStateFlow<List<OdometerEntry>>(emptyList())

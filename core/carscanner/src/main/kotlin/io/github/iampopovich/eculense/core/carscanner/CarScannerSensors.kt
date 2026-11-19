@@ -1,8 +1,8 @@
 package io.github.iampopovich.eculense.core.carscanner
 
 /**
- * Сопоставление внутренних id датчиков Car Scanner с нашими sensorId.
- * Сверено по реальному бэкапу: имя датчика + диапазон значений. Остальные id сохраняются как "cs.<id>".
+ * Mapping of Car Scanner internal sensor ids to our sensorId.
+ * Verified against a real backup: sensor name + value range. Other ids are stored as "cs.<id>".
  */
 object CarScannerSensors {
     private val obd = mapOf(
@@ -11,7 +11,7 @@ object CarScannerSensors {
         41 to "01.21",
     )
 
-    /** Код формата → единица при настройках из бэкапа пользователя: км, °C, л/100 км, л.с., g, давление не в кПа. */
+    /** Format code → unit under the user's backup settings: km, °C, L/100 km, hp, g, pressure not in kPa. */
     private val units = mapOf(
         1 to "km/h", 3 to "km", 6 to "rpm", 7 to "°", 8 to "g/s", 10 to "V", 12 to "L/h", 14 to "%",
         15 to "°C", 20 to "m", 22 to "L/100km", 24 to "L", 43 to "g", 45 to "hp", 46 to "hp", 47 to "psi",
@@ -21,6 +21,6 @@ object CarScannerSensors {
 
     fun unit(format: Int): String = units[format].orEmpty()
 
-    /** «Сырые» датчики. С 229 начинаются производные (расход, стоимость, пробег за день/неделю) и GPS — их не берём. */
+    /** Raw sensors. From 229 on come derived ones (consumption, cost, daily/weekly mileage) and GPS — we skip them. */
     fun isImported(csId: Int): Boolean = csId < 229
 }

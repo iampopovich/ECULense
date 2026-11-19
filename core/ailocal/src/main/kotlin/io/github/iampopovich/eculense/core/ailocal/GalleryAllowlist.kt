@@ -4,7 +4,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** Запись allowlist Google AI Edge Gallery (`model_allowlists/<ver>.json`, Apache-2.0); лишние поля игнорируются. */
+/** A Google AI Edge Gallery allowlist entry (`model_allowlists/<ver>.json`, Apache-2.0); extra fields are ignored. */
 @Serializable
 data class GalleryModel(
     val name: String,
@@ -29,20 +29,20 @@ data class GalleryConfig(val accelerators: String? = null)
 private data class GalleryAllowlistFile(val models: List<GalleryModel> = emptyList())
 
 /**
- * Основной каталог моделей — allowlist приложения Google AI Edge Gallery (github.com/google-ai-edge/gallery,
- * Apache-2.0): HF-репозиторий, файл, коммит, размер, минимум ОЗУ, ускорители. В приложении лежит копия
- * [BUNDLED_VERSION]; свежая подтягивается по запросу ([LocalModels.refreshCatalog]). Файл пишется вручную и
- * содержит висячие запятые — парсим терпимо.
+ * The main model catalog is the Google AI Edge Gallery app's allowlist (github.com/google-ai-edge/gallery,
+ * Apache-2.0): HF repository, file, commit, size, minimum RAM, accelerators. The app ships a copy of
+ * [BUNDLED_VERSION]; a fresh one is fetched on demand ([LocalModels.refreshCatalog]). The file is hand-written and
+ * contains trailing commas — parse leniently.
  */
 object GalleryAllowlist {
     const val BUNDLED_VERSION = "1_0_23"
     const val REPO_URL = "https://github.com/google-ai-edge/gallery"
     private const val RAW = "https://raw.githubusercontent.com/google-ai-edge/gallery/main/model_allowlists/"
 
-    /** Задачи Gallery, для которых модель годится как чат. */
+    /** Gallery tasks for which a model is usable as a chat. */
     private val CHAT_TASKS = setOf("llm_chat", "llm_agent_chat")
 
-    /** Закрытые (gated) репозитории на 2026-11-19 — пока нет ответа API Hugging Face. */
+    /** Gated repositories as of 2026-11-19 — until the Hugging Face API responds. */
     val KNOWN_GATED = setOf(
         "litert-community/Gemma3-1B-IT",
         "google/gemma-3n-E2B-it-litert-lm",
@@ -60,7 +60,7 @@ object GalleryAllowlist {
 
     fun url(version: String): String = "$RAW$version.json"
 
-    /** Следующая версия allowlist («1_0_23» → «1_0_24»): новые файлы получают больший номер. */
+    /** Next allowlist version («1_0_23» → «1_0_24»): new files get a higher number. */
     fun next(version: String): String {
         val parts = version.split('_')
         val last = parts.last().toIntOrNull() ?: return version
@@ -75,7 +75,7 @@ object GalleryAllowlist {
 
     fun bundled(): List<GalleryModel> = parse(bundledText())
 
-    /** Чат-модели `.litertlm` → записи каталога с закреплённой ссылкой `resolve/<commit>/<file>`. */
+    /** `.litertlm` chat models → catalog entries with a pinned `resolve/<commit>/<file>` link. */
     fun toLocalModels(models: List<GalleryModel>, gated: Map<String, Boolean> = emptyMap()): List<LocalModel> =
         models.filter { m ->
             m.modelFile.endsWith(".litertlm") && m.modelId.contains('/') && m.commitHash.isNotBlank() && m.taskTypes.any { it in CHAT_TASKS }
@@ -87,7 +87,7 @@ object GalleryAllowlist {
                 description = plain(m.description),
                 url = "https://huggingface.co/${m.modelId}/resolve/${m.commitHash}/${m.modelFile}",
                 sizeBytes = m.sizeInBytes.takeIf { it > 0 },
-                sha256 = null, // allowlist не даёт хэш; проверяется размер
+                sha256 = null, // the allowlist provides no hash; size is checked
                 gated = gated[m.modelId] ?: (m.modelId in KNOWN_GATED),
                 origin = ModelOrigin.GALLERY,
                 license = "см. страницу модели",
@@ -100,6 +100,6 @@ object GalleryAllowlist {
             )
         }
 
-    /** Markdown-ссылки описаний «[текст](url)» → «текст». */
+    /** Markdown links in descriptions «[text](url)» → «text». */
     fun plain(markdown: String): String = markdown.replace(Regex("""\[([^\]]+)]\([^)]*\)"""), "$1").trim()
 }

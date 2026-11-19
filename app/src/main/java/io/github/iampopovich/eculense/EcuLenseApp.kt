@@ -33,7 +33,7 @@ fun EcuLenseApp(deepLink: String? = null, onDeepLinkHandled: () -> Unit = {}) {
     val backStack = rememberNavBackStack(entries.first().destination)
     val navigator = remember(backStack) { Navigator { backStack.add(it) } }
 
-    // Нажатие на уведомление: экран поверх «Пит-стопа», если фича с ним подключена (иначе просто открываем приложение).
+    // Notification tap: screen on top of «Пит-стоп» if that feature is wired in (otherwise just open the app).
     LaunchedEffect(deepLink) {
         val target = DeepLinks.destination(deepLink) ?: return@LaunchedEffect
         val hubs = koin.getAll<HubEntry>()
@@ -52,7 +52,7 @@ fun EcuLenseApp(deepLink: String? = null, onDeepLinkHandled: () -> Unit = {}) {
                 item(
                     icon = { Icon(painterResource(entry.icon), contentDescription = entry.label) },
                     label = { Text(entry.label) },
-                    // Вкладка = корень стека: подэкран (например, «Адаптер» из настроек) не сбрасывает подсветку.
+                    // Tab = stack root: a sub-screen (e.g. «Адаптер» from settings) does not reset the highlight.
                     selected = backStack.firstOrNull() == entry.destination,
                     onClick = {
                         backStack.clear()

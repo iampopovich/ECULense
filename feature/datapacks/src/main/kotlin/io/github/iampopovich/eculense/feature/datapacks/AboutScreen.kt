@@ -17,10 +17,10 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import io.github.iampopovich.eculense.core.datapacks.PackCatalog
 
-/** Источник данных для «О приложении»: что, чьё, под какой лицензией, где взять. */
+/** Data source for «О приложении»: what, whose, under which license, where to get it. */
 internal data class Attribution(val title: String, val license: String, val url: String, val note: String)
 
-/** Все внешние данные приложения: пакеты по запросу + встроенная база кодов + OBDb. */
+/** All external app data: on-demand packs + bundled code database + OBDb. */
 internal val ATTRIBUTIONS: List<Attribution> =
     PackCatalog.all.map { Attribution(it.title, it.license, it.sourceUrl, "${it.attribution.trimEnd().removeSuffix(".")}. Зафиксированная версия: ${it.version}.") } + listOf(
         Attribution(

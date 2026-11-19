@@ -30,7 +30,7 @@ private class NoPrefs : VehiclePrefs {
     override suspend fun setActiveCarId(id: Long) = Unit
 }
 
-/** Пробег профиля — это последний ручной ввод в журнале odometer_log, а не колонка cars. */
+/** Profile mileage is the latest manual entry in the odometer_log journal, not a cars column. */
 class CarOdometerTest {
     private val dao = MemCarDao()
     private val log = FakeOdometerDao()

@@ -1,31 +1,31 @@
 package io.github.iampopovich.eculense.core.dtcdb
 
-/** Откуда расшифровка: от этого зависит, как её показывать и можно ли ей доверять для этой машины. */
+/** Where the description comes from: this determines how it's shown and whether it can be trusted for this car. */
 enum class DtcSource {
-    /** OBDex: заголовок, описание, причины, симптомы. */
+    /** OBDex: title, description, causes, symptoms. */
     OBDEX,
-    /** Встроенный CSV (только заголовок) — пакет OBDex не скачан. */
+    /** Bundled CSV (title only): the OBDex pack is not downloaded. */
     BUILTIN,
-    /** Заводская расшифровка для марки активной машины (Wal33D). */
+    /** Manufacturer description for the active car's make (Wal33D). */
     OEM,
-    /** Заводской код, для марки машины расшифровки нет — чужую (другой марки) не показываем. */
+    /** Manufacturer code with no description for the car's make; another make's description is not shown. */
     OEM_UNKNOWN,
-    /** Общий код без расшифровки. */
+    /** Generic code without a description. */
     UNKNOWN,
 }
 
 data class DtcInfo(
     val code: String,
-    /** Название кода (англ.); null — неизвестно. */
+    /** Code title (English); null means unknown. */
     val title: String?,
     val source: DtcSource,
     val description: String? = null,
     val causes: List<String> = emptyList(),
     val symptoms: List<String> = emptyList(),
-    /** Марка в базе заводских кодов, по которой найдена расшифровка. */
+    /** Make in the manufacturer code database under which the description was found. */
     val manufacturer: String? = null,
 ) {
-    /** Строка для списка: название или честное «не знаем». */
+    /** List line: the title or an honest «не знаем». */
     val text: String
         get() = title ?: when (source) {
             DtcSource.OEM_UNKNOWN -> OEM_UNKNOWN_TEXT
@@ -43,8 +43,8 @@ object DtcCodes {
     fun isValid(code: String): Boolean = FORMAT.matches(code)
 
     /**
-     * SAE J2012: общие — P0, P2, P34–P39, B0/B3, C0/C3, U0/U3; заводские — P1, P30–P33, B1/B2, C1/C2, U1/U2.
-     * Номера заводских кодов пересекаются между марками: P1847 у GM — соленоид КПП, у Kia — что-то своё.
+     * SAE J2012: generic are P0, P2, P34–P39, B0/B3, C0/C3, U0/U3; manufacturer are P1, P30–P33, B1/B2, C1/C2, U1/U2.
+     * Manufacturer code numbers overlap between makes: P1847 on GM is a transmission solenoid, on Kia something else.
      */
     fun isManufacturerSpecific(code: String): Boolean {
         if (!isValid(code)) return false

@@ -52,7 +52,7 @@ internal class AnalysisViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AnalysisUiState())
 
     init {
-        // Первый вход: находок ещё нет — считаем сразу (в фоне, с прогрессом), а не ждём кнопку.
+        // First visit: no findings yet — compute right away (in the background, with progress) instead of waiting for the button.
         viewModelScope.launch {
             val id = cars.activeCarId() ?: return@launch
             if (analytics.findings(id).isEmpty() && analytics.state.value !is AnalysisState.Running) recompute()
@@ -73,11 +73,11 @@ internal data class FindingUiState(
     val finding: StoredFinding? = null,
     val sessions: List<SessionSummary> = emptyList(),
     val canAskAi: Boolean = false,
-    /** Расшифровки кодов из доказательств (метка доказательства = код DTC). */
+    /** Code descriptions from the evidence (evidence label = DTC code). */
     val dtc: Map<String, DtcNote> = emptyMap(),
 )
 
-/** Что показать под кодом: название (или «заводской код, расшифровка неизвестна») и пара частых причин. */
+/** What to show under the code: the title (or «заводской код, расшифровка неизвестна») and a couple of common causes. */
 internal data class DtcNote(val text: String, val causes: List<String> = emptyList())
 
 internal class FindingViewModel(
@@ -105,7 +105,7 @@ internal class FindingViewModel(
     }
 }
 
-/** Текст для чата: что нашёл код и на каких числах — модель объясняет, а не пересчитывает. */
+/** Text for the chat: what the code found and on which numbers — the model explains rather than recomputes. */
 internal fun askAiPrompt(f: StoredFinding): String = buildString {
     val x = f.finding
     append("Объясни находку анализа «${x.title}» (${x.severity.label}): ${x.message}")

@@ -9,14 +9,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /**
- * Провайдеры = ровно пресеты koog-spring-boot-starter (META-INF/config/koog: anthropic, deepseek, google, mistral,
- * ollama, openai, openrouter) + [OTHER] для любого OpenAI-совместимого сервера. Порядок = порядок в мастере,
- * OpenRouter первым и по умолчанию (решение пользователя).
+ * Providers = exactly the koog-spring-boot-starter presets (META-INF/config/koog: anthropic, deepseek, google, mistral,
+ * ollama, openai, openrouter) + [OTHER] for any OpenAI-compatible server. Order = order in the wizard,
+ * OpenRouter first and default (user's decision).
  *
- * Адреса и пути API не наши: у пресетов адрес и пути — только из настроек клиента Koog по умолчанию
- * (`OpenAIClientSettings()` и т.д.), в UI поля адреса нет и в настройках он не хранится. Адрес вводится и хранится
- * только у [OTHER]. [defaultBaseUrl] — для показа (сводка), из тех же настроек Koog.
- * [recommended] — курируемые модели, их показываем первыми в каталоге (если сервер их отдаёт).
+ * API addresses and paths are not ours: for presets the address and paths come only from the Koog client's default
+ * settings (`OpenAIClientSettings()` etc.); the UI has no address field and it is not stored in settings. The address is
+ * entered and stored only for [OTHER]. [defaultBaseUrl] — for display (summary), from the same Koog settings.
+ * [recommended] — curated models, shown first in the catalog (if the server returns them).
  */
 enum class LlmProviderKind(
     val title: String,
@@ -33,22 +33,22 @@ enum class LlmProviderKind(
     DEEPSEEK("DeepSeek", Key.REQUIRED, listOf("deepseek-chat", "deepseek-reasoner")),
     MISTRAL("Mistral", Key.REQUIRED, listOf("mistral-small-latest", "mistral-medium-latest", "mistral-large-latest")),
 
-    /** Локальный Ollama по адресу клиента Koog по умолчанию (localhost:11434). Ollama на другом ПК — через [OTHER] (…:11434/v1). */
+    /** Local Ollama at the Koog client's default address (localhost:11434). Ollama on another PC — via [OTHER] (…:11434/v1). */
     OLLAMA("Ollama", Key.NONE, emptyList()),
 
-    /** LM Studio, vLLM, llama.cpp server, LocalAI, Ollama на ПК, прокси: полный OpenAI-совместимый адрес (…/v1). Ключ — если нужен. */
+    /** LM Studio, vLLM, llama.cpp server, LocalAI, Ollama on a PC, proxies: full OpenAI-compatible address (…/v1). Key — if required. */
     OTHER("Другой (свой сервер)", Key.OPTIONAL, emptyList()),
     ;
 
     private enum class Key { REQUIRED, OPTIONAL, NONE }
 
-    /** Без ключа провайдер не работает. */
+    /** The provider does not work without a key. */
     val needsKey: Boolean get() = key == Key.REQUIRED
 
-    /** Показывать ли поле ключа вообще (у Ollama его нет). */
+    /** Whether to show the key field at all (Ollama has none). */
     val usesKey: Boolean get() = key != Key.NONE
 
-    /** Адрес по умолчанию из настроек клиента Koog; у [OTHER] его нет — адрес вводит пользователь. */
+    /** Default address from the Koog client settings; [OTHER] has none — the user enters the address. */
     val defaultBaseUrl: String get() = KoogClients.defaultBaseUrl(this)
 
     companion object {
@@ -56,7 +56,7 @@ enum class LlmProviderKind(
     }
 }
 
-/** [baseUrl] — действующий адрес: сохранённый пользователем или адрес клиента Koog по умолчанию. */
+/** [baseUrl] — effective address: saved by the user or the Koog client's default address. */
 data class LlmSettings(
     val provider: LlmProviderKind,
     val model: String,
@@ -68,24 +68,24 @@ class LlmSettingsStore(
     private val dataStore: DataStore<Preferences>,
     private val cipher: SecretCipher,
 ) {
-    /** null — ИИ не настроен (или сохранён провайдер, которого больше нет). */
+    /** null — AI is not configured (or a provider that no longer exists is saved). */
     val settings: Flow<LlmSettings?> = dataStore.data.map { p ->
         val name = p[PROVIDER] ?: return@map null
         val legacy = name == LEGACY_CUSTOM
         val provider = if (legacy) LlmProviderKind.OTHER else LlmProviderKind.entries.firstOrNull { it.name == name } ?: return@map null
         val url = if (provider == LlmProviderKind.OTHER) {
-            // У прежнего «Свой сервер» адрес по умолчанию в файл не писался — восстанавливаем его.
+            // The former «Свой сервер» did not write its default address to the file — restore it.
             p[BASE_URL] ?: if (legacy) LEGACY_CUSTOM_URL else ""
         } else {
-            // У пресетов адрес всегда из Koog; сохранённый раньше (прокси) игнорируется и удаляется при следующем save.
+            // For presets the address always comes from Koog; a previously saved one (proxy) is ignored and removed on the next save.
             provider.defaultBaseUrl
         }
         LlmSettings(provider, p[MODEL].orEmpty(), url, hasKey = p[API_KEY] != null)
     }
 
     /**
-     * Пустой apiKey = «не менять сохранённый». [baseUrl] хранится только у [LlmProviderKind.OTHER];
-     * для пресетов адрес не храним вовсе — его задают настройки клиента Koog.
+     * Empty apiKey = "keep the saved one". [baseUrl] is stored only for [LlmProviderKind.OTHER];
+     * for presets the address is not stored at all — the Koog client settings define it.
      */
     suspend fun save(provider: LlmProviderKind, model: String, baseUrl: String?, apiKey: String?) {
         dataStore.edit { p ->
@@ -97,18 +97,18 @@ class LlmSettingsStore(
             when {
                 !provider.usesKey -> p.remove(API_KEY)
                 !apiKey.isNullOrBlank() -> p[API_KEY] = cipher.encrypt(apiKey.trim())
-                // Ключ одного провайдера не годится другому.
+                // One provider's key is no good for another.
                 previous != null && previous != provider.name -> p.remove(API_KEY)
             }
         }
     }
 
-    /** Удалить сохранённый ключ (провайдер и модель остаются). */
+    /** Delete the saved key (provider and model remain). */
     suspend fun clearKey() {
         dataStore.edit { it.remove(API_KEY) }
     }
 
-    /** Забыть всё: провайдер, адрес, модель и ключ. */
+    /** Forget everything: provider, address, model and key. */
     suspend fun clear() {
         dataStore.edit { it.clear() }
     }
@@ -121,7 +121,7 @@ class LlmSettingsStore(
         val BASE_URL = stringPreferencesKey("base_url")
         val API_KEY = stringPreferencesKey("api_key")
 
-        /** Имя и адрес по умолчанию прежнего пункта «Свой сервер (OpenAI-совместимый)» — читаются как [LlmProviderKind.OTHER]. */
+        /** Name and default address of the former «Свой сервер (OpenAI-совместимый)» item — read as [LlmProviderKind.OTHER]. */
         const val LEGACY_CUSTOM = "OPENAI_COMPATIBLE"
         const val LEGACY_CUSTOM_URL = "http://192.168.1.10:1234/v1"
     }

@@ -1,6 +1,6 @@
 package io.github.iampopovich.eculense.core.datapacks
 
-/** Файл пакета. sha256/size известны только для зафиксированной версии; у обновления — null (проверяется длина ответа). */
+/** Pack file. sha256/size are known only for the pinned version; for an update they are null (response length is checked). */
 data class PackFile(
     val name: String,
     val url: String,
@@ -8,26 +8,26 @@ data class PackFile(
     val sha256: String? = null,
 )
 
-/** Откуда узнать последнюю версию пакета для еженедельной проверки обновлений. */
+/** Where to find the latest pack version for the weekly update check. */
 sealed interface UpdateSource {
-    /** Нет проверки: версия меняется только с релизом приложения. */
+    /** No check: the version changes only with an app release. */
     data object None : UpdateSource
 
     /**
-     * Релизы GitHub: тег из редиректа `https://github.com/<repo>/releases/latest` (без REST API — он ограничен по IP).
-     * files: имя файла → шаблон URL с `{tag}` (ассет релиза или raw-файл на теге, если ассетов нет).
+     * GitHub releases: tag from the `https://github.com/<repo>/releases/latest` redirect (no REST API, it is rate-limited per IP).
+     * files: file name → URL template with `{tag}` (release asset, or raw file at the tag if there are no assets).
      */
     data class GithubRelease(val repo: String, val files: Map<String, String>) : UpdateSource {
         fun fileUrl(tag: String, name: String) = files.getValue(name).replace("{tag}", tag)
     }
 
-    /** Версия — строковое поле JSON (OBDex: `meta.json` → `generated_at`); URL файлов не меняется. */
+    /** Version is a JSON string field (OBDex: `meta.json` → `generated_at`); file URLs don't change. */
     data class JsonField(val url: String, val field: String) : UpdateSource
 }
 
 /**
- * Описание пакета данных: что, откуда, какой версии, под какой лицензией. Версии зафиксированы в коде ([PackCatalog]);
- * обновление = новый тег/версия источника, файл берётся без изменений (для ODbL — без производной БД).
+ * Data pack description: what, from where, which version, under which license. Versions are pinned in code ([PackCatalog]);
+ * update = new tag/source version, the file is taken unchanged (for ODbL, no derived database).
  */
 data class PackManifest(
     val id: String,
@@ -38,20 +38,20 @@ data class PackManifest(
     val license: String,
     val licenseUrl: String,
     val sourceUrl: String,
-    /** Строка атрибуции для «О приложении». */
+    /** Attribution line for «О приложении». */
     val attribution: String,
     val update: UpdateSource = UpdateSource.None,
-    /** Справочники показывает экран «Данные и справочники»; модели ИИ — свой экран (:core:ailocal). */
+    /** Reference packs are shown on the «Данные и справочники» screen; AI models have their own screen (:core:ailocal). */
     val group: PackGroup = PackGroup.REFERENCE,
     /**
-     * Многогигабайтные файлы: `.part` переживает обрыв/остановку и докачивается с места (HTTP Range), воркер работает
-     * как foreground-задача и повторяет попытки. У справочников — false: при ошибке всё начинается заново.
+     * Multi-gigabyte files: `.part` survives drops/stops and resumes where it left off (HTTP Range); the worker runs
+     * as a foreground task and retries. For reference packs it's false: on error everything starts over.
      */
     val resumable: Boolean = false,
 ) {
     val sizeBytes: Long? get() = files.map { it.sizeBytes ?: return null }.sum()
 
-    /** Файлы другой версии: у релизов GitHub URL зависит от тега, хэш новой версии неизвестен. */
+    /** Files of a different version: for GitHub releases the URL depends on the tag, the new version's hash is unknown. */
     fun filesFor(version: String): List<PackFile> = when {
         version == this.version -> files
         update is UpdateSource.GithubRelease -> update.files.keys.map { PackFile(it, update.fileUrl(version, it)) }
@@ -62,17 +62,17 @@ data class PackManifest(
 enum class PackGroup { REFERENCE, MODEL }
 
 /**
- * Заголовки авторизации для URL (токен Hugging Face для gated-моделей). Отдаются только исходному хосту запроса:
- * после редиректа на CDN токен не уходит. Токен не хранится в манифесте и не попадает в WorkManager.
+ * Authorization headers for a URL (Hugging Face token for gated models). Sent only to the request's original host:
+ * after a redirect to a CDN the token is not sent. The token is not stored in the manifest and never reaches WorkManager.
  */
 fun interface PackAuth {
     fun headersFor(url: String): Map<String, String>
 }
 
-/** Каталог пакетов, который меняется во время работы (модели пользователя по ссылке). */
+/** Pack catalog that changes at runtime (user models added by link). */
 fun interface PackSource {
     fun manifests(): List<PackManifest>
 }
 
-/** Имя каталога версии: теги и даты ISO содержат «:», которые в путях лучше не держать. */
+/** Version directory name: tags and ISO dates contain «:», which is better kept out of paths. */
 internal fun versionDir(version: String): String = version.replace(Regex("[^A-Za-z0-9._-]"), "_")

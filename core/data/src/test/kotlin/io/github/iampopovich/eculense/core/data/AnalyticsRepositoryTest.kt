@@ -25,7 +25,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.ZoneOffset
 
-/** Таблица readings в памяти: SQL-агрегаты повторены простым Kotlin — проверяем логику репозитория, не SQLite. */
+/** In-memory readings table: SQL aggregates reimplemented in plain Kotlin — we test the repository logic, not SQLite. */
 private class FakeAnalyticsDao : AnalyticsDao {
     data class Row(val id: Long, val sessionId: Long, val sensorId: String, val value: Double, val t: Long)
     val sessions = mutableListOf<SessionSummaryRow>()
@@ -79,7 +79,7 @@ class AnalyticsRepositoryTest {
 
     @Test
     fun `recompute stores findings with evidence and reports progress and timing`() = runTest {
-        // перегрев 112 °C 40 с в первой сессии, вторая — без ОЖ; чужая машина не учитывается
+        // overheating 112 °C for 40 s in the first session, the second has no coolant temp; another car is not counted
         dao.add(1, 1, 100, *(0..4).map { Triple("01.05", 112.0, it * 10_000L) }.toTypedArray())
         dao.add(2, 1, 200, Triple("01.0C", 800.0, 1))
         dao.add(3, 2, 300, Triple("01.05", 130.0, 1))
@@ -99,11 +99,11 @@ class AnalyticsRepositoryTest {
         assertEquals(2, done.sessions)
         assertTrue(logs.single(), logs.single().startsWith("recompute car=1 sessions=2 cached=0"))
 
-        // повторный пересчёт заменяет, а не дублирует
+        // recomputing replaces rather than duplicates
         repo.recompute(1)
         assertEquals(stored.size, repo.findings(1).size)
         assertEquals(stored.map { it.finding }, repo.findings(1).map { it.finding })
-        // законченные сессии второй раз из БД не читаются
+        // finished sessions are not read from the DB a second time
         assertTrue(logs.last(), logs.last().contains("cached=2 points=0"))
     }
 
@@ -113,7 +113,7 @@ class AnalyticsRepositoryTest {
         val report = repo(StandardTestDispatcher(testScheduler)).sessionReport(1, 1)!!
         assertEquals(listOf("01.0C"), report.sensors.map { it.sensorId })
         assertEquals(95.0, report.sensors.single().p95!!, 1e-9)
-        assertEquals(100, report.session.readings) // координаты не считаются и не показываются
+        assertEquals(100, report.session.readings) // coordinates are neither computed nor shown
         assertTrue(report.findings.none { it.severity == Severity.OK || it.severity == Severity.NO_DATA })
         assertNull(repo(StandardTestDispatcher(testScheduler)).sessionReport(2, 1))
     }

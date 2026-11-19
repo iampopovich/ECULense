@@ -131,7 +131,7 @@ class CarScannerImporterTest {
 
     @Test
     fun `separate reads of the same code in one recording stay separate events`() = runTest {
-        // Car Scanner: чтение без заголовков, через 9 с — с заголовками, через 2 мин — снова
+        // Car Scanner: a read without headers, 9 s later — with headers, 2 min later — again
         val rec = BrcWriter().header(car = "Тестовая", startTicks = startTicks)
             .dtc(startTicks + 10_000_000, p0113)
             .dtc(startTicks + 100_000_000, p0113WithHeader)
@@ -160,7 +160,7 @@ class CarScannerImporterTest {
             .bytes()
         importer.importRecording("a.brc", rec)
         val start = sessions.started.single().startedAtMs!!
-        // как на телефоне после старого импорта: из двух событий записи осталось первое
+        // as on the phone after the old import: of the two recording events only the first remained
         dtcs.snapshots.removeAt(1)
 
         val report = importer.importStream({ ByteArrayInputStream(rec) }, "a.brc")

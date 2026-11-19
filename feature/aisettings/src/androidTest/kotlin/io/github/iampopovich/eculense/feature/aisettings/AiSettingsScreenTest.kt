@@ -88,7 +88,7 @@ class AiSettingsScreenTest {
             AiSettingsScreen(AiSettingsUiState(loaded = true, check = passed), AiSettingsActions(onModel = { picked += it }))
         }
         rule.onNodeWithText("✓ Подключение работает: 2 модели").assertExists()
-        // Восемь провайдеров сдвигают каталог ниже экрана — LazyColumn составляет строки только после прокрутки.
+        // Eight providers push the catalog below the screen; LazyColumn composes rows only after scrolling.
         rule.onNode(hasScrollAction()).performScrollToNode(hasText("бесплатно", substring = true))
         rule.onNodeWithText("Поиск модели").assertExists()
         rule.onNodeWithText("бесплатно", substring = true).assertExists()

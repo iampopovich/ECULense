@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// OBDb signalset v3 (CC BY-SA 4.0): скачивание и разбор по марке/модели/году. Опроса расширенных PID здесь нет.
+// OBDb signalset v3 (CC BY-SA 4.0): download and parsing by make/model/year. No extended PID polling here.
 dependencies {
     implementation(project(":core:datapacks"))
     implementation(libs.kotlinx.serialization.json)

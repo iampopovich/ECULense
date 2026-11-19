@@ -26,7 +26,7 @@ internal data class DashboardUiState(
     val connected: Boolean = false,
     val values: List<LiveValue> = emptyList(),
     val recording: Boolean = false,
-    /** Короткая строка «адаптер · протокол · напряжение» — только когда подключены. */
+    /** Short "adapter · protocol · voltage" line, only while connected. */
     val status: String? = null,
 )
 
@@ -51,7 +51,7 @@ internal class DashboardViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    /** Значения хранятся метрическими; км/ч → mph, °C → °F и т. п. — только при показе. */
+    /** Values are stored in metric; km/h → mph, °C → °F etc. only at display time. */
     val uiState: StateFlow<DashboardUiState> =
         combine(controller.state, selected, latest, recorder.activeSessionId, units.units) { state, pids, values, sessionId, u ->
             DashboardUiState(

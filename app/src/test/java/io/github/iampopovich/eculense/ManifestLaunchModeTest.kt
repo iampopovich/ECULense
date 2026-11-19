@@ -7,10 +7,10 @@ import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
 /**
- * Регрессия: со standard launchMode тап по иконке (интент лаунчера не совпал с корневым интентом задачи — задача
- * открыта из уведомления, `am start` или MIUI добавил extras) клал НОВЫЙ MainActivity поверх старого с пустым
- * back stack → пользователь попадал на «Панель». singleTask: одна активность, повторный запуск идёт в onNewIntent.
- * Поведение задач проверяется только на устройстве (Robolectric в проекте нет), здесь — инвариант манифеста.
+ * Regression: with standard launchMode, tapping the icon (when the launcher intent did not match the task's root
+ * intent — the task was opened from a notification, `am start`, or MIUI added extras) put a NEW MainActivity on top
+ * of the old one with an empty back stack → the user landed on «Панель». singleTask: one activity, relaunch goes to onNewIntent.
+ * Task behavior can only be checked on a device (the project has no Robolectric); here we check the manifest invariant.
  */
 class ManifestLaunchModeTest {
     private val android = "http://schemas.android.com/apk/res/android"

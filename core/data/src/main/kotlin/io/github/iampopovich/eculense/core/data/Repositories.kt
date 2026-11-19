@@ -12,7 +12,7 @@ import io.github.iampopovich.eculense.core.model.SessionSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-/** Явные метки времени и externalId нужны импорту Car Scanner (1.21); живая запись их не передаёт. carId = null → активная машина. */
+/** Explicit timestamps and externalId are needed by the Car Scanner import (1.21); live recording does not pass them. carId = null → active car. */
 interface SessionRepository {
     fun observeSessions(): Flow<List<Session>>
     suspend fun start(
@@ -28,7 +28,7 @@ interface SessionRepository {
     suspend fun readings(sessionId: Long): List<SensorReading>
     suspend fun delete(sessionId: Long)
     suspend fun hasExternal(externalId: String): Boolean
-    /** Повторный импорт: уже импортированная запись переезжает на машину из бэкапа. */
+    /** Repeat import: an already imported recording moves to the car from the backup. */
     suspend fun assignCar(externalId: String, carId: Long)
 }
 
@@ -36,16 +36,16 @@ interface DtcRepository {
     suspend fun saveSnapshot(dtcs: List<Dtc>, vin: String?, takenAtMs: Long? = null, carId: Long? = null)
 
     /**
-     * Успешное живое чтение кодов (любой адаптер) → событие истории активной машины. Тот же набор кодов, прочитанный
-     * повторно в пределах [DEDUP_WINDOW_MS], не дублируется. Пустое чтение ничего не пишет. true — снимок записан.
+     * Successful live code read (any adapter) → history event for the active car. The same set of codes read
+     * again within [DEDUP_WINDOW_MS] is not duplicated. An empty read writes nothing. true — snapshot written.
      */
     suspend fun recordRead(dtcs: List<Dtc>, vin: String? = null): Boolean = false
 
-    /** Есть ли уже событие с этим кодом в окне времени — повторный импорт не дублирует события. */
+    /** Whether an event with this code already exists in the time window — repeat import does not duplicate events. */
     suspend fun hasEvent(code: String, fromMs: Long, toMs: Long): Boolean = false
 
     companion object {
-        /** Повторное нажатие «Прочитать» и снимок перед сбросом не плодят одинаковые события. */
+        /** Pressing «Прочитать» again and the snapshot before clearing do not create duplicate events. */
         const val DEDUP_WINDOW_MS = 5 * 60_000L
     }
 }

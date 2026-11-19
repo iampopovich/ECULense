@@ -7,12 +7,12 @@ import java.util.Locale
 internal object StatsFormat {
     private val ru = Locale.forLanguageTag("ru")
 
-    /** Разделитель тысяч — всегда неразрывный пробел (ICU даёт то U+00A0, то узкий U+202F). */
+    /** Thousands separator is always a non-breaking space (ICU yields either U+00A0 or the narrow U+202F). */
     fun number(v: Double, decimals: Int = 1): String = String.format(ru, "%,.${decimals}f", v).replace('\u202F', '\u00A0')
 
     fun distance(km: Double, units: UnitsSettings): String = units.distance(km).let { (v, u) -> "${number(v)} $u" }
 
-    /** Меньше литра — с сотыми: иначе короткая поездка показывает «0,0 л». */
+    /** Under a liter — with hundredths: otherwise a short trip shows «0,0 л». */
     fun volume(l: Double, units: UnitsSettings): String = units.volume(l).let { (v, u) -> "${number(v, if (v < 1.0) 2 else 1)} $u" }
 
     fun consumption(lPer100: Double?, units: UnitsSettings): String =
@@ -33,13 +33,13 @@ internal object StatsFormat {
             StatsPeriod.ALL -> "Всё время"
         }
 
-    /** Порядок в переключателе — от короткого периода к длинному. */
+    /** Order in the toggle — from the shortest period to the longest. */
     val periods = listOf(StatsPeriod.WEEK, StatsPeriod.MONTH, StatsPeriod.YEAR, StatsPeriod.ALL)
 
     const val NO_TRIPS_AT_ALL = "Поездок пока нет"
     const val EMPTY_HINT = "Запишите поездку на Панели или импортируйте бэкап Car Scanner"
 
-    /** Заголовок плейсхолдера: нет поездок вообще → «пока нет», иначе — за выбранный период. */
+    /** Placeholder title: no trips at all → «пока нет», otherwise for the selected period. */
     fun emptyTitle(period: StatsPeriod, totalTrips: Int): String =
         if (totalTrips == 0) NO_TRIPS_AT_ALL
         else "Нет поездок за " + when (period) {

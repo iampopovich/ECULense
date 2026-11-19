@@ -12,7 +12,7 @@ data class VehicleGeneration(val id: Long, val name: String, val yearStart: Int?
     val years: String get() = listOfNotNull(yearStart?.toString(), yearEnd?.toString() ?: yearStart?.let { "н. в." }).joinToString("–")
 }
 
-/** Модификация (мотор + КПП + привод) с нормализованными полями и баком из сырых specs. */
+/** A trim (engine + gearbox + drivetrain) with normalized fields and tank size from raw specs. */
 data class VehicleEngine(
     val id: Long,
     val label: String,
@@ -34,11 +34,11 @@ data class VehicleEngine(
 }
 
 /**
- * Запросы к `vehicles.sqlite` (gor3a/vehicle-makes-models). Файл открывается только на чтение и не меняется.
- * Схема релиза v1.0.3: makes → models → generations → engines (+ engine_specs key/value).
+ * Queries against `vehicles.sqlite` (gor3a/vehicle-makes-models). The file is opened read-only and never modified.
+ * Release v1.0.3 schema: makes → models → generations → engines (+ engine_specs key/value).
  */
 class VehicleDb(private val db: PackDb) : AutoCloseable {
-    /** Недостающие таблицы/колонки — пустой список, если схема та, под которую написан код. */
+    /** Missing tables/columns; an empty list if the schema is the one the code was written for. */
     fun schemaProblems(): List<String> = EXPECTED.flatMap { (table, columns) ->
         val actual = db.query("SELECT name FROM pragma_table_info(?)", listOf(table)) { it.string(0) }.toSet()
         if (actual.isEmpty()) listOf("нет таблицы $table") else columns.filter { it !in actual }.map { "нет колонки $table.$it" }
@@ -49,7 +49,7 @@ class VehicleDb(private val db: PackDb) : AutoCloseable {
             VehicleMake(it.long(0)!!, it.string(1)!!)
         }
 
-    /** Марка по имени из профиля («Kia», «KIA», «kia»). */
+    /** Make by the name from the profile («Kia», «KIA», «kia»). */
     fun makeByName(name: String): VehicleMake? =
         db.query("SELECT id, name FROM makes WHERE name = ? COLLATE NOCASE OR \"group\" = ? COLLATE NOCASE LIMIT 1", listOf(name.trim(), name.trim())) {
             VehicleMake(it.long(0)!!, it.string(1)!!)
@@ -61,7 +61,7 @@ class VehicleDb(private val db: PackDb) : AutoCloseable {
             listOf(makeId, like(query)),
         ) { VehicleModel(it.long(0)!!, it.string(1)!!, it.long(2)?.toInt(), it.long(3)?.toInt()) }
 
-    /** Поколения от старых к новым. */
+    /** Generations from oldest to newest. */
     fun generations(modelId: Long): List<VehicleGeneration> =
         db.query(
             "SELECT id, name, year_start, year_end, body_type FROM generations WHERE model_id = ? ORDER BY year_start, name",
@@ -71,7 +71,7 @@ class VehicleDb(private val db: PackDb) : AutoCloseable {
     fun engines(generationId: Long, query: String = ""): List<VehicleEngine> =
         db.query("$ENGINE_SELECT WHERE e.generation_id = ? AND e.label LIKE ? ORDER BY e.label", listOf(generationId, like(query)), ::engineRow)
 
-    /** Модификация вместе с объёмом бака из сырых specs («21.1 gallons (79.9 L)»). */
+    /** A trim together with the tank capacity from raw specs («21.1 gallons (79.9 L)»). */
     fun engine(id: Long): VehicleEngine? {
         val e = db.query("$ENGINE_SELECT WHERE e.id = ?", listOf(id), ::engineRow).firstOrNull() ?: return null
         val tank = db.query("SELECT value FROM engine_specs WHERE engine_id = ? AND key = ?", listOf(id, TANK_KEY)) { it.string(0) }
@@ -108,7 +108,7 @@ class VehicleDb(private val db: PackDb) : AutoCloseable {
     }
 }
 
-/** Строки справочника (англ., как на autoevolution) → наши перечисления. Неизвестное → null/OTHER, поле остаётся редактируемым. */
+/** Catalog strings (English, as on autoevolution) → our enums. Unknown → null/OTHER, the field stays editable. */
 object VehicleSpecs {
     private val litres = Regex("""([\d]+(?:[.,]\d+)?)\s*L\b""")
 

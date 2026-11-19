@@ -4,13 +4,13 @@ import java.io.Closeable
 import java.io.File
 import java.util.zip.ZipFile
 
-/** Запись .brc в бэкапе: имя файла без пути, размер и CRC-32 из центрального каталога zip (читаются без распаковки). */
+/** .brc entry in a backup: file name without path, size and CRC-32 from the zip central directory (read without extracting). */
 data class CbzRecordingEntry(val fileName: String, val size: Long, val crc: Long, internal val entryName: String)
 
 /**
- * Бэкап .cbz, скопированный на диск (из SAF — во временный кэш). В отличие от потокового [CbzBackup], zip читается
- * с произвольным доступом: список записей с размерами и CRC известен сразу (прогресс «23 из 73», пропуск уже
- * импортированных .brc без распаковки), а распаковывается только нужное.
+ * A .cbz backup copied to disk (from SAF into a temp cache). Unlike the streaming [CbzBackup], the zip is read
+ * with random access: the entry list with sizes and CRCs is known upfront (progress «23 из 73», skipping already
+ * imported .brc without extracting), and only what's needed gets extracted.
  */
 class CbzArchive(file: File) : Closeable {
     private val zip = ZipFile(file)
@@ -23,7 +23,7 @@ class CbzArchive(file: File) : Closeable {
     fun read(entry: CbzRecordingEntry): ByteArray =
         zip.getInputStream(zip.getEntry(entry.entryName) ?: error("нет записи в архиве")).use { it.readBytes() }
 
-    /** Настройки из корня + машины и поездки из drivecyclesv2.db.bak (во временный файл — SQLite читает только с диска). */
+    /** Settings from the root + cars and trips from drivecyclesv2.db.bak (into a temp file, since SQLite reads only from disk). */
     fun meta(tempDir: File, sqlite: SqliteOpener): CarScannerBackupMeta {
         val settings = mutableMapOf<String, ByteArray>()
         var dbFile: File? = null

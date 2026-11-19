@@ -22,7 +22,7 @@ internal sealed interface CheckState {
     data object Idle : CheckState
     data object Checking : CheckState
 
-    /** [listed] = false — свой сервер не отдал список, модель вводится вручную. */
+    /** [listed] = false: the custom server returned no list, the model is entered manually. */
     data class Passed(val models: List<ModelInfo>, val listed: Boolean, val message: String) : CheckState
     data class Failed(val message: String) : CheckState
 }
@@ -30,15 +30,15 @@ internal sealed interface CheckState {
 internal data class SavedConfig(val provider: LlmProviderKind, val model: String, val baseUrl: String, val hasKey: Boolean)
 
 /**
- * Мастер подключения: провайдер → адрес + ключ → проверка (доказывает ключ и грузит каталог) → модель → сохранить.
- * Шаг «Модель» открыт только после успешной проверки; любая правка адреса/ключа/провайдера её сбрасывает.
+ * Connection wizard: provider → address + key → check (proves the key and loads the catalog) → model → save.
+ * The «Модель» step opens only after a successful check; any edit of address/key/provider resets it.
  */
 internal data class AiSettingsUiState(
     val loaded: Boolean = false,
     val saved: SavedConfig? = null,
     val editing: Boolean = true,
     val provider: LlmProviderKind = LlmProviderKind.DEFAULT,
-    /** Адрес вводится только у «Другой (свой сервер)»; у пресетов его задаёт Koog. */
+    /** The address is entered only for «Другой (свой сервер)»; for presets Koog sets it. */
     val baseUrl: String = "",
     val apiKey: String = "",
     val urlError: String? = null,
@@ -46,18 +46,18 @@ internal data class AiSettingsUiState(
     val query: String = "",
     val model: String = "",
     val busy: Boolean = false,
-    /** Модуль «На устройстве» подключён — в списке провайдеров есть пункт, ведущий на его экран. */
+    /** The «На устройстве» module is included: the provider list has an entry leading to its screen. */
     val onDeviceAvailable: Boolean = false,
-    /** Облачная сборка: вместо пункта «На устройстве» — приглушённая строка «доступно в сборке «Локально»». */
+    /** Cloud build: instead of the «На устройстве» entry, a dimmed line «доступно в сборке «Локально»». */
     val onDeviceInOtherBuild: Boolean = false,
-    /** Выбрана модель на телефоне — чат идёт через неё (облачная настройка, если есть, не активна). */
+    /** An on-device model is selected: chat goes through it (the cloud setting, if any, is inactive). */
     val onDevice: OnDeviceSummary? = null,
 ) {
-    /** Пустое поле ключа = использовать сохранённый (только для того же провайдера). */
+    /** Empty key field = use the saved one (only for the same provider). */
     val canReuseSavedKey: Boolean get() = saved?.hasKey == true && saved.provider == provider
-    /** У Ollama ключа нет — поле не показываем. */
+    /** Ollama has no key, so the field is hidden. */
     val showKeyField: Boolean get() = provider.usesKey
-    /** Поле адреса — только у «Другой (свой сервер)». */
+    /** Address field only for «Другой (свой сервер)». */
     val showUrlField: Boolean get() = provider == LlmProviderKind.OTHER
     val modelStepEnabled: Boolean get() = check is CheckState.Passed
     val manualModel: Boolean get() = (check as? CheckState.Passed)?.listed == false
@@ -75,10 +75,10 @@ internal data class AiSettingsUiState(
 internal class AiSettingsViewModel(
     private val store: LlmSettingsStore,
     private val checker: ConnectionChecker,
-    /** Модель на телефоне (:core:ailocal), если модуль подключён. */
+    /** On-device model (:core:ailocal), if the module is included. */
     private val onDevice: OnDeviceLlm? = null,
     onDeviceRoute: Boolean = false,
-    /** Флаг флейвора сборки (BuildCapabilities): локальные модели есть только в сборке «Локально». */
+    /** Build flavor flag (BuildCapabilities): local models exist only in the «Локально» build. */
     onDeviceInOtherBuild: Boolean = false,
 ) : ViewModel() {
     private val _state = MutableStateFlow(
@@ -96,7 +96,7 @@ internal class AiSettingsViewModel(
         }
     }
 
-    /** «Перейти на облачного провайдера»: локальная модель перестаёт использоваться, файлы остаются. */
+    /** «Перейти на облачного провайдера»: the local model stops being used, files remain. */
     fun useCloud() {
         viewModelScope.launch {
             onDevice?.deactivate()
@@ -104,7 +104,7 @@ internal class AiSettingsViewModel(
         }
     }
 
-    /** Сброс проверки и выбора модели: всё, что было доказано, относилось к старым адресу/ключу. */
+    /** Reset the check and model selection: everything proven applied to the old address/key. */
     private fun AiSettingsUiState.invalidated() = copy(check = CheckState.Idle, model = "", query = "", urlError = null)
 
     private fun edit(transform: AiSettingsUiState.() -> AiSettingsUiState) {
@@ -128,7 +128,7 @@ internal class AiSettingsViewModel(
     fun check() {
         val s = _state.value
         if (s.check is CheckState.Checking) return
-        // Адрес вводится только для «Другого»; у пресетов его задаёт Koog.
+        // The address is entered only for «Другого»; for presets Koog sets it.
         val url = if (s.provider != LlmProviderKind.OTHER) {
             null
         } else {
@@ -140,7 +140,7 @@ internal class AiSettingsViewModel(
                 is EndpointUrl.Result.Valid -> v.url
             }
         }
-        // Модель, выбранная до проверки (например, сохранённая при «Изменить»), остаётся, если сервер её отдаёт.
+        // A model chosen before the check (e.g. the saved one on «Изменить») stays if the server returns it.
         val previousModel = s.model.ifBlank { s.saved?.takeIf { it.provider == s.provider }?.model.orEmpty() }
         _state.update { it.copy(urlError = null, check = CheckState.Checking, model = "") }
         checkJob = viewModelScope.launch {
@@ -169,14 +169,14 @@ internal class AiSettingsViewModel(
         viewModelScope.launch {
             val url = if (s.provider == LlmProviderKind.OTHER) (EndpointUrl.validate(s.baseUrl) as EndpointUrl.Result.Valid).url else null
             store.save(s.provider, s.model, url, s.apiKey)
-            // сохранили облачного провайдера — значит, выбрали его вместо модели на телефоне
+            // a cloud provider was saved, meaning it was chosen instead of the on-device model
             onDevice?.deactivate()
             val saved = store.settings.first()?.let { SavedConfig(it.provider, it.model, it.baseUrl, it.hasKey) }
             _state.update { it.copy(saved = saved, editing = false, apiKey = "", busy = false) }
         }
     }
 
-    /** Открыть мастер с сохранёнными провайдером и адресом; проверку нужно пройти заново. */
+    /** Open the wizard with the saved provider and address; the check must be passed again. */
     fun edit() {
         val saved = _state.value.saved ?: return
         checkJob?.cancel()
@@ -192,7 +192,7 @@ internal class AiSettingsViewModel(
         }
     }
 
-    /** Мастер облачного провайдера, когда сохранена только модель на телефоне. */
+    /** Cloud provider wizard when only an on-device model is saved. */
     fun startWizard() = _state.update { it.copy(editing = true) }
 
     fun cancelEdit() {
@@ -208,7 +208,7 @@ internal class AiSettingsViewModel(
         }
     }
 
-    /** Забыть всё и вернуться к мастеру с OpenRouter. */
+    /** Forget everything and return to the wizard with OpenRouter. */
     fun reset() {
         checkJob?.cancel()
         viewModelScope.launch {

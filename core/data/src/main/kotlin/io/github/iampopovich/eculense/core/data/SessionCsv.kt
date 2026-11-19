@@ -6,7 +6,7 @@ import io.github.iampopovich.eculense.core.model.UnitsSettings
 object SessionCsv {
     const val HEADER = "timestamp_ms;sensor_id;value;unit"
 
-    /** Значения переводятся в единицы пользователя (в БД — метрические). */
+    /** Values are converted to the user's units (metric in the DB). */
     fun write(readings: List<SensorReading>, out: Appendable, units: UnitsSettings = UnitsSettings()) {
         out.append(HEADER).append('\n')
         readings.forEach {

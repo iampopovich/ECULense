@@ -26,14 +26,14 @@ internal data class StatsUiState(
     val car: CarProfile? = null,
     val period: StatsPeriod = StatsPeriod.ALL,
     val stats: TripStats = TripStats.EMPTY,
-    /** Поездки выбранного периода, новые сверху. */
+    /** Trips in the selected period, newest first. */
     val trips: List<Trip> = emptyList(),
-    /** Поездок у машины вообще (для пустого состояния: «нет совсем» ≠ «нет за период»). */
+    /** Total trips for the car (for the empty state: "none at all" ≠ "none in the period"). */
     val totalTrips: Int = 0,
     val units: UnitsSettings = UnitsSettings(),
 )
 
-/** Статистика активной машины. Данные — только из :core:data (поездки, машины, единицы). */
+/** Stats for the active car. Data comes only from :core:data (trips, cars, units). */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class StatsViewModel(
     cars: CarRepository,

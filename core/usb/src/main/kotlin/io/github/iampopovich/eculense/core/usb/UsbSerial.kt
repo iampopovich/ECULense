@@ -25,7 +25,7 @@ import org.koin.dsl.module
 import java.io.IOException
 import kotlin.coroutines.resume
 
-/** Адаптер порта usb-serial-for-android к платформенно-независимому SerialPortIo. */
+/** Adapter from a usb-serial-for-android port to the platform-independent SerialPortIo. */
 internal class AndroidUsbSerialPort(
     private val usbManager: UsbManager,
     private val driver: UsbSerialDriver,
@@ -52,7 +52,7 @@ internal class AndroidUsbSerialPort(
     private fun requirePort() = port ?: throw IOException("USB-порт не открыт")
 }
 
-/** Системный диалог «Разрешить ECULense доступ к устройству?» — до открытия порта. */
+/** System dialog «Разрешить ECULense доступ к устройству?» — before opening the port. */
 internal class UsbPermissions(private val context: Context, private val usbManager: UsbManager) {
     suspend fun ensure(device: UsbDevice) {
         if (usbManager.hasPermission(device)) return
@@ -77,7 +77,7 @@ internal class UsbPermissions(private val context: Context, private val usbManag
     }
 }
 
-/** Сначала разрешение, потом открытие порта; остальное делегируется SerialTransport. */
+/** Permission first, then open the port; the rest is delegated to SerialTransport. */
 internal class PermissionGatedTransport(
     private val ensurePermission: suspend () -> Unit,
     private val delegate: ObdTransport,

@@ -104,7 +104,7 @@ class MaintenanceDueToolTest {
     }
 }
 
-/** Делегат-заглушка: инструмент ТО к аналитике не обращается. */
+/** Stub delegate: the maintenance tool does not touch analytics. */
 private fun unused(): AnalyticsRepository = object : AnalyticsRepository {
     override val state = MutableStateFlow<AnalysisState>(AnalysisState.Idle)
     override fun observeFindings(carId: Long) = error("unused")

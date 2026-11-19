@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.Flow
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
-/** externalId — откуда пришла сессия при импорте ("carscanner:<имя файла>"), защищает от дублей при повторном импорте. */
+/** externalId: where the session came from on import ("carscanner:<file name>"); prevents duplicates on re-import. */
 @Entity(tableName = "sessions", indices = [Index(value = ["externalId"], unique = true)])
 data class SessionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -29,11 +29,11 @@ data class SessionEntity(
     val source: String,
     val vin: String?,
     val externalId: String? = null,
-    /** Без внешнего ключа: ALTER TABLE не умеет его добавить, а пересоздание таблицы с 1+ млн показаний рискованно. */
+    /** No foreign key: ALTER TABLE can't add one, and recreating a table with 1M+ readings is risky. */
     @ColumnInfo(index = true) val carId: Long? = null,
 )
 
-/** «Длинный» формат: одна строка = одно значение одного датчика. Так же устроены CSV Car Scanner. */
+/** "Long" format: one row = one value of one sensor. Car Scanner CSVs are laid out the same way. */
 @Entity(
     tableName = "readings",
     foreignKeys = [ForeignKey(SessionEntity::class, ["id"], ["sessionId"], onDelete = ForeignKey.CASCADE)],
@@ -58,7 +58,7 @@ data class DtcSnapshotEntity(
     @ColumnInfo(index = true) val carId: Long? = null,
 )
 
-/** Профиль машины. externalId — "carscanner:<id машины в бэкапе>" для повторного импорта без дублей. */
+/** Car profile. externalId is "carscanner:<car id in backup>" for re-import without duplicates. */
 @Entity(tableName = "cars", indices = [Index(value = ["externalId"], unique = true)])
 data class CarEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -84,12 +84,12 @@ data class CarEntity(
     val sparkPlugsIntervalKm: Int? = null,
     val airFilterIntervalKm: Int? = null,
     val fuelFilterIntervalKm: Int? = null,
-    /** v4: привод (DriveType) и снаряжённая масса из справочника моделей. */
+    /** v4: drivetrain (DriveType) and curb weight from the model catalog. */
     val drive: String? = null,
     val curbWeightKg: Int? = null,
 )
 
-/** Итоги поездки (как таблица trips Car Scanner): путь в мм и топливо в мкл — целые, без потерь при суммировании. */
+/** Trip totals (like the Car Scanner trips table): distance in mm and fuel in µl as integers, lossless when summed. */
 @Entity(
     tableName = "trips",
     foreignKeys = [ForeignKey(CarEntity::class, ["id"], ["carId"], onDelete = ForeignKey.CASCADE)],
@@ -107,7 +107,7 @@ data class TripEntity(
     val standingMs: Long,
     val source: String,
     val externalId: String? = null,
-    /** v5: как посчитано топливо поездки по записи (FuelMethod); null — поездка Car Scanner. */
+    /** v5: how the trip's fuel was computed from the recording (FuelMethod); null for a Car Scanner trip. */
     val fuelMethod: String? = null,
 )
 
@@ -132,7 +132,7 @@ interface SessionDao {
     @Query("SELECT COUNT(*) FROM sessions WHERE externalId = :externalId")
     suspend fun countByExternalId(externalId: String): Int
 
-    /** Запись, импортированная раньше на другую машину, переезжает на машину из бэкапа. */
+    /** A recording previously imported to a different car moves to the car from the backup. */
     @Query("UPDATE sessions SET carId = :carId WHERE externalId = :externalId")
     suspend fun assignCar(externalId: String, carId: Long)
 }
@@ -147,12 +147,12 @@ interface DtcDao {
     @Query("SELECT COUNT(*) FROM dtc_snapshots WHERE code = :code AND takenAtMs BETWEEN :fromMs AND :toMs")
     suspend fun countEvents(code: String, fromMs: Long, toMs: Long): Int
 
-    /** Последний снимок машины (все коды с максимальным takenAtMs); carId = null — снимки без машины. */
+    /** The car's latest snapshot (all codes with the max takenAtMs); carId = null means snapshots without a car. */
     @Query("SELECT * FROM dtc_snapshots WHERE carId IS :carId AND takenAtMs = (SELECT MAX(takenAtMs) FROM dtc_snapshots WHERE carId IS :carId)")
     suspend fun latestForCar(carId: Long?): List<DtcSnapshotEntity>
 }
 
-/** Агрегат одного датчика: считает SQLite, в Kotlin приходит одна строка вместо тысяч значений. */
+/** Per-sensor aggregate: computed by SQLite, Kotlin gets one row instead of thousands of values. */
 data class SensorAggregateRow(
     val sensorId: String,
     val unit: String,
@@ -163,10 +163,10 @@ data class SensorAggregateRow(
     val sessions: Int,
 )
 
-/** Лёгкая проекция показания (без id и единицы) для однопроходных расчётов по сессии. */
+/** Lightweight reading projection (no id or unit) for single-pass calculations over a session. */
 data class ReadingPoint(val sensorId: String, val value: Double, val timestampMs: Long)
 
-/** Сессия со счётчиком значений — для списков и инструментов ИИ. */
+/** Session with a value count, for lists and AI tools. */
 data class SessionSummaryRow(
     val id: Long,
     val startedAtMs: Long,
@@ -176,9 +176,9 @@ data class SessionSummaryRow(
 )
 
 /**
- * Запросы аналитики (этап 3). Агрегаты — в SQL, без загрузки 1,3 млн значений в память; перцентили —
- * по прореженной выборке (`id % step = 0`). «Прогретый» = после первого замера ОЖ ≥ 80 °C в этой сессии.
- * Индекс по sessionId уже есть; полный проход по readings на телефоне — 0,2–2,5 с, отдельный индекс не нужен.
+ * Analytics queries (stage 3). Aggregates are done in SQL without loading 1.3M values into memory; percentiles
+ * use a thinned sample (`id % step = 0`). "Warmed up" = after the first coolant reading ≥ 80 °C in this session.
+ * There's already an index on sessionId; a full pass over readings on the phone takes 0.2–2.5 s, no extra index needed.
  */
 @Dao
 interface AnalyticsDao {
@@ -238,7 +238,7 @@ interface AnalyticsDao {
     )
     suspend fun warmSensorSample(carId: Long, sensorId: String, fromMs: Long, toMs: Long, step: Int): List<Double>
 
-    /** Только нужные правилам датчики одной сессии, по времени — вход для однопроходного дайджеста. */
+    /** Only the sensors the rules need for one session, ordered by time: input for the single-pass digest. */
     @Query("SELECT sensorId, value, timestampMs FROM readings WHERE sessionId = :sessionId AND sensorId IN (:sensorIds) ORDER BY timestampMs")
     suspend fun points(sessionId: Long, sensorIds: Collection<String>): List<ReadingPoint>
 }
@@ -278,7 +278,7 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE carId = :carId ORDER BY startedAtMs DESC")
     fun observeForCar(carId: Long): Flow<List<TripEntity>>
 
-    /** IGNORE + уникальный externalId = повторный импорт не дублирует поездки; -1 — такая уже была. */
+    /** IGNORE + unique externalId = re-import doesn't duplicate trips; -1 means it already existed. */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(trips: List<TripEntity>): List<Long>
 
@@ -288,12 +288,12 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE externalId IN (:externalIds)")
     suspend fun byExternalIds(externalIds: List<String>): List<TripEntity>
 
-    /** Поездка Car Scanner, дописанная/изменённая в новом бэкапе (тот же externalId). */
+    /** A Car Scanner trip extended/changed in a new backup (same externalId). */
     @Update suspend fun updateAll(trips: List<TripEntity>)
 
     /**
-     * Законченные записи без своей поездки ("session:<id>"). Импортированные записи, которые по времени
-     * перекрываются с поездкой Car Scanner, пропускаются: эта поездка уже есть в таблице, дубль не нужен.
+     * Finished recordings without their own trip ("session:<id>"). Imported recordings that overlap in time
+     * with a Car Scanner trip are skipped: that trip is already in the table, no duplicate needed.
      */
     @Query(
         "SELECT s.id, s.startedAtMs, s.endedAtMs, s.source, s.carId FROM sessions s " +
@@ -308,7 +308,7 @@ interface TripDao {
 
 data class TripCandidateRow(val id: Long, val startedAtMs: Long, val endedAtMs: Long, val source: String, val carId: Long)
 
-/** Работа ТО машины (3.3/3.9 п.2): интервалы по пробегу/времени и когда делали последний раз. */
+/** A car maintenance task (3.3/3.9 item 2): mileage/time intervals and when it was last done. */
 @Entity(
     tableName = "maintenance_items",
     foreignKeys = [ForeignKey(CarEntity::class, ["id"], ["carId"], onDelete = ForeignKey.CASCADE)],
@@ -325,7 +325,7 @@ data class MaintenanceItemEntity(
     val note: String?,
 )
 
-/** Записи пробега: MANUAL — ввод пользователя (или перенос из профиля машины), ESTIMATED — оценка. */
+/** Odometer entries: MANUAL is user input (or migrated from the car profile), ESTIMATED is an estimate. */
 @Entity(
     tableName = "odometer_log",
     foreignKeys = [ForeignKey(CarEntity::class, ["id"], ["carId"], onDelete = ForeignKey.CASCADE)],
@@ -368,7 +368,7 @@ interface OdometerDao {
     @Query("SELECT * FROM odometer_log WHERE carId = :carId ORDER BY atMs, id")
     suspend fun forCar(carId: Long): List<OdometerEntity>
 
-    /** Последний ручной ввод каждой машины (для профиля машины). */
+    /** The latest manual entry for each car (for the car profile). */
     @Query(
         "SELECT * FROM odometer_log o WHERE o.source = 'MANUAL' AND o.id = (SELECT o2.id FROM odometer_log o2 " +
             "WHERE o2.carId = o.carId AND o2.source = 'MANUAL' ORDER BY o2.atMs DESC, o2.id DESC LIMIT 1)",
@@ -387,8 +387,8 @@ interface OdometerDao {
 }
 
 /**
- * v6 (1.27): строка истории импорта — что принёс один бэкап. status: DONE / FAILED / CANCELLED.
- * fileName — имя выбранного файла (только локально, в логи не пишется).
+ * v6 (1.27): an import history row: what one backup brought in. status: DONE / FAILED / CANCELLED.
+ * fileName is the name of the selected file (local only, never logged).
  */
 @Entity(tableName = "import_history")
 data class ImportHistoryEntity(
@@ -410,7 +410,7 @@ data class ImportHistoryEntity(
     val message: String?,
 )
 
-/** v6: запись .brc, импортированная целиком (имя + размер + CRC из zip) — повторный бэкап пропускает её без распаковки. */
+/** v6: a .brc entry imported in full (name + size + CRC from the zip); a repeat backup skips it without unpacking. */
 @Entity(tableName = "import_files")
 data class ImportedFileEntity(
     @PrimaryKey val name: String,
@@ -420,8 +420,8 @@ data class ImportedFileEntity(
 )
 
 /**
- * v6: значения, принесённые прошлым импортом (JSON), по ключу «car:<id>» / «units». Поле обновляется из нового
- * бэкапа, только если пользователь его не менял после прошлого импорта (текущее значение == снимок).
+ * v6: values brought in by the previous import (JSON), keyed by "car:<id>" / "units". A field is updated from a new
+ * backup only if the user hasn't changed it since the previous import (current value == snapshot).
  */
 @Entity(tableName = "import_snapshots")
 data class ImportSnapshotEntity(
@@ -468,7 +468,7 @@ abstract class EcuDatabase : RoomDatabase() {
     abstract fun importDao(): ImportDao
 
     companion object {
-        /** Версия схемы; резервная копия ECULense со старшей версией не восстанавливается. */
+        /** Schema version; an ECULense backup with a newer version is not restored. */
         const val VERSION = 6
         const val FILE_NAME = "ecu.db"
         val MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
@@ -476,7 +476,7 @@ abstract class EcuDatabase : RoomDatabase() {
         const val DEFAULT_CAR_ID = 1L
         const val DEFAULT_CAR_NAME = "Мой автомобиль"
 
-        /** Первая машина есть всегда: новые записи и старые данные привязываются к ней. */
+        /** The first car always exists: new recordings and legacy data are attached to it. */
         val defaultCar = object : Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 db.execSQL("INSERT INTO cars (id, name) VALUES ($DEFAULT_CAR_ID, '$DEFAULT_CAR_NAME')")
@@ -486,9 +486,9 @@ abstract class EcuDatabase : RoomDatabase() {
 }
 
 /**
- * 1 → 2: машины и поездки (задача 1.25). Только CREATE и ALTER TABLE ADD COLUMN — таблицы sessions/readings
- * не пересоздаются, поэтому каскад readings → sessions не срабатывает и записи пользователя не трогаются.
- * Все существующие сессии и снимки DTC привязываются к машине по умолчанию.
+ * 1 → 2: cars and trips (task 1.25). Only CREATE and ALTER TABLE ADD COLUMN: the sessions/readings tables
+ * are not recreated, so the readings → sessions cascade doesn't fire and user recordings are left untouched.
+ * All existing sessions and DTC snapshots are attached to the default car.
  */
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -519,8 +519,8 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
 }
 
 /**
- * Находка аналитики (этап 3) для машины. evidenceJson — {"evidence":[{"label","value"}],"sessions":[id…]};
- * пересчёт заменяет все находки машины разом ([FindingDao.replaceForCar]).
+ * An analytics finding (stage 3) for a car. evidenceJson is {"evidence":[{"label","value"}],"sessions":[id…]};
+ * recomputation replaces all of the car's findings at once ([FindingDao.replaceForCar]).
  */
 @Entity(
     tableName = "findings",
@@ -563,7 +563,7 @@ interface FindingDao {
     }
 }
 
-/** 2 → 3: таблица находок аналитики. Только CREATE — существующие таблицы и данные не трогаются. */
+/** 2 → 3: analytics findings table. Only CREATE: existing tables and data are untouched. */
 val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(
@@ -576,7 +576,7 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
-/** 3 → 4: привод и масса машины (справочник моделей, 1.25b). Только ADD COLUMN — данные не трогаются. */
+/** 3 → 4: car drivetrain and weight (model catalog, 1.25b). Only ADD COLUMN: data is untouched. */
 val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE `cars` ADD COLUMN `drive` TEXT")
@@ -585,9 +585,9 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 }
 
 /**
- * 4 → 5: ТО и журнал пробега (3.9 п.2), способ расчёта топлива у поездок. Только CREATE и ADD COLUMN.
- * Пробег из профиля машины (1.25: odometerKm/odometerAtMs) переносится в odometer_log как ручной ввод, а в
- * cars обнуляется — источник один, профиль читает пробег из журнала. Без даты — дата миграции.
+ * 4 → 5: maintenance and odometer log (3.9 item 2), fuel calculation method for trips. Only CREATE and ADD COLUMN.
+ * Mileage from the car profile (1.25: odometerKm/odometerAtMs) is moved to odometer_log as manual input and
+ * cleared in cars: a single source, the profile reads mileage from the log. No date means the migration date.
  */
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -612,7 +612,7 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
-/** 5 → 6: история импортов, отметки импортированных .brc и снимки прошлого импорта (1.27). Только CREATE. */
+/** 5 → 6: import history, markers of imported .brc files and previous-import snapshots (1.27). Only CREATE. */
 val MIGRATION_5_6 = object : Migration(5, 6) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(

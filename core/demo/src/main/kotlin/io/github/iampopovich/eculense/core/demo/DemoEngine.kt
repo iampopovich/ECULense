@@ -7,12 +7,12 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * Модель «машины на ходу» для демо-режима: всё — чистые функции времени с момента подключения,
- * без Random, поэтому тесты детерминированы, а значения на экране всё равно «живые».
+ * A "car in motion" model for demo mode: everything is a pure function of time since connection,
+ * with no Random, so tests are deterministic while on-screen values still look "alive".
  *
- * Цикл поездки 70 с: холостой ход → разгон → круиз → торможение → холостой ход.
- * Скорость круиза меняется от цикла к циклу. Двигатель прогревается (ОЖ ~18 → ~90 °C),
- * пока он холодный, холостые обороты выше.
+ * 70 s trip cycle: idle → acceleration → cruise → braking → idle.
+ * Cruise speed varies from cycle to cycle. The engine warms up (coolant ~18 → ~90 °C);
+ * while it's cold, idle RPM is higher.
  */
 internal class DemoEngine(
     private val ambientC: Double = 18.0,
@@ -20,7 +20,7 @@ internal class DemoEngine(
 ) {
     private enum class Phase { IDLE, ACCEL, CRUISE, BRAKE }
 
-    /** Значения в единицах StandardPids (ключ — номер PID сервиса 01). */
+    /** Values in StandardPids units (key is the service 01 PID number). */
     fun values(elapsedMs: Long, clearedAtMs: Long? = null): Map<Int, Double> {
         val t = max(0L, elapsedMs) / 1000.0
         val cycle = (t / CYCLE_S).toInt()
@@ -95,7 +95,7 @@ internal class DemoEngine(
         return c * c * (3 - 2 * c)
     }
 
-    /** Гладкий детерминированный «шум» в [-1, 1]; k разводит датчики, чтобы они не дрожали синхронно. */
+    /** Smooth deterministic "noise" in [-1, 1]; k decorrelates sensors so they don't jitter in sync. */
     private fun noise(t: Double, k: Int): Double =
         (sin(t * 1.3 + k) + 0.6 * sin(t * 2.7 + 2 * k + PI / 3) + 0.4 * sin(t * 7.1 + 3 * k)) / 2.0
 

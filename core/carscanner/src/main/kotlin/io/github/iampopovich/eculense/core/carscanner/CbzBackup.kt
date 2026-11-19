@@ -3,9 +3,9 @@ package io.github.iampopovich.eculense.core.carscanner
 import java.io.InputStream
 import java.util.zip.ZipInputStream
 
-/** Полный бэкап Car Scanner — zip: настройки (по файлу на ключ), records/<имя>.brc, cache/drivecyclesv2.db.bak. */
+/** Full Car Scanner backup — a zip: settings (one file per key), records/<name>.brc, cache/drivecyclesv2.db.bak. */
 object CbzBackup {
-    /** Потоково, без распаковки на диск: самый большой .brc в бэкапе пользователя ~23 МБ. */
+    /** Streaming, without extracting to disk: the largest .brc in the user's backup is ~23 MB. */
     inline fun forEachRecording(input: InputStream, block: (fileName: String, bytes: ByteArray) -> Unit) {
         ZipInputStream(input).use { zip ->
             while (true) {

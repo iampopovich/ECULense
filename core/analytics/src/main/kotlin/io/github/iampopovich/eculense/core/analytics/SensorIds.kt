@@ -1,9 +1,9 @@
 package io.github.iampopovich.eculense.core.analytics
 
 /**
- * Идентификаторы датчиков, которые нужны аналитике. Формат как в БД: "01.05" = сервис 01, PID 0x05.
- * Импорт Car Scanner кладёт коррекции топлива под теми же PID 01.06–01.09, а напряжение часто
- * только как "elm.voltage" (команда ATRV адаптера) — правила понимают оба источника.
+ * Sensor IDs needed by analytics. Same format as in the DB: "01.05" = service 01, PID 0x05.
+ * Car Scanner import stores fuel trims under the same PIDs 01.06–01.09, while voltage is often
+ * only "elm.voltage" (the adapter's ATRV command) — the rules understand both sources.
  */
 object SensorIds {
     const val COOLANT = "01.05"
@@ -16,19 +16,19 @@ object SensorIds {
     const val IAT = "01.0F"
     const val MAF = "01.10"
     const val MIL_DISTANCE = "01.21"
-    /** Расход топлива двигателя, л/ч (PID 0x5E) — есть не у всех машин. */
+    /** Engine fuel rate, L/h (PID 0x5E) — not available on every car. */
     const val FUEL_RATE = "01.5E"
-    /** Напряжение блока управления (PID 0x42) — точнее, чем у адаптера. */
+    /** Control module voltage (PID 0x42) — more accurate than the adapter's. */
     const val MODULE_VOLTAGE = "01.42"
-    /** Напряжение на разъёме OBD по ATRV — есть почти в каждой записи. */
+    /** Voltage at the OBD connector via ATRV — present in almost every recording. */
     const val ELM_VOLTAGE = "elm.voltage"
 
     val TRIMS = listOf(STFT1, LTFT1, STFT2, LTFT2)
 
-    /** Всё, что читает [SessionDigester]: остальные датчики правилам не нужны и из БД не грузятся. */
+    /** Everything [SessionDigester] reads: the rules need no other sensors, and those are not loaded from the DB. */
     val FOR_RULES: Set<String> = setOf(COOLANT, RPM, SPEED, MAF, MIL_DISTANCE, MODULE_VOLTAGE, ELM_VOLTAGE) + TRIMS
 
-    /** Подписи для ИИ и экрана; неизвестные id показываются как есть. */
+    /** Labels for the AI and the screen; unknown ids are shown as is. */
     val NAMES: Map<String, String> = mapOf(
         "01.04" to "Нагрузка двигателя",
         COOLANT to "Температура ОЖ",
@@ -47,7 +47,7 @@ object SensorIds {
         ELM_VOLTAGE to "Напряжение на разъёме OBD (адаптер)",
     )
 
-    /** Координаты и прочие следы местоположения никогда не уходят наружу (инструменты ИИ, экспорт сводок). */
+    /** Coordinates and any other location traces never leave the app (AI tools, summary export). */
     fun isLocation(sensorId: String): Boolean {
         val id = sensorId.lowercase()
         return id.startsWith("gps") || id.contains("lat") || id.contains("lon") || id.contains("location") || id.contains("altitude")

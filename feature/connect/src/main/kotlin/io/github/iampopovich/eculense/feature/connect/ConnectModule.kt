@@ -9,7 +9,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** Экран подключения — пункт хаба «Настройки» (и цель кнопки «Подключить» на панели), а не вкладка. */
+/** Connection screen: an item of the «Настройки» hub (and the target of the «Подключить» button on the dashboard), not a tab. */
 @OptIn(KoinExperimentalAPI::class)
 val connectModule = module {
     viewModelOf(::ConnectViewModel)

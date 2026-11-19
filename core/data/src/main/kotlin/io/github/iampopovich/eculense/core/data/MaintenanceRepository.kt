@@ -21,27 +21,27 @@ import kotlinx.coroutines.sync.withLock
 import java.time.ZoneId
 
 /**
- * ТО и пробег (3.9 п.2). Пробег — журнал ручных вводов + оценка по поездкам после последнего ввода
- * ([OdometerEstimator]); статусы работ — [MaintenanceRule]. Всё локально, без сети.
+ * Maintenance and mileage (3.9 item 2). Mileage = log of manual entries + estimate from trips after the last entry
+ * ([OdometerEstimator]); task statuses — [MaintenanceRule]. Everything is local, no network.
  */
 interface MaintenanceRepository {
     fun observeItems(carId: Long): Flow<List<MaintenanceItem>>
     suspend fun items(carId: Long): List<MaintenanceItem>
-    /** Предложить типовой список один раз на машину; true — список добавлен сейчас. */
+    /** Offer the default list once per car; true — the list was added just now. */
     suspend fun ensureTemplate(car: CarProfile): Boolean
-    /** id == 0 → новая работа. Возвращает id. Так же «Отменить» возвращает прежнее состояние работы. */
+    /** id == 0 → new task. Returns the id. «Отменить» also uses this to restore the task's previous state. */
     suspend fun save(item: MaintenanceItem): Long
     suspend fun delete(id: Long)
-    /** Отметить «сделано»; возвращает состояние до отметки (для «Отменить»). */
+    /** Mark as «сделано»; returns the state before marking (for «Отменить»). */
     suspend fun markDone(id: Long, km: Long?, atMs: Long): MaintenanceItem?
     fun observeOdometer(carId: Long): Flow<List<OdometerEntry>>
     suspend fun addOdometer(carId: Long, km: Long, atMs: Long): Long
     suspend fun deleteOdometer(id: Long)
     fun observeEstimate(carId: Long): Flow<OdometerEstimate?>
     suspend fun estimate(carId: Long): OdometerEstimate?
-    /** Все работы со статусами (сначала просроченные). */
+    /** All tasks with statuses (overdue first). */
     suspend fun evaluate(carId: Long): List<MaintenanceDue>
-    /** Что пора делать: просрочено или скоро. */
+    /** What is due: overdue or coming soon. */
     suspend fun due(carId: Long): List<MaintenanceDue>
 }
 

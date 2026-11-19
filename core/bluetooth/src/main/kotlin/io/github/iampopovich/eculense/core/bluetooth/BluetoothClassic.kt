@@ -17,7 +17,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
 
-/** Разрешение BLUETOOTH_CONNECT запрашивает экран подключения до вызова discover()/connect(). */
+/** The BLUETOOTH_CONNECT permission is requested by the connection screen before discover()/connect() is called. */
 @SuppressLint("MissingPermission")
 internal class BluetoothClassicTransport(
     private val adapter: BluetoothAdapter,
@@ -26,7 +26,7 @@ internal class BluetoothClassicTransport(
     private var socket: BluetoothSocket? = null
 
     override fun openStreams(): Pair<InputStream, OutputStream> {
-        // Без BLUETOOTH_SCAN (API 31+) бросает SecurityException; сами поиск не запускаем, так что это не критично.
+        // Without BLUETOOTH_SCAN (API 31+) this throws SecurityException; we don't start discovery ourselves, so it's not critical.
         runCatching { adapter.cancelDiscovery() }
         val s = adapter.getRemoteDevice(address).createInsecureRfcommSocketToServiceRecord(SPP_UUID)
         s.connect()

@@ -84,7 +84,7 @@ class VehicleDbTest {
         assertEquals(DriveType.REAR, VehicleSpecs.drive("Rear Wheel Drive"))
     }
 
-    /** Настоящий релиз: VEHICLES_DB=/путь/к/vehicles.sqlite ./gradlew :core:vehicledb:testDebugUnitTest. В git не кладём. */
+    /** Real release: VEHICLES_DB=/path/to/vehicles.sqlite ./gradlew :core:vehicledb:testDebugUnitTest. Not committed to git. */
     @Test
     fun `real release db contains the reference record`() {
         val path = System.getenv("VEHICLES_DB")

@@ -13,10 +13,10 @@ import java.security.MessageDigest
 enum class ModelOrigin(val badge: String) { KOOG("Koog"), GALLERY("Gallery"), HF("HF"), CUSTOM_LINK("своя"), CUSTOM_FILE("файл") }
 
 /**
- * Модель для экрана «На устройстве». [fileName] = id модели в Koog (`LiteRTLLModels`): клиент Koog открывает
- * `modelsPath/<id>`. [packId] — id пакета данных (скачивание/хранение через :core:datapacks).
- * [repo] — репозиторий HF (ключ дедупликации вместе с [fileName]); [koog] — модель есть и в каталоге Koog;
- * [minRamGb]/[accelerators] — из allowlist Google AI Edge Gallery; [actionsOnly] — модель для вызова функций, не для чата.
+ * A model for the «На устройстве» screen. [fileName] = the model id in Koog (`LiteRTLLModels`): the Koog client opens
+ * `modelsPath/<id>`. [packId] — data pack id (download/storage via :core:datapacks).
+ * [repo] — HF repository (dedup key together with [fileName]); [koog] — the model is also in the Koog catalog;
+ * [minRamGb]/[accelerators] — from the Google AI Edge Gallery allowlist; [actionsOnly] — a function-calling model, not for chat.
  */
 @Serializable
 data class LocalModel(
@@ -59,9 +59,9 @@ data class LocalModel(
 }
 
 /**
- * Каталог моделей: сначала модели клиента Koog (`LiteRTLLModels.models` — их id и есть имена файлов), к ним — откуда
- * скачать на Hugging Face (litert-community; ревизия, размер и sha256 LFS зафиксированы 2026-11-18). Модели, о которых
- * Koog знает, а мы ещё нет, видны без ссылки — их можно добавить как «Свою модель».
+ * Model catalog: first the Koog client's models (`LiteRTLLModels.models` — their ids are the file names), plus where
+ * to download them on Hugging Face (litert-community; revision, size and LFS sha256 pinned 2026-11-18). Models that
+ * Koog knows about but we don't yet are shown without a link — they can be added as «Свою модель».
  */
 object LocalModelCatalog {
     private data class HfSource(
@@ -82,7 +82,7 @@ object LocalModelCatalog {
             title = "FunctionGemma 270M",
             description = "Крошечная модель Google для вызова функций (обучена на действиях телефона). Нужен токен Hugging Face и принятая лицензия Gemma.",
             sizeBytes = 288_964_608L,
-            sha256 = null, // файл закрыт без токена — хэш не опубликован; проверяется размер
+            sha256 = null, // the file is gated without a token — hash not published; size is checked
             gated = true,
             license = "Gemma Terms of Use",
         ),
@@ -129,14 +129,14 @@ object LocalModelCatalog {
         )
     }
 
-    /** id пакета модели каталога: из имени файла (тот же, что был у записей Koog — начатые загрузки не теряются). */
+    /** Pack id of a catalog model: derived from the file name (same as the Koog entries had — started downloads are not lost). */
     fun catalogId(fileName: String): String = "model-" + slug(fileName.removeSuffix(".litertlm"))
 
     /**
-     * Единый список: Koog + Gallery + свои/из поиска HF. Дубликаты по (репозиторий, файл) склеиваются: метаданные
-     * Gallery (название, описание, ОЗУ, ускорители), но ревизия/sha256/id пакета Koog — они проверены с рантаймом
-     * клиента Koog, и начатая загрузка продолжается. Свои модели, совпадающие с каталогом, не дублируются.
-     * Сортировка — по размеру от меньшей к большей, неизвестный размер — в конце.
+     * Unified list: Koog + Gallery + custom/from HF search. Duplicates by (repository, file) are merged: Gallery
+     * metadata (name, description, RAM, accelerators), but Koog's revision/sha256/pack id — they are verified with the
+     * Koog client runtime, and a started download continues. Custom models matching the catalog are not duplicated.
+     * Sorted by size, smallest to largest; unknown size goes last.
      */
     fun merge(koog: List<LocalModel>, gallery: List<LocalModel>, custom: List<LocalModel>): List<LocalModel> {
         val byKey = LinkedHashMap<Pair<String?, String>, LocalModel>()
@@ -159,7 +159,7 @@ object LocalModelCatalog {
         return byKey.values.sortedWith(compareBy<LocalModel> { it.sizeBytes ?: Long.MAX_VALUE }.thenBy { it.title.lowercase() })
     }
 
-    /** id пакета своей модели: стабилен для одной ссылки, безопасен для путей. */
+    /** Pack id of a custom model: stable for the same link, safe for paths. */
     fun customId(repo: String, fileName: String): String {
         val hash = MessageDigest.getInstance("SHA-256").digest("$repo/$fileName".toByteArray()).take(4).joinToString("") { "%02x".format(it) }
         return "model-custom-" + slug(fileName.removeSuffix(".litertlm")).take(40).trim('-') + "-" + hash
@@ -168,7 +168,7 @@ object LocalModelCatalog {
     internal fun slug(s: String) = s.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 }
 
-/** Ссылка на файл `.litertlm` на Hugging Face (resolve/blob, с ревизией). */
+/** Link to a `.litertlm` file on Hugging Face (resolve/blob, with revision). */
 data class HfLink(val repo: String, val revision: String, val path: String) {
     val fileName: String get() = path.substringAfterLast('/')
     val resolveUrl: String get() = "https://huggingface.co/$repo/resolve/$revision/$path"

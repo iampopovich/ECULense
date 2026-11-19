@@ -30,9 +30,9 @@ import org.junit.Test
 
 private class FakeDtcRepository(private val session: FakeSession? = null) : DtcRepository {
     val saved = mutableListOf<Dtc>()
-    /** Каждое успешное чтение, переданное в репозиторий (дубли отсекает сам репозиторий). */
+    /** Every successful read passed to the repository (the repository itself drops duplicates). */
     val reads = mutableListOf<List<Dtc>>()
-    /** Сколько сбросов уже было в момент записи — снимок обязан идти до сброса. */
+    /** How many clears had happened at write time: the snapshot must come before the clear. */
     val clearCallsAtRecord = mutableListOf<Int>()
     override suspend fun saveSnapshot(dtcs: List<Dtc>, vin: String?, takenAtMs: Long?, carId: Long?) {
         saved += dtcs
@@ -44,7 +44,7 @@ private class FakeDtcRepository(private val session: FakeSession? = null) : DtcR
     }
 }
 
-/** Настоящий путь ELM327 (Elm327Session через ObdConnectionManager) поверх скриптового адаптера. */
+/** The real ELM327 path (Elm327Session via ObdConnectionManager) on top of a scripted adapter. */
 private class ScriptedFactory(private val replies: Map<String, String>) : TransportFactory {
     override val kind = "fake"
     override suspend fun discover() = listOf(ENDPOINT)
@@ -135,7 +135,7 @@ class DtcViewModelTest {
         val vm = DtcViewModel(FakeConnectionController(session = session), descriptions, repository, emptyList())
         vm.read()
         vm.clear()
-        // чтение + снимок перед сбросом (одинаковые — дубль отсекает репозиторий); оба до сброса
+        // read + snapshot before clearing (identical, the repository drops the duplicate); both before the clear
         assertEquals(listOf(listOf(p0133), listOf(p0133)), repository.reads)
         assertEquals(listOf(0, 0), repository.clearCallsAtRecord)
         assertEquals(1, session.clearCalls)

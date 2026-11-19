@@ -43,7 +43,7 @@ class ConnectionService : Service() {
     }
 }
 
-/** Подключились → запустить сервис, отключились → остановить. */
+/** Connected → start the service, disconnected → stop it. */
 internal class ConnectionServiceStarter(context: Context, controller: ConnectionController, scope: CoroutineScope) {
     init {
         scope.launch {

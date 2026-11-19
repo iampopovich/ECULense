@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.ZoneId
 
-/** Что можно отменить через снекбар: новую запись пробега, отметку «сделано», удаление работы. */
+/** What can be undone via the snackbar: a new mileage entry, a «сделано» mark, deleting a job. */
 internal sealed interface Undo {
     val text: String
     data class Odometer(val entryId: Long, override val text: String) : Undo
@@ -42,7 +42,7 @@ internal data class MaintenanceUiState(
     val nowMs: Long = 0,
 )
 
-/** «Обслуживание» активной машины (3.9 п.2): список работ со статусами, ввод пробега, «Сделано» с отменой. */
+/** «Обслуживание» for the active car (3.9 item 2): job list with statuses, mileage input, «Сделано» with undo. */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class MaintenanceViewModel(
     private val cars: CarRepository,
@@ -69,7 +69,7 @@ internal class MaintenanceViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MaintenanceUiState())
 
     init {
-        // Первый вход для машины — типовой список работ (один раз; удалённое не возвращается).
+        // First visit for a car: the default job list (once; deleted items do not come back).
         viewModelScope.launch { cars.observeActiveCar().first()?.let { repo.ensureTemplate(it) } }
     }
 

@@ -46,17 +46,17 @@ import kotlinx.coroutines.flow.map
 import java.io.IOException
 
 /**
- * Клиенты Koog по провайдеру. У пресетов адрес и пути — настройки клиентов Koog по умолчанию
+ * Koog clients per provider. For presets the base URL and paths are the Koog client defaults
  * (`OpenRouterClientSettings()`, `OpenAIClientSettings()`, `AnthropicClientSettings()`, `GoogleClientSettings()`,
- * `DeepSeekClientSettings()`, `MistralAIClientSettings()`, `OllamaClient` с `DEFAULT_BASE_URL`); от нас — только
- * таймауты. Адрес задаёт пользователь лишь у [LlmProviderKind.OTHER]: полный OpenAI-совместимый адрес (…/v1),
- * поэтому пути клиенту OpenAI там задаём относительно него.
+ * `DeepSeekClientSettings()`, `MistralAIClientSettings()`, `OllamaClient` with `DEFAULT_BASE_URL`); we only set
+ * timeouts. The user sets the URL only for [LlmProviderKind.OTHER]: a full OpenAI-compatible URL (…/v1),
+ * so there the OpenAI client paths are relative to it.
  */
 internal object KoogClients {
     /**
-     * Koog 1.3.0: удобные функции OpenAILLMClient(apiKey) и т.п. ищут фабрику HTTP через ServiceLoader,
-     * а в Android-артефакте http-client-ktor нет META-INF/services → «No KoogHttpClient.Factory provider found».
-     * Поэтому фабрику передаём явно, движок — OkHttp (его тянет koog-agents).
+     * Koog 1.3.0: convenience functions like OpenAILLMClient(apiKey) look up the HTTP factory via ServiceLoader,
+     * but the Android artifact of http-client-ktor has no META-INF/services → «No KoogHttpClient.Factory provider found».
+     * So we pass the factory explicitly; the engine is OkHttp (pulled in by koog-agents).
      */
     private val httpFactory: KoogHttpClient.Factory by lazy { KtorKoogHttpClient.Factory(HttpClient(OkHttp)) }
 
@@ -81,7 +81,7 @@ internal object KoogClients {
         }
     }
 
-    /** Для показа в сводке; в клиенты пресетов адрес не передаётся. */
+    /** For display in the summary; the URL is not passed to preset clients. */
     fun defaultBaseUrl(kind: LlmProviderKind): String = defaults.getValue(kind)
 
     fun provider(kind: LlmProviderKind): LLMProvider = when (kind) {
@@ -94,13 +94,13 @@ internal object KoogClients {
         LlmProviderKind.OLLAMA -> LLMProvider.Ollama
     }
 
-    /** Модель задаёт пользователь строкой (id у провайдера), поэтому LLModel собираем сами. */
+    /** The user enters the model as a string (provider id), so we build the LLModel ourselves. */
     fun model(settings: LlmSettings): LLModel {
         val capabilities = buildList {
             add(LLMCapability.Completion)
             add(LLMCapability.Temperature)
             add(LLMCapability.Tools)
-            // OpenAILLMClient 1.3.0 выбирает эндпоинт по способности; без неё — «Cannot determine proper LLM params».
+            // OpenAILLMClient 1.3.0 picks the endpoint by capability; without it: «Cannot determine proper LLM params».
             if (provider(settings.provider) == LLMProvider.OpenAI) add(LLMCapability.OpenAIEndpoint.Completions)
         }
         return LLModel(
@@ -112,10 +112,10 @@ internal object KoogClients {
     }
 
     /**
-     * [otherBaseUrl] — адрес пользователя, используется только для [LlmProviderKind.OTHER].
-     * [model] нужен только Anthropic: 1.3.0 отправляет в API не model.id, а значение из modelVersionsMap.
-     * [presetBaseUrlForTests] — только для JVM-тестов (локальный HttpServer вместо провайдера); приложение его не задаёт,
-     * и тогда настройки пресета — целиком Koog по умолчанию.
+     * [otherBaseUrl] is the user's URL, used only for [LlmProviderKind.OTHER].
+     * [model] is needed only for Anthropic: 1.3.0 sends the API not model.id but the value from modelVersionsMap.
+     * [presetBaseUrlForTests] is only for JVM tests (local HttpServer instead of the provider); the app never sets it,
+     * and then the preset settings are entirely Koog defaults.
      */
     fun client(
         kind: LlmProviderKind,
@@ -169,9 +169,9 @@ internal object KoogClients {
                 if (test == null) OllamaClient(httpClientFactory = httpFactory, timeoutConfig = timeouts)
                 else OllamaClient(httpClientFactory = httpFactory, baseUrl = test, timeoutConfig = timeouts)
             LlmProviderKind.OTHER -> OpenAILLMClient(
-                // Локальным серверам ключ обычно не нужен, но Koog требует непустую строку.
+                // Local servers usually need no key, but Koog requires a non-empty string.
                 apiKey = apiKey?.trim()?.takeIf { it.isNotEmpty() } ?: "not-needed",
-                // Адрес пользователя уже содержит версию API (…/v1), поэтому пути — относительно него.
+                // The user's URL already contains the API version (…/v1), so paths are relative to it.
                 settings = OpenAIClientSettings(
                     baseUrl = otherBaseUrl?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() }
                         ?: throw IllegalStateException("Не задан адрес сервера"),
@@ -189,7 +189,7 @@ internal object KoogClients {
 
     fun executor(settings: LlmSettings, apiKey: String?, presetBaseUrlForTests: String? = null): PromptExecutor {
         val other = if (settings.provider == LlmProviderKind.OTHER) {
-            // Адрес мог быть сохранён до появления проверки — http в интернет не пускаем и здесь.
+            // The URL may have been saved before the check existed, so plain http to the internet is rejected here too.
             when (val v = EndpointUrl.validate(settings.baseUrl)) {
                 is EndpointUrl.Result.Invalid -> throw IllegalStateException(v.reason)
                 is EndpointUrl.Result.Valid -> v.url
@@ -202,7 +202,7 @@ internal object KoogClients {
     }
 }
 
-/** Перевод исключений Koog/сети в понятный текст. Ключ вырезается, если вдруг попал в ответ сервера. */
+/** Translates Koog/network exceptions into readable text. The key is stripped if it ever ends up in the server response. */
 internal object LlmErrors {
     private val providerMessage = Regex("\"(?:message|error)\"\\s*:\\s*\"([^\"]{1,200})\"")
 
@@ -234,11 +234,11 @@ internal class KoogLlmGateway(
     private val store: LlmSettingsStore,
     private val toolbox: VehicleToolbox? = null,
     private val historyProvider: ChatHistoryStore = InMemoryChatHistory(),
-    /** Модель на телефоне (:core:ailocal); если выбрана — чат идёт через неё, облачные настройки не трогаются. */
+    /** On-phone model (:core:ailocal); if selected, chat goes through it and cloud settings are left untouched. */
     private val onDevice: OnDeviceLlm? = null,
-    /** Диспетчер: вопрос → тип, эксперты, период (детерминированно, без модели). */
+    /** Dispatcher: question → type, experts, period (deterministic, no model). */
     private val router: (String) -> ChatRoute = { ChatRouter.route(it) },
-    /** Сколько ждать одного эксперта в облаке; не успел — редактор получает «эксперт недоступен». */
+    /** How long to wait for one cloud expert; if it misses the deadline, the editor gets «эксперт недоступен». */
     private val expertTimeoutMs: Long = 120_000,
     private val expertLog: (String) -> Unit = { msg -> runCatching { android.util.Log.w("EcuExperts", msg) } },
     private val executorFactory: (LlmSettings, String?) -> PromptExecutor = { s, key -> KoogClients.executor(s, key) },
@@ -264,7 +264,7 @@ internal class KoogLlmGateway(
         }
         if (local != null) {
             chatOnDevice(local, route, conversationId, userText, useCarData)
-            // исполнитель принадлежит :core:ailocal (движок держится между вопросами) — не закрываем
+            // the executor belongs to :core:ailocal (the engine is kept between questions), so we do not close it
             return@channelFlow
         }
         val settings = store.settings.first()?.takeIf { it.model.isNotBlank() } ?: throw LlmException(NOT_CONFIGURED)
@@ -278,10 +278,10 @@ internal class KoogLlmGateway(
         val model = KoogClients.model(settings)
         try {
             when {
-                // без данных машины или вопрос не о машине («привет») — без экспертов, форма по вопросу
+                // no car data, or the question is not about the car («привет»): no experts, format by question
                 tools == null || route.roles.isEmpty() ->
                     runAgent(executor, model, null, conversationId, userText, streaming = true, system = SystemPrompts.general(route.intent))
-                // одна роль — отвечает сама, стримом, без редактора
+                // a single role answers by itself, streamed, without the editor
                 route.roles.size == 1 -> {
                     val role = route.roles.single()
                     send(ChatEvent.Status(role.statusText(route.periodDays)))
@@ -308,8 +308,8 @@ internal class KoogLlmGateway(
     }
 
     /**
-     * Модель на телефоне (≈ 90 с на вызов): один вызов «сразу в ролях» выбранных экспертов; данные — сводкой только из
-     * нужных вопросу разделов (тренды за период для «как машина вела себя»), а не всё подряд.
+     * On-phone model (≈ 90 s per call): a single call answering "in the roles" of all selected experts at once; data is a summary of only
+     * the sections the question needs (trends for the period for «как машина вела себя»), not everything.
      */
     private suspend fun kotlinx.coroutines.channels.ProducerScope<ChatEvent>.chatOnDevice(
         local: OnDeviceSession,
@@ -319,7 +319,7 @@ internal class KoogLlmGateway(
         useCarData: Boolean,
     ) {
         val tools = toolbox?.takeIf { useCarData && local.supportsTools && route.roles.isNotEmpty() }
-        // Модель без инструментов: данные машины — сводкой в системном промпте, числа считает приложение.
+        // Model without tools: car data goes as a summary in the system prompt, the app computes the numbers.
         val digest = if (useCarData && toolbox != null && !local.supportsTools && route.roles.isNotEmpty()) {
             send(ChatEvent.Status("Приложение собирает данные машины…"))
             toolbox.digest(route.digestSections, route.periodDays)
@@ -343,9 +343,9 @@ internal class KoogLlmGateway(
     }
 
     /**
-     * Эксперты параллельно: у каждого свой системный промпт роли и только свои инструменты, ≤ [EXPERT_TOOL_ROUNDS] кругов,
-     * без ChatMemory (контекст — две последние реплики диалога). Текст экспертов пользователю не стримится — он уходит
-     * редактору и в «Заметки экспертов». Ошибка или таймаут одного эксперта не валит ответ.
+     * Experts in parallel: each has its own role system prompt and only its own tools, ≤ [EXPERT_TOOL_ROUNDS] rounds,
+     * no ChatMemory (context is the last two turns of the conversation). Expert text is not streamed to the user; it goes
+     * to the editor and into «Заметки экспертов». An error or timeout of one expert does not fail the answer.
      */
     private suspend fun kotlinx.coroutines.channels.ProducerScope<ChatEvent>.experts(
         executor: PromptExecutor,
@@ -377,7 +377,7 @@ internal class KoogLlmGateway(
                                 llmModel = model,
                                 strategy = VehicleChatStrategy.create(
                                     system = SystemPrompts.expert(role, route),
-                                    // пользователю — только какие данные смотрит роль; текст заметки — редактору
+                                    // the user sees only which data the role is looking at; the note text goes to the editor
                                     emit = { e -> if (e is ChatEvent.ToolCall) send(e) },
                                     label = roleLabel(role, tools),
                                     streaming = true,
@@ -454,7 +454,7 @@ internal class KoogLlmGateway(
             throw LlmErrors.describe(e, apiKey)
         }
         try {
-            // catch{} ловит только ошибки апстрима (Koog/сеть), исключения коллектора не подменяются.
+            // catch{} catches only upstream errors (Koog/network); collector exceptions are not replaced.
             emitAll(
                 executor.executeStreaming(chat, KoogClients.model(settings))
                     .filterIsInstance<StreamFrame.TextDelta>()

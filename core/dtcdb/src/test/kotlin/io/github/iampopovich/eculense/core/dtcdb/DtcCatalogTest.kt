@@ -34,7 +34,7 @@ private class JdbcPackDb(file: File) : PackDb {
 class DtcCatalogTest {
     private val dir = createTempDirectory("dtcdb").toFile()
 
-    /** Синтетический фрагмент OBDex (структура как в generic.min.json, тексты свои). */
+    /** Synthetic OBDex fragment (structure as in generic.min.json, own texts). */
     private val obdexJson = """
         [{"code":"P0171","category":"powertrain","title":{"en":"System Too Lean Bank 1","de":"x"},
           "description":{"en":"Long-term trim at its upper limit.\tTab inside","de":"x"},
@@ -44,7 +44,7 @@ class DtcCatalogTest {
          {"code":"P0420","title":{"en":"Catalyst System Efficiency Below Threshold Bank 1"},"description":{"en":"Cat."}}]
     """.trimIndent()
 
-    /** Синтетическая dtc_codes.db со схемой Wal33D: P1847 есть у GM-марок и в OTHER, у KIA — другой код. */
+    /** Synthetic dtc_codes.db with the Wal33D schema: P1847 exists for GM makes and in OTHER, KIA has a different code. */
     private fun oemDb(): File = File(dir, "dtc_codes.db").also { f ->
         if (f.exists()) return@also
         DriverManager.getConnection("jdbc:sqlite:${f.path}").use { c ->
@@ -148,7 +148,7 @@ class DtcCatalogTest {
         assertEquals(mapOf("P0100" to "Mass or Volume Air Flow Circuit Malfunction"), map)
     }
 
-    /** OBDEX_JSON=…/generic.min.json OEM_DTC_DB=…/dtc_codes.db — настоящие пакеты (в git не кладём). */
+    /** OBDEX_JSON=…/generic.min.json OEM_DTC_DB=…/dtc_codes.db are the real packs (not committed to git). */
     @Test
     fun `real packs`() {
         val json = System.getenv("OBDEX_JSON")

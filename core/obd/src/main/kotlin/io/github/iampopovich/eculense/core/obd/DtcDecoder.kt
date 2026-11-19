@@ -4,14 +4,14 @@ import io.github.iampopovich.eculense.core.model.Dtc
 import io.github.iampopovich.eculense.core.model.DtcKind
 
 internal object DtcDecoder {
-    /** Первые 2 бита — система (P/C/B/U), следующие 2 — первая цифра, дальше три hex-цифры. */
+    /** First 2 bits are the system (P/C/B/U), next 2 the first digit, then three hex digits. */
     fun code(a: Int, b: Int): String {
         val system = "PCBU"[a shr 6]
         val firstDigit = (a shr 4) and 0x3
         return "%c%d%X%02X".format(system, firstDigit, a and 0x0F, b)
     }
 
-    /** responseSid: 0x43 (сервис 03), 0x47 (07), 0x4A (0A). На CAN после SID идёт байт-счётчик. */
+    /** responseSid: 0x43 (service 03), 0x47 (07), 0x4A (0A). On CAN a count byte follows the SID. */
     fun parse(messages: List<ByteArray>, responseSid: Int, isCan: Boolean, kind: DtcKind): List<Dtc> =
         messages.flatMap { message ->
             val u = message.toUnsigned()

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <!-- импорт бэкапа Car Scanner — foreground-задача WorkManager с уведомлением о прогрессе и кнопкой «Отменить» -->
+    <!-- Car Scanner backup import: a WorkManager foreground job with a progress notification and a «Отменить» button -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

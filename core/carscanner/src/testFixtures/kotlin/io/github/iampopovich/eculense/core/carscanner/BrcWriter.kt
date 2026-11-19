@@ -22,7 +22,7 @@ class BrcWriter {
     private fun long(v: Long) = le(8) { putLong(v) }
     private fun double(v: Double) = le(8) { putDouble(v) }
 
-    /** Строка .NET BinaryWriter: длина в байтах 7-битными группами, затем UTF-8. */
+    /** .NET BinaryWriter string: byte length in 7-bit groups, then UTF-8. */
     private fun string(s: String) {
         val bytes = s.encodeToByteArray()
         var n = bytes.size

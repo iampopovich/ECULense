@@ -31,7 +31,7 @@ class RealBackupSmokeTest {
         assertEquals(emptyList<String>(), failures)
     }
 
-    /** Печатает только агрегаты (без имён, координат, адресов) — сверка с Car Scanner глазами, значения не коммитим. */
+    /** Prints only aggregates (no names, coordinates, addresses) — for eyeballing against Car Scanner; values are not committed. */
     @Test
     fun `settings, car and trips of a real backup`() {
         val path = System.getenv("CARSCANNER_BACKUP")
@@ -56,7 +56,7 @@ class RealBackupSmokeTest {
             )
             assertTrue(meta.cars.isNotEmpty())
             assertTrue(trips.isNotEmpty())
-            // ticks = 100 нс: сумма движение+стоянка совпадает с длительностью поездки
+            // ticks = 100 ns: moving + stopped time adds up to the trip duration
             trips.forEach { t -> assertEquals((t.finishedUtcMs - t.startedUtcMs).toDouble(), t.totalMs.toDouble(), 1_000.0) }
         } finally {
             tmp.deleteRecursively()

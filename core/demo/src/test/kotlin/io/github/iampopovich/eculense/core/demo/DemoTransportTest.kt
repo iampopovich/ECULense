@@ -16,7 +16,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-/** Демо-адаптер проверяется через настоящий стек :core:obd (ObdConnectionManager → Elm327Session → ElmLink). */
+/** The demo adapter is tested through the real :core:obd stack (ObdConnectionManager → Elm327Session → ElmLink). */
 class DemoTransportTest {
 
     private suspend fun ObdConnectionManager.connectDemo(): ConnectionState.Connected {
@@ -166,12 +166,12 @@ class DemoTransportTest {
             assertEquals(0.0, s.read(speed)!!.value, 0.0)
             assertTrue("cold idle rpm=$idleRpm", idleRpm in 700.0..1200.0)
 
-            now = 30_000 // середина цикла: крейсерская скорость
+            now = 30_000 // mid-cycle: cruising speed
             val cruise = s.read(speed)!!.value
             assertTrue("cruise speed=$cruise", cruise > 40.0)
             assertTrue(s.read(rpm)!!.value > 1500.0)
 
-            now = 15 * 60_000L + 5_000 // прогретый двигатель на холостых
+            now = 15 * 60_000L + 5_000 // warmed-up engine at idle
             val warm = s.read(coolant)!!.value
             assertTrue("warm coolant=$warm", warm in 85.0..95.0)
             val warmIdle = s.read(rpm)!!.value
@@ -203,7 +203,7 @@ class DemoTransportTest {
 internal fun String.hexBytes(): ByteArray =
     replace(" ", "").chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 
-/** Отправить команду и вернуть ответ без приглашения и концевых \r. */
+/** Send a command and return the response without the prompt and trailing \r. */
 internal suspend fun DemoTransport.ask(command: String): String {
     write("$command\r".encodeToByteArray())
     val sb = StringBuilder()

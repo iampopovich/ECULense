@@ -7,7 +7,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
-/** Область корутин, живущая столько же, сколько процесс приложения. */
+/** Coroutine scope that lives as long as the app process. */
 val AppScope = named("app-scope")
 
 fun obdModule(includeEmulator: Boolean) = module {

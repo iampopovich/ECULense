@@ -5,9 +5,9 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- Ключ LLM зашифрован ключом Keystore, который не переносится на другое устройство. -->
+        <!-- The LLM key is encrypted with a Keystore key that does not transfer to another device. -->
         <exclude domain="file" path="datastore/llm_settings.preferences_pb" />
-        <!-- Пакеты данных (справочники) скачиваются заново по запросу. -->
+        <!-- Data packs (reference databases) are re-downloaded on demand. -->
         <exclude domain="file" path="packs/" />
     </cloud-backup>
     <device-transfer>

@@ -13,7 +13,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** Ошибки — пункт хаба «Пит-стоп», а не вкладка. */
+/** DTCs are an item in the «Пит-стоп» hub, not a tab. */
 @OptIn(KoinExperimentalAPI::class)
 val dtcModule = module {
     single<DtcDescriber> {

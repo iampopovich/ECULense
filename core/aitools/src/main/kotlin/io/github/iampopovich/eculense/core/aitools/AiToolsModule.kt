@@ -9,7 +9,7 @@ import io.github.iampopovich.eculense.core.data.TripRepository
 import io.github.iampopovich.eculense.core.dtcdb.DtcDescriptions
 import org.koin.dsl.module
 
-/** Набор инструментов на один ход диалога; все только на чтение. */
+/** Tool set for one dialogue turn; all read-only. */
 internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox {
     constructor(
         analytics: AnalyticsRepository,
@@ -33,12 +33,12 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
 
     override fun progressLabel(toolName: String): String = LABELS[toolName] ?: "ИИ смотрит данные машины…"
 
-    /** Модель на телефоне инструменты не вызывает: та же информация обычным текстом (без JSON — его она пересказывала). */
+    /** The on-device model does not call tools: the same information as plain text (no JSON — it used to just paraphrase it). */
     override suspend fun digest(): String? = digest(DEFAULT_SECTIONS, DEFAULT_DAYS)
 
     /**
-     * Сводка только из разделов [sections] (имена инструментов, в этом порядке); [days] — период трендов и поездок.
-     * Раздел, который не удалось собрать, пропускается.
+     * Digest of only the [sections] sections (tool names, in this order); [days] — period for trends and trips.
+     * A section that couldn't be built is skipped.
      */
     override suspend fun digest(sections: List<String>, days: Int): String? {
         val parts = sections.distinct().mapNotNull { name ->
@@ -59,7 +59,7 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
     }
 
     companion object {
-        /** Сводка без маршрутизации вопроса: профиль, тренды за полгода, ошибки, находки, ТО, последняя запись. */
+        /** Digest without question routing: profile, six-month trends, DTCs, findings, maintenance, latest recording. */
         val DEFAULT_SECTIONS = listOf("carProfile", TrendsTool.NAME, "dtcHistory", "findings", "maintenanceDue", "listSessions")
         const val DEFAULT_DAYS = 180
 
@@ -77,7 +77,7 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
     }
 }
 
-/** Подключение: строка в AppModules. Без этого модуля чат работает, но без данных машины. */
+/** Wiring: one line in AppModules. Without this module the chat works, but without vehicle data. */
 val aiToolsModule = module {
     single<VehicleToolbox> { VehicleDataToolbox(get(), get(), get(), getOrNull(), getOrNull()) }
 }

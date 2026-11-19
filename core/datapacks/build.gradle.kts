@@ -2,7 +2,7 @@ plugins {
     id("ecu.android.library")
 }
 
-// Пакеты данных по запросу (1.25b/1.26): справочники скачиваются после установки, в APK их нет.
+// On-demand data packs (1.25b/1.26): reference databases are downloaded after install, they are not in the APK.
 dependencies {
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.core.ktx)

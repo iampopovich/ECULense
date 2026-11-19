@@ -11,7 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** История чата в Room (ai_chat.db) переживает «перезапуск» — новый экземпляр поверх той же базы. */
+/** Chat history in Room (ai_chat.db) survives a "restart": a new instance on top of the same database. */
 @RunWith(AndroidJUnit4::class)
 class RoomChatHistoryTest {
     @Test

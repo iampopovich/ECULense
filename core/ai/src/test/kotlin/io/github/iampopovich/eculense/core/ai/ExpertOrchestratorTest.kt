@@ -35,8 +35,8 @@ import java.io.File
 import java.util.Collections
 
 /**
- * Оркестратор экспертов на подставном исполнителе: исполнитель узнаёт роль по системному промпту («Ты — Диагност»),
- * первым кругом вызывает инструмент своей роли, вторым пишет заметку; редактор («Ты — Редактор») стримит ответ.
+ * Expert orchestrator on a fake executor: the executor recognizes the role from the system prompt («Ты — Диагност»),
+ * calls its role's tool in the first round and writes a note in the second; the editor («Ты — Редактор») streams the answer.
  */
 class ExpertOrchestratorTest {
     @get:Rule val tmp = TemporaryFolder()
@@ -57,7 +57,7 @@ class ExpertOrchestratorTest {
     @Serializable
     data class Args(@property:LLMDescription("days") val days: Int? = null, @property:LLMDescription("limit") val limit: Int? = null)
 
-    /** Все инструменты :core:aitools по имени; вызовы пишутся (имя, days). */
+    /** All :core:aitools tools by name; calls are recorded (name, days). */
     private class Toolbox : VehicleToolbox {
         val calls: MutableList<Pair<String, Int?>> = Collections.synchronizedList(mutableListOf())
         val names = listOf("carProfile", "tripStats", "listSessions", "sessionStats", "sensorSummary", "findings", "dtcHistory", "maintenanceDue", "trends")
@@ -75,7 +75,7 @@ class ExpertOrchestratorTest {
         override fun progressLabel(toolName: String) = if (toolName == "trends") "ИИ смотрит тренды по месяцам…" else "ИИ смотрит $toolName…"
     }
 
-    /** Какой инструмент роль вызывает первым кругом. */
+    /** Which tool the role calls in the first round. */
     private val firstTool = mapOf("usage" to "trends", "diagnostician" to "dtcHistory", "engine" to "trends", "fuel" to "tripStats")
 
     private class RoleExecutor(val firstTool: Map<String, String>, val failing: Set<String> = emptySet()) : PromptExecutor() {
@@ -124,18 +124,18 @@ class ExpertOrchestratorTest {
         val events = gw.chat("c1", "как моя машина ведет себя последние полгода", useCarData = true).toList()
 
         assertEquals(setOf("usage", "diagnostician", "engine"), exec.offered.keys)
-        // у каждого эксперта — только его инструменты
+        // each expert gets only its own tools
         exec.offered.forEach { (id, names) -> assertEquals(id, ExpertRoles.byId(id)!!.tools, names) }
-        // период 180 дней — в промпте эксперта и в аргументах инструментов
+        // 180-day period — in the expert prompt and in the tool arguments
         assertTrue(exec.systems.filter { it.contains("Ты — Аналитик эксплуатации.") }.all { it.contains("days=180") })
         assertEquals(2, toolbox.calls.count { it == ("trends" to 180) })
         assertTrue(toolbox.calls.contains("dtcHistory" to null))
-        // редактор получил заметки всех трёх и форму ответа «обзор/тренд», а не «причины → проверить»
+        // the editor got all three notes and the «обзор/тренд» answer form, not «причины → проверить»
         val editor = exec.editorPrompts.single()
         listOf("usage", "diagnostician", "engine").forEach { assertTrue(editor, editor.contains("Заметка $it")) }
         assertTrue(editor, editor.contains("что изменилось за период"))
         assertFalse(editor, editor.contains("что проверить самому"))
-        // статусы ролей с периодом, «Над ответом работали», ответ редактора
+        // role statuses with the period, «Над ответом работали», the editor's answer
         val statuses = events.filterIsInstance<ChatEvent.Status>().map { it.label }
         assertTrue(statuses.toString(), statuses.contains("Аналитик эксплуатации смотрит поездки за 6 месяцев…"))
         assertTrue(events.filterIsInstance<ChatEvent.ToolCall>().map { it.label }.contains("Аналитик эксплуатации смотрит тренды по месяцам…"))
@@ -145,7 +145,7 @@ class ExpertOrchestratorTest {
         assertTrue(experts.notes.none { it.failed })
         val answer = events.filterIsInstance<ChatEvent.Text>().joinToString("") { it.delta }
         assertEquals("Коротко: машина в целом в порядке. За 6 месяцев расход стабилен.", answer)
-        // заметки экспертов пользователю не стримились, в истории — только вопрос и итоговый ответ
+        // expert notes were not streamed to the user; history holds only the question and the final answer
         assertFalse(answer.contains("Заметка"))
         assertEquals(listOf("как моя машина ведет себя последние полгода", answer), gw.history("c1").map { it.text })
     }
@@ -186,7 +186,7 @@ class ExpertOrchestratorTest {
         assertTrue(exec.editorPrompts.isEmpty())
         assertEquals(setOf("fuel"), exec.offered.keys)
         assertEquals(ExpertRoles.FUEL.tools, exec.offered.getValue("fuel"))
-        // прямой ответ роли — форма «расход и сравнение», не заметка для редактора
+        // direct role answer — «расход и сравнение» form, not a note for the editor
         val system = exec.systems.first()
         assertTrue(system, system.contains("цифры расхода и трат"))
         assertFalse(system, system.contains("заметку для редактора"))
@@ -204,7 +204,7 @@ class ExpertOrchestratorTest {
         assertEquals("Ответ без роли", events.filterIsInstance<ChatEvent.Text>().joinToString("") { it.delta })
     }
 
-    // --- Модель на телефоне: один вызов «сразу в ролях», сводка только из нужных разделов.
+    // --- On-device model: a single call «сразу в ролях», summary only from the relevant sections.
     private class WholeAnswerExecutor : PromptExecutor() {
         val prompts = mutableListOf<Prompt>()
         override suspend fun execute(prompt: Prompt, model: LLModel, tools: List<ToolDescriptor>): Message.Assistant {

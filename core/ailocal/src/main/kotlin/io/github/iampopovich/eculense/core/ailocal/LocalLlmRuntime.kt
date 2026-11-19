@@ -22,16 +22,16 @@ import kotlinx.coroutines.sync.withLock
 import java.io.File
 
 /**
- * Исполнение через Koog: `LiteRTLLMClient` (prompt-executor-litert-client 1.3.0-beta, LiteRT-LM 0.11) за
- * [OnDeviceLlm] — шлюз :core:ai строит на нём того же агента с инструментами, что и для облака. Проверено на
- * Xiaomi 14T Pro: Gemma 4 E2B работает на CPU и GPU. Клиент (и движок с гигабайтами весов) живёт между вопросами
- * и пересоздаётся только при смене модели/бэкенда или выборе облачного провайдера.
+ * Execution via Koog: `LiteRTLLMClient` (prompt-executor-litert-client 1.3.0-beta, LiteRT-LM 0.11) behind
+ * [OnDeviceLlm]; the :core:ai gateway builds on it the same tool-enabled agent as for the cloud. Verified on
+ * Xiaomi 14T Pro: Gemma 4 E2B runs on CPU and GPU. The client (and the engine with gigabytes of weights) lives between questions
+ * and is recreated only when the model/backend changes or a cloud provider is selected.
  */
 class LocalLlmRuntime(
     private val store: LocalModelStore,
     private val models: LocalModels,
     private val cacheDir: File,
-    /** Каталог нативных библиотек приложения — для бэкенда NPU (вендорские диспетчеры). */
+    /** The app's native library directory, for the NPU backend (vendor dispatchers). */
     private val nativeLibDir: String? = null,
 ) : OnDeviceLlm {
     private val lock = Mutex()
@@ -79,7 +79,7 @@ class LocalLlmRuntime(
             model = llm,
             executor = executor!!,
             streaming = false,
-            // Gemma 4 через клиент Koog инструменты не вызывает (замер 3.10) — данные машины идут сводкой (VehicleToolbox.digest).
+            // Gemma 4 via the Koog client does not call tools (measured in 3.10), so vehicle data goes in as a digest (VehicleToolbox.digest).
             supportsTools = false,
         )
     }
@@ -89,7 +89,7 @@ class LocalLlmRuntime(
         release()
     }
 
-    /** Освободить движок (смена модели/бэкенда, удаление файла, выбор облака). */
+    /** Release the engine (model/backend change, file deletion, cloud selected). */
     suspend fun release() = lock.withLock { closeLocked() }
 
     private fun closeLocked() {

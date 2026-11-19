@@ -51,7 +51,7 @@ class KoogLlmGatewayTest {
         return LlmSettingsStore(dataStore, plain).also { it.save(provider, model, baseUrl, key) }
     }
 
-    /** Поддельный исполнитель Koog: отдаёт заданные кадры, ничего не ходит в сеть. */
+    /** Fake Koog executor: returns the given frames, never touches the network. */
     private class FakeExecutor(private val frames: List<StreamFrame>) : PromptExecutor() {
         var lastPrompt: Prompt? = null
         override suspend fun execute(prompt: Prompt, model: LLModel, tools: List<ToolDescriptor>): Message.Assistant =
@@ -99,7 +99,7 @@ class KoogLlmGatewayTest {
         }
         http.start()
         server = http
-        // Базовый адрес как в настройках Koog: корень хоста, пути добавляет клиент Koog.
+        // Base URL as in Koog settings: the host root; the Koog client appends the paths.
         return "http://127.0.0.1:${http.address.port}"
     }
 
@@ -116,7 +116,7 @@ class KoogLlmGatewayTest {
         return """data: {"id":"gen-1","object":"chat.completion.chunk","created":1,"model":"openai/gpt-4.1-mini","system_fingerprint":"fp_1","choices":[{"index":0,"delta":$delta,"finish_reason":$reason}]}""" + "\n\n"
     }
 
-    /** Пресет с настоящим клиентом Koog, направленным на локальный сервер через тестовый вход KoogClients. */
+    /** Preset with a real Koog client pointed at the local server via the KoogClients test entry point. */
     private fun preset(store: LlmSettingsStore, root: String) =
         KoogLlmGateway(store) { s, key -> KoogClients.executor(s, key, presetBaseUrlForTests = root) }
 
@@ -151,7 +151,7 @@ class KoogLlmGatewayTest {
 
     @Test
     fun `403 block is not reported as a bad key and shows the server reason`() = runBlocking {
-        // Так OpenRouter (Cloudflare) отвечает телефону из заблокированной сети/региона на любой запрос.
+        // This is how OpenRouter (Cloudflare) answers any request from a phone on a blocked network/region.
         val baseUrl = startServer(403, "application/json", """{ "success": false, "error": "Access denied by security policy." }""", mutableListOf())
         val gateway = preset(store(LlmProviderKind.OPENROUTER, "openai/gpt-4.1-mini", null, "sk-or-invalid"), baseUrl)
         val message = streamError(gateway).message!!

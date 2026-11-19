@@ -16,9 +16,9 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 
 /**
- * 1.27: пользователь продолжает ездить с Car Scanner и периодически переносит новый бэкап. Второй бэкап = первый +
- * новые записи/поездки/DTC + дописанная поездка; ручные правки профиля в ECULense не перетираются.
- * Только синтетика: машина «Тестовая», нейтральные цены и даты.
+ * 1.27: the user keeps driving with Car Scanner and periodically transfers a new backup. The second backup = the first +
+ * new recordings/trips/DTCs + an extended trip; manual profile edits in ECULense are not overwritten.
+ * Synthetic data only: car «Тестовая», neutral prices and dates.
  */
 class CarScannerIncrementalImportTest {
     @get:Rule val tmp = TemporaryFolder()
@@ -54,7 +54,7 @@ class CarScannerIncrementalImportTest {
         .recording("2026-01-01 10-00-00.brc", recording(start, "P0171"))
         .recording("2026-01-02 10-00-00.brc", recording(start + day))
 
-    /** + запись с новым кодом, + поездка, поездка 2 дописана, новая цена топлива и год, другие единицы. */
+    /** + a recording with a new code, + a trip, trip 2 extended, new fuel price and year, different units. */
     private fun second() = CbzWriter()
         .string("SelectedBrand", "Lada").string("Currency", "RUB").string("FuelPriceForLitre", "62.0")
         .bool("Use_km", false).bool("Use_celcium", true)
@@ -75,7 +75,7 @@ class CarScannerIncrementalImportTest {
         assertEquals(2, r1.tripsImported)
         assertEquals(1, r1.dtcEventsAdded)
 
-        // пользователь правит в ECULense: имя, модель и единицы (°F)
+        // the user edits in ECULense: name, model and units (°F)
         cars.save(cars.all.value.single().copy(name = "Моя", model = "Granta"))
         units.save(units.units.value.copy(celsius = false))
         val progress = mutableListOf<ImportProgress>()

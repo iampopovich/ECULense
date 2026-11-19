@@ -11,14 +11,14 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
-/** Тексты экрана «Обслуживание»: числа с неразрывным пробелом-разделителем тысяч, всё по-русски. */
+/** Texts for the «Обслуживание» screen: numbers with a non-breaking space as the thousands separator, all in Russian. */
 internal object MaintenanceFormat {
     private val ru = Locale.forLanguageTag("ru")
     private val dateInput = DateTimeFormatter.ofPattern("dd.MM.yyyy", ru)
 
     fun km(v: Number): String = String.format(ru, "%,d", v.toDouble().roundToLong()).replace('\u202F', '\u00A0').replace(' ', '\u00A0') + "\u00A0км"
 
-    /** Небольшая добавка к пробегу — с десятыми («0,2 км»), иначе короткая поездка выглядит как «плюс 0 км». */
+    /** A small mileage increment is shown with tenths («0,2 км»), otherwise a short trip looks like «плюс 0 км». */
     fun addedKm(v: Double): String = if (v < 10.0) String.format(ru, "%.1f", v) + "\u00A0км" else km(v)
 
     fun status(s: MaintenanceStatus): String = when (s) {
@@ -33,7 +33,7 @@ internal object MaintenanceFormat {
         return if (parts.isEmpty()) "Интервал не задан" else "Каждые " + parts.joinToString(" или ")
     }
 
-    /** null — ещё не отмечали (тогда подсказку «Отметьте, когда делали» даёт [remaining]). */
+    /** null — never marked yet (then [remaining] gives the hint «Отметьте, когда делали»). */
     fun lastDone(item: MaintenanceItem, zone: ZoneId): String? {
         val parts = listOfNotNull(item.lastDoneAtMs?.let { date(it, zone) }, item.lastDoneKm?.let { km(it) })
         return if (parts.isEmpty()) null else "Последний раз: " + parts.joinToString(", ")
@@ -64,12 +64,12 @@ internal object MaintenanceFormat {
 
     fun date(ms: Long, zone: ZoneId): String = dateInput.format(Instant.ofEpochMilli(ms).atZone(zone))
 
-    /** Пробег из поля ввода: «120 000» → 120000; пусто/мусор/вне 0..5 000 000 → null. */
+    /** Mileage from the input field: «120 000» → 120000; empty/garbage/outside 0..5 000 000 → null. */
     fun parseKm(text: String): Long? = text.filterNot { it.isWhitespace() || it == '\u00A0' }.toLongOrNull()?.takeIf { it in 0..5_000_000 }
 
     fun parseInt(text: String, max: Int): Int? = text.filterNot { it.isWhitespace() || it == '\u00A0' }.toIntOrNull()?.takeIf { it in 1..max }
 
-    /** «dd.MM.yyyy» в полдень местного времени (чтобы смена часового пояса не сдвигала дату); будущее нельзя. */
+    /** «dd.MM.yyyy» at local noon (so a time zone change doesn't shift the date); future dates are not allowed. */
     fun parseDate(text: String, zone: ZoneId, nowMs: Long): Long? = runCatching {
         val d = LocalDate.parse(text.trim(), dateInput)
         val today = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()

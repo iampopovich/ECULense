@@ -11,7 +11,7 @@ private val lengthLine = Regex("^[0-9A-F]{3}$")
 private val frameLine = Regex("^[0-9A-F]:[0-9A-F]+$")
 private val hexLine = Regex("^([0-9A-F]{2})+$")
 
-/** Ответ ELM327 (заголовки выключены) → по одному массиву байт на сообщение ЭБУ. */
+/** ELM327 response (headers off) → one byte array per ECU message. */
 internal fun elmMessages(lines: List<String>): List<ByteArray> {
     val isMultiFrame = lines.size > 1 && lines[0].matches(lengthLine) && lines.drop(1).all { it.matches(frameLine) }
     if (isMultiFrame) {

@@ -5,7 +5,7 @@ import io.github.iampopovich.eculense.core.model.Dtc
 import io.github.iampopovich.eculense.core.model.DtcKind
 import io.github.iampopovich.eculense.core.model.SensorReading
 
-/** Высокоуровневые операции с машиной. Реализация для ELM327 — Elm327Session; в тестах фич — FakeSession. */
+/** High-level vehicle operations. ELM327 implementation — Elm327Session; in feature tests — FakeSession. */
 interface ObdSession {
     suspend fun initialize(): AdapterInfo
     suspend fun supportedPids(): Set<Int>
@@ -71,7 +71,7 @@ internal class Elm327Session(
         return result is ElmResult.Data && result.lines.any { it.startsWith("44") }
     }
 
-    /** MVP: VIN собирается только из CAN-ответа одним сообщением. K-Line VIN (5 строк с номерами) — бэклог 1.24. */
+    /** MVP: VIN is assembled only from a single-message CAN response. K-Line VIN (5 numbered lines) — backlog 1.24. */
     override suspend fun readVin(): String? {
         val messages = query("0902", timeoutMs = 5_000) ?: return null
         val message = messages.map { it.toUnsigned() }.firstOrNull { it.size > 3 && it[0] == 0x49 } ?: return null
@@ -79,7 +79,7 @@ internal class Elm327Session(
             .joinToString("").takeIf { it.length == 17 }
     }
 
-    /** null = NO DATA (PID не поддержан или ЭБУ промолчал). Ошибка адаптера → ObdException. */
+    /** null = NO DATA (PID not supported or the ECU stayed silent). Adapter error → ObdException. */
     private suspend fun query(command: String, timeoutMs: Long = 2_000): List<ByteArray>? =
         when (val result = ElmResponseParser.parse(link.send(command, timeoutMs))) {
             is ElmResult.Data -> elmMessages(result.lines)

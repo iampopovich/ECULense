@@ -12,7 +12,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** Поездки — пункт хаба «Пит-стоп»; детали поездки открываются поверх списка. */
+/** Trips are an item in the «Пит-стоп» hub; trip details open on top of the list. */
 @OptIn(KoinExperimentalAPI::class)
 val sessionsModule = module {
     viewModelOf(::SessionsViewModel)

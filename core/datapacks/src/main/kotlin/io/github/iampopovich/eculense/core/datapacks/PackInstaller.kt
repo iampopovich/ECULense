@@ -9,27 +9,27 @@ import java.io.IOException
 import kotlin.coroutines.coroutineContext
 
 /**
- * Обработка скачанной версии до переключения (в каталоге staging). Например, OBDex: 30 МБ JSON → компактный индекс,
- * чтобы не разбирать JSON при каждом показе кода. Исходные файлы остаются как есть.
+ * Processing of a downloaded version before switching (in the staging directory). E.g. OBDex: 30 MB JSON → compact index,
+ * so the JSON is not parsed every time a code is shown. Source files stay as is.
  */
 interface PackPostProcessor {
     val packId: String
     fun process(dir: File)
 }
 
-/** Файл скачан не тот: размер больше ожидаемого или не совпал хэш. Частичный файл удаляется — докачивать нечего. */
+/** Wrong file downloaded: size larger than expected or hash mismatch. The partial file is deleted — nothing to resume. */
 class PackIntegrityException(message: String) : IOException(message)
 
-/** Скачивание, проверка, постобработка и атомарная установка версии пакета. Без Android — тестируется на JVM. */
+/** Download, verification, post-processing and atomic installation of a pack version. No Android — tested on the JVM. */
 class PackInstaller(
     private val store: PackStore,
     private val http: PackHttp = UrlConnectionHttp(),
     private val postProcessors: List<PackPostProcessor> = emptyList(),
     private val githubBase: String = "https://github.com",
-    /** Заголовки авторизации по URL (токен HF для gated-моделей); уходят только исходному хосту. */
+    /** Authorization headers per URL (HF token for gated models); sent only to the original host. */
     private val auth: List<PackAuth> = emptyList(),
 ) {
-    /** Последняя версия у источника; null — проверить нельзя (нет источника или сети). */
+    /** Latest version at the source; null — cannot check (no source or no network). */
     suspend fun latestVersion(manifest: PackManifest): String? = withContext(Dispatchers.IO) {
         when (val u = manifest.update) {
             UpdateSource.None -> null
@@ -40,11 +40,11 @@ class PackInstaller(
     }
 
     /**
-     * version = null: зафиксированная версия, а для пакетов без тегов (JSON с GitHub Pages) — та, что сейчас на сервере
-     * (хэш проверяется, только если она совпала с зафиксированной).
+     * version = null: the pinned version, or for untagged packs (JSON from GitHub Pages) whatever is on the server now
+     * (the hash is checked only if it matches the pinned one).
      *
-     * [PackManifest.resumable]: каталог staging и `.part` переживают ошибку/отмену — следующая попытка докачивает
-     * (Range); при несовпадении хэша частичный файл удаляется.
+     * [PackManifest.resumable]: the staging directory and `.part` survive an error/cancel — the next attempt resumes
+     * (Range); on hash mismatch the partial file is deleted.
      */
     suspend fun install(manifest: PackManifest, version: String? = null, progress: DownloadProgress = DownloadProgress { _, _ -> }): PackStore.Installed =
         withContext(Dispatchers.IO) {
@@ -61,7 +61,7 @@ class PackInstaller(
                 for (f in files) {
                     val dest = File(staging, f.name)
                     val size = if (manifest.resumable && dest.isFile && f.sizeBytes == dest.length()) {
-                        dest.length() // файл уже скачан и проверен в прошлой попытке
+                        dest.length() // file already downloaded and verified in a previous attempt
                     } else {
                         download(f, dest, manifest.resumable) { done, _ -> progress.onProgress(before + done, total) }
                     }
@@ -77,7 +77,7 @@ class PackInstaller(
 
     private fun headersFor(url: String): Map<String, String> = auth.fold(emptyMap()) { acc, a -> acc + a.headersFor(url) }
 
-    /** Пишет в `.part`, проверяет длину и sha256, затем переименовывает. Возвращает размер. */
+    /** Writes to `.part`, checks length and sha256, then renames. Returns the size. */
     private suspend fun download(file: PackFile, dest: File, resumable: Boolean, progress: DownloadProgress): Long {
         val part = File(dest.parentFile, dest.name + ".part")
         val md = java.security.MessageDigest.getInstance("SHA-256")
@@ -86,7 +86,7 @@ class PackInstaller(
         val response = try {
             http.get(file.url, headersFor(file.url), offset)
         } catch (e: HttpStatusException) {
-            // 416: частичный файл за концом — начать заново
+            // 416: partial file is past the end — start over
             if (e.code == 416 && offset > 0) {
                 offset = 0
                 http.get(file.url, headersFor(file.url), 0)
@@ -94,10 +94,10 @@ class PackInstaller(
                 throw e
             }
         }
-        // Сервер отдал файл с начала (Range проигнорирован) — частичный файл не продолжаем.
+        // The server sent the file from the start (Range ignored) — do not continue the partial file.
         if (response.rangeStart == null) offset = 0
         if (offset > 0) part.inputStream().use { input ->
-            // хэш уже скачанной части — чтобы проверить файл целиком без второго прохода
+            // hash of the already downloaded part — to verify the whole file without a second pass
             val buf = ByteArray(256 * 1024)
             while (true) {
                 coroutineContext.ensureActive()
@@ -129,7 +129,7 @@ class PackInstaller(
         }
         file.sizeBytes?.let {
             if (done > it) throw PackIntegrityException("${file.name}: ожидалось $it байт, получено $done")
-            // недокачано: обрыв соединения — у resumable частичный файл остаётся для следующей попытки
+            // incomplete: connection dropped — for resumable packs the partial file is kept for the next attempt
             if (done < it) throw IOException("${file.name}: ожидалось $it байт, получено $done")
         }
         val sha = md.digest().joinToString("") { "%02x".format(it) }
@@ -144,7 +144,7 @@ class PackInstaller(
     }
 
     companion object {
-        /** Строковое поле верхнего уровня без JSON-библиотеки: meta.json мал и плоский в нужном месте. */
+        /** Top-level string field without a JSON library: meta.json is small and flat where it matters. */
         internal fun jsonString(json: String, field: String): String? =
             Regex("\"" + Regex.escape(field) + "\"\\s*:\\s*\"([^\"]*)\"").find(json)?.groupValues?.get(1)
     }

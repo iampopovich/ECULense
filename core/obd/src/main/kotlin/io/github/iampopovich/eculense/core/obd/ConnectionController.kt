@@ -28,7 +28,7 @@ sealed interface ConnectionState {
 interface ConnectionController {
     val state: StateFlow<ConnectionState>
 
-    /** Значения PID из setPolledPids. Опрос идёт, только пока есть подписчики (экран или запись). */
+    /** PID values from setPolledPids. Polling runs only while there are subscribers (a screen or a recording). */
     val readings: SharedFlow<SensorReading>
 
     suspend fun discover(): List<AdapterEndpoint>
@@ -36,7 +36,7 @@ interface ConnectionController {
     fun disconnect()
     fun setPolledPids(pids: List<Pid>)
 
-    /** Разовые операции (ошибки, VIN). null — если не подключены. */
+    /** One-off operations (DTCs, VIN). null — if not connected. */
     suspend fun <T> withSession(block: suspend (ObdSession) -> T): T?
 }
 

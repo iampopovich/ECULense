@@ -14,7 +14,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 
 /**
- * Живой тест, только по переменным окружения (ключ не коммитим и не печатаем):
+ * Live test, runs only with environment variables (the key is never committed or printed):
  * LLM_IT_PROVIDER=OPENROUTER LLM_IT_MODEL=openai/gpt-4.1-mini LLM_IT_KEY=… ./gradlew :core:ai:testDebugUnitTest --tests '*LlmLiveTest*' --rerun -i
  */
 class LlmLiveTest {

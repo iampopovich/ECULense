@@ -1,15 +1,15 @@
 package io.github.iampopovich.eculense.core.datapacks
 
 /**
- * Зафиксированные версии пакетов (проверено 2026-11-18). Обновить версию = поменять тег, размер и sha256 здесь
- * (размер и хэш — `curl -sL <url> | sha256sum`, для релизов GitHub хэш виден на странице релиза).
+ * Pinned pack versions (checked 2026-11-18). To update a version, change the tag, size and sha256 here
+ * (size and hash — `curl -sL <url> | sha256sum`; for GitHub releases the hash is shown on the release page).
  */
 object PackCatalog {
     const val VEHICLES = "vehicles"
     const val OBDEX = "obdex"
     const val OEM_DTC = "oem-dtc"
 
-    /** gor3a/vehicle-makes-models: еженедельные версионные релизы, `vehicles.sqlite` берём без изменений. */
+    /** gor3a/vehicle-makes-models: weekly versioned releases; `vehicles.sqlite` is used unmodified. */
     val vehicles = PackManifest(
         id = VEHICLES,
         title = "Справочник моделей и ТТХ",
@@ -35,8 +35,8 @@ object PackCatalog {
     )
 
     /**
-     * foerbsnavi/OBDex: релизов на GitHub нет, собранный JSON публикуется на GitHub Pages; версия — `generated_at`
-     * из meta.json. Хэш проверяется только для зафиксированной версии (Pages отдаёт последнюю сборку).
+     * foerbsnavi/OBDex: no GitHub releases, the built JSON is published on GitHub Pages; version = `generated_at`
+     * from meta.json. The hash is checked only for the pinned version (Pages serves the latest build).
      */
     val obdex = PackManifest(
         id = OBDEX,
@@ -58,7 +58,7 @@ object PackCatalog {
         update = UpdateSource.JsonField("https://foerbsnavi.github.io/OBDex/meta.json", "generated_at"),
     )
 
-    /** Wal33D/dtc-database: SQLite лежит в репозитории, релиз v0.1.0 без файлов → raw-ссылка на тег. */
+    /** Wal33D/dtc-database: the SQLite file lives in the repository, release v0.1.0 has no assets → raw link to the tag. */
     val oemDtc = PackManifest(
         id = OEM_DTC,
         title = "Заводские коды ошибок",

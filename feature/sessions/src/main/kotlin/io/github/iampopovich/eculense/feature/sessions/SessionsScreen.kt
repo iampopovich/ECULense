@@ -30,7 +30,7 @@ internal fun SessionsRoute(viewModel: SessionsViewModel = koinViewModel()) {
     val sessions by viewModel.sessions.collectAsStateWithLifecycle()
     val navigator = LocalNavigator.current
     val koin = getKoin()
-    // импорт живёт в :feature:backup; без него (фича убрана из сборки) кнопки просто нет
+    // import lives in :feature:backup; without it (feature removed from the build) there's simply no button
     val hasBackup = remember { koin.getAll<RouteHandler>().any { it.routeClass == BackupDestination::class } }
     SessionsScreen(
         sessions,

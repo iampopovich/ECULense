@@ -12,13 +12,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.File
 
-/** Идёт тест: какая модель, какой бэкенд сейчас, что уже измерено. */
+/** Test in progress: which model, which backend right now, what has been measured so far. */
 data class BenchProgress(val packId: String, val current: BackendKind?, val done: List<BackendRun>)
 
 /**
- * Тест скорости модели после скачивания: по очереди CPU, GPU (если есть OpenCL), NPU (если найдены вендорские
- * библиотеки) — каждый в свежем процессе `:bench` ([BenchRunner]); итог сохраняется, у выбранной модели бэкенд
- * переключается на лучший. Перед тестом движок чата освобождается — две копии весов в памяти не нужны.
+ * Model speed test after download: CPU, GPU (if OpenCL is available), NPU (if vendor libraries are found)
+ * in turn, each in a fresh `:bench` process ([BenchRunner]); the result is saved, and the selected model's backend
+ * switches to the best one. The chat engine is released before the test: two copies of the weights in memory are not needed.
  */
 class LocalBench(
     private val runner: BenchRunner,
@@ -34,7 +34,7 @@ class LocalBench(
     val progress: StateFlow<BenchProgress?> = _progress.asStateFlow()
     private var job: Job? = null
 
-    /** Запустить тест (если другой уже идёт — игнорируется). */
+    /** Start the test (ignored if another one is already running). */
     fun start(packId: String) {
         if (job?.isActive == true) return
         job = scope.launch { run(packId) }

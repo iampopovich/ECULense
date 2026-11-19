@@ -2,13 +2,13 @@ package io.github.iampopovich.eculense.core.ailocal
 
 import kotlinx.serialization.Serializable
 
-/** Бэкенд LiteRT-LM. */
+/** LiteRT-LM backend. */
 @Serializable
 enum class BackendKind(val label: String) { CPU("CPU"), GPU("GPU"), NPU("NPU") }
 
 /**
- * Замер одного бэкенда (LiteRT-LM `benchmark()` в отдельном процессе `:bench`). ok = false — бэкенд не заработал:
- * ошибка инициализации, нехватка памяти (процесс убит) или падение в нативном коде — [error] объясняет.
+ * Measurement of one backend (LiteRT-LM `benchmark()` in a separate `:bench` process). ok = false means the backend failed:
+ * init error, out of memory (process killed) or a native crash; [error] explains which.
  */
 @Serializable
 data class BackendRun(
@@ -19,7 +19,7 @@ data class BackendRun(
     val ttftSeconds: Double = 0.0,
     val prefillTokensPerSecond: Double = 0.0,
     val decodeTokensPerSecond: Double = 0.0,
-    /** Пик памяти процесса теста (VmHWM). */
+    /** Peak memory of the test process (VmHWM). */
     val peakRssBytes: Long? = null,
     val prefillTokens: Int = 0,
     val decodeTokens: Int = 0,
@@ -34,14 +34,14 @@ enum class Verdict(val label: String) {
 }
 
 /**
- * Вердикт по замерам (план 3.10): «Комфортно» — ≥ 8 ток/с генерации и первый токен ≤ 3 с (на промпте теста),
- * «Медленно» — работает, но хуже, «Не подходит» — ни один бэкенд не заработал (OOM/ошибка).
+ * Verdict from measurements (plan 3.10): «Комфортно» = ≥ 8 tok/s generation and first token ≤ 3 s (on the test prompt),
+ * «Медленно» = works but worse, «Не подходит» = no backend worked (OOM/error).
  */
 object BenchVerdict {
     const val COMFORT_DECODE_TPS = 8.0
     const val COMFORT_TTFT_S = 3.0
 
-    /** Лучший бэкенд: сначала «комфортный», затем самая быстрая генерация, при равенстве — меньший TTFT. */
+    /** Best backend: "comfortable" first, then fastest generation, ties broken by lower TTFT. */
     fun best(runs: List<BackendRun>): BackendRun? =
         runs.filter { it.ok }.sortedWith(
             compareByDescending<BackendRun> { it.comfortable }
@@ -55,7 +55,7 @@ object BenchVerdict {
     }
 }
 
-/** Итог теста модели: хранится и показывается в мастере. */
+/** Model test result: stored and shown in the wizard. */
 @Serializable
 data class BenchReport(
     val modelId: String,

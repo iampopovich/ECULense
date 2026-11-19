@@ -4,7 +4,7 @@ plugins {
 }
 
 dependencies {
-    // SQLite на JVM — только для тестов и синтетических бэкапов; на Android читает android.database.sqlite.
+    // SQLite on the JVM — only for tests and synthetic backups; on Android android.database.sqlite reads it.
     testFixturesImplementation(libs.sqlite.jdbc)
     testImplementation(libs.sqlite.jdbc)
 }

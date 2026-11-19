@@ -1,20 +1,20 @@
 plugins {
     id("ecu.android.library")
     alias(libs.plugins.kotlin.serialization)
-    // История чата ИИ — своя база ai_chat.db (выпиливается вместе с модулем).
+    // AI chat history has its own database ai_chat.db (removed together with the module).
     id("ecu.android.room")
 }
 
 dependencies {
     implementation(libs.koog.agents)
-    // Клиенты провайдеров из koog-spring-boot-starter: OpenRouter, Google, DeepSeek, Mistral, Ollama
-    // (OpenAI и Anthropic приходят с koog-agents).
+    // Provider clients from koog-spring-boot-starter: OpenRouter, Google, DeepSeek, Mistral, Ollama
+    // (OpenAI and Anthropic come with koog-agents).
     implementation(libs.koog.openrouter)
     implementation(libs.koog.google)
     implementation(libs.koog.deepseek)
     implementation(libs.koog.mistral)
     implementation(libs.koog.ollama)
-    // Разбор ошибок клиентов Koog (SerializationException = сервер ответил не в формате API).
+    // Parsing Koog client errors (SerializationException = server replied in a non-API format).
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.datastore.preferences)
     implementation(platform(libs.koin.bom))

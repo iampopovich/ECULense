@@ -12,7 +12,7 @@ import java.io.File
 import java.io.InputStream
 import java.io.RandomAccessFile
 
-/** Нужное из записи OBDex (схема `schema/code.schema.json`); остальное (источники, ссылки) игнорируется. */
+/** What we need from an OBDex entry (schema `schema/code.schema.json`); the rest (sources, links) is ignored. */
 @Serializable
 internal data class ObdexCode(
     val code: String,
@@ -26,9 +26,9 @@ internal data class ObdexCode(
 internal data class ObdexCause(val label: Map<String, String> = emptyMap(), val likelihood: String? = null)
 
 /**
- * OBDex `generic.min.json` (30 МБ) → `obdex-index.tsv`: строка на код (код, название, описание, причины, симптомы).
- * JSON разбирается потоком один раз при установке пакета; на экране читается одна строка по смещению.
- * Исходный JSON остаётся рядом без изменений.
+ * OBDex `generic.min.json` (30 MB) → `obdex-index.tsv`: one line per code (code, name, description, causes, symptoms).
+ * The JSON is stream-parsed once when the pack is installed; the screen reads a single line by offset.
+ * The original JSON stays alongside, unchanged.
  */
 object ObdexIndex : PackPostProcessor {
     const val SOURCE = "generic.min.json"
@@ -69,7 +69,7 @@ object ObdexIndex : PackPostProcessor {
     }
 }
 
-/** Чтение индекса OBDex: в памяти только смещения строк (~9,5 тыс.), текст — с диска по запросу. */
+/** OBDex index reader: only line offsets (~9.5k) are kept in memory, text is read from disk on demand. */
 class ObdexReader(private val index: File) : GenericDtcSource {
     private val offsets: Map<String, Long> by lazy {
         val map = HashMap<String, Long>(16_384)

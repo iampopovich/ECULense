@@ -8,7 +8,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** «Статистика» — отдельная вкладка (решение пользователя): между «Панелью» (0) и «Пит-стопом» (10). */
+/** «Статистика» is a separate tab (user's decision): between «Панелью» (0) and «Пит-стопом» (10). */
 @OptIn(KoinExperimentalAPI::class)
 val statsModule = module {
     viewModel { StatsViewModel(get(), get(), get()) }

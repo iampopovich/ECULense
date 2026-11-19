@@ -16,8 +16,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * История чата ИИ — своя маленькая база ai_chat.db внутри :core:ai: модуль ИИ выпиливается вместе с ней,
- * основная база (поездки, 1,3 млн значений) ничего о чате не знает. Только тексты вопросов и ответов.
+ * AI chat history — its own small database ai_chat.db inside :core:ai: the AI module is removed together with it,
+ * and the main database (trips, 1.3M values) knows nothing about the chat. Only question and answer texts.
  */
 @Entity(tableName = "chat_messages", indices = [Index(value = ["conversationId", "position"], unique = true)])
 data class ChatMessageEntity(
@@ -45,21 +45,21 @@ abstract class AiChatDatabase : RoomDatabase() {
     abstract fun messages(): ChatMessageDao
 }
 
-/** Хранилище истории для ChatMemory Koog + полный текст диалога для экрана. */
+/** History storage for Koog ChatMemory + full dialogue text for the screen. */
 internal interface ChatHistoryStore : ChatHistoryProvider {
     suspend fun transcript(conversationId: String): List<ChatMessage>
     suspend fun delete(conversationId: String)
 
     companion object {
-        /** Сколько последних сообщений уходит модели как контекст (≈10 вопросов-ответов): дальше — лишние токены. */
+        /** How many recent messages go to the model as context (≈10 question-answer pairs): beyond that it's wasted tokens. */
         const val WINDOW = 20
     }
 }
 
 /**
- * ChatMemory сохраняет весь промпт хода: загруженное окно истории + новые сообщения. Чтобы не терять то, что
- * старше окна, дописываем только хвост, которого ещё нет: ищем самый длинный конец сохранённого, совпадающий
- * с началом пришедшего.
+ * ChatMemory saves the whole turn prompt: the loaded history window + new messages. To avoid losing what is
+ * older than the window, we append only the tail that isn't there yet: find the longest end of the stored list
+ * that matches the start of the incoming one.
  */
 internal object HistoryMerge {
     fun newTail(stored: List<ChatMessage>, incoming: List<ChatMessage>): List<ChatMessage> {
@@ -100,7 +100,7 @@ internal class RoomChatHistory(private val dao: ChatMessageDao, private val cloc
     override suspend fun delete(conversationId: String) = dao.delete(conversationId)
 }
 
-/** Для тестов и как запасной вариант: то же поведение в памяти. */
+/** For tests and as a fallback: the same behavior in memory. */
 internal class InMemoryChatHistory : ChatHistoryStore {
     private val mutex = Mutex()
     private val all = mutableMapOf<String, List<ChatMessage>>()

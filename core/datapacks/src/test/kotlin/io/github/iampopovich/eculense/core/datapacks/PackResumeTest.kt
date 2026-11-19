@@ -15,7 +15,7 @@ import java.net.InetSocketAddress
 import java.security.MessageDigest
 import kotlin.io.path.createTempDirectory
 
-/** Докачка многогигабайтных файлов (модели ИИ): Range, сохранение `.part` между попытками, токен только своему хосту. */
+/** Resuming multi-gigabyte downloads (AI models): Range, keeping `.part` between attempts, token only to its own host. */
 class PackResumeTest {
     private lateinit var origin: HttpServer
     private lateinit var cdn: HttpServer
@@ -25,7 +25,7 @@ class PackResumeTest {
     private val store = PackStore(root)
     private val body = ByteArray(300_000) { (it % 251).toByte() }
 
-    /** Сколько байт CDN отдаёт до обрыва соединения (null — без обрыва). */
+    /** How many bytes the CDN serves before the connection drops (null: no drop). */
     private var cutAfter: Int? = null
     private var honourRange = true
     private val cdnRanges = mutableListOf<String?>()
@@ -53,7 +53,7 @@ class PackResumeTest {
                     ex.responseBody.write(slice, 0, cut)
                     ex.responseBody.flush()
                     cutAfter = null
-                    // обрыв посреди ответа: соединение закрывается раньше объявленной длины
+                    // drop mid-response: the connection closes before the declared length
                     throw IOException("cut")
                 } else {
                     ex.responseBody.write(slice)
@@ -64,7 +64,7 @@ class PackResumeTest {
             }
         }
         cdn.start()
-        // Другой hostname (localhost vs 127.0.0.1): токен не должен уйти на CDN.
+        // Different hostname (localhost vs 127.0.0.1): the token must not go to the CDN.
         cdnBase = "http://localhost:${cdn.address.port}"
         origin = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         origin.createContext("/resolve") { ex ->

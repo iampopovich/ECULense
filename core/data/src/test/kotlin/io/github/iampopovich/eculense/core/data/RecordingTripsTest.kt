@@ -32,7 +32,7 @@ class RecordingTripsTest {
         assertEquals("session:5", t.externalId)
         assertEquals(TripSource.LIVE, t.source)
         assertEquals(1.0, t.distanceKm, 1e-9)
-        // 14,7·0,745 г/с воздуха = 1 мл/с бензина → 100 с = 0,1 л
+        // 14.7·0.745 g/s of air = 1 ml/s of gasoline → 100 s = 0.1 L
         assertEquals(0.1, t.fuelL, 1e-9)
         assertEquals(FuelMethod.MAF_ESTIMATE, t.fuelMethod)
         assertEquals(50.0, t.fuelPricePerL!!, 0.0)

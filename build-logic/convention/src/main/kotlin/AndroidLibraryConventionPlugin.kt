@@ -5,7 +5,7 @@ import org.gradle.api.Project
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
 
-/** AGP 9: Kotlin встроен, плагин kotlin-android применять не нужно. */
+/** AGP 9: Kotlin is built in, the kotlin-android plugin need not be applied. */
 class AndroidLibraryConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
@@ -27,7 +27,7 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                 add("testImplementation", lib("junit"))
                 add("testImplementation", lib("kotlinx-coroutines-test"))
                 add("androidTestImplementation", lib("androidx-junit"))
-                // androidx-junit не тянет сам AndroidJUnitRunner — без него тест-APK падает при старте.
+                // androidx-junit does not pull in AndroidJUnitRunner itself — without it the test APK crashes on start.
                 add("androidTestImplementation", lib("androidx-test-runner"))
                 add("androidTestImplementation", lib("kotlinx-coroutines-test"))
             }

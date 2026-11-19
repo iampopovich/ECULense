@@ -20,17 +20,17 @@ internal data class CarEditUiState(
     val loading: Boolean = true,
     val form: CarForm = CarForm(),
     val errors: Map<CarField, String> = emptyMap(),
-    /** Удалять можно, только если машина не единственная. */
+    /** Deletion is allowed only if the car is not the only one. */
     val canDelete: Boolean = false,
     val isNew: Boolean = true,
-    /** Сохранено/удалено — экран закрывается. */
+    /** Saved/deleted — the screen closes. */
     val done: Boolean = false,
-    /** Справочник моделей: null — модуль справочника не подключён. */
+    /** Model catalog: null — the catalog module is not wired in. */
     val vehiclePack: PackState? = null,
     val catalogAvailable: Boolean = false,
-    /** Открыт пошаговый выбор из справочника. */
+    /** Step-by-step catalog picker is open. */
     val picker: PickerState? = null,
-    /** Справочник по мобильной сети — спросить перед скачиванием. */
+    /** Catalog over mobile data — ask before downloading. */
     val confirmMeteredDownload: Boolean = false,
 )
 
@@ -85,7 +85,7 @@ internal class CarEditViewModel(
         val profile = _state.value.form.toProfile(original, clock(), currentYear) ?: return
         viewModelScope.launch {
             val id = cars.save(profile)
-            // новая машина становится активной: пользователь создаёт её, чтобы ездить на ней
+            // a new car becomes active: the user creates it to drive it
             if (original == null) cars.setActive(id)
             _state.update { it.copy(done = true) }
         }
@@ -98,7 +98,7 @@ internal class CarEditViewModel(
         }
     }
 
-    // --- справочник моделей ---
+    // --- model catalog ---
 
     fun downloadCatalog(confirmed: Boolean = false) {
         val p = packs ?: return
@@ -112,7 +112,7 @@ internal class CarEditViewModel(
 
     fun dismissDownload() = _state.update { it.copy(confirmMeteredDownload = false) }
 
-    /** Открыть выбор: марка из профиля сразу ведёт к её моделям, модель — к поколениям. */
+    /** Open the picker: the make from the profile leads straight to its models, the model to its generations. */
     fun openPicker() = runPicker(PickerState(loading = true)) {
         val form = _state.value.form
         val make = form.brand.takeIf { it.isNotBlank() }?.let { catalog?.makeByName(it) }
@@ -153,7 +153,7 @@ internal class CarEditViewModel(
         }
     }
 
-    /** «Назад» внутри выбора: от ТТХ к списку модификаций, от модификаций к поколениям и т. д. */
+    /** «Назад» inside the picker: from specs to the trim list, from trims to generations, etc. */
     fun pickerBack() {
         val p = _state.value.picker ?: return
         if (p.engine != null) {
@@ -168,7 +168,7 @@ internal class CarEditViewModel(
         }
     }
 
-    /** «Заполнить»: ТТХ выбранной модификации — в форму; сохраняет пользователь сам. */
+    /** «Заполнить»: specs of the selected trim go into the form; the user saves it themselves. */
     fun fillFromPicker() {
         val p = _state.value.picker ?: return
         val e = p.engine ?: return

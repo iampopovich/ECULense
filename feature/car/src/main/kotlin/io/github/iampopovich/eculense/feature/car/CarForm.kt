@@ -9,8 +9,8 @@ import io.github.iampopovich.eculense.core.model.ServiceIntervals
 internal enum class CarField { NAME, YEAR, ENGINE_VOLUME, CYLINDERS, TANK, MASS, ODOMETER, VIN, FUEL_PRICE, CURRENCY, OIL, PLUGS, AIR_FILTER, FUEL_FILTER }
 
 /**
- * Форма редактора: всё — строки, как их вводит пользователь. Ошибки считаются сразу (предупреждение ошибок по Нильсену):
- * кнопка «Сохранить» недоступна, пока есть хоть одна, а поле подсвечивает причину.
+ * Editor form: everything is strings, as the user types them. Errors are computed immediately (Nielsen's error prevention):
+ * the «Сохранить» button is disabled while there is at least one, and the field highlights the cause.
  */
 internal data class CarForm(
     val id: Long = 0,
@@ -56,7 +56,7 @@ internal data class CarForm(
         checkInt(fuelFilterKm, 500, 300_000)?.let { put(CarField.FUEL_FILTER, it) }
     }
 
-    /** null, если есть ошибки. Дата пробега обновляется, только когда пользователь поменял сам пробег. */
+    /** null if there are errors. The mileage date is updated only when the user changed the mileage itself. */
     fun toProfile(original: CarProfile?, nowMs: Long, currentYear: Int): CarProfile? {
         if (errors(currentYear).isNotEmpty()) return null
         val odometer = odometerKm.toLongOrNullTrim()

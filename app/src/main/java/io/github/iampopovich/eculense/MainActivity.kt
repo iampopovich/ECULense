@@ -10,7 +10,7 @@ import io.github.iampopovich.eculense.core.navigation.DeepLinks
 import io.github.iampopovich.eculense.core.ui.theme.ECULenseTheme
 
 class MainActivity : ComponentActivity() {
-    /** Экран из уведомления (DeepLinks); сбрасывается после перехода. */
+    /** Screen from a notification (DeepLinks); reset after navigation. */
     private val deepLink = mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {

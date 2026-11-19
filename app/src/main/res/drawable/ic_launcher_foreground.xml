@@ -1,27 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Передний план: линза (ECU + Lens) с сигналом датчика внутри. Всё в безопасной зоне 66dp. -->
+<!-- Foreground: a lens (ECU + Lens) with a sensor signal inside. Everything within the 66dp safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Стекло линзы -->
+    <!-- Lens glass -->
     <path
         android:fillColor="#3329D3C2"
         android:pathData="M49,49m-15.5,0a15.5,15.5 0,1 1,31 0a15.5,15.5 0,1 1,-31 0" />
-    <!-- Сигнал: ровная линия, всплеск, ровная линия -->
+    <!-- Signal: flat line, spike, flat line -->
     <path
         android:pathData="M35.5,50.5L41,50.5L44,42.5L48.5,58L52,45.5L54.5,50.5L62.5,50.5"
         android:strokeWidth="3"
         android:strokeColor="#FF29D3C2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round" />
-    <!-- Оправа -->
+    <!-- Rim -->
     <path
         android:pathData="M49,49m-17.5,0a17.5,17.5 0,1 1,35 0a17.5,17.5 0,1 1,-35 0"
         android:strokeWidth="5"
         android:strokeColor="#FFF4F7FB" />
-    <!-- Ручка -->
+    <!-- Handle -->
     <path
         android:pathData="M62.5,62.5L72.5,72.5"
         android:strokeWidth="7.5"

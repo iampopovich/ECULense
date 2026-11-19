@@ -6,8 +6,8 @@ import org.koin.dsl.module
 import java.io.File
 
 /**
- * filesDir/packs; постобработчики (OBDex-индекс и т. п.) регистрируют модули-читатели как PackPostProcessor;
- * модули с динамическим каталогом (модели ИИ) — PackSource, токены источников — PackAuth.
+ * filesDir/packs; post-processors (OBDex index, etc.) are registered by reader modules as PackPostProcessor;
+ * modules with a dynamic catalog (AI models) as PackSource, source tokens as PackAuth.
  */
 val dataPacksModule = module {
     single { PackStore(File(androidContext().filesDir, "packs")) }

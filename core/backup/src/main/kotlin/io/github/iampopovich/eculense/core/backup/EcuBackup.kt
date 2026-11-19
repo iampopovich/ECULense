@@ -10,7 +10,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
-/** Манифест `.eculense`: по нему восстановление решает, можно ли принять копию. */
+/** `.eculense` manifest: restore uses it to decide whether the backup can be accepted. */
 @Serializable
 data class BackupManifest(
     val format: Int,
@@ -20,11 +20,11 @@ data class BackupManifest(
     val createdAtMs: Long,
     val databases: List<String>,
     val datastore: List<String>,
-    /** Сколько секретных значений (ключи API, токены) исключено — только число, без имён и значений. */
+    /** How many secret values (API keys, tokens) were excluded — just the count, no names or values. */
     val secretsExcluded: Int,
 )
 
-/** База для копии: snapshotTo пишет согласованную копию (checkpoint WAL + VACUUM INTO) и возвращает user_version. */
+/** Database for the backup: snapshotTo writes a consistent copy (WAL checkpoint + VACUUM INTO) and returns user_version. */
 interface DbSource {
     val fileName: String
     fun snapshotTo(target: File): Int
@@ -35,22 +35,22 @@ class BackupRejectedException(message: String) : Exception(message)
 data class RestoreResult(val manifest: BackupManifest, val migratesFrom: Int?)
 
 /**
- * Резервная копия ECULense (1.27 п.4): zip `.eculense` = manifest.json + databases/ecu.db (+ ai_chat.db по флажку) +
- * datastore/<файл>.preferences_pb без секретов. Пакеты данных и модели не входят (качаются заново), ключи API и
- * токены — никогда (остаются на телефоне; при восстановлении текущие секреты сохраняются).
+ * ECULense backup (1.27 item 4): zip `.eculense` = manifest.json + databases/ecu.db (+ ai_chat.db if flagged) +
+ * datastore/<file>.preferences_pb without secrets. Data packs and models are not included (re-downloaded); API keys and
+ * tokens — never (they stay on the phone; on restore the current secrets are kept).
  *
- * Восстановление: проверка манифеста и версии схемы (старшая — отказ, младшая — Room доведёт миграциями при запуске),
- * закрытие базы, замена файлов (вместе с удалением -wal/-shm старой базы), затем приложение перезапускается.
+ * Restore: check the manifest and schema version (newer — reject, older — Room migrates on startup),
+ * close the database, replace files (also deleting the old database's -wal/-shm), then the app restarts.
  */
 class EcuBackup(
     private val databases: List<DbSource>,
-    /** Куда восстанавливать базы: имя файла → путь (ecu.db, ai_chat.db). */
+    /** Where to restore databases: file name → path (ecu.db, ai_chat.db). */
     private val databaseTargets: Map<String, File>,
     private val dataStoreDir: File,
     private val workDir: File,
     private val schemaVersion: Int,
     private val appVersion: String,
-    /** Закрыть открытые базы перед заменой файлов. */
+    /** Close open databases before replacing files. */
     private val closeDatabases: () -> Unit,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
@@ -64,7 +64,7 @@ class EcuBackup(
                 val target = File(staging, db.fileName)
                 val v = runCatching { db.snapshotTo(target) }.getOrElse { e ->
                     if (db.fileName == MAIN_DB) throw e
-                    -1 // чат ИИ ещё не создан — копия без него
+                    -1 // AI chat not created yet — backup without it
                 }
                 if (v < 0 || !target.exists()) continue
                 if (db.fileName == MAIN_DB) version = v
@@ -76,7 +76,7 @@ class EcuBackup(
             dataStoreDir.listFiles().orEmpty().filter { it.isFile && it.name.endsWith(PREFS_SUFFIX) && it.name.removeSuffix(PREFS_SUFFIX) !in EXCLUDED_STORES }
                 .sortedBy { it.name }
                 .forEach { f ->
-                    val split = runCatching { PrefsFile.split(f.readBytes()) }.getOrNull() ?: return@forEach // непонятный файл — не берём
+                    val split = runCatching { PrefsFile.split(f.readBytes()) }.getOrNull() ?: return@forEach // unknown file — skip it
                     secrets += split.secretCount
                     prefs += f.name to split.public
                 }
@@ -95,7 +95,7 @@ class EcuBackup(
         }
     }
 
-    /** Распаковывает и проверяет копию, не трогая текущие данные. */
+    /** Unpacks and validates the backup without touching current data. */
     fun inspect(input: InputStream): BackupManifest = unpack(input).let { (manifest, dir) -> dir.deleteRecursively(); manifest }
 
     fun restore(input: InputStream): RestoreResult {
@@ -111,7 +111,7 @@ class EcuBackup(
             dataStoreDir.mkdirs()
             for (name in manifest.datastore) {
                 val current = File(dataStoreDir, name)
-                // секреты из копии исключены — сохраняем текущие (ключ API остаётся на этом телефоне)
+                // secrets are excluded from the backup — keep the current ones (the API key stays on this phone)
                 val keepSecrets = if (current.exists()) runCatching { PrefsFile.split(current.readBytes()).secret }.getOrDefault(ByteArray(0)) else ByteArray(0)
                 val restored = File(dir, "$PREFS_DIR/$name").readBytes()
                 current.writeBytes(restored + keepSecrets)
@@ -134,7 +134,7 @@ class EcuBackup(
                     val allowed = name == MANIFEST ||
                         (name.startsWith("$DB_DIR/") && name.substringAfter('/') in KNOWN_DATABASES) ||
                         (name.startsWith("$PREFS_DIR/") && SAFE_NAME.matches(name.substringAfter('/')) && name.endsWith(PREFS_SUFFIX))
-                    if (!allowed) continue // чужие и опасные пути (../) пропускаем
+                    if (!allowed) continue // skip foreign and unsafe paths (../)
                     if (name == MANIFEST) manifestBytes = zip.readBytes()
                     else File(dir, name).apply { parentFile?.mkdirs() }.outputStream().use { zip.copyTo(it) }
                 }
@@ -176,13 +176,13 @@ class EcuBackup(
         private val SQLITE_SIDE_FILES = listOf("-wal", "-shm", "-journal")
 
         /**
-         * Хранилища, которые в копию не идут: ailocal — выбор скачанной модели и замеры этого телефона (модели не
-         * копируются), backup — доступ SAF к папке бэкапов (разрешение действует только на этом устройстве).
+         * Stores that don't go into the backup: ailocal — the downloaded model choice and this phone's benchmarks (models
+         * are not copied), backup — SAF access to the backups folder (the permission is valid only on this device).
          */
         val EXCLUDED_STORES = setOf("ailocal", "backup")
         private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
-        /** PRAGMA user_version из заголовка SQLite (смещение 60, big-endian) — без открытия базы. */
+        /** PRAGMA user_version from the SQLite header (offset 60, big-endian) — without opening the database. */
         fun sqliteUserVersion(file: File): Int = RandomAccessFile(file, "r").use { f ->
             val magic = ByteArray(16).also { f.readFully(it) }
             if (!magic.decodeToString().startsWith("SQLite format 3")) throw BackupRejectedException("Копия повреждена: база не SQLite")

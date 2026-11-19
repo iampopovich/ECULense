@@ -10,7 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 
-/** Что уходит провайдеру, когда включены данные машины (то же перечисляют инструменты :core:aitools). */
+/** What is sent to the provider when vehicle data is enabled (the :core:aitools tools list the same). */
 internal val SHARED_DATA = listOf(
     "профиль машины: марка, модель, год, двигатель, пробег",
     "итоги поездок: путь, расход, время",
@@ -19,8 +19,8 @@ internal val SHARED_DATA = listOf(
 )
 
 /**
- * Согласие перед первой отправкой данных машины облачному провайдеру (план 3.7): что уходит и куда.
- * Касание вне диалога не закрывает его (решение должно быть явным); «Назад» — отмена, вопрос возвращается в поле.
+ * Consent before the first sending of vehicle data to a cloud provider (plan 3.7): what is sent and where.
+ * Tapping outside the dialog doesn't close it (the decision must be explicit); «Назад» cancels, the question goes back into the field.
  */
 @Composable
 internal fun ConsentDialog(request: ConsentRequest, onAccept: () -> Unit, onDecline: () -> Unit, onCancel: () -> Unit) {

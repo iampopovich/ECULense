@@ -17,9 +17,9 @@ class ChatHistoryTest {
     fun `merge appends only the new tail`() {
         assertEquals(listOf(u("q1"), a("a1")), HistoryMerge.newTail(emptyList(), listOf(u("q1"), a("a1"))))
         assertEquals(listOf(u("q2"), a("a2")), HistoryMerge.newTail(listOf(u("q1"), a("a1")), listOf(u("q1"), a("a1"), u("q2"), a("a2"))))
-        // повтор того же вопроса — тоже новый ход
+        // repeating the same question is also a new turn
         assertEquals(listOf(u("q"), a("a")), HistoryMerge.newTail(listOf(u("q"), a("a")), listOf(u("q"), a("a"), u("q"), a("a"))))
-        // загружено окно из конца длинной истории
+        // a window from the end of a long history is loaded
         val stored = (1..30).flatMap { listOf(u("q$it"), a("a$it")) }
         val window = stored.takeLast(ChatHistoryStore.WINDOW)
         assertEquals(listOf(u("new"), a("ans")), HistoryMerge.newTail(stored, window + listOf(u("new"), a("ans"))))
@@ -30,7 +30,7 @@ class ChatHistoryTest {
         val h = InMemoryChatHistory()
         val all = (1..15).flatMap { listOf(ku("q$it"), ka("a$it")) }
         h.store("c", all.take(2))
-        // следующий ход: ChatMemory сохраняет окно + новое
+        // next turn: ChatMemory saves the window + the new part
         h.store("c", h.load("c") + all.drop(2))
         assertEquals(30, h.transcript("c").size)
         assertEquals(ChatHistoryStore.WINDOW, h.load("c").size)

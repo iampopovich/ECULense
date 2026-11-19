@@ -78,7 +78,7 @@ class EndpointUrlTest {
             assertTrue("$url → $reason", reason.contains("https://"))
             assertTrue("$url → $reason", reason.contains("локальн"))
         }
-        // https разрешён куда угодно.
+        // https is allowed to anywhere.
         valid("https://example.com/v1")
         valid("https://8.8.8.8")
     }

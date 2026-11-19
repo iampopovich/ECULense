@@ -5,7 +5,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 
-/** Команда → ответ до приглашения '>'. Команды строго по одной (Mutex): ELM327 не умеет параллельно. */
+/** Command → response up to the '>' prompt. Strictly one command at a time (Mutex): ELM327 cannot do them in parallel. */
 internal class ElmLink(private val transport: ObdTransport) {
     private val mutex = Mutex()
     private val buffer = StringBuilder()

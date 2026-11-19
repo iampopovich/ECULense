@@ -13,8 +13,8 @@ import org.koin.dsl.binds
 import org.koin.dsl.module
 
 /**
- * Реакция на новые данные (запись остановлена, импорт закончен). Реализует необязательный модуль фоновой работы
- * (:core:background — анализ в WorkManager и уведомления). Если его нет, слой данных сам пересчитывает находки.
+ * Reaction to new data (recording stopped, import finished). Implemented by the optional background-work module
+ * (:core:background: analysis in WorkManager and notifications). Without it, the data layer recomputes findings itself.
  */
 interface DataEvents {
     fun recordingFinished(sessionId: Long)
@@ -44,7 +44,7 @@ val dataModule = module {
         val trips = get<RecordingTrips>()
         val koin = getKoin()
         val scope = get<CoroutineScope>(AppScope)
-        // Поездка по записи — сразу (быстро, одна запись); анализ и уведомления — в фоновом модуле.
+        // Trip from the recording right away (fast, single recording); analysis and notifications in the background module.
         LiveSessionRecorder(get(), get(), scope) { id ->
             runCatching { trips.backfill() }
             val events = koin.dataEvents()
@@ -57,7 +57,7 @@ val dataModule = module {
         val scope = get<CoroutineScope>(AppScope)
         val koin = getKoin()
         val trips = get<RecordingTrips>()
-        // Новые записи и коды → поездки по записям без поездки Car Scanner, затем находки (в фоне, для всех машин).
+        // New recordings and codes → trips for recordings without a Car Scanner trip, then findings (in background, for all cars).
         CarScannerImporter(androidContext(), get(), get(), get(), get(), get(), get()) { report ->
             if (report.imported > 0 || report.tripsImported > 0 || report.tripsUpdated > 0 || report.dtcEventsAdded > 0) {
                 scope.launch {

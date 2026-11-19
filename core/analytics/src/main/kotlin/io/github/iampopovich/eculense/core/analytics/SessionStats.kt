@@ -6,7 +6,7 @@ import kotlin.math.roundToInt
 
 data class SensorStats(val sensorId: String, val count: Int, val min: Double, val max: Double, val mean: Double, val p95: Double)
 
-/** Статистика одной сессии по всем датчикам (план 3.1). Для больших выборок — агрегаты SQL + [Percentiles] по прореженной выборке. */
+/** Statistics of one session across all sensors (plan 3.1). For large samples: SQL aggregates + [Percentiles] over a thinned sample. */
 object SessionStats {
     fun compute(readings: List<SensorReading>): List<SensorStats> =
         readings.groupBy { it.sensorId }.map { (id, list) ->
@@ -16,7 +16,7 @@ object SessionStats {
 }
 
 object Percentiles {
-    /** Перцентиль по ближайшему рангу (ceil(q·n)): для 1..100 и q=0.95 → 95; для трёх значений p95 — максимум. */
+    /** Nearest-rank percentile (ceil(q·n)): for 1..100 and q=0.95 → 95; for three values p95 is the maximum. */
     fun of(values: Collection<Double>, q: Double): Double? {
         if (values.isEmpty()) return null
         val sorted = values.sorted()
@@ -25,11 +25,11 @@ object Percentiles {
 
     fun rank(n: Int, q: Double): Int = (ceil(q * n).toInt() - 1).coerceIn(0, n - 1)
 
-    /** Шаг прореживания (каждое step-е значение), чтобы выборка была не больше maxSample. */
+    /** Thinning step (every step-th value) so the sample is no larger than maxSample. */
     fun step(count: Int, maxSample: Int = 2_000): Int = if (count <= maxSample) 1 else ceil(count.toDouble() / maxSample).toInt()
 }
 
-/** Сумма/мин/макс/число — складываются между сессиями без хранения самих значений. */
+/** Sum/min/max/count: combined across sessions without storing the values themselves. */
 data class Agg(
     val count: Int = 0,
     val sum: Double = 0.0,
@@ -49,7 +49,7 @@ data class Agg(
 
 fun Iterable<Agg>.merged(): Agg = fold(Agg.EMPTY) { a, b -> a + b }
 
-/** Гистограмма с шагом 0,1 — даёт медиану между сессиями (напряжение) без хранения всех значений. */
+/** Histogram with a 0.1 step: gives a cross-session median (voltage) without storing all values. */
 data class Histogram(val bins: Map<Int, Int> = emptyMap()) {
     val count: Int get() = bins.values.sum()
 

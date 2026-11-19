@@ -7,7 +7,7 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
 
-/** PackDb поверх sqlite-jdbc: те же SQL, что и на телефоне, на синтетической базе в JVM-тестах. */
+/** PackDb on top of sqlite-jdbc: the same SQL as on the phone, on a synthetic database in JVM tests. */
 internal class JdbcPackDb(file: File, readOnly: Boolean = true) : PackDb {
     private val conn: Connection = DriverManager.getConnection(
         "jdbc:sqlite:${file.path}",
@@ -32,7 +32,7 @@ internal class JdbcPackDb(file: File, readOnly: Boolean = true) : PackDb {
     }
 }
 
-/** Синтетическая vehicles.sqlite со схемой релиза gor3a v1.0.3 и эталонной записью (данные набраны вручную, не из релиза). */
+/** Synthetic vehicles.sqlite with the gor3a v1.0.3 release schema and a reference record (data typed by hand, not from the release). */
 internal object SyntheticVehicles {
     private val SCHEMA = listOf(
         "CREATE TABLE makes (id INTEGER PRIMARY KEY, \"group\" TEXT NOT NULL, name TEXT NOT NULL, country TEXT)",

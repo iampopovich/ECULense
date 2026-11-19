@@ -66,7 +66,7 @@ class StatsScreenTest {
         rule.onNodeWithText("Поездок пока нет").assertExists()
         rule.onNodeWithText(StatsFormat.EMPTY_HINT).assertExists()
         rule.onNodeWithText(IMPORT).assertDoesNotExist()
-        // переключатель периода есть и без данных
+        // the period toggle is present even without data
         rule.onNodeWithText("Неделя").assertExists()
     }
 
@@ -78,7 +78,7 @@ class StatsScreenTest {
         assertEquals(1, clicks)
     }
 
-    /** Одна кнопка импорта на экран при любом периоде и состоянии — не «импорт за неделю/месяц». */
+    /** One import button per screen for any period and state — not «импорт за неделю/месяц». */
     @Test
     fun exactlyOneImportButtonInEveryPeriodAndState() {
         var state by mutableStateOf(StatsUiState(loading = false, car = car))

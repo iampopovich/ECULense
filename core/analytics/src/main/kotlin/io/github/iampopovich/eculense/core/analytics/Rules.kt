@@ -8,15 +8,15 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 
-/** rank — для сортировки: сначала опасное, затем «нет данных», в конце «в норме». */
+/** rank is for sorting: dangerous first, then «нет данных», «в норме» last. */
 enum class Severity(val rank: Int) { OK(0), NO_DATA(1), INFO(2), WARNING(3), CRITICAL(4) }
 
-/** Доказательство находки: подпись и значение, уже округлённое и с единицей. */
+/** Finding evidence: label and value, already rounded and with a unit. */
 data class Evidence(val label: String, val value: String)
 
 /**
- * Результат правила. Числа в message/evidence посчитаны кодом; ИИ их только объясняет.
- * OK и NO_DATA — тоже результаты: «проверено, в норме» и «проверить нечем» (а не ложная находка).
+ * Rule result. Numbers in message/evidence are computed by code; the AI only explains them.
+ * OK and NO_DATA are results too: "checked, normal" and "nothing to check with" (rather than a false finding).
  */
 data class Finding(
     val ruleId: String,
@@ -29,7 +29,7 @@ data class Finding(
     val toMs: Long? = null,
 )
 
-/** Событие кода ошибки: живой снимок или импортированное событие Car Scanner. */
+/** Trouble code event: live snapshot or imported Car Scanner event. */
 data class DtcEvent(val code: String, val kind: DtcKind, val atMs: Long)
 
 data class AnalysisInput(
@@ -41,7 +41,7 @@ data class AnalysisInput(
 )
 
 interface AnalyticsRule {
-    /** Все ruleId, которые правило может вернуть (для «нет данных» и ссылок). */
+    /** All ruleIds the rule can return (for «нет данных» and links). */
     val ids: List<String>
     fun evaluate(input: AnalysisInput): List<Finding>
 }
@@ -53,7 +53,7 @@ object AnalyticsEngine {
         rules.flatMap { it.evaluate(input) }.sortedByDescending { it.severity.rank }
 }
 
-/** Числа по-русски: запятая, округление; знак у коррекций. */
+/** Russian number formatting: decimal comma, rounding; sign on trims. */
 internal object Fmt {
     private val ru = Locale.forLanguageTag("ru")
     fun n(v: Double, decimals: Int = 1): String = String.format(ru, "%.${decimals}f", v)
@@ -72,7 +72,7 @@ private fun ok(id: String, title: String, message: String, evidence: List<Eviden
 
 private fun noData(id: String, title: String, message: String) = Finding(id, Severity.NO_DATA, title, message)
 
-/** ОЖ ≥ 105 °C дольше 30 с — WARNING, ≥ 110 °C дольше 30 с — CRITICAL. */
+/** Coolant ≥ 105 °C for over 30 s is WARNING, ≥ 110 °C for over 30 s is CRITICAL. */
 object CoolantOverheatRule : AnalyticsRule {
     private const val ID = "coolant-overheat"
     private const val TITLE = "Перегрев двигателя"
@@ -105,7 +105,7 @@ object CoolantOverheatRule : AnalyticsRule {
     }
 }
 
-/** Напряжение на работающем двигателе: < 13,2 В дольше 60 с и > 14,8 В дольше 10 с. */
+/** Voltage with the engine running: < 13.2 V for over 60 s and > 14.8 V for over 10 s. */
 object VoltageRule : AnalyticsRule {
     private const val LOW = "voltage-low"
     private const val HIGH = "voltage-high"
@@ -160,14 +160,14 @@ object VoltageRule : AnalyticsRule {
     }
 }
 
-/** Топливные коррекции на прогретом двигателе. Знак «+» — ЭБУ добавляет топливо (смесь бедная). */
+/** Fuel trims on a warm engine. Sign «+» means the ECU adds fuel (lean mixture). */
 object FuelTrimRule : AnalyticsRule {
     private const val LONG = "fuel-trim-long"
     private const val TOTAL = "fuel-trim-total"
     private const val ASYM = "fuel-trim-bank-asymmetry"
     override val ids = listOf(LONG, TOTAL, ASYM)
 
-    /** ltft/stft — из последней записи, где есть прогретая LTFT банка: адаптация ЭБУ меняется, старые месяцы её не описывают. */
+    /** ltft/stft come from the latest recording with warm LTFT for the bank: ECU adaptation changes, old months don't describe it. */
     private data class Bank(val n: Int, val stft: Agg, val ltft: Agg, val ltftAll: Agg, val atMs: Long, val sessions: List<Long>)
 
     override fun evaluate(input: AnalysisInput): List<Finding> {
@@ -238,7 +238,7 @@ object FuelTrimRule : AnalyticsRule {
     }
 }
 
-/** MAF на прогретом холостом ходу относительно объёма двигателя из профиля. */
+/** MAF at warm idle relative to engine displacement from the profile. */
 object MafIdleRule : AnalyticsRule {
     private const val ID = "maf-idle"
     private const val TITLE = "Расход воздуха на холостом ходу"
@@ -279,7 +279,7 @@ object MafIdleRule : AnalyticsRule {
     }
 }
 
-/** Пробег с горящим Check Engine (PID 01.21) и его рост. */
+/** Distance driven with Check Engine on (PID 01.21) and its growth. */
 object MilDistanceRule : AnalyticsRule {
     private const val ID = "mil-distance"
     private const val TITLE = "Пробег с горящим Check Engine"
@@ -308,7 +308,7 @@ object MilDistanceRule : AnalyticsRule {
     }
 }
 
-/** Время прогрева до 80 °C с холодного пуска: тренд между ранними и поздними поездками. */
+/** Warm-up time to 80 °C from a cold start: trend between early and late trips. */
 object WarmupTrendRule : AnalyticsRule {
     private const val ID = "warmup-trend"
     private const val TITLE = "Время прогрева"
@@ -344,9 +344,9 @@ object WarmupTrendRule : AnalyticsRule {
     }
 }
 
-/** Коды ошибок: группы связанных кодов, повторы за 30 дней, остальные — справкой. */
+/** Trouble codes: groups of related codes, repeats within 30 days, the rest as reference. */
 object DtcRule : AnalyticsRule {
-    /** [title] и [explain] получают коды группы, найденные в истории: текст не должен говорить о том, чего нет. */
+    /** [title] and [explain] receive the group's codes found in history: the text must not mention what isn't there. */
     private data class Group(
         val id: String,
         val title: (List<String>) -> String,
@@ -354,7 +354,7 @@ object DtcRule : AnalyticsRule {
         val explain: (List<String>) -> String,
     )
 
-    /** P0171/P0174 — бедная смесь банков 1/2, P0172/P0175 — богатая. */
+    /** P0171/P0174: lean mixture on banks 1/2, P0172/P0175: rich. */
     private val MIXTURE_BANK = mapOf("P0171" to 1, "P0172" to 1, "P0174" to 2, "P0175" to 2)
     private val LEAN = setOf("P0171", "P0174")
 
@@ -379,7 +379,7 @@ object DtcRule : AnalyticsRule {
     )
     override val ids = GROUPS.map { it.id } + listOf("dtc-repeat", "dtc-other", "dtc-history")
 
-    /** Чтения одного кода чаще раза в 6 часов — одно событие. */
+    /** Reads of the same code more often than once per 6 hours count as one event. */
     private fun occurrences(events: List<DtcEvent>): Map<String, List<DtcEvent>> =
         events.groupBy { it.code }.mapValues { (_, list) ->
             list.sortedBy { it.atMs }.fold(mutableListOf<DtcEvent>()) { acc, e ->

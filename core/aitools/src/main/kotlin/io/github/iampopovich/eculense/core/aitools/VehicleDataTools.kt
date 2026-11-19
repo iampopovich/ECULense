@@ -34,8 +34,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
- * Общие зависимости инструментов. Активная машина берётся в момент вызова. log(имя, байты, json) —
- * для отладки на телефоне (тег EcuTools); JSON целиком — только при `setprop log.tag.EcuToolsJson VERBOSE`.
+ * Shared tool dependencies. The active car is resolved at call time. log(name, bytes, json) is
+ * for on-phone debugging (tag EcuTools); full JSON only with `setprop log.tag.EcuToolsJson VERBOSE`.
  */
 internal class ToolContext(
     val analytics: AnalyticsRepository,
@@ -44,9 +44,9 @@ internal class ToolContext(
     val clock: () -> Long = System::currentTimeMillis,
     val zone: () -> ZoneId = ZoneId::systemDefault,
     val log: (tool: String, bytes: Int, json: String) -> Unit = ::logcat,
-    /** Расшифровки DTC с учётом марки (OBDex/заводская база); без пакетов — встроенный CSV. */
+    /** Make-aware DTC descriptions (OBDex/factory database); without packs, the built-in CSV. */
     val describeDtc: suspend (codes: Collection<String>, make: String?) -> Map<String, DtcInfo> = { _, _ -> emptyMap() },
-    /** ТО и пробег (3.9); null — модуль ТО не подключён. */
+    /** Maintenance and mileage (3.9); null means the maintenance module is not wired in. */
     val maintenance: MaintenanceRepository? = null,
 )
 
@@ -60,7 +60,7 @@ private fun logcat(tool: String, bytes: Int, json: String) {
 internal const val TOOLS_TAG = "EcuTools"
 private const val JSON_TAG = "EcuToolsJson"
 
-/** Ответы инструментов: компактный JSON (≤ ~2 КБ), числа округлены, без VIN и координат. */
+/** Tool responses: compact JSON (≤ ~2 KB), rounded numbers, no VIN or coordinates. */
 internal object Compact {
     const val MAX_BYTES = 2_000
 
@@ -69,7 +69,7 @@ internal object Compact {
     fun num(v: Double, decimals: Int = 1): JsonPrimitive =
         if (decimals == 0) JsonPrimitive(Math.round(v)) else JsonPrimitive(BigDecimal(v).setScale(decimals, RoundingMode.HALF_UP).toDouble())
 
-    /** Сколько элементов списка влезает в бюджет вместе с остальным ответом; truncated = true, если обрезали. */
+    /** How many list items fit into the budget together with the rest of the response; truncated = true if cut. */
     fun <T> fit(items: List<T>, render: (T) -> JsonElement, maxBytes: Int = MAX_BYTES, build: (JsonArray, Boolean) -> JsonObject): JsonObject {
         val rendered = items.map(render)
         var n = rendered.size
@@ -89,7 +89,7 @@ internal object Dates {
     fun endOf(day: String?, zone: ZoneId): Long? = startOf(day, zone)?.let { it + 86_400_000L - 1 }
 }
 
-/** Короткие английские подписи датчиков — дешевле в токенах, чем русские (UTF-8 по 2 байта на букву). */
+/** Short English sensor labels: cheaper in tokens than Russian ones (UTF-8, 2 bytes per letter). */
 internal val SENSOR_NAMES = mapOf(
     "01.04" to "engine load", SensorIds.COOLANT to "coolant temp", SensorIds.STFT1 to "STFT bank1", SensorIds.LTFT1 to "LTFT bank1",
     SensorIds.STFT2 to "STFT bank2", SensorIds.LTFT2 to "LTFT bank2", SensorIds.RPM to "rpm", SensorIds.SPEED to "speed",
@@ -109,8 +109,8 @@ internal fun period(value: String?): StatsPeriod = when (value?.lowercase()) {
 internal fun periodFrom(p: StatsPeriod, now: Long): Long = p.days?.let { now - it * 86_400_000L } ?: 0L
 
 /**
- * Начало периода: [days] (произвольный, «полгода» = 180) приоритетнее именованного [period].
- * Возвращает (начало, подпись периода для ответа).
+ * Period start: [days] (arbitrary, «полгода» = 180) takes priority over the named [period].
+ * Returns (start, period label for the response).
  */
 internal fun periodStart(period: String?, days: Int?, now: Long): Pair<Long, String> {
     val d = days?.coerceIn(1, 3_650)
@@ -120,9 +120,9 @@ internal fun periodStart(period: String?, days: Int?, now: Long): Pair<Long, Str
 }
 
 /**
- * Базовый инструмент: только чтение по активной машине; ответ — компактный JSON, размер пишется в лог.
- * Типизированные [SimpleTool] с @Serializable-аргументами, а не @Tool-методы [ai.koog.agents.core.tools.reflect.ToolSet]:
- * без kotlin-reflect во время вызова, аргументы проверяет kotlinx.serialization.
+ * Base tool: read-only over the active car; the response is compact JSON, its size is logged.
+ * Typed [SimpleTool]s with @Serializable arguments rather than @Tool methods of [ai.koog.agents.core.tools.reflect.ToolSet]:
+ * no kotlin-reflect at call time, and arguments are validated by kotlinx.serialization.
  */
 internal abstract class VehicleTool<A>(
     argsType: TypeToken,
@@ -138,7 +138,7 @@ internal abstract class VehicleTool<A>(
         return json
     }
 
-    /** Ответ без сериализации — для текстовой сводки модели на телефоне ([DigestText]). */
+    /** Unserialized response, for the on-phone model's text digest ([DigestText]). */
     internal suspend fun json(args: A): JsonObject {
         val carId = ctx.cars.activeCarId()
         return if (carId == null) Compact.noData("no car profile") else answer(args, carId)
@@ -181,7 +181,7 @@ internal class CarProfileTool(ctx: ToolContext) : VehicleTool<NoArgs>(
 ) {
     override suspend fun answer(args: NoArgs, carId: Long): JsonObject {
         val car = ctx.cars.cars().firstOrNull { it.id == carId } ?: return Compact.noData("no car profile")
-        // VIN, имя, внешний id не отдаём: модели они не нужны.
+        // VIN, name and external id are not exposed: the model doesn't need them.
         return buildJsonObject {
             car.brand?.let { put("brand", it) }
             car.model?.let { put("model", it) }
@@ -382,7 +382,7 @@ internal class FindingsTool(ctx: ToolContext) : VehicleTool<LimitArgs>(
 ) {
     override suspend fun answer(args: LimitArgs, carId: Long): JsonObject {
         var stored: List<StoredFinding> = ctx.analytics.findings(carId)
-        // Находок ещё нет (анализ не открывали) — считаем: правила детерминированные, сеть не нужна.
+        // No findings yet (analysis never opened): compute them; the rules are deterministic, no network needed.
         if (stored.isEmpty()) {
             ctx.analytics.recompute(carId)
             stored = ctx.analytics.findings(carId)
@@ -420,7 +420,7 @@ internal class DtcHistoryTool(ctx: ToolContext) : VehicleTool<LimitArgs>(
             .sortedByDescending { (_, l) -> l.last().atMs }.take(args.limit.coerceIn(1, 30))
         val make = ctx.cars.cars().firstOrNull { it.id == carId }?.brand
         val info = runCatching { ctx.describeDtc(codes.map { it.first }, make) }.getOrDefault(emptyMap())
-        // Сначала с причинами и симптомами; не влезло в 2 КБ — без симптомов, затем без причин, затем режем список.
+        // First with causes and symptoms; if it doesn't fit in 2 KB, drop symptoms, then causes, then trim the list.
         fun answer(detail: Int) = Compact.fit(
             codes,
             { (code, list) ->

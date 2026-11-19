@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Незашифрованный http нужен для LLM-серверов в домашней сети (Ollama, LM Studio, vLLM) — в обеих сборках.
-     Диапазоны IP здесь не задать, поэтому ограничение в коде: :core:ai EndpointUrl/LocalNetwork пускают http://
-     только к loopback, 10/8, 172.16/12, 192.168/16, link-local и *.local; публичные адреса — только https. -->
+<!-- Cleartext http is needed for LLM servers on the home network (Ollama, LM Studio, vLLM), in both builds.
+     IP ranges cannot be set here, so the restriction lives in code: :core:ai EndpointUrl/LocalNetwork allow http://
+     only to loopback, 10/8, 172.16/12, 192.168/16, link-local and *.local; public addresses are https only. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

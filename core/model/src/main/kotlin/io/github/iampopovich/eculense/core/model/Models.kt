@@ -1,6 +1,6 @@
 package io.github.iampopovich.eculense.core.model
 
-/** Одно значение датчика. sensorId стабилен между сессиями: "01.0C" = сервис 01, PID 0x0C (обороты). */
+/** One sensor value. sensorId is stable across sessions: "01.0C" = service 01, PID 0x0C (RPM). */
 data class SensorReading(
     val sensorId: String,
     val value: Double,
@@ -12,7 +12,7 @@ enum class DtcKind { STORED, PENDING, PERMANENT }
 
 data class Dtc(val code: String, val kind: DtcKind)
 
-/** Что адаптер рассказал о себе после инициализации. protocolNumber — ответ ATDPN без префикса 'A'. */
+/** What the adapter reported about itself after init. protocolNumber: ATDPN response without the 'A' prefix. */
 data class AdapterInfo(
     val version: String,
     val protocolNumber: Char,

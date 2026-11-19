@@ -7,8 +7,8 @@ import java.time.format.FormatStyle
 import java.util.Locale
 
 /**
- * Даты в интерфейсе — всегда по-русски, как и весь UI, независимо от языка системы
- * (иначе на английском телефоне получается «Jun 11, 2026 10:07 AM» среди русского текста).
+ * Dates in the UI are always in Russian, like the rest of the UI, regardless of the system language
+ * (otherwise an English-language phone shows «Jun 11, 2026 10:07 AM» amid Russian text).
  */
 object EcuDates {
     val RU: Locale = Locale.forLanguageTag("ru")

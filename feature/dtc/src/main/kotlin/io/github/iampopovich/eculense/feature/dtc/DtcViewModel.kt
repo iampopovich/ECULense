@@ -16,12 +16,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Расшифровки с учётом марки активной машины (заводские коды — только своей марки). */
+/** Descriptions taking the active vehicle's make into account (manufacturer codes — only for its own make). */
 internal fun interface DtcDescriber {
     suspend fun describe(codes: Collection<String>): Map<String, DtcInfo>
 }
 
-/** Событие из истории активной машины: живые чтения и импорт Car Scanner. */
+/** Event from the active vehicle's history: live reads and Car Scanner import. */
 internal data class DtcHistoryEvent(val code: String, val kind: DtcKind, val atMs: Long)
 
 internal fun interface DtcHistorySource {
@@ -32,7 +32,7 @@ internal data class DtcItem(val dtc: Dtc, val info: DtcInfo) {
     val description: String? get() = info.title
 }
 
-/** Код из истории: сколько раз встречался и когда последний раз. */
+/** Code from history: how many times it occurred and when it was last seen. */
 internal data class DtcHistoryItem(val code: String, val kind: DtcKind, val count: Int, val lastMs: Long, val info: DtcInfo)
 
 internal data class DtcUiState(
@@ -41,7 +41,7 @@ internal data class DtcUiState(
     val history: List<DtcHistoryItem> = emptyList(),
     val error: String? = null,
     val canAskAi: Boolean = false,
-    /** Коды хотя бы раз успешно прочитаны: пустой список тогда значит «ошибок нет», а не «ещё не читали». */
+    /** Codes have been read successfully at least once: an empty list then means «ошибок нет» rather than «ещё не читали». */
     val checked: Boolean = false,
 )
 
@@ -59,7 +59,7 @@ internal class DtcViewModel(
         viewModelScope.launch { runCatching { loadHistory() } }
     }
 
-    /** Каждое успешное чтение (демо или настоящий адаптер) попадает в историю активной машины — её читает ИИ. */
+    /** Every successful read (demo or real adapter) goes into the active vehicle's history — the AI reads it. */
     fun read() = launchGuarded {
         val dtcs = controller.withSession { session -> DtcKind.entries.flatMap { session.readDtcs(it) } }
         if (dtcs == null) {
@@ -71,7 +71,7 @@ internal class DtcViewModel(
         }
     }
 
-    /** Сначала сохранить снимок (после сброса восстановить коды невозможно), потом сбросить и перечитать. */
+    /** First save a snapshot (codes can't be recovered after clearing), then clear and re-read. */
     fun clear() = launchGuarded {
         repository.recordRead(_uiState.value.items.map { it.dtc })
         val cleared = controller.withSession { it.clearDtcs() }
@@ -112,7 +112,7 @@ internal class DtcViewModel(
     }
 }
 
-/** Текст для чата: код, что о нём известно (кратко), просьба объяснить. */
+/** Text for the chat: the code, what is known about it (briefly), a request to explain. */
 internal fun askAiPrompt(code: String, info: DtcInfo): String = buildString {
     append("Объясни код ошибки $code")
     when (info.source) {

@@ -8,12 +8,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 
 /**
- * Сводка данных машины для модели на телефоне (она не вызывает инструменты): те же ответы инструментов, но обычным
- * текстом — короткие русские строки «Раздел: метка: значение», списки строками «- …». JSON маленькая модель
- * пересказывала пользователю дословно (в чат попадал сырой `carProfile`).
+ * Car data digest for the on-phone model (it doesn't call tools): the same tool responses, but as plain
+ * text: short Russian lines «Раздел: метка: значение», lists as «- …» lines. Given JSON, the small model
+ * retold it to the user verbatim (raw `carProfile` leaked into the chat).
  */
 internal object DigestText {
-    /** Порядок и заголовки разделов сводки. */
+    /** Order and headings of digest sections. */
     val SECTIONS: Map<String, String> = linkedMapOf(
         "carProfile" to "Машина",
         "trends" to "Тренды",
@@ -24,10 +24,10 @@ internal object DigestText {
         "listSessions" to "Последняя запись",
     )
 
-    /** Ведущее поле элемента списка — пишется первым, без подписи. */
+    /** Leading field of a list item: written first, without a label. */
     private val LEAD = listOf("code", "work", "title", "month")
 
-    /** Служебные поля, бесполезные модели без инструментов. */
+    /** Internal fields useless to a model without tools. */
     private val SKIP = setOf("id", "rule")
 
     private val LABELS = mapOf(
@@ -147,8 +147,8 @@ internal object DigestText {
     )
 
     /**
-     * Тренды — строкой на месяц/неделю от старых к новым, затем «Изменение» и «Мало данных». Только числа из ответа
-     * инструмента [TrendsTool], подписи по-русски.
+     * Trends: one line per month/week from oldest to newest, then «Изменение» and «Мало данных». Only numbers from the
+     * [TrendsTool] response, labels in Russian.
      */
     fun trends(json: JsonObject): String {
         val title = SECTIONS.getValue("trends")
@@ -211,6 +211,6 @@ internal object DigestText {
         }
     }
 
-    /** Текст из данных пользователя/баз тоже не должен выглядеть как JSON. */
+    /** Text from user data/databases must not look like JSON either. */
     private fun clean(s: String) = s.replace('"', '\'').replace('{', '(').replace('}', ')').replace('[', '(').replace(']', ')')
 }

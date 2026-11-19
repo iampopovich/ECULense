@@ -5,7 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import java.io.Closeable
 import java.io.File
 
-/** Строка результата: колонки по индексу, null — NULL в базе. */
+/** Result row: columns by index, null — NULL in the database. */
 interface PackRow {
     fun string(i: Int): String?
     fun long(i: Int): Long?
@@ -13,14 +13,14 @@ interface PackRow {
 }
 
 /**
- * Read-only SQL к скачанному пакету (vehicles.sqlite, dtc_codes.db). Интерфейс, а не android.database напрямую:
- * модули-читатели тестируют запросы на JVM через sqlite-jdbc на синтетической базе с той же схемой.
+ * Read-only SQL over a downloaded pack (vehicles.sqlite, dtc_codes.db). An interface rather than android.database directly:
+ * reader modules test their queries on the JVM via sqlite-jdbc against a synthetic database with the same schema.
  */
 interface PackDb : Closeable {
     fun <T> query(sql: String, args: List<Any?> = emptyList(), map: (PackRow) -> T): List<T>
 }
 
-/** Открывает файл пакета (только чтение, файл не меняется — важно для ODbL «без изменений»). */
+/** Opens the pack file (read-only, the file is not modified — important for ODbL "unmodified"). */
 fun interface PackDbOpener {
     fun open(file: File): PackDb
 }

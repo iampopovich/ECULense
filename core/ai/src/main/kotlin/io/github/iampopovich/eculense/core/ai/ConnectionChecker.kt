@@ -18,7 +18,7 @@ import java.net.UnknownHostException
 import java.net.UnknownServiceException
 import javax.net.ssl.SSLException
 
-/** Модель из каталога провайдера. Типы Koog наружу из :core:ai не выходят. */
+/** A model from the provider catalog. Koog types do not leak out of :core:ai. */
 data class ModelInfo(
     val id: String,
     val name: String = id,
@@ -27,9 +27,9 @@ data class ModelInfo(
     val recommended: Boolean = false,
 )
 
-/** Итог «Проверить подключение»: доказан ли ключ и что сервер отдал. */
+/** Result of «Проверить подключение»: whether the key is proven and what the server returned. */
 sealed interface ConnectionCheck {
-    /** Ключ и адрес подтверждены. [listed] = false — свой сервер не отдаёт список моделей: id вводится вручную. */
+    /** Key and URL confirmed. [listed] = false — a custom server does not return a model list: the id is entered manually. */
     data class Ok(val models: List<ModelInfo>, val listed: Boolean = true) : ConnectionCheck
     data object NoModels : ConnectionCheck
     data object KeyMissing : ConnectionCheck
@@ -41,17 +41,17 @@ sealed interface ConnectionCheck {
 }
 
 interface ConnectionChecker {
-    /** [baseUrl] — адрес пользователя, только для [LlmProviderKind.OTHER]; у пресетов адрес задаёт Koog (передавайте null). */
+    /** [baseUrl] — the user's URL, only for [LlmProviderKind.OTHER]; for presets Koog sets the URL (pass null). */
     suspend fun check(provider: LlmProviderKind, baseUrl: String?, apiKey: String?): ConnectionCheck
 }
 
 /**
- * Проверка «ключ + адрес» и каталог моделей — только средствами клиентов Koog, без своих путей и запросов:
- * каталог = `LLMClient.models()` (у Ollama — `OllamaClient.getModels()`, models() там не реализован).
- * Для всех, кроме OpenRouter, список моделей требует ключ, так что он же и доказывает ключ.
- * Каталог OpenRouter публичный, а отдельного вызова «проверить ключ» в Koog 1.3.0 нет, поэтому ключ доказываем
- * самым дешёвым запросом Koog — `execute` на 1 токен (maxTokens = 1) к бесплатной модели из каталога.
- * Ошибки Koog (`KoogHttpClientException.statusCode/errorBody`) переводятся в состояния [ConnectionCheck].
+ * "Key + URL" check and model catalog — using Koog clients only, no custom paths or requests:
+ * catalog = `LLMClient.models()` (for Ollama — `OllamaClient.getModels()`, models() is not implemented there).
+ * For everyone except OpenRouter, the model list requires a key, so it also proves the key.
+ * The OpenRouter catalog is public, and Koog 1.3.0 has no separate "check key" call, so we prove the key
+ * with Koog's cheapest request — a 1-token `execute` (maxTokens = 1) against a free model from the catalog.
+ * Koog errors (`KoogHttpClientException.statusCode/errorBody`) are mapped to [ConnectionCheck] states.
  */
 class KoogConnectionChecker(
     private val clientFactory: (LlmProviderKind, String?, String?) -> LLMClient = { kind, otherUrl, key ->
@@ -60,7 +60,7 @@ class KoogConnectionChecker(
 ) : ConnectionChecker {
 
     override suspend fun check(provider: LlmProviderKind, baseUrl: String?, apiKey: String?): ConnectionCheck {
-        // Адрес вводится только для «Другого»; пресеты ходят по адресу клиента Koog по умолчанию.
+        // The URL is entered only for «Другого»; presets use the Koog client's default URL.
         val otherUrl = if (provider == LlmProviderKind.OTHER) {
             when (val v = EndpointUrl.validate(baseUrl.orEmpty())) {
                 is EndpointUrl.Result.Invalid -> return ConnectionCheck.InvalidUrl(v.reason)
@@ -99,7 +99,7 @@ class KoogConnectionChecker(
                 .map { ModelInfo(it.name, contextLength = it.contextLength) }
         } else {
             client.models().map { model ->
-                // Google отдаёт имена ресурсов «models/…», а в запросах Koog ждёт голый id.
+                // Google returns resource names "models/…", but Koog expects a bare id in requests.
                 val id = if (provider == LlmProviderKind.GOOGLE) model.id.removePrefix("models/") else model.id
                 ModelInfo(
                     id = id,
@@ -109,7 +109,7 @@ class KoogConnectionChecker(
             }
         }
 
-    /** null — ключ принят. Любой ответ, кроме 401/403, значит, что авторизация пройдена (402 — ключ верный, нет средств). */
+    /** null — key accepted. Any response other than 401/403 means authorization passed (402 — key is valid, no funds). */
     private suspend fun proveKey(client: LLMClient, provider: LlmProviderKind, models: List<ModelInfo>, key: String?): ConnectionCheck? {
         val probe = models.firstOrNull { it.isFree == true }?.id
             ?: provider.recommended.firstOrNull { r -> models.any { it.id == r } }
@@ -141,18 +141,18 @@ class KoogConnectionChecker(
             val detail = redact(providerMessage.find(body)?.groupValues?.get(1), key)
             return when {
                 status == 401 -> ConnectionCheck.Unauthorized(detail)
-                // Google на плохой ключ отвечает 400 INVALID_ARGUMENT с причиной API_KEY_INVALID.
+                // For a bad key Google responds 400 INVALID_ARGUMENT with reason API_KEY_INVALID.
                 status == 400 && provider == LlmProviderKind.GOOGLE && ("API_KEY_INVALID" in body || "API key not valid" in body) ->
                     ConnectionCheck.Unauthorized(detail)
                 status == 403 -> ConnectionCheck.Blocked(detail)
-                // Свой сервер может не уметь /models (llama.cpp старых версий и т.п.) — модель вводится руками.
+                // A custom server may not support /models (old llama.cpp versions etc.) — the model is entered manually.
                 status == 404 && provider == LlmProviderKind.OTHER -> ConnectionCheck.Ok(emptyList(), listed = false)
                 status == 404 -> ConnectionCheck.Unreachable("по этому адресу нет API (404) — проверьте адрес")
                 else -> ConnectionCheck.Failed(status, detail)
             }
         }
         if (!isNetwork(e) && chain(e).any { it is SerializationException || it is IllegalArgumentException }) {
-            // Сервер ответил, но не в формате API клиента Koog (HTML, нестандартный список моделей).
+            // The server responded, but not in the Koog client's API format (HTML, non-standard model list).
             return if (provider == LlmProviderKind.OTHER) {
                 ConnectionCheck.Ok(emptyList(), listed = false)
             } else {
@@ -175,7 +175,7 @@ class KoogConnectionChecker(
                 it is HttpRequestTimeoutException || it is ConnectTimeoutException || it is UnknownServiceException
         }
 
-        /** Рекомендованные (в порядке курируемого списка) первыми, остальные по алфавиту. */
+        /** Recommended ones first (in curated-list order), the rest alphabetically. */
         fun order(models: List<ModelInfo>, recommended: List<String>): List<ModelInfo> {
             fun rank(id: String) = recommended.indexOfFirst { id == it || id.startsWith("$it-") }
             val (top, rest) = models.distinctBy { it.id }.partition { rank(it.id) >= 0 }

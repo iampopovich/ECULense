@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 
-/** Машины в памяти; как в Room — первая машина «Мой автомобиль» создаётся сразу. */
+/** In-memory cars; as in Room, the first car «Мой автомобиль» is created right away. */
 internal class FakeCars(withDefault: Boolean = true) : CarRepository {
     val all = MutableStateFlow(if (withDefault) listOf(CarProfile(id = 1, name = CarProfile.DEFAULT_NAME)) else emptyList())
     var active: Long? = null
@@ -73,7 +73,7 @@ internal class FakeUnits : UnitsRepository {
     }
 }
 
-/** Снимки кодов в памяти; запросы повторяют SQL из DtcDao. */
+/** In-memory code snapshots; queries mirror the SQL in DtcDao. */
 internal class FakeDtcDao(val items: MutableList<DtcSnapshotEntity> = mutableListOf()) : DtcDao {
     override suspend fun insert(items: List<DtcSnapshotEntity>) { this.items += items }
     override suspend fun forCar(carId: Long) = items.filter { it.carId == carId }.sortedBy { it.takenAtMs }

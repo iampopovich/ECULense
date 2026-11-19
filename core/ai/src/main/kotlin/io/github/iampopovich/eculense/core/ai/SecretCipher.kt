@@ -14,7 +14,7 @@ interface SecretCipher {
     fun decrypt(encoded: String): String
 }
 
-/** AES-GCM ключом из Android Keystore. Ключ не покидает устройство и не попадает в бэкап. */
+/** AES-GCM with a key from Android Keystore. The key never leaves the device and is not included in backups. */
 class KeystoreCipher(private val alias: String = "eculense_llm_keys") : SecretCipher {
     private val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 

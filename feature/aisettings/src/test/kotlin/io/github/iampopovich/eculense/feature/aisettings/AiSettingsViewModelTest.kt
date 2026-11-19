@@ -33,7 +33,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 
-/** Отвечает заданным результатом; [gate] позволяет «подвесить» проверку и увидеть состояние Checking. */
+/** Answers with the given result; [gate] lets the check "hang" so the Checking state can be observed. */
 private class FakeChecker(var result: ConnectionCheck) : ConnectionChecker {
     val calls = mutableListOf<Triple<LlmProviderKind, String?, String?>>()
     var gate: CompletableDeferred<Unit>? = null
@@ -61,7 +61,7 @@ class AiSettingsViewModelTest {
     }
     private lateinit var store: LlmSettingsStore
 
-    // Реальный DataStore работает на IO, поэтому Main = Unconfined и ожидание по состоянию.
+    // The real DataStore runs on IO, hence Main = Unconfined and waiting on state.
     @Before fun setUp() {
         Dispatchers.setMain(Dispatchers.Unconfined)
         store = LlmSettingsStore(PreferenceDataStoreFactory.create(scope = io) { File(tmp.root, "s.preferences_pb") }, reversing)
@@ -121,7 +121,7 @@ class AiSettingsViewModelTest {
         vm.reset()
         waitUntil { vm.state.value.loaded }
         assertTrue(vm.state.value.onDeviceInOtherBuild)
-        // локальная сборка и сборка без флага подсказку не показывают
+        // local build and build without the flag do not show the hint
         assertFalse(loadedVm(FakeChecker(ConnectionCheck.Ok(catalog))).state.value.onDeviceInOtherBuild)
     }
 
@@ -174,7 +174,7 @@ class AiSettingsViewModelTest {
 
         val s = vm.state.value
         assertEquals("Подключение работает: 3 модели", (s.check as CheckState.Passed).message)
-        // Пресет: адрес не передаётся — его задаёт клиент Koog.
+        // Preset: the address is not passed — the Koog client defines it.
         assertEquals(listOf(Triple(LlmProviderKind.OPENROUTER, null, "sk-or-test")), checker.calls)
         assertTrue(s.modelStepEnabled)
         assertEquals(catalog, s.visibleModels)
@@ -280,11 +280,11 @@ class AiSettingsViewModelTest {
         assertFalse(vm.state.value.modelStepEnabled)
         vm.checkAndWait()
         assertEquals("sk-or-saved", checker.calls.single().third)
-        // Сохранённая модель остаётся выбранной, если сервер её отдаёт.
+        // The saved model stays selected if the server returns it.
         assertEquals("openai/gpt-4.1-mini", vm.state.value.model)
         assertTrue(vm.state.value.canSave)
 
-        // Другой провайдер — чужой ключ не подставляем.
+        // Different provider — don't fill in another provider's key.
         vm.selectProvider(LlmProviderKind.OPENAI)
         assertFalse(vm.state.value.canReuseSavedKey)
         assertFalse(vm.state.value.showUrlField)

@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.yield
 
-/** Бесконечный опрос по кругу. Сбой одного PID (ObdException) не останавливает остальные. IOException пробрасывается. */
+/** Endless round-robin polling. A failure of one PID (ObdException) does not stop the others. IOException is rethrown. */
 internal class LivePoller(private val session: ObdSession, private val pauseBetweenCyclesMs: Long = 0) {
     fun poll(pids: List<Pid>): Flow<SensorReading> = flow {
         if (pids.isEmpty()) return@flow

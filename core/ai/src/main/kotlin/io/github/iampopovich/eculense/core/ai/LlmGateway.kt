@@ -6,50 +6,50 @@ data class ChatMessage(val role: Role, val text: String) {
     enum class Role { USER, ASSISTANT }
 }
 
-/** Событие ответа агента: кусок текста или «ИИ смотрит данные…» перед вызовом инструмента. */
+/** Agent response event: a chunk of text or «ИИ смотрит данные…» before a tool call. */
 sealed interface ChatEvent {
     data class Text(val delta: String) : ChatEvent
     data class ToolCall(val toolName: String, val label: String) : ChatEvent
 
-    /** Подпись ожидания без инструмента: модель на телефоне отвечает целиком, без потока («Модель думает…»). */
+    /** Waiting label without a tool: the on-phone model answers all at once, without streaming («Модель думает…»). */
     data class Status(val label: String) : ChatEvent
 
     /**
-     * Кто работал над ответом: названия ролей (ведущая первой) и заметки экспертов (пусто, если роль одна и отвечала сама
-     * или модель на телефоне была «сразу в ролях»). В историю диалога заметки не пишутся — только финальный ответ.
+     * Who worked on the answer: role names (lead first) and expert notes (empty if there is a single role that answered itself
+     * or the on-phone model was "all roles at once"). Notes are not written to the dialog history — only the final answer.
      */
     data class Experts(val roles: List<String>, val notes: List<ExpertNote>) : ChatEvent
 }
 
 /**
- * Кому уходят данные — для диалога согласия (без API-ключа).
- * key — для согласия (провайдер); title и model — показать пользователю, куда уйдут данные.
- * [onDevice] — модель на телефоне: данные никуда не уходят, согласие не нужно.
+ * Where the data goes — for the consent dialog (without the API key).
+ * key — for consent (provider); title and model — shown to the user to say where the data goes.
+ * [onDevice] — on-phone model: data goes nowhere, no consent needed.
  */
 data class ProviderInfo(val key: String, val title: String, val model: String, val onDevice: Boolean = false)
 
 interface LlmGateway {
-    /** Ответ модели кусками по мере генерации. Ошибки — [LlmException] с понятным текстом. */
+    /** Model response in chunks as it is generated. Errors are [LlmException] with a readable message. */
     fun stream(system: String, history: List<ChatMessage>): Flow<String>
 
-    /** Подключены ли инструменты данных машины (модуль :core:aitools). */
+    /** Whether car data tools are wired in (module :core:aitools). */
     val hasVehicleTools: Boolean get() = false
 
     /**
-     * Ход диалога через агента Koog: история — по [conversationId] (ChatMemory), ответ стримится,
-     * перед вызовом инструмента приходит [ChatEvent.ToolCall]. useCarData = false — без инструментов.
+     * Dialog turn via the Koog agent: history is keyed by [conversationId] (ChatMemory), the answer is streamed,
+     * [ChatEvent.ToolCall] arrives before a tool call. useCarData = false — no tools.
      */
     fun chat(conversationId: String, userText: String, useCarData: Boolean): Flow<ChatEvent>
 
-    /** Сохранённый диалог (тексты вопросов и ответов) — переживает перезапуск приложения. */
+    /** Saved dialog (question and answer texts) — survives an app restart. */
     suspend fun history(conversationId: String): List<ChatMessage> = emptyList()
 
-    /** «Новый диалог»: старый удаляется (списка диалогов в приложении нет). */
+    /** «Новый диалог»: the old one is deleted (the app has no dialog list). */
     suspend fun deleteConversation(conversationId: String) = Unit
 
-    /** Текущий провайдер; null — ИИ не настроен. */
+    /** Current provider; null — AI is not configured. */
     suspend fun provider(): ProviderInfo? = null
 }
 
-/** Ошибка ИИ с текстом для пользователя (без ключей и сырых ответов сервера). */
+/** AI error with a user-facing message (no keys or raw server responses). */
 class LlmException(message: String, val statusCode: Int? = null, cause: Throwable? = null) : Exception(message, cause)

@@ -16,10 +16,10 @@ import java.io.File
 import kotlin.io.path.createTempDirectory
 
 /**
- * Только по переменным окружения, в обычной сборке пропускаются:
- * - ECU_SYNTHETIC_CBZ_DIR=/папка — пишет два синтетических бэкапа для проверки на устройстве (машина «Тестовая»,
- *   нейтральные даты/цены): ecu-test-1.cbz и ecu-test-2.cbz (= первый + 3 записи, 2 поездки, новый код, дописанная поездка).
- * - CARSCANNER_BACKUP=/путь.cbz — инкрементальный импорт настоящего бэкапа дважды, печатает только время и счётчики.
+ * Env-var driven only, skipped in a normal build:
+ * - ECU_SYNTHETIC_CBZ_DIR=/dir — writes two synthetic backups for on-device testing (vehicle «Тестовая»,
+ *   neutral dates/prices): ecu-test-1.cbz and ecu-test-2.cbz (= first + 3 recordings, 2 trips, a new code, an extended trip).
+ * - CARSCANNER_BACKUP=/path.cbz — incremental import of a real backup twice, prints only timings and counters.
  */
 class ImportBenchmarksTest {
     private val start = 1_767_000_000_000L
@@ -68,7 +68,7 @@ class ImportBenchmarksTest {
         }
     }
 
-    /** Хранит только счётчики показаний — настоящий бэкап (1,3 млн значений) не держим в памяти. */
+    /** Keeps only reading counters — the real backup (1.3M values) is not held in memory. */
     private class CountingSessions : SessionRepository {
         val external = mutableSetOf<String>()
         var readings = 0L

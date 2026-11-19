@@ -46,8 +46,8 @@ internal fun AnalysisRoute(viewModel: AnalysisViewModel = koinViewModel()) {
 }
 
 /**
- * Список находок по активной машине: сначала то, что требует внимания (с подписью уровня, не только цветом),
- * затем «нет данных» и «в норме». Пересчёт идёт в фоне с прогрессом — экран не блокируется.
+ * List of findings for the active car: first what needs attention (with a severity label, not just color),
+ * then "no data" and "normal". Recalculation runs in the background with progress; the screen isn't blocked.
  */
 @Composable
 internal fun AnalysisScreen(
@@ -160,7 +160,7 @@ internal fun FindingRoute(findingId: Long, viewModel: FindingViewModel = koinVie
     )
 }
 
-/** Детали находки: текст, доказательства (числа и записи), «Спросить ИИ» — если модуль чата есть. */
+/** Finding details: text, evidence (numbers and recordings), «Спросить ИИ» if the chat module is present. */
 @Composable
 internal fun FindingScreen(
     state: FindingUiState,

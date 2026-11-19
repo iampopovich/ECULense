@@ -5,10 +5,10 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 
-/** Самый свежий .cbz в папке бэкапов Car Scanner (по дате изменения). */
+/** The most recent .cbz in the Car Scanner backup folder (by modification date). */
 data class CbzCandidate(val uri: String, val name: String, val lastModifiedMs: Long)
 
-/** Папка SAF с постоянным доступом — интерфейс, чтобы ViewModel тестировалась без ContentResolver. */
+/** SAF folder with persistent access — an interface so the ViewModel can be tested without ContentResolver. */
 interface BackupFolder {
     fun displayName(treeUri: String): String?
     fun newest(treeUri: String): CbzCandidate?
@@ -43,7 +43,7 @@ internal class SafBackupFolder(private val context: Context) : BackupFolder {
     }.getOrNull()
 }
 
-/** Имя выбранного файла: по расширению импортёр отличает одиночную запись .brc от бэкапа .cbz. */
+/** Name of the selected file: by extension the importer tells a single .brc recording from a .cbz backup. */
 internal fun displayName(context: Context, uri: Uri): String =
     runCatching {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->

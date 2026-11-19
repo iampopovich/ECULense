@@ -3,19 +3,19 @@ package io.github.iampopovich.eculense.core.backup
 import java.io.ByteArrayOutputStream
 
 /**
- * Файл DataStore Preferences (`*.preferences_pb`) — protobuf `PreferenceMap { map<string, Value> preferences = 1; }`:
- * последовательность полей 1 (length-delimited), в каждом key = 1 (строка) и value = 2. Делим записи на публичные и
- * секретные по имени ключа, не разбирая значения: байты записей копируются как есть, формат не теряется.
+ * DataStore Preferences file (`*.preferences_pb`) — protobuf `PreferenceMap { map<string, Value> preferences = 1; }`:
+ * a sequence of field 1 (length-delimited), each with key = 1 (string) and value = 2. Entries are split into public and
+ * secret by key name without parsing values: entry bytes are copied as is, so the format is preserved.
  */
 object PrefsFile {
-    /** Ключи API, токены, пароли — в резервную копию не попадают никогда. */
+    /** API keys, tokens, passwords — never go into the backup. */
     private val SECRET = Regex("(?i)(api[_-]?key|token|secret|passw|credential|private[_-]?key|cipher|auth)")
 
     fun isSecret(key: String): Boolean = SECRET.containsMatchIn(key)
 
     data class Split(val public: ByteArray, val secret: ByteArray, val publicKeys: List<String>, val secretCount: Int)
 
-    /** Бросает IllegalArgumentException на непонятном файле — вызывающий тогда не берёт файл в копию совсем. */
+    /** Throws IllegalArgumentException on an unrecognized file — the caller then leaves the file out of the backup entirely. */
     fun split(bytes: ByteArray): Split {
         val pub = ByteArrayOutputStream()
         val sec = ByteArrayOutputStream()
@@ -37,7 +37,7 @@ object PrefsFile {
         return Split(pub.toByteArray(), sec.toByteArray(), keys, secrets)
     }
 
-    /** Ключи всех записей (для проверок и манифеста). */
+    /** Keys of all entries (for checks and the manifest). */
     fun keys(bytes: ByteArray): List<String> = split(bytes).let { s -> s.publicKeys + List(s.secretCount) { "<secret>" } }
 
     private fun entryKey(b: ByteArray, from: Int, to: Int): String {

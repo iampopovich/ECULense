@@ -11,8 +11,8 @@ import org.koin.core.context.startKoin
 class EcuLenseApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Вспомогательные процессы (тест локальной модели `:bench` — нативный код может упасть или съесть память)
-        // не поднимают граф приложения: там нет WorkManager, базы и Koin не нужен.
+        // Helper processes (the `:bench` local model test — native code may crash or eat memory)
+        // do not bring up the app graph: no WorkManager or database there, Koin is not needed.
         if (!isMainProcess()) return
         startKoin {
             androidLogger()

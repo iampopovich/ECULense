@@ -2,7 +2,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Для Wi-Fi адаптеров: одно из условий запуска FGS типа connectedDevice на Android 14+ -->
+    <!-- For Wi-Fi adapters: one of the conditions for starting a connectedDevice FGS on Android 14+ -->
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <application>
         <service

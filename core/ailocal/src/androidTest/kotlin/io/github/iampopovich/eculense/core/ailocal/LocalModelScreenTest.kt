@@ -114,8 +114,8 @@ class LocalModelScreenTest {
     }
 
     /**
-     * Прогресс загрузки меняется между жестами (как на телефоне) — прокрутка пальцем всё равно доходит до конца.
-     * Прогресс двигает сам тест: бесконечный цикл в LaunchedEffect не даёт тестовым часам «простаивать».
+     * Download progress changes between gestures (as on a phone) — finger scrolling still reaches the end.
+     * The test drives the progress itself: an infinite loop in LaunchedEffect would keep the test clock from going idle.
      */
     @Test
     fun swipeGesturesReachTheEndWhileADownloadIsProgressing() {

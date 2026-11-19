@@ -13,7 +13,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Синтетические сессии: каждый тест строит ряд значений и проверяет одну величину дайджеста. */
+/** Synthetic sessions: each test builds a series of values and checks one digest metric. */
 class SessionDigesterTest {
     private fun r(id: String, v: Double, tSec: Long) = SensorReading(id, v, "", tSec * 1000)
     private fun digest(readings: List<SensorReading>) = SessionDigester.digest(1, 0, readings.sortedBy { it.timestampMs })
@@ -36,9 +36,9 @@ class SessionDigesterTest {
     @Test
     fun `voltage counts only while the engine runs`() {
         val readings = buildList {
-            // стартер: обороты 0, напряжение 9 В — не считается
+            // starter: 0 rpm, 9 V — not counted
             add(r(RPM, 0.0, 0)); add(r(ELM_VOLTAGE, 9.0, 1))
-            // работа: 800 об/мин, 13.0 В 70 секунд подряд
+            // running: 800 rpm, 13.0 V for 70 seconds straight
             for (t in 10L..80L step 5) { add(r(RPM, 800.0, t)); add(r(ELM_VOLTAGE, 13.0, t)) }
             add(r(RPM, 800.0, 85)); add(r(ELM_VOLTAGE, 14.1, 85))
         }
@@ -72,8 +72,8 @@ class SessionDigesterTest {
     fun `idle maf needs warm engine, zero speed and idle rpm`() {
         val readings = listOf(
             r(COOLANT, 90.0, 0), r(SPEED, 0.0, 0), r(RPM, 750.0, 0), r(MAF, 3.5, 1),
-            r(RPM, 2500.0, 2), r(MAF, 15.0, 3), // перегазовка на месте — не холостой ход
-            r(SPEED, 40.0, 4), r(RPM, 750.0, 4), r(MAF, 5.0, 5), // едем
+            r(RPM, 2500.0, 2), r(MAF, 15.0, 3), // revving while stationary — not idle
+            r(SPEED, 40.0, 4), r(RPM, 750.0, 4), r(MAF, 5.0, 5), // driving
             r(SPEED, 0.0, 6), r(MAF, 4.5, 7),
         )
         val d = digest(readings)
@@ -127,10 +127,10 @@ class SessionDigesterTest {
     @Test
     fun `idle rpm is taken on a warm engine standing still`() {
         val readings = listOf(
-            r(COOLANT, 40.0, 0), r(SPEED, 0.0, 0), r(RPM, 1200.0, 1), // холодный — не считается
+            r(COOLANT, 40.0, 0), r(SPEED, 0.0, 0), r(RPM, 1200.0, 1), // cold — not counted
             r(COOLANT, 88.0, 10), r(SPEED, 0.0, 10), r(RPM, 760.0, 11), r(RPM, 740.0, 12),
-            r(SPEED, 50.0, 13), r(RPM, 2000.0, 14), // едем
-            r(SPEED, 0.0, 15), r(RPM, 2500.0, 16), // перегазовка на месте
+            r(SPEED, 50.0, 13), r(RPM, 2000.0, 14), // driving
+            r(SPEED, 0.0, 15), r(RPM, 2500.0, 16), // revving while stationary
         )
         val d = digest(readings)
         assertEquals(2, d.warmIdleRpm.count)

@@ -98,7 +98,7 @@ class CarViewModelTest {
         val vm = CarEditViewModel(0, cars, clock = { now })
         assertTrue(vm.state.value.isNew)
         assertFalse(vm.state.value.canDelete)
-        vm.save() // пустое имя — ничего не сохраняется
+        vm.save() // empty name: nothing is saved
         assertEquals(1, cars.all.value.size)
 
         vm.edit { it.copy(name = "Новая", year = "2015") }

@@ -42,7 +42,7 @@ class MigrationTest {
             db.query("SELECT COUNT(*) FROM dtc_snapshots WHERE carId = 1").use { c -> c.moveToFirst(); assertEquals(1, c.getInt(0)) }
         }
 
-        // Room открывает мигрированную базу без ошибок схемы, DAO видят данные
+        // Room opens the migrated database without schema errors, DAOs see the data
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
             .addMigrations(*EcuDatabase.MIGRATIONS).build()
         try {
@@ -86,7 +86,7 @@ class MigrationTest {
             room.findingDao().replaceForCar(1, listOf(f.copy(ruleId = "r3")))
             assertEquals(listOf("r3"), room.findingDao().forCar(1).map { it.ruleId })
             assertEquals(2, room.sessionDao().readings(1).size)
-            // находки удаляются вместе с машиной
+            // findings are deleted together with the car
             room.carDao().insert(CarEntity(name = "второй"))
             room.carDao().delete(1)
             assertEquals(0, room.findingDao().forCar(1).size)
@@ -140,7 +140,7 @@ class MigrationTest {
             assertEquals(2, count("SELECT COUNT(*) FROM odometer_log WHERE source = 'MANUAL'"))
             assertEquals(120000, count("SELECT km FROM odometer_log WHERE carId = 1"))
             assertEquals(1000, count("SELECT atMs FROM odometer_log WHERE carId = 1"))
-            // без даты в профиле — дата миграции
+            // no date in the profile — migration date
             assertTrue(count("SELECT atMs FROM odometer_log WHERE carId = 2") >= before / 1000 * 1000)
             assertEquals(0, count("SELECT COUNT(*) FROM cars WHERE odometerKm IS NOT NULL OR odometerAtMs IS NOT NULL"))
         }
@@ -151,9 +151,9 @@ class MigrationTest {
             val id = room.maintenanceDao().insert(MaintenanceItemEntity(carId = 1, title = "Масло", intervalKm = 10000, intervalMonths = 12, lastDoneKm = null, lastDoneAtMs = null, note = null))
             room.maintenanceDao().update(room.maintenanceDao().byId(id)!!.copy(lastDoneKm = 119000, lastDoneAtMs = 900))
             assertEquals(119000L, room.maintenanceDao().forCar(1).single().lastDoneKm)
-            // живая запись без своей поездки — кандидат на поездку
+            // a live recording without its own trip — a trip candidate
             assertEquals(listOf(1L), room.tripDao().sessionsWithoutTrip().map { it.id })
-            // ТО и пробег удаляются вместе с машиной
+            // maintenance and mileage are deleted together with the car
             room.carDao().delete(1)
             assertEquals(0, room.maintenanceDao().forCar(1).size)
             assertEquals(0, room.odometerDao().forCar(1).size)

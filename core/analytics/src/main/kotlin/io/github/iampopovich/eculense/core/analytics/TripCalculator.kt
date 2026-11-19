@@ -3,7 +3,7 @@ package io.github.iampopovich.eculense.core.analytics
 import io.github.iampopovich.eculense.core.model.FuelMethod
 import io.github.iampopovich.eculense.core.model.FuelType
 
-/** Итоги поездки, посчитанные по записи. */
+/** Trip totals computed from a recording. */
 data class TripMetrics(
     val startedAtMs: Long,
     val endedAtMs: Long,
@@ -15,22 +15,22 @@ data class TripMetrics(
 )
 
 /**
- * Поездка по собственной записи (3.9 п.1). Однопроходный: значения подаются по времени, в памяти — только
- * предыдущая точка каждого ряда, поэтому подходит и для записи на 100 тыс. значений.
+ * Trip from our own recording (3.9 item 1). Single-pass: values are fed in time order, only the previous point
+ * of each series is kept in memory, so it also works for a recording with 100k values.
  *
- * - путь — интеграл скорости 01.0D методом трапеций; интервалы длиннее [MAX_GAP_MS] (обрыв связи, пауза)
- *   не интегрируются и не считаются ни движением, ни стоянкой;
- * - движение/стоянка — по средней скорости интервала > [MOVING_KMH];
- * - топливо — интеграл 01.5E (л/ч), иначе оценка по MAF (г/с) для бензина: топливо = воздух / 14,7,
- *   плотность 0,745 кг/л; для дизеля/газа/электро — [FuelMethod.NOT_AVAILABLE] (у дизеля смесь бедная и
- *   переменная, MAF ничего не говорит о подаче).
+ * - distance — trapezoidal integral of speed 01.0D; intervals longer than [MAX_GAP_MS] (link loss, pause)
+ *   are not integrated and count as neither moving nor stopped;
+ * - moving/stopped — by the interval's average speed > [MOVING_KMH];
+ * - fuel — integral of 01.5E (L/h), otherwise a MAF-based estimate (g/s) for gasoline: fuel = air / 14.7,
+ *   density 0.745 kg/L; for diesel/gas/electric — [FuelMethod.NOT_AVAILABLE] (diesel runs a lean, variable
+ *   mixture, so MAF says nothing about fuel delivery).
  */
 object TripCalculator {
     const val MAX_GAP_MS = 10_000L
     const val MOVING_KMH = 2.0
-    /** Стехиометрическое соотношение воздух/топливо для бензина. */
+    /** Stoichiometric air/fuel ratio for gasoline. */
     const val PETROL_AFR = 14.7
-    /** Плотность бензина, г/л (≈ 0,72–0,775 по ГОСТ 32513; середина диапазона). */
+    /** Gasoline density, g/L (≈ 0.72–0.775 per GOST 32513; middle of the range). */
     const val PETROL_DENSITY_G_PER_L = 745.0
 
     fun compute(points: Iterable<Triple<String, Double, Long>>, fuelType: FuelType?): TripMetrics? {
@@ -39,7 +39,7 @@ object TripCalculator {
         return acc.build()
     }
 
-    /** Топливо можно оценить по MAF, если машина бензиновая или тип топлива не указан (чаще всего бензин). */
+    /** Fuel can be estimated from MAF if the car is gasoline or the fuel type is unspecified (most often gasoline). */
     fun mafEstimateAllowed(fuelType: FuelType?): Boolean = fuelType == null || fuelType == FuelType.PETROL || fuelType == FuelType.HYBRID
 
     class Accumulator(private val fuelType: FuelType?) {
@@ -61,7 +61,7 @@ object TripCalculator {
 
         fun build(): TripMetrics? {
             if (speed.samples < 2) return null
-            // скорость км/ч × мс → км: / 3 600 000
+            // speed km/h × ms → km: / 3 600 000
             val distanceKm = speed.area / 3_600_000.0
             val (fuelL, method) = when {
                 fuelRate.samples >= 2 -> fuelRate.area / 3_600_000.0 to FuelMethod.OBD_FUEL_RATE
@@ -73,7 +73,7 @@ object TripCalculator {
         }
     }
 
-    /** Трапеции по одному ряду; area — в «единицах × мс». */
+    /** Trapezoids over one series; area is in "units × ms". */
     private class Integral {
         var samples = 0
         var area = 0.0

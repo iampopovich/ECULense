@@ -5,13 +5,13 @@ import io.github.iampopovich.eculense.core.analytics.MaintenanceDue
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** Ключи уже показанных уведомлений (переживают перезапуск). */
+/** Keys of already shown notifications (survive a restart). */
 interface AlertLedger {
     suspend fun load(): Set<String>
     suspend fun save(keys: Set<String>)
 }
 
-/** Поездки по записям без поездки (обёртка над RecordingTrips — для подмены в тестах воркеров). */
+/** Trips for recordings without a trip (wrapper over RecordingTrips — to substitute in worker tests). */
 fun interface TripBackfill {
     suspend fun run(): Int
 }
@@ -22,8 +22,8 @@ interface Notifier {
 }
 
 /**
- * Фоновый анализ после поездки/импорта: поездки по новым записям → пересчёт находок каждой машины → уведомление
- * о новых WARNING/CRITICAL. Без сети и без ИИ. Зависимости — функциями, чтобы тестироваться на JVM.
+ * Background analysis after a trip/import: trips for new recordings → recompute findings for each car → notify
+ * about new WARNING/CRITICAL. No network and no AI. Dependencies are passed as functions so it is testable on the JVM.
  */
 class PostTripAnalysis(
     private val backfill: suspend () -> Int,
@@ -56,14 +56,14 @@ class PostTripAnalysis(
     }
 }
 
-/** Ежедневная проверка ТО: «пора ТО» по каждой машине один раз на состояние работы. */
+/** Daily maintenance check: "maintenance due" for each car, once per service item state. */
 class MaintenanceCheck(
     private val cars: suspend () -> List<Pair<Long, String>>,
     private val due: suspend (carId: Long) -> List<MaintenanceDue>,
     private val ledger: AlertLedger,
     private val notifier: Notifier,
 ) {
-    /** Сколько работ попало в уведомления. */
+    /** How many service items made it into notifications. */
     suspend fun run(): Int {
         var notified = ledger.load()
         var count = 0

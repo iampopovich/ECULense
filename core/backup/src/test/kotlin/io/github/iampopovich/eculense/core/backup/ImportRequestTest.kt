@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Импорт стартует expedited из нажатия (пока приложение видно → foreground-служба разрешена, Android 16). */
+/** Import starts expedited from the tap (while the app is visible → foreground service allowed, Android 16). */
 class ImportRequestTest {
     @Test
     fun `import is expedited with a regular-work fallback`() {

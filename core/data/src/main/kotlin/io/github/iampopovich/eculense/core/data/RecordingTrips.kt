@@ -11,10 +11,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Поездки по собственным записям (3.9 п.1): для каждой законченной записи без поездки — Trip(source = LIVE,
- * externalId = "session:<id>"). Импортированные записи, перекрытые поездкой Car Scanner, отбирает SQL
- * ([io.github.iampopovich.eculense.core.database.TripDao.sessionsWithoutTrip]). Повторный запуск безопасен:
- * уникальный externalId не даёт дублей. Запись без движения (путь < [MIN_DISTANCE_KM]) поездкой не считается.
+ * Trips from our own recordings (3.9 item 1): for each finished recording without a trip, Trip(source = LIVE,
+ * externalId = "session:<id>"). Imported recordings covered by a Car Scanner trip are filtered out in SQL
+ * ([io.github.iampopovich.eculense.core.database.TripDao.sessionsWithoutTrip]). Re-running is safe:
+ * the unique externalId prevents duplicates. A recording without movement (distance < [MIN_DISTANCE_KM]) is not a trip.
  */
 class RecordingTrips internal constructor(
     private val candidates: suspend () -> List<TripCandidateRow>,
@@ -25,7 +25,7 @@ class RecordingTrips internal constructor(
 ) {
     private val mutex = Mutex()
 
-    /** Сколько поездок добавлено. */
+    /** Number of trips added. */
     suspend fun backfill(): Int = mutex.withLock {
         val started = System.nanoTime()
         val list = candidates()
@@ -48,7 +48,7 @@ class RecordingTrips internal constructor(
 
     companion object {
         const val TAG = "EcuTrips"
-        /** 10 м: меньше — стоянка/прогрев, не поездка. */
+        /** 10 m: anything less is parking/warm-up, not a trip. */
         const val MIN_DISTANCE_KM = 0.01
         val SENSORS = listOf(SensorIds.SPEED, SensorIds.MAF, SensorIds.FUEL_RATE)
         fun externalId(sessionId: Long) = "session:$sessionId"

@@ -28,7 +28,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 
-/** Воркер импорта через work-testing (импортёр — фейк) и копия ECULense на настоящей Room-базе устройства. */
+/** Import worker via work-testing (fake importer) and ECULense backup on the device's real Room database. */
 @RunWith(AndroidJUnit4::class)
 class BackupDeviceTest {
     private val context: Context = ApplicationProvider.getApplicationContext()

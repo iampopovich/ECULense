@@ -79,8 +79,8 @@ private sealed interface Dialog {
 }
 
 /**
- * Пробег и список работ ТО. Пробег по OBD-II не читается — ввод вручную, дальше оценка по поездкам («≈»).
- * Статус подписан словом, а не только цветом; действие «Сделано» отменяется из снекбара (защита от случайного нажатия).
+ * Mileage and the list of maintenance tasks. Mileage cannot be read over OBD-II — entered manually, then estimated from trips («≈»).
+ * Status is labeled with a word, not just a color; the «Сделано» action can be undone from the snackbar (guards against accidental taps).
  */
 @Composable
 internal fun MaintenanceScreen(state: MaintenanceUiState, zone: ZoneId, actions: MaintenanceActions, modifier: Modifier = Modifier) {
@@ -268,7 +268,7 @@ private fun EditDialog(item: MaintenanceItem?, onSave: (MaintenanceItem) -> Unit
                 OutlinedTextField(note, { note = it }, label = { Text("Заметка") }, maxLines = 3)
                 Secondary("Пустой интервал — не считать по нему. Срабатывает то, что наступит раньше.")
                 if (item != null && (item.lastDoneKm != null || item.lastDoneAtMs != null)) {
-                    // Отметка «сделано» по ошибке, а снекбар уже ушёл, — вернуть «ещё не отмечали».
+                    // Marked «сделано» by mistake and the snackbar is already gone — revert to «ещё не отмечали».
                     TextButton(onClick = { onSave(item.copy(lastDoneKm = null, lastDoneAtMs = null)) }) { Text("Сбросить отметку «сделано»") }
                 }
                 if (item != null) TextButton(onClick = { onDelete(item) }) { Text("Удалить работу", color = MaterialTheme.colorScheme.error) }

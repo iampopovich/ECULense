@@ -14,7 +14,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class AiChatDestination(val prefill: String? = null) : NavKey
 @Serializable data object CarDestination : NavKey
 @Serializable data object StatsDestination : NavKey
-/** carId = 0 — новая машина. */
+/** carId = 0 — new car. */
 @Serializable data class CarEditDestination(val carId: Long = 0) : NavKey
 @Serializable data object AnalysisDestination : NavKey
 @Serializable data class FindingDestination(val findingId: Long) : NavKey
@@ -22,14 +22,14 @@ import kotlinx.serialization.Serializable
 @Serializable data object AboutDestination : NavKey
 @Serializable data object SignalsetDestination : NavKey
 @Serializable data object MaintenanceDestination : NavKey
-/** 3.10: модель на телефоне (модуль :core:ailocal; мастер ИИ показывает пункт, только если есть RouteHandler). */
+/** 3.10: on-device model (module :core:ailocal; the AI wizard shows the item only if there is a RouteHandler). */
 @Serializable data object LocalModelDestination : NavKey
-/** 1.27: «Импорт и резервные копии» (:feature:backup); «Записи»/«Статистика» ссылаются сюда, если есть RouteHandler. */
+/** 1.27: «Импорт и резервные копии» (:feature:backup); «Записи»/«Статистика» link here if there is a RouteHandler. */
 @Serializable data object BackupDestination : NavKey
 
 /**
- * Ссылки из уведомлений: MainActivity получает экстру [EXTRA_SCREEN] и открывает экран поверх «Пит-стопа»
- * (если фича с этим экраном подключена). Строки — чтобы модулю уведомлений не нужны были ключи фич.
+ * Links from notifications: MainActivity receives the [EXTRA_SCREEN] extra and opens the screen on top of «Пит-стоп»
+ * (if the feature with that screen is included). Strings, so the notification module doesn't need feature keys.
  */
 object DeepLinks {
     const val EXTRA_SCREEN = "io.github.iampopovich.eculense.SCREEN"

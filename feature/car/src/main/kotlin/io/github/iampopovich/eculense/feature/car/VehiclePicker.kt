@@ -6,7 +6,7 @@ import io.github.iampopovich.eculense.core.vehicledb.VehicleMake
 import io.github.iampopovich.eculense.core.vehicledb.VehicleModel
 import io.github.iampopovich.eculense.core.vehicledb.VehicleRepository
 
-/** Справочник моделей для редактора; null из методов — справочник не скачан. Интерфейс — ради тестов без SQLite. */
+/** Model reference database for the editor; null from methods means it isn't downloaded. An interface for tests without SQLite. */
 internal interface VehicleCatalog {
     fun isAvailable(): Boolean
     suspend fun makes(query: String): List<VehicleMake>?
@@ -33,7 +33,7 @@ internal enum class PickerStep(val title: String) {
 
 internal data class PickerOption(val id: Long, val title: String, val subtitle: String? = null)
 
-/** Пошаговый выбор «марка → модель → поколение → модификация» с поиском; на последнем шаге — карточка ТТХ. */
+/** Step-by-step «марка → модель → поколение → модификация» picker with search; the last step shows a specs card. */
 internal data class PickerState(
     val step: PickerStep = PickerStep.MAKE,
     val query: String = "",
@@ -50,8 +50,8 @@ internal data class PickerState(
 }
 
 /**
- * Заполнение формы из справочника: ТТХ мотора перезаписываются (пользователь сам нажал «Заполнить»), а название, марка
- * и год, если уже есть, остаются — это профиль пользователя. Все поля потом можно править.
+ * Filling the form from the reference database: engine specs are overwritten (the user tapped «Заполнить» themselves), while name, make
+ * and year, if already present, are kept since this is the user's profile. All fields can be edited afterwards.
  */
 internal fun CarForm.fillFrom(make: VehicleMake, model: VehicleModel, generation: VehicleGeneration, engine: VehicleEngine): CarForm = copy(
     brand = brand.ifBlank { make.name },

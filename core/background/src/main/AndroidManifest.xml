@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- уведомления «Анализ» и «Обслуживание» (3.9 п.3); запрос разрешения — на экране подключения -->
+    <!-- «Анализ» and «Обслуживание» notifications (3.9 item 3); permission is requested on the connection screen -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

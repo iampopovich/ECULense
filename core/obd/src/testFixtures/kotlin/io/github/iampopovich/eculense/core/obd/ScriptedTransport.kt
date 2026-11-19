@@ -3,9 +3,9 @@ package io.github.iampopovich.eculense.core.obd
 import kotlinx.coroutines.channels.Channel
 
 /**
- * Отвечает на команды по словарю. Неизвестная команда → "?" (как настоящий ELM327).
- * chunkSize режет ответ на куски — так в тестах видно, что ElmLink склеивает ответ из нескольких read().
- * silent = true — адаптер молчит (проверка таймаута).
+ * Answers commands from a dictionary. Unknown command → "?" (like a real ELM327).
+ * chunkSize splits the response into pieces — so tests show that ElmLink assembles a response from several read() calls.
+ * silent = true — the adapter stays silent (timeout check).
  */
 class ScriptedTransport(
     private val replies: Map<String, String>,

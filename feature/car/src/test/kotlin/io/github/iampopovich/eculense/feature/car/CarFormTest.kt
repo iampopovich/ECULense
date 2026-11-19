@@ -27,7 +27,7 @@ class CarFormTest {
     @Test
     fun `vin and currency formats`() {
         assertEquals(setOf(CarField.VIN), CarForm(name = "x", vin = "TOO-SHORT").errors(year).keys)
-        // I, O, Q запрещены в VIN
+        // I, O, Q are not allowed in a VIN
         assertEquals(setOf(CarField.VIN), CarForm(name = "x", vin = "OOOOOOOOOOOOOOOOO").errors(year).keys)
         assertTrue(CarForm(name = "x", vin = "abcdefgh123456789", currency = "rub").errors(year).isEmpty())
         assertEquals(setOf(CarField.CURRENCY), CarForm(name = "x", currency = "рубли").errors(year).keys)

@@ -16,8 +16,8 @@ import org.koin.dsl.module
 import java.io.File
 
 /**
- * Расшифровки для экранов и ИИ: собирает [DtcCatalog] из того, что скачано сейчас (OBDex, заводские коды),
- * и встроенного CSV. После установки/удаления пакета каталог пересобирается при следующем запросе.
+ * Descriptions for screens and AI: builds a [DtcCatalog] from what is currently downloaded (OBDex, manufacturer codes)
+ * and the bundled CSV. After a pack is installed/removed, the catalog is rebuilt on the next request.
  */
 class DtcDescriptions(
     private val context: Context,

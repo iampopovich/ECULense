@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 import org.koin.dsl.module
 import java.io.File
 
-/** Справочник доступен, только если пакет скачан; база открывается лениво и переоткрывается после обновления версии. */
+/** The reference is available only if the pack is downloaded; the database is opened lazily and reopened after a version update. */
 class VehicleRepository(private val packs: DataPacks, private val opener: PackDbOpener) {
     private val mutex = Mutex()
     private var open: Pair<File, VehicleDb>? = null
@@ -22,7 +22,7 @@ class VehicleRepository(private val packs: DataPacks, private val opener: PackDb
 
     fun isAvailable(): Boolean = packs.file(PackCatalog.VEHICLES, FILE) != null
 
-    /** null — справочник не скачан (или схема релиза изменилась: тогда в лог, а пользователь вводит вручную). */
+    /** null — the reference is not downloaded (or the release schema changed: then it goes to the log, and the user enters data manually). */
     suspend fun <T> query(block: (VehicleDb) -> T): T? = withContext(Dispatchers.IO) {
         mutex.withLock {
             val file = packs.file(PackCatalog.VEHICLES, FILE)

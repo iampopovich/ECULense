@@ -30,7 +30,7 @@ import io.github.iampopovich.eculense.feature.settings.settingsModule
 import io.github.iampopovich.eculense.feature.stats.statsModule
 import org.koin.core.module.Module
 
-/** Добавить/убрать фичу = добавить/убрать строку здесь и в settings.gradle.kts. */
+/** Add/remove a feature = add/remove a line here and in settings.gradle.kts. */
 val appModules: List<Module> = listOf(
     obdModule(includeEmulator = BuildConfig.DEBUG),
     bluetoothModule,
@@ -38,9 +38,9 @@ val appModules: List<Module> = listOf(
     serviceModule,
     databaseModule,
     dataModule,
-    // Фоновый анализ после поездки и напоминания о ТО (WorkManager + уведомления); без него находки считает слой данных.
+    // Background post-trip analysis and maintenance reminders (WorkManager + notifications); without it the data layer computes findings.
     backgroundModule,
-    // Пакеты данных по запросу (справочники, базы кодов) — до модулей-читателей.
+    // On-demand data packs (reference catalogs, code databases) — before the modules that read them.
     dataPacksModule,
     vehicleDbModule,
     dtcDbModule,
@@ -55,16 +55,16 @@ val appModules: List<Module> = listOf(
     analysisModule,
     maintenanceModule,
     dataPacksFeatureModule,
-    // Импорт бэкапов Car Scanner (WorkManager) и резервная копия ECULense; без них «Поездки»/«Статистика» без ссылки на импорт.
+    // Car Scanner backup import (WorkManager) and ECULense backup; without them «Поездки»/«Статистика» have no import link.
     backupModule,
     backupFeatureModule,
-    // Демо-режим (виртуальный ELM327) — последним в списке транспортов, во всех сборках.
+    // Demo mode (virtual ELM327) — last in the transport list, in all builds.
     demoModule,
-    // ИИ (этап 2): убрать эти строки + модули в settings.gradle.kts/app → приложение работает без ИИ.
+    // AI (stage 2): remove these lines + the modules in settings.gradle.kts/app → the app works without AI.
     aiModule,
-    // Инструменты данных машины для ИИ (этап 3): без них чат работает, но без данных.
+    // Car data tools for AI (stage 3): without them chat works, but without data.
     aiToolsModule,
     aiSettingsModule,
     aiChatModule,
-    // Модель на телефоне (3.10): провайдер «На устройстве», скачивание моделей, тест скорости — см. OnDeviceModules.kt.
+    // On-phone model (3.10): «На устройстве» provider, model downloads, speed test — see OnDeviceModules.kt.
 ) + onDeviceModules

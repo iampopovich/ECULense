@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
-        <!-- GPU-бэкенд LiteRT-LM (OpenCL) на API 31+: вендорская библиотека должна быть объявлена, иначе не загрузится. -->
+        <!-- LiteRT-LM GPU backend (OpenCL) on API 31+: the vendor library must be declared, otherwise it will not load. -->
         <uses-native-library android:name="libOpenCL.so" android:required="false" />
         <uses-native-library android:name="libOpenCL-pixel.so" android:required="false" />
         <uses-native-library android:name="libvndksupport.so" android:required="false" />
-        <!-- Тест скорости модели — в отдельном процессе: нативный сбой или нехватка памяти не роняют приложение. -->
+        <!-- Model speed test runs in a separate process: a native crash or out-of-memory does not take down the app. -->
         <service
             android:name=".BenchService"
             android:exported="false"

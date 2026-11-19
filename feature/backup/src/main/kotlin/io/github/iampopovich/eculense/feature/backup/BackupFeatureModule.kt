@@ -11,7 +11,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** «Импорт и резервные копии» — пункт хаба «Настройки»; RouteHandler включает ссылки из «Поездок» и «Статистики». */
+/** «Импорт и резервные копии» — an item in the «Настройки» hub; RouteHandler enables links from «Поездок» and «Статистики». */
 @OptIn(KoinExperimentalAPI::class)
 val backupFeatureModule = module {
     single<BackupFolder> { SafBackupFolder(androidContext()) }

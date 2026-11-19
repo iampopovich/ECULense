@@ -1,12 +1,12 @@
 package io.github.iampopovich.eculense.core.ai
 
-/** Тип вопроса: от него зависят эксперты, данные и форма ответа (а не один шаблон на всё). */
+/** Question type: it determines the experts, the data and the answer shape (rather than one template for everything). */
 enum class ChatIntent { DIAGNOSE, OVERVIEW, TREND, FUEL, MAINTENANCE, MODEL, SENSOR, SMALLTALK }
 
 /**
- * Роль-эксперт: кто смотрит данные и с какой стороны. [tools] — имена инструментов :core:aitools, которые роли
- * доступны (у каждого эксперта свой набор); [digestSections] — разделы сводки для модели на телефоне;
- * [keywords] — фрагменты регулярных выражений для [ChatRouter] (ищутся с начала слова, ру + англ.).
+ * Expert role: who looks at the data and from which angle. [tools] — names of :core:aitools tools available to
+ * the role (each expert has its own set); [digestSections] — digest sections for the on-device model;
+ * [keywords] — regex fragments for [ChatRouter] (matched from the start of a word, RU + EN).
  */
 data class ExpertRole(
     val id: String,
@@ -16,18 +16,18 @@ data class ExpertRole(
     val tools: Set<String>,
     val digestSections: List<String>,
     val keywords: List<String>,
-    /** Что роль делает, для статуса в чате; «%s» — период («за 6 месяцев»). */
+    /** What the role is doing, for the chat status; «%s» is the period («за 6 месяцев»). */
     val status: String,
 ) {
     fun statusText(days: Int): String = status.replace("%s", ExpertRoles.periodText(days))
 }
 
-/** Заметка эксперта для редактора и для блока «Заметки экспертов» под ответом. */
+/** Expert note for the editor and for the «Заметки экспертов» block under the answer. */
 data class ExpertNote(val roleId: String, val title: String, val text: String, val failed: Boolean = false)
 
 /**
- * Реестр ролей — данные, а не код в when: добавить роль = добавить элемент. Промпт роли говорит, кто ты, на что
- * смотришь и чего не касаешься; формат заметки и общие правила — в [SystemPrompts].
+ * Role registry — data, not code in a when: adding a role = adding an element. The role prompt says who you are,
+ * what you look at and what you don't touch; the note format and common rules live in [SystemPrompts].
  */
 object ExpertRoles {
     val DIAGNOSTICIAN = ExpertRole(
@@ -179,7 +179,7 @@ object ExpertRoles {
 
     fun byId(id: String): ExpertRole? = ALL.firstOrNull { it.id == id }
 
-    /** «за 6 месяцев», «за месяц»… — для статусов и промптов. */
+    /** «за 6 месяцев», «за месяц»… — for statuses and prompts. */
     fun periodText(days: Int): String = when {
         days == 7 -> "неделю"
         days == 30 -> "месяц"

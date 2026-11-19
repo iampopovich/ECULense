@@ -24,11 +24,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Блок «Резервная копия ECULense»: что сейчас происходит и что показать. */
+/** «Резервная копия ECULense» block: what is happening now and what to show. */
 internal data class CopyState(
     val busy: Boolean = false,
     val message: String? = null,
-    /** Выбранная для восстановления копия — ждёт подтверждения «заменит текущие данные». */
+    /** Backup selected for restore — awaits confirmation «заменит текущие данные». */
     val pendingRestore: PendingRestore? = null,
 )
 
@@ -63,7 +63,7 @@ internal class BackupViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BackupUiState())
 
     init {
-        // папка выбрана/сменилась или импорт закончился — пересмотреть, какой бэкап в папке самый свежий
+        // folder selected/changed or import finished — re-check which backup in the folder is the newest
         viewModelScope.launch { prefs.folderUri.distinctUntilChanged().collect { refreshFolder(it) } }
         viewModelScope.launch {
             imports.state.map { it is ImportWorkState.Finished }.distinctUntilChanged().collect { if (it) refreshFolder(prefs.folderUri.first()) }
@@ -74,7 +74,7 @@ internal class BackupViewModel(
         folderInfo.value = if (uri == null) null to null else withContext(Dispatchers.IO) { folder.displayName(uri) to folder.newest(uri) }
     }
 
-    /** Вызывается прямо из результата выбора файла (приложение на экране) — expedited-задача успеет стать foreground. */
+    /** Called directly from the file picker result (app in the foreground) — the expedited job has time to become foreground. */
     fun importFile(uri: Uri, fileName: String) {
         if (state.value.importing) return
         imports.start(uri.toString(), fileName, releaseUri = true)

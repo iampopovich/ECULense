@@ -13,15 +13,15 @@ import kotlinx.serialization.json.longOrNull
 import java.net.URLEncoder
 
 /**
- * Публичный API Hugging Face (без токена): статус gated репозитория и поиск «Другие модели» в litert-community —
- * `/api/models?author=…&search=…` (только id), затем `/api/models/<repo>?blobs=true` (файлы с размерами и sha256,
- * коммит `sha` — ссылка закрепляется на него).
+ * Public Hugging Face API (no token): gated status of a repository and the «Другие модели» search in litert-community:
+ * `/api/models?author=…&search=…` (ids only), then `/api/models/<repo>?blobs=true` (files with sizes and sha256,
+ * commit `sha`, which the link is pinned to).
  */
 object HfApi {
     const val AUTHOR = "litert-community"
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** Файлы, собранные под конкретный NPU (MediaTek/Qualcomm/…): с GPU/CPU-бэкендом не запускаются. */
+    /** Files built for a specific NPU (MediaTek/Qualcomm/…): they do not run on the GPU/CPU backend. */
     private val NPU_FILE = Regex("""(?i)[._](mediatek|qualcomm|google_tensor|tensor|samsung|exynos|mt\d{4}|sm\d{4})[._]""")
 
     fun modelUrl(repo: String) = "https://huggingface.co/api/models/$repo"
@@ -29,7 +29,7 @@ object HfApi {
     fun searchUrl(query: String, limit: Int = 20) =
         "https://huggingface.co/api/models?author=$AUTHOR&search=${URLEncoder.encode(query.trim(), "UTF-8")}&limit=$limit"
 
-    /** `gated`: false — открыт; "auto"/"manual" — нужен токен и принятая лицензия; null — поля нет. */
+    /** `gated`: false = open; "auto"/"manual" = token and accepted license required; null = field absent. */
     fun gated(body: String): Boolean? {
         val g = json.parseToJsonElement(body).jsonObject["gated"] as? JsonPrimitive ?: return null
         return g.booleanOrNull ?: (g.contentOrNull?.isNotBlank() == true)
@@ -38,7 +38,7 @@ object HfApi {
     fun searchRepos(body: String): List<String> =
         json.parseToJsonElement(body).jsonArray.mapNotNull { (it as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull }
 
-    /** Файлы `.litertlm` репозитория (без NPU-сборок) → модели «из HF» с закреплённой ревизией, размером и sha256. */
+    /** Repository `.litertlm` files (excluding NPU builds) → "from HF" models with pinned revision, size and sha256. */
     fun repoModels(body: String): List<LocalModel> {
         val o = json.parseToJsonElement(body).jsonObject
         val repo = o["id"]?.jsonPrimitive?.contentOrNull ?: return emptyList()

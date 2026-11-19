@@ -5,8 +5,8 @@ import java.time.YearMonth
 import java.time.ZoneId
 
 /**
- * Итоги поездок за период. Средний расход = всё топливо / весь путь (так же считает Car Scanner);
- * путь поездок без оценки топлива ([Trip.fuelKnown] = false) в знаменатель не входит.
+ * Trip totals for a period. Average consumption = all fuel / all distance (Car Scanner computes it the same way);
+ * distance of trips without a fuel estimate ([Trip.fuelKnown] = false) is excluded from the denominator.
  */
 data class TripStats(
     val trips: Int,
@@ -15,10 +15,10 @@ data class TripStats(
     val drivingMs: Long,
     val standingMs: Long,
     val fuelCost: Double,
-    /** Путь поездок, у которых топливо известно. */
+    /** Distance of trips with known fuel. */
     val fuelDistanceKm: Double = distanceKm,
 ) {
-    /** null, когда пути нет: деление на ноль не должно превращаться в «бесконечный расход». */
+    /** null when there is no distance: division by zero must not turn into «бесконечный расход». */
     val avgLPer100Km: Double? get() = if (fuelDistanceKm > 0.0) fuelL / fuelDistanceKm * 100.0 else null
 
     companion object {
@@ -43,7 +43,7 @@ enum class StatsPeriod(val days: Long?) { ALL(null), YEAR(365), MONTH(30), WEEK(
 object TripStatistics {
     private const val DAY_MS = 86_400_000L
 
-    /** Поездки, начавшиеся в последние period.days суток до now (ALL — все). */
+    /** Trips that started within the last period.days days before now (ALL means all). */
     fun inPeriod(trips: List<Trip>, period: StatsPeriod, nowMs: Long): List<Trip> {
         val from = period.days?.let { nowMs - it * DAY_MS } ?: Long.MIN_VALUE
         return trips.filter { it.startedAtMs in from..nowMs }
@@ -51,7 +51,7 @@ object TripStatistics {
 
     fun forPeriod(trips: List<Trip>, period: StatsPeriod, nowMs: Long): TripStats = TripStats.of(inPeriod(trips, period, nowMs))
 
-    /** Помесячно по местному времени, от новых к старым. */
+    /** Monthly in local time, newest to oldest. */
     fun byMonth(trips: List<Trip>, zone: ZoneId = ZoneId.systemDefault()): List<Pair<YearMonth, TripStats>> =
         trips.groupBy { YearMonth.from(Instant.ofEpochMilli(it.startedAtMs).atZone(zone)) }
             .map { (month, list) -> month to TripStats.of(list) }

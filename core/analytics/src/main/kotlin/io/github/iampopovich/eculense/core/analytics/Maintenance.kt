@@ -12,8 +12,8 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 /**
- * Текущий пробег. Настоящий одометр по OBD-II стандартно не читается (на K-Line машине пользователя — точно),
- * поэтому пробег = последний ручной ввод + путь поездок, начавшихся после него. С добавкой — это оценка («≈»).
+ * Current mileage. The real odometer can't be read via standard OBD-II (certainly not on the user's K-Line car),
+ * so mileage = last manual entry + distance of trips started after it. With the added part it is an estimate («≈»).
  */
 data class OdometerEstimate(val km: Double, val baseKm: Long, val baseAtMs: Long, val addedKm: Double) {
     val estimated: Boolean get() = addedKm > 0.0
@@ -30,8 +30,8 @@ object OdometerEstimator {
 enum class MaintenanceStatus(val rank: Int) { OVERDUE(3), SOON(2), OK(1), UNKNOWN(0) }
 
 /**
- * Состояние одной работы ТО. kmLeft/daysLeft < 0 — на столько просрочено. null — это измерение не считается
- * (интервал не задан, неизвестно, когда делали, или пробег не введён).
+ * State of one maintenance task. kmLeft/daysLeft < 0 means overdue by that much. null means this dimension is not computed
+ * (interval not set, unknown when last done, or mileage not entered).
  */
 data class MaintenanceDue(
     val item: MaintenanceItem,
@@ -43,8 +43,8 @@ data class MaintenanceDue(
 )
 
 /**
- * «Просрочено / скоро / в норме» (3.9 п.2). Скоро — осталось ≤ 10 % интервала по пробегу, или по времени
- * ≤ 2 недель (или ≤ 10 % интервала, если это больше). Срабатывает то, что наступит раньше: пробег или дата.
+ * «Просрочено / скоро / в норме» (3.9 item 2). Soon means ≤ 10 % of the mileage interval left, or by time
+ * ≤ 2 weeks (or ≤ 10 % of the interval if that is larger). Whichever comes first triggers: mileage or date.
  */
 object MaintenanceRule {
     const val SOON_FRACTION = 0.10
@@ -90,19 +90,19 @@ object MaintenanceRule {
         return MaintenanceDue(item, status, dueKm, kmLeft, dueAt, daysLeft)
     }
 
-    /** Все работы: сначала просроченные, потом «скоро», «в норме», «неизвестно»; внутри — в порядке добавления (шаблон: масло первым). */
+    /** All tasks: overdue first, then «скоро», «в норме», «неизвестно»; within each, in insertion order (template: oil first). */
     fun evaluateAll(items: List<MaintenanceItem>, odometerKm: Double?, nowMs: Long, zone: ZoneId = ZoneId.systemDefault()): List<MaintenanceDue> =
         items.map { evaluate(it, odometerKm, nowMs, zone) }.sortedWith(compareByDescending<MaintenanceDue> { it.status.rank }.thenBy { it.item.id })
 
-    /** Что пора делать: просроченное и «скоро». */
+    /** What is due: overdue and «скоро». */
     fun due(items: List<MaintenanceItem>, odometerKm: Double?, nowMs: Long, zone: ZoneId = ZoneId.systemDefault()): List<MaintenanceDue> =
         evaluateAll(items, odometerKm, nowMs, zone).filter { it.status == MaintenanceStatus.OVERDUE || it.status == MaintenanceStatus.SOON }
 }
 
 /**
- * Типовой список работ для бензиновой машины (3.9 п.2). Пользователь правит его на экране «Обслуживание»;
- * интервалы из профиля машины (импорт Car Scanner/ручной ввод) важнее шаблона. Источник ориентиров — типовые
- * регламенты массовых бензиновых моделей; точные значения — в сервисной книжке.
+ * Typical task list for a petrol car (3.9 item 2). The user edits it on the «Обслуживание» screen;
+ * intervals from the car profile (Car Scanner import/manual entry) take precedence over the template. Reference values come
+ * from typical service schedules of mass-market petrol models; exact values are in the service book.
  */
 object MaintenanceTemplate {
     fun forCar(car: CarProfile): List<MaintenanceItem> {

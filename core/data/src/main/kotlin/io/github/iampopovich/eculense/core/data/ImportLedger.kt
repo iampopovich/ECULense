@@ -7,12 +7,12 @@ import io.github.iampopovich.eculense.core.database.ImportedFileEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-/** Запись .brc, импортированная целиком: имя + размер + CRC-32 из zip. */
+/** A fully imported .brc recording: name + size + CRC-32 from the zip. */
 data class ImportedFileMark(val name: String, val size: Long, val crc: Long)
 
 /**
- * Память импорта между бэкапами (1.27): какие .brc уже перенесены целиком (их не распаковываем повторно) и какие
- * значения машины/единиц принёс прошлый импорт (по ним отличаем «пользователь не трогал» от ручной правки).
+ * Import memory across backups (1.27): which .brc files were already fully carried over (not extracted again) and which
+ * car/unit values the previous import brought (used to tell "user didn't touch it" from a manual edit).
  */
 interface ImportLedger {
     suspend fun importedFile(name: String): ImportedFileMark?
@@ -23,7 +23,7 @@ interface ImportLedger {
 
 enum class ImportStatus { DONE, FAILED, CANCELLED }
 
-/** Строка истории импортов на экране «Импорт и резервные копии». */
+/** Import history row on the «Импорт и резервные копии» screen. */
 data class ImportHistoryItem(
     val id: Long = 0,
     val fileName: String,
@@ -92,7 +92,7 @@ internal class RoomImportLedger(private val dao: ImportDao, private val clock: (
     }
 }
 
-/** Без базы (юнит-тесты, одиночная запись): ничего не помнит между экземплярами. */
+/** Without a database (unit tests, single recording): remembers nothing between instances. */
 class InMemoryImportLedger : ImportLedger, ImportHistoryRepository {
     val files = mutableMapOf<String, ImportedFileMark>()
     val snapshots = mutableMapOf<String, String>()

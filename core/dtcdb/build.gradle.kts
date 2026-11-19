@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Расшифровки DTC: общие — OBDex (CC0) из пакета, офлайн — встроенный CSV (lennykean, MIT); заводские — Wal33D (MIT) по марке.
+// DTC descriptions: generic from OBDex (CC0) in the pack, offline from a bundled CSV (lennykean, MIT); manufacturer-specific from Wal33D (MIT) per make.
 dependencies {
     implementation(project(":core:datapacks"))
     implementation(libs.kotlinx.serialization.json)

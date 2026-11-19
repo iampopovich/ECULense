@@ -25,7 +25,7 @@ class RulesTest {
 
     private fun AnalyticsRule.only(input: AnalysisInput): Finding = evaluate(input).single()
 
-    // --- перегрев ---
+    // --- overheating ---
     @Test
     fun `overheat above 110 for 30 s is critical, 105 is warning, 106 peak is ok`() {
         val crit = CoolantOverheatRule.only(input(listOf(digest().copy(coolant = aggOf(112.0), overheatWarnMs = 40_000, overheatCritMs = 40_000))))
@@ -44,7 +44,7 @@ class RulesTest {
         assertEquals(Severity.NO_DATA, CoolantOverheatRule.only(input()).severity)
     }
 
-    // --- напряжение ---
+    // --- voltage ---
     @Test
     fun `low voltage for a minute while running`() {
         val low = digest().copy(voltageSensor = ELM_VOLTAGE, runningVoltage = aggOf(12.9, 13.0), lowVoltageMs = 61_000)
@@ -70,7 +70,7 @@ class RulesTest {
         val low = digest().copy(voltageSensor = ELM_VOLTAGE, runningVoltage = aggOf(10.1, 12.8), runningVoltageHist = hist, lowVoltageMs = 241_000)
         val f = VoltageRule.evaluate(input(listOf(low))).first { it.ruleId == "voltage-low" }
         assertTrue(f.message, f.message.contains("адаптер"))
-        // кратковременный провал (стартер, перезапуск) отделён от устойчивого уровня
+        // a brief dip (starter, restart) is separated from the steady level
         assertTrue(f.evidence.joinToString(), f.evidence.any { it.label.startsWith("1 %") && it.value == "12,8 В" })
     }
 
@@ -80,7 +80,7 @@ class RulesTest {
         assertEquals(Severity.WARNING, VoltageRule.evaluate(input(listOf(high))).first { it.ruleId == "voltage-high" }.severity)
     }
 
-    // --- коррекции ---
+    // --- fuel trims ---
     @Test
     fun `long term trims beyond 10 percent on both banks`() {
         val d = digest().copy(warmTrims = mapOf(LTFT1 to aggOf(12.5, 12.5), LTFT2 to aggOf(12.5, 12.5), STFT2 to aggOf(4.7, 24.2, 15.0)))
@@ -89,7 +89,7 @@ class RulesTest {
         assertEquals(Severity.WARNING, lt.severity)
         assertTrue(lt.message, lt.message.contains("банк 1") && lt.message.contains("банк 2"))
         assertTrue(lt.evidence.any { it.value.contains("+12,5") })
-        // мало замеров: сумма 12,5+14,6 > 25, но CRITICAL не ставим
+        // few samples: sum 12.5+14.6 > 25, but no CRITICAL
         assertEquals(Severity.WARNING, f.first { it.ruleId == "fuel-trim-total" }.severity)
         assertEquals(Severity.OK, f.first { it.ruleId == "fuel-trim-bank-asymmetry" }.severity)
     }
@@ -111,7 +111,7 @@ class RulesTest {
 
     @Test
     fun `latest session decides long term trim, older readings do not dilute it`() {
-        // декабрь: LTFT1 −8,6 %; май: LTFT1/LTFT2 +12,5 % — ЭБУ сейчас добавляет топливо на обоих банках
+        // December: LTFT1 −8.6 %; May: LTFT1/LTFT2 +12.5 % — the ECU now adds fuel on both banks
         val dec = digest(1).copy(warmTrims = mapOf(LTFT1 to aggOf(-8.6)))
         val may = digest(2).copy(warmTrims = mapOf(LTFT1 to aggOf(12.5, 12.5), LTFT2 to aggOf(12.5, 12.5, 12.5)))
         val lt = FuelTrimRule.evaluate(input(listOf(dec, may))).first { it.ruleId == "fuel-trim-long" }
@@ -126,7 +126,7 @@ class RulesTest {
         assertTrue(FuelTrimRule.evaluate(input(listOf(digest()))).all { it.severity == Severity.NO_DATA })
     }
 
-    // --- MAF на ХХ ---
+    // --- MAF at idle ---
     @Test
     fun `maf rule asks for engine volume instead of guessing`() {
         val d = digest().copy(warmIdleMaf = aggOf(3.0, 3.2, 3.1, 3.0, 3.1, 3.2))
@@ -134,7 +134,7 @@ class RulesTest {
         assertEquals(Severity.NO_DATA, noVolume.severity)
         assertTrue(noVolume.message, noVolume.message.contains("объём двигателя") && noVolume.message.contains("Автомобиль"))
         val low = MafIdleRule.only(input(listOf(d), car = CarProfile(name = "c", engineVolumeL = 3.5)))
-        assertEquals(Severity.WARNING, low.severity) // ~0,89 г/с на литр
+        assertEquals(Severity.WARNING, low.severity) // ~0.89 g/s per liter
         val ok = MafIdleRule.only(input(listOf(digest().copy(warmIdleMaf = aggOf(4.0, 4.0, 4.0, 4.0, 4.0))), car = CarProfile(name = "c", engineVolumeL = 3.5)))
         assertEquals(Severity.OK, ok.severity)
         assertEquals(Severity.NO_DATA, MafIdleRule.only(input(listOf(digest()), car = CarProfile(name = "c", engineVolumeL = 3.5))).severity)
@@ -153,7 +153,7 @@ class RulesTest {
         assertEquals(Severity.NO_DATA, MilDistanceRule.only(input(listOf(digest()))).severity)
     }
 
-    // --- прогрев ---
+    // --- warm-up ---
     @Test
     fun `warm-up getting longer is reported as a trend`() {
         val old = (1L..3L).map { digest(it).copy(coldStartC = 10.0, warmupMs = 600_000) }
@@ -163,7 +163,7 @@ class RulesTest {
         assertEquals(Severity.NO_DATA, WarmupTrendRule.only(input(old)).severity)
     }
 
-    // --- коды ошибок ---
+    // --- trouble codes ---
     @Test
     fun `dtc groups, repeats and singles`() {
         val events = listOf(
@@ -176,7 +176,7 @@ class RulesTest {
             DtcEvent("P0174", DtcKind.STORED, ms(2026, 5, 8)),
             DtcEvent("P0113", DtcKind.STORED, ms(2026, 5, 8)),
             DtcEvent("P0102", DtcKind.STORED, ms(2026, 5, 8)),
-            // повторное чтение того же кода через час — то же событие
+            // re-reading the same code an hour later — same event
             DtcEvent("P0102", DtcKind.STORED, ms(2026, 5, 8) + 3_600_000),
             DtcEvent("P0300", DtcKind.STORED, ms(2026, 2, 1)),
             DtcEvent("P0300", DtcKind.STORED, ms(2026, 4, 1)),
@@ -190,7 +190,7 @@ class RulesTest {
         val mix = f.getValue("dtc-mixture")
         assertEquals(Severity.WARNING, mix.severity)
         assertTrue(mix.message.contains("P0171") && mix.message.contains("P0174"))
-        // P0300 дважды, но с разницей 2 месяца — не «повтор за 30 дней»; P1847 — один раз
+        // P0300 twice, but 2 months apart — not a "repeat within 30 days"; P1847 — once
         val single = f.getValue("dtc-other")
         assertEquals(Severity.INFO, single.severity)
         assertTrue(single.message.contains("P1847") && single.message.contains("P0300"))
@@ -229,7 +229,7 @@ class RulesTest {
         assertEquals(Severity.OK, DtcRule.only(input()).severity)
     }
 
-    // --- движок ---
+    // --- engine ---
     @Test
     fun `engine runs all rules and sorts problems first`() {
         val d = digest().copy(coolant = aggOf(112.0), overheatWarnMs = 40_000, overheatCritMs = 40_000)

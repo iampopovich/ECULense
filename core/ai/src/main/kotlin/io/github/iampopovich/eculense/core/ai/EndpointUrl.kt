@@ -6,9 +6,9 @@ import java.net.URI
 import java.net.URISyntaxException
 
 /**
- * Локальная проверка адреса, который ввёл пользователь, — до любого запроса в сеть.
- * Cleartext в network security config разрешён (Ollama/LM Studio в домашней сети), поэтому именно здесь
- * не пускаем незашифрованный http к серверам в интернете: http — только loopback, частные сети и *.local.
+ * Local check of the address entered by the user, before any network request.
+ * Cleartext is allowed in the network security config (Ollama/LM Studio on the home network), so this is where
+ * unencrypted http to internet servers is blocked: http only for loopback, private networks and *.local.
  */
 object EndpointUrl {
     sealed interface Result {
@@ -31,7 +31,7 @@ object EndpointUrl {
         }
         val scheme = uri.scheme?.lowercase()
         if (scheme != "http" && scheme != "https") return Result.Invalid("Адрес должен начинаться с http:// или https://")
-        // При неверном порту URI молча переходит в «registry»-режим: host = null, authority = "host:99999".
+        // With an invalid port, URI silently switches to «registry» mode: host = null, authority = "host:99999".
         val authority = uri.rawAuthority.orEmpty()
         val portText = authority.substringAfterLast(':', "").takeIf { ':' in authority && !authority.endsWith("]") }
         if (portText != null && portText.isNotEmpty() && (portText.toIntOrNull() ?: 0) !in 1..65535) {
@@ -45,7 +45,7 @@ object EndpointUrl {
     }
 }
 
-/** Локальный ли адрес — только по записи хоста, без DNS (имя вроде 127.0.0.1.nip.io — не локальное). */
+/** Whether the address is local, judged only by how the host is written, without DNS (a name like 127.0.0.1.nip.io is not local). */
 object LocalNetwork {
     private val ipv4 = Regex("""^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$""")
     private val ipv6 = Regex("""^[0-9a-fA-F:.]+$""")
@@ -64,7 +64,7 @@ object LocalNetwork {
                 (b[0] == 169 && b[1] == 254)
         }
         if (':' in host && ipv6.matches(host)) {
-            // Литерал IPv6 разбирается без обращения к DNS.
+            // An IPv6 literal is parsed without a DNS lookup.
             val address = runCatching { InetAddress.getByName(host) }.getOrNull() as? Inet6Address ?: return false
             val first = address.address[0].toInt() and 0xFF
             return address.isLoopbackAddress || address.isLinkLocalAddress || (first and 0xFE) == 0xFC

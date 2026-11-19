@@ -9,7 +9,7 @@ import java.util.Locale
 internal object CarFormat {
     private val ru = Locale.forLanguageTag("ru")
 
-    /** Разделитель тысяч — всегда неразрывный пробел (ICU даёт то U+00A0, то узкий U+202F). */
+    /** Thousands separator is always a non-breaking space (ICU yields either U+00A0 or narrow U+202F). */
     fun number(v: Double, decimals: Int = 1): String = String.format(ru, "%,.${decimals}f", v).replace('\u202F', '\u00A0')
 
     /** «Kia · Sorento · BL · 2005». */

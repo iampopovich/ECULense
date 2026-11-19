@@ -1,14 +1,14 @@
 name: release
-# Тег вида 0.1.0 (или v0.1.0) → две подписанные APK (cloud, local) + SHA256SUMS → черновик релиза GitHub
-# с заметками из CHANGELOG.md. Опубликовать черновик — вручную на странице Releases.
+# A tag like 0.1.0 (or v0.1.0) → two signed APKs (cloud, local) + SHA256SUMS → a GitHub release draft
+# with notes from CHANGELOG.md. Publishing the draft is manual, on the Releases page.
 #
-# Секреты репозитория (Settings → Secrets and variables → Actions):
-#   ECU_KEYSTORE_BASE64   — base64 от .jks с ключом релиза
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   ECU_KEYSTORE_BASE64   — base64 of the .jks with the release key
 #   ECU_KEYSTORE_PASSWORD, ECU_KEY_ALIAS, ECU_KEY_PASSWORD
-# Без секретов APK подписываются случайным отладочным ключом раннера и получают суффикс -debugkey:
-# поставить их можно, но обновить поверх них сборку с настоящим ключом — нет.
-# Перезапуск для уже существующего тега: Actions → release → Run workflow (tag). Старый черновик
-# перед этим удалите — черновики GitHub не находит по тегу, и рядом появится второй.
+# Without the secrets, APKs are signed with the runner's random debug key and get the -debugkey suffix:
+# they can be installed, but a build with the real key cannot be installed over them as an update.
+# Re-running for an existing tag: Actions → release → Run workflow (tag). Delete the old draft
+# first — GitHub does not find drafts by tag, and a second one will appear next to it.
 on:
   push:
     tags: ["[0-9]+.[0-9]+.[0-9]+*", "v[0-9]+.[0-9]+.[0-9]+*"]

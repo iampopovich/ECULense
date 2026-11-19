@@ -12,11 +12,11 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** Настройки ИИ — пункт хаба «Настройки» (и цель кнопки «Настроить ИИ» в чате). */
+/** AI settings — an item in the «Настройки» hub (and the target of the «Настроить ИИ» button in the chat). */
 @OptIn(KoinExperimentalAPI::class)
 val aiSettingsModule = module {
-    // «На устройстве» — только если модуль :core:ailocal подключён (его экран и OnDeviceLlm); облачная сборка
-    // (BuildCapabilities.onDeviceModels = false) вместо пункта показывает подсказку о сборке «Локально».
+    // «На устройстве» — only if the :core:ailocal module is included (its screen and OnDeviceLlm); the cloud build
+    // (BuildCapabilities.onDeviceModels = false) shows a hint about the «Локально» build instead of the item.
     viewModel {
         AiSettingsViewModel(
             get(), get(), getOrNull(),

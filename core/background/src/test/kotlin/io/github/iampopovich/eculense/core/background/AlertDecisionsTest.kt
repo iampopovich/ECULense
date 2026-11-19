@@ -52,10 +52,10 @@ class AlertDecisionsTest {
         assertEquals(listOf(2L, 1L), first.toNotify.map { it.item.id })
         val again = MaintenanceAlerts.decide(1, listOf(due(1, MaintenanceStatus.SOON), due(2, MaintenanceStatus.OVERDUE)), first.notified)
         assertTrue(again.toNotify.isEmpty())
-        // «скоро» стало «просрочено» — напомнить снова
+        // «скоро» became «просрочено»: remind again
         val worse = MaintenanceAlerts.decide(1, listOf(due(1, MaintenanceStatus.OVERDUE), due(2, MaintenanceStatus.OVERDUE)), again.notified)
         assertEquals(listOf(1L), worse.toNotify.map { it.item.id })
-        // отметили «сделано» → работа ушла из списка, её ключ забыт
+        // marked «сделано» → the task left the list, its key is forgotten
         val done = MaintenanceAlerts.decide(1, listOf(due(2, MaintenanceStatus.OVERDUE)), worse.notified)
         assertTrue(done.toNotify.isEmpty())
         assertTrue(done.notified.none { it.startsWith("m:1:1:") })

@@ -1,13 +1,13 @@
 package io.github.iampopovich.eculense.feature.aichat
 
 /**
- * Модели иногда присылают HTML-сущности (`&gt;105 °C`), а markdown-рендерер их сознательно не раскрывает
- * (multiplatform-markdown-renderer: getUnescapedTextInNode → processEntities = false), поэтому на экране был
- * буквальный «&gt;». Раскрываем сами до разбора Markdown.
+ * Models sometimes send HTML entities (`&gt;105 °C`), and the markdown renderer deliberately doesn't decode them
+ * (multiplatform-markdown-renderer: getUnescapedTextInNode → processEntities = false), so the screen showed
+ * a literal "&gt;". We decode them ourselves before parsing Markdown.
  *
- * complete = false — ответ ещё стримится: незаконченная сущность в хвосте («…&g») придерживается до следующего куска.
- * Так результат для префикса — всегда префикс результата для полного текста: потоковое состояние рендерера
- * дописывается только в конец.
+ * complete = false means the response is still streaming: an unfinished entity at the tail ("…&g") is held until the next chunk.
+ * That way the result for a prefix is always a prefix of the result for the full text: the renderer's streaming state
+ * is only ever appended to.
  */
 internal object HtmlEntities {
     private val entity = Regex("&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,7});")

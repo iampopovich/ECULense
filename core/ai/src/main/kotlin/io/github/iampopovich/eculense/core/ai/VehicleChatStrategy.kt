@@ -10,15 +10,15 @@ import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.prompt.streaming.StreamFrame
 
 /**
- * Стратегия агента Koog для чата: стриминг ответа + вызовы инструментов между кругами.
+ * Koog agent strategy for chat: streamed response + tool calls between rounds.
  *
- * Готовые стратегии Koog 1.3.0 (singleRunStrategy, reAct) зовут модель без стриминга — ответ пришёл бы целиком
- * после всех инструментов. Поэтому свой цикл на [functionalStrategy]: `requestLLMStreaming()` → куски текста сразу
- * в UI → из кадров собирается [Message.Assistant] → если в нём вызовы инструментов, `executeTools` (через окружение
- * агента, с событиями пайплайна) → результаты в промпт → следующий круг.
+ * Koog 1.3.0 built-in strategies (singleRunStrategy, reAct) call the model without streaming, so the answer would arrive
+ * whole after all tools. Hence a custom loop on [functionalStrategy]: `requestLLMStreaming()` → text chunks go straight
+ * to the UI → frames are assembled into [Message.Assistant] → if it contains tool calls, `executeTools` (via the agent
+ * environment, with pipeline events) → results go into the prompt → next round.
  */
 internal object VehicleChatStrategy {
-    /** Сколько кругов с инструментами максимум; последний круг — без инструментов, чтобы модель ответила текстом. */
+    /** Maximum number of rounds with tools; the last round has no tools so the model answers with text. */
     const val MAX_TOOL_ROUNDS = 5
 
     const val THINKING = "Модель на телефоне думает…"
@@ -32,8 +32,8 @@ internal object VehicleChatStrategy {
         maxToolRounds: Int = MAX_TOOL_ROUNDS,
     ): AIAgentFunctionalStrategy<String, String> = functionalStrategy("ecu-chat") { input ->
         llm.writeSession {
-            // ChatMemory подставляет сохранённую историю без системного сообщения — задаём актуальное заново
-            // (оно зависит от переключателя «данные машины»).
+            // ChatMemory injects the saved history without the system message, so set the current one again
+            // (it depends on the «данные машины» toggle).
             prompt = prompt.withMessages { messages ->
                 listOf(Message.System(system, RequestMetaInfo.Empty)) + messages.filterNot { it is Message.System }
             }
@@ -51,9 +51,9 @@ internal object VehicleChatStrategy {
                     }
                     assistantOf(frames).also { appendPrompt { message(it) } }
                 } else {
-                    // Модель на телефоне (клиент Koog LiteRT) не стримит: ответ целиком, до него — «Модель думает…».
+                    // The on-device model (Koog LiteRT client) does not stream: the whole answer at once, «Модель думает…» until then.
                     emit(ChatEvent.Status(thinkingLabel))
-                    val whole = requestLLM() // write-сессия сама добавляет ответ в промпт
+                    val whole = requestLLM() // the write session adds the response to the prompt itself
                     val text = whole.parts.filterIsInstance<MessagePart.Text>().joinToString("") { it.text }
                     if (text.isNotEmpty()) emit(ChatEvent.Text(text))
                     whole
@@ -63,7 +63,7 @@ internal object VehicleChatStrategy {
             answer.append(text)
             val calls = response.parts.filterIsInstance<MessagePart.Tool.Call>()
             if (calls.isEmpty()) break
-            // текст между кругами отделяем абзацем, чтобы ответ не склеивался
+            // separate text between rounds with a paragraph so the answer doesn't run together
             if (text.isNotBlank()) emit(ChatEvent.Text("\n\n"))
             calls.forEach { emit(ChatEvent.ToolCall(it.tool, label(it.tool))) }
             val results = executeTools(calls)
@@ -73,9 +73,9 @@ internal object VehicleChatStrategy {
     }
 
     /**
-     * Кадры → сообщение ассистента. Как `toMessageResponse()` Koog, но пустые аргументы вызова → "{}"
-     * (некоторые OpenAI-совместимые серверы шлют "" для инструментов без параметров), а текст без TextComplete
-     * собирается из дельт.
+     * Frames → assistant message. Like Koog's `toMessageResponse()`, but empty call arguments → "{}"
+     * (some OpenAI-compatible servers send "" for tools without parameters), and text without TextComplete
+     * is assembled from deltas.
      */
     fun assistantOf(frames: List<StreamFrame>): Message.Assistant {
         val end = frames.filterIsInstance<StreamFrame.End>().lastOrNull()
@@ -94,9 +94,9 @@ internal object VehicleChatStrategy {
 }
 
 /**
- * Что сохраняет ChatMemory: только тексты вопросов и ответов (окно — в [ChatHistoryStore.load]). Вызовы инструментов и их
- * JSON в следующих ходах не нужны (модель вызовет инструмент заново) и стоят токенов; к тому же обрезка окна
- * посреди пары «вызов — результат» ломает запрос к API.
+ * What ChatMemory saves: only question and answer texts (the window is in [ChatHistoryStore.load]). Tool calls and their
+ * JSON are not needed in later turns (the model will call the tool again) and cost tokens; besides, cutting the window
+ * in the middle of a call/result pair breaks the API request.
  */
 internal object TextOnlyHistory : ChatMemoryPreProcessor {
 

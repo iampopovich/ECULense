@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Wi-Fi/TCP ELM327 (WifiTransportFactory из :core:obd — JVM-модуль без манифеста) -->
+    <!-- Wi-Fi/TCP ELM327 (WifiTransportFactory from :core:obd, a JVM module without a manifest) -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
@@ -16,9 +16,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.ECULense">
-        <!-- singleTask: тап по иконке возвращает в существующую задачу с её back stack (а не кладёт новый
-             MainActivity на «Панель», если задачу открыли из уведомления/am start или MIUI добавил extras).
-             Повторные запуски и deep links из уведомлений приходят в onNewIntent. -->
+        <!-- singleTask: tapping the icon returns to the existing task with its back stack (instead of putting a new
+             MainActivity on top of «Панель» when the task was opened from a notification/am start or MIUI added extras).
+             Repeated launches and deep links from notifications arrive in onNewIntent. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

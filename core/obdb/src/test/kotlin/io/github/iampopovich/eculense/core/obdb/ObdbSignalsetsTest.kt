@@ -15,7 +15,7 @@ import org.junit.Test
 import java.io.IOException
 import kotlin.io.path.createTempDirectory
 
-/** Синтетический сигналсет в формате v3 (структура как у OBDb, значения свои). */
+/** Synthetic signalset in v3 format (structure like OBDb, our own values). */
 private val SIGNALSET = """
 { "ecu": [ { "hdr": "7E0", "type": "engine" }, { "hdr": "7E1", "type": "transmission" } ],
   "commands": [
@@ -49,7 +49,7 @@ generations:
     end_year: null
 """
 
-/** Отвечает из карты url → тело; остальное — 404. */
+/** Responds from a url → body map; everything else is 404. */
 private class MapHttp(private val files: Map<String, String>) : PackHttp {
     val requested = mutableListOf<String>()
     override fun get(url: String): HttpResponse {
@@ -149,7 +149,7 @@ class ObdbSignalsetsTest {
         assertEquals(SignalsetResult.NeedsProfile(listOf("модель", "год")), obdb.check("Lada", " ", null))
     }
 
-    /** OBDB_LIVE=1 — настоящий OBDb/Kia-Sorento по сети: BL (2005) не покрыт, 2012 покрыт. */
+    /** OBDB_LIVE=1 — real OBDb/Kia-Sorento over the network: BL (2005) is not covered, 2012 is. */
     @Test
     fun `live kia sorento`() = runTest {
         assumeTrue("задайте OBDB_LIVE=1", System.getenv("OBDB_LIVE") == "1")

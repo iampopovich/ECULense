@@ -13,12 +13,12 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
-/** Выбранная локальная модель (id пакета) и бэкенд, на котором она работает в чате. */
+/** Selected local model (package id) and the backend it runs on in chat. */
 data class ActiveModel(val packId: String, val backend: BackendKind)
 
 /**
- * Настройки «На устройстве»: выбранная модель и бэкенд, результаты тестов, свои модели, токен Hugging Face
- * (зашифрован ключом из Android Keystore — тот же [SecretCipher], что у API-ключей; в логи не пишется).
+ * «На устройстве» settings: selected model and backend, test results, custom models, Hugging Face token
+ * (encrypted with an Android Keystore key, the same [SecretCipher] as API keys; never logged).
  */
 class LocalModelStore(
     private val dataStore: DataStore<Preferences>,
@@ -65,7 +65,7 @@ class LocalModelStore(
         }
     }
 
-    /** Модель удалена: её тест и выбор больше не действительны. */
+    /** Model deleted: its test and selection are no longer valid. */
     suspend fun forget(packId: String) {
         dataStore.edit { p ->
             val all = p[REPORTS]?.let { runCatching { json.decodeFromString(reportsSerializer, it) }.getOrNull() }.orEmpty()
@@ -91,7 +91,7 @@ class LocalModelStore(
         }
     }
 
-    /** null или пустая строка — удалить токен. */
+    /** null or empty string deletes the token. */
     suspend fun setToken(token: String?) {
         dataStore.edit {
             val t = token?.trim()

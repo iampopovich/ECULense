@@ -26,7 +26,7 @@ import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
 
-/** Воркеры через work-testing: решения — в фейках, уведомления — настоящие (в тестовом пакете). */
+/** Workers via work-testing: decisions are in fakes, notifications are real (in the test package). */
 @RunWith(AndroidJUnit4::class)
 class WorkersTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
@@ -85,7 +85,7 @@ class WorkersTest {
         val posted = nm().activeNotifications.single { it.id == AndroidNotifier.ID_ANALYSIS }
         assertEquals(AndroidNotifier.CHANNEL_ANALYSIS, posted.notification.channelId)
         assertTrue(posted.notification.extras.getString("android.title")!!.contains("Низкое напряжение"))
-        // contentIntent в тестовом APK библиотеки пуст: у него нет launcher-активности (в приложении — MainActivity)
+        // contentIntent is empty in the library's test APK: it has no launcher activity (in the app it's MainActivity)
     }
 
     @Test

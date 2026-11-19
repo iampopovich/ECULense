@@ -2,8 +2,8 @@ plugins {
     id("ecu.android.library")
 }
 
-// Фоновый анализ после поездки/импорта и ежедневная проверка ТО (3.9 п.3): WorkManager + уведомления.
-// Без сети и без ИИ. Модуль необязательный: без него слой данных сам пересчитывает находки.
+// Background analysis after a trip/import and a daily maintenance check (3.9 item 3): WorkManager + notifications.
+// No network and no AI. The module is optional: without it the data layer recomputes findings itself.
 dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:navigation"))

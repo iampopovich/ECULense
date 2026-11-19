@@ -27,21 +27,21 @@ import java.io.IOException
 import java.net.URL
 import kotlin.coroutines.coroutineContext
 
-/** Ссылка проверена: модель можно добавить; или понятная причина, почему нет. */
+/** Link checked: the model can be added; or a clear reason why not. */
 sealed interface LinkCheck {
     data class Ok(val model: LocalModel) : LinkCheck
     data class Failed(val message: String) : LinkCheck
 }
 
 /**
- * Модели «На устройстве»: каталог Koog + свои (по ссылке HF или из файла), их файлы — пакеты :core:datapacks
- * (группа MODEL, докачка). Сам является [PackSource] (каталог меняется на ходу) и [PackAuth] (токен HF — только для
- * huggingface.co, на CDN после редиректа не уходит).
+ * «На устройстве» models: Koog catalog + custom ones (via HF link or from a file); their files are :core:datapacks packs
+ * (MODEL group, resumable). It is itself a [PackSource] (the catalog changes on the fly) and a [PackAuth] (the HF token is
+ * only for huggingface.co, it is not sent to the CDN after a redirect).
  */
 class LocalModels(
     private val context: Context,
     private val store: LocalModelStore,
-    /** Провайдер, а не экземпляр: DataPacks сам собирается из PackSource/PackAuth (этот класс) — иначе цикл в Koin. */
+    /** A provider, not an instance: DataPacks is itself built from PackSource/PackAuth (this class) — otherwise a Koin cycle. */
     packsProvider: () -> DataPacks,
     private val http: PackHttp,
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
@@ -55,12 +55,12 @@ class LocalModels(
 
     fun all(): List<LocalModel> = LocalModelCatalog.merge(LocalModelCatalog.koogEntries(), galleryState.value, customState.value)
 
-    /** Версия allowlist Gallery, из которой собран каталог («1_0_23»). */
+    /** Gallery allowlist version the catalog was built from («1_0_23»). */
     val catalogVersion: String get() = cachedVersion() ?: GalleryAllowlist.BUNDLED_VERSION
 
     private fun cachedVersion(): String? = File(cacheDir, "allowlist.version").takeIf { it.exists() }?.readText()?.trim()?.ifBlank { null }
 
-    /** Скачанная копия allowlist (если есть и читается), иначе вшитая; gated — из ответа HF API или известный список. */
+    /** Downloaded allowlist copy (if present and readable), otherwise the bundled one; gated — from the HF API response or a known list. */
     private fun loadGallery(): List<LocalModel> {
         val text = File(cacheDir, "allowlist.json").takeIf { it.exists() }?.let { f -> runCatching { f.readText().also { GalleryAllowlist.parse(it) } }.getOrNull() }
         val models = runCatching { GalleryAllowlist.parse(text ?: GalleryAllowlist.bundledText()) }.getOrElse { GalleryAllowlist.bundled() }
@@ -71,9 +71,9 @@ class LocalModels(
         ?.mapNotNull { line -> line.split('\t').takeIf { it.size == 2 }?.let { it[0] to (it[1] == "1") } }?.toMap().orEmpty()
 
     /**
-     * Обновить каталог по запросу: allowlist Gallery — от известной версии вверх, пока следующий номер существует
-     * (новые файлы получают больший номер), затем статус gated каждого репозитория из API Hugging Face. Без сети —
-     * остаётся прежний (вшитый) каталог. Возвращает версию или null, если обновить не удалось.
+     * Refresh the catalog on request: Gallery allowlist — upward from the known version while the next number exists
+     * (new files get a higher number), then the gated status of each repository from the Hugging Face API. Offline —
+     * the previous (bundled) catalog stays. Returns the version or null if the refresh failed.
      */
     suspend fun refreshCatalog(): String? = withContext(Dispatchers.IO) {
         var version = catalogVersion
@@ -99,8 +99,8 @@ class LocalModels(
     }
 
     /**
-     * «Другие модели»: поиск по litert-community на Hugging Face. Файлы — с размером и sha256, ссылка закреплена на
-     * коммит. То, что уже есть в каталоге, не повторяется. Модели никем не проверены — на риск пользователя.
+     * «Другие модели»: search of litert-community on Hugging Face. Files come with size and sha256, the link is pinned to
+     * a commit. Anything already in the catalog is not repeated. The models are unvetted — at the user's own risk.
      */
     suspend fun search(query: String): List<LocalModel> = withContext(Dispatchers.IO) {
         val known = all().map { it.key }.toSet()
@@ -114,7 +114,7 @@ class LocalModels(
 
     fun find(packId: String): LocalModel? = all().firstOrNull { it.packId == packId }
 
-    /** Файл скачанной/импортированной модели или null. */
+    /** File of the downloaded/imported model, or null. */
     fun file(packId: String): File? = find(packId)?.let { packs.store.file(packId, it.fileName) }
 
     override fun manifests(): List<PackManifest> = all().mapNotNull { it.toPack() }
@@ -127,8 +127,8 @@ class LocalModels(
     }
 
     /**
-     * Своя модель по ссылке HF: HEAD без следования редиректу — размер и sha256 LFS-файла (`x-linked-size`,
-     * `x-linked-etag`), ревизия (`x-repo-commit`, ссылка фиксируется на неё), 401/403 — закрытая модель.
+     * Custom model via HF link: HEAD without following the redirect — size and sha256 of the LFS file (`x-linked-size`,
+     * `x-linked-etag`), revision (`x-repo-commit`, the link is pinned to it), 401/403 — gated model.
      */
     suspend fun checkLink(raw: String): LinkCheck = withContext(Dispatchers.IO) {
         HfLink.check(raw)?.let { return@withContext LinkCheck.Failed(it.message) }
@@ -175,7 +175,7 @@ class LocalModels(
         packs.changed()
     }
 
-    /** Удалить файл (и запись своей модели); тест и выбор этой модели забываются. */
+    /** Delete the file (and the custom model entry); the test and selection of this model are forgotten. */
     suspend fun delete(packId: String) {
         packs.delete(packId)
         store.forget(packId)
@@ -189,7 +189,7 @@ class LocalModels(
         const val MAX_SEARCH_REPOS = 12
     }
 
-    /** «Файл с телефона»: копия в хранилище моделей (атомарно, через staging пакета). */
+    /** «Файл с телефона»: copy into model storage (atomically, via the pack staging). */
     suspend fun importFile(uri: Uri, displayName: String, sizeBytes: Long?, progress: (Long) -> Unit): LocalModel = withContext(Dispatchers.IO) {
         require(displayName.endsWith(".litertlm")) { HfLink.Problem.NOT_LITERTLM.message }
         val model = LocalModel(

@@ -3,9 +3,9 @@ package io.github.iampopovich.eculense.core.datapacks
 import java.io.File
 
 /**
- * Хранилище пакетов: `<root>/<id>/<версия>/файлы` + `<root>/<id>/current` (какая версия активна).
- * Новая версия собирается в `.staging-*`, затем каталог переименовывается и `current` заменяется rename-ом — читатель
- * видит либо старую, либо новую версию целиком. Старые версии удаляются после переключения.
+ * Pack storage: `<root>/<id>/<version>/files` + `<root>/<id>/current` (which version is active).
+ * A new version is assembled in `.staging-*`, then the directory is renamed and `current` is replaced via rename, so a reader
+ * sees either the old or the new version in full. Old versions are deleted after the switch.
  */
 class PackStore(val root: File) {
     data class Installed(val id: String, val version: String, val dir: File, val sizeBytes: Long) {
@@ -23,17 +23,17 @@ class PackStore(val root: File) {
         return Installed(id, version, dir, dir.walkTopDown().filter { it.isFile }.sumOf { it.length() })
     }
 
-    /** Файл активной версии или null, если пакет не скачан. */
+    /** File of the active version, or null if the pack isn't downloaded. */
     fun file(id: String, name: String): File? = installed(id)?.file(name)?.takeIf { it.isFile }
 
-    /** Каталог для сборки версии. keep = true — докачка: содержимое прошлой попытки (`.part`) остаётся. */
+    /** Directory for assembling a version. keep = true means resume: the previous attempt's contents (`.part`) are kept. */
     fun staging(id: String, version: String, keep: Boolean = false): File =
         File(packDir(id), ".staging-${versionDir(version)}").apply {
             if (!keep) deleteRecursively()
             mkdirs()
         }
 
-    /** Сколько байт уже лежит в staging (докачка после обрыва); 0 — ничего. */
+    /** How many bytes are already in staging (resume after a dropped connection); 0 means nothing. */
     fun partialBytes(id: String): Long =
         packDir(id).listFiles().orEmpty().filter { it.isDirectory && it.name.startsWith(".staging-") }
             .sumOf { d -> d.walkTopDown().filter { it.isFile }.sumOf { it.length() } }
@@ -42,7 +42,7 @@ class PackStore(val root: File) {
     fun commit(id: String, version: String, staged: File): Installed {
         val target = File(packDir(id), versionDir(version))
         if (target.exists()) {
-            // переустановка той же версии: старый каталог сначала в сторону, чтобы rename был атомарным
+            // reinstalling the same version: move the old directory aside first so the rename is atomic
             val old = File(packDir(id), ".old-${versionDir(version)}-${System.nanoTime()}")
             check(target.renameTo(old)) { "не удалось убрать старую версию $target" }
         }

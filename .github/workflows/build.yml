@@ -13,9 +13,9 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      # Все модули и оба флейвора app (cloud, local): компиляция, unit-тесты (testCloud*/testLocal*), lint.
+      # All modules and both app flavors (cloud, local): compilation, unit tests (testCloud*/testLocal*), lint.
       - run: ./gradlew build --stacktrace
-      # Две сборки одного приложения: облачная (без :core:ailocal, ≈ 10 МБ) и «Локально» (модель на телефоне, ≈ 35 МБ).
+      # Two builds of the same app: cloud (without :core:ailocal, ≈ 10 MB) and «Локально» (on-phone model, ≈ 35 MB).
       - name: Release APKs
         run: ./gradlew :app:assembleCloudRelease :app:assembleLocalRelease --stacktrace
       - name: Cloud build has no LiteRT

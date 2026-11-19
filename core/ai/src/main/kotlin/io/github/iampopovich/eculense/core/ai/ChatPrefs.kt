@@ -10,14 +10,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /**
- * Настройки чата: согласие на отправку данных машины (по провайдеру — сменил провайдера, спросим снова),
- * переключатель «данные моей машины» и текущий диалог.
+ * Chat settings: consent to send car data (per provider: switch provider and we ask again),
+ * the «данные моей машины» toggle and the current conversation.
  */
 interface ChatPrefs {
     suspend fun hasConsent(providerKey: String): Boolean
     suspend fun grantConsent(providerKey: String)
     suspend fun revokeConsents()
-    /** null — пользователь ещё не выбирал (по умолчанию включено). */
+    /** null means the user has not chosen yet (enabled by default). */
     suspend fun useCarData(): Boolean?
     suspend fun setUseCarData(enabled: Boolean)
     suspend fun conversationId(): String?

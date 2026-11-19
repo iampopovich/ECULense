@@ -5,7 +5,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
-/** Демо-режим: виртуальный ELM327, видимый в списке адаптеров как обычный транспорт. */
+/** Demo mode: a virtual ELM327 shown in the adapter list as a regular transport. */
 val demoModule = module {
     single(named(DemoTransportFactory.KIND)) { DemoTransportFactory() } bind TransportFactory::class
 }

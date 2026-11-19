@@ -1,6 +1,6 @@
 package io.github.iampopovich.eculense.core.obd
 
-/** PID сервиса 01. decode получает только байты данных (без 41 и номера PID). */
+/** Service 01 PID. decode receives only the data bytes (without 41 and the PID number). */
 class Pid(
     val code: Int,
     val name: String,
@@ -48,7 +48,7 @@ object StandardPids {
         Pid(0x5E, "Расход топлива", "L/h", 2) { word(it) / 20.0 },
     )
 
-    /** Что показывает панель по умолчанию, в порядке важности (если ЭБУ поддерживает). */
+    /** What the dashboard shows by default, in order of importance (if the ECU supports it). */
     val dashboardDefaults: List<Int> = listOf(0x0C, 0x0D, 0x05, 0x04, 0x11, 0x42, 0x0F, 0x10)
 
     private val index = all.associateBy { it.code }

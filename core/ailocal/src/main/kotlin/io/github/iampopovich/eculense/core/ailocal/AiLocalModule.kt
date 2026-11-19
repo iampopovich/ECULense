@@ -17,8 +17,8 @@ import org.koin.dsl.navigation3.navigation
 import java.io.File
 
 /**
- * 3.10 «На устройстве». Подключается после aiModule и dataPacksModule. Мастер ИИ видит пункт по RouteHandler,
- * шлюз :core:ai — по OnDeviceLlm, пакеты — по PackSource/PackAuth. Без модуля всё это просто отсутствует.
+ * 3.10 «На устройстве». Loaded after aiModule and dataPacksModule. The AI wizard sees the option via RouteHandler,
+ * the :core:ai gateway via OnDeviceLlm, data packs via PackSource/PackAuth. Without the module all of this is simply absent.
  */
 @OptIn(KoinExperimentalAPI::class)
 val aiLocalModule = module {

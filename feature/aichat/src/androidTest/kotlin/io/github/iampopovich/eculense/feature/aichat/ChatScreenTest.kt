@@ -35,7 +35,7 @@ class ChatScreenTest {
         rule.onNodeWithText("## Причины", substring = true).assertDoesNotExist()
         rule.onNodeWithText("Подсос воздуха", substring = true).assertExists()
         rule.onNodeWithText("**Подсос", substring = true).assertDoesNotExist()
-        // Сообщение пользователя — обычный текст, звёздочки остаются как есть.
+        // The user message is plain text; asterisks stay as they are.
         rule.onNodeWithText("**P0171?**").assertExists()
         rule.onNodeWithContentDescription("Копировать ответ").assertExists()
     }
@@ -48,7 +48,7 @@ class ChatScreenTest {
         rule.onNodeWithTag("chat-input").performTextInput("P0171?")
         rule.onNodeWithContentDescription("Отправить").assertIsEnabled().performClick()
         assertEquals(listOf("P0171?"), sent)
-        // поле очищается — кнопка снова недоступна
+        // field is cleared, the button is disabled again
         rule.onNodeWithContentDescription("Отправить").assertIsNotEnabled()
     }
 
@@ -94,7 +94,7 @@ class ChatScreenTest {
         )
         rule.setContent { ChatScreen(state, onSend = {}, onOpenSettings = {}) }
         rule.onNodeWithText("Над ответом работали: Аналитик эксплуатации · Моторист · Диагност").assertExists()
-        // свёрнуто по умолчанию
+        // collapsed by default
         rule.onNodeWithText("Поездок", substring = true).assertDoesNotExist()
         rule.onNodeWithText("Заметки экспертов (2)").performClick()
         rule.waitUntil(5_000) { rule.onAllNodesWithText("Поездок", substring = true).fetchSemanticsNodes().isNotEmpty() }

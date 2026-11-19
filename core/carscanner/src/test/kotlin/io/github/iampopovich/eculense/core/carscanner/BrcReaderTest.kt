@@ -9,7 +9,7 @@ import java.time.ZoneOffset
 
 class BrcReaderTest {
     private val utc = ZoneOffset.UTC
-    // 2026-05-08 03:46:53 как .NET ticks (100 нс от 0001-01-01)
+    // 2026-05-08 03:46:53 as .NET ticks (100 ns since 0001-01-01)
     private val start = dotNetTicks(LocalDateTime.of(2026, 5, 8, 3, 46, 53))
 
     @Test
@@ -75,7 +75,7 @@ class BrcReaderTest {
         assertEquals("cs.20", CarScannerSensors.sensorId(20))
         assertEquals("°C", CarScannerSensors.unit(15))
         assertTrue(CarScannerSensors.isImported(12))
-        assertFalse(CarScannerSensors.isImported(633)) // стоимость топлива — производная
+        assertFalse(CarScannerSensors.isImported(633)) // fuel cost is derived
     }
 
     private fun dotNetTicks(t: LocalDateTime): Long =

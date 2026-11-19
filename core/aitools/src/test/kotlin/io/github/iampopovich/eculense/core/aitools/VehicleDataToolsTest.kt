@@ -58,7 +58,7 @@ private class Trips(val list: List<Trip>) : TripRepository {
     override suspend fun addAll(trips: List<Trip>) = 0
 }
 
-/** Много данных, чтобы проверить бюджет ответа: 24 датчика, 40 кодов, 15 находок, координаты в сессии. */
+/** Lots of data to test the response budget: 24 sensors, 40 codes, 15 findings, coordinates in the session. */
 private class Analytics : AnalyticsRepository {
     var stored = emptyList<StoredFinding>()
     var recomputes = 0
@@ -83,7 +83,7 @@ private class Analytics : AnalyticsRepository {
     }
     override suspend fun sessionReport(carId: Long, sessionId: Long): SessionReport = SessionReport(
         SessionSummary(sessionId, NOW - DAY, NOW - DAY + 3_600_000, SessionSource.IMPORT_CARSCANNER, 100_000),
-        // репозиторий уже убирает координаты; здесь проверяем, что и сами инструменты ничего такого не добавляют
+        // the repository already strips coordinates; here we check that the tools themselves don't add anything like that
         (1..24).map { SensorSummary("01.%02X".format(it), "u", 10_000, 1, 1.23456, 99.98765, 50.5555, 50.0, 95.0) },
         listOf(Finding("coolant-overheat", Severity.WARNING, "Перегрев", "m", listOf(Evidence("Максимум ОЖ", "106,0 °C")))),
     )
@@ -94,7 +94,7 @@ private class Analytics : AnalyticsRepository {
     override suspend fun dtcEvents(carId: Long) = if (noDtc) emptyList() else (1..40).flatMap { i ->
         listOf(DtcEvent("P0%03d".format(100 + i), DtcKind.STORED, NOW - i * DAY), DtcEvent("P0%03d".format(100 + i), DtcKind.STORED, NOW - i * DAY + 5 * DAY))
     }
-    /** По записи раз в 3 дня за ~200 дней: ОЖ растёт от 88 к ~94 °C, напряжение 14,1 В. */
+    /** One recording every 3 days over ~200 days: coolant rises from 88 to ~94 °C, voltage 14.1 V. */
     var digests: List<SessionDigest> = (1..66).map { i ->
         val coolant = 88.0 + (66 - i) * 0.1
         val many = { v: Double -> (1..40).fold(Agg.EMPTY to Histogram.EMPTY) { (a, h), _ -> a.add(v) to h.add(v) } }
@@ -299,7 +299,7 @@ class VehicleDataToolsTest {
         assertEquals(labels.sortedDescending(), labels)
         assertEquals(7, labels.size)
         val change = t.getValue("change").jsonArray.map { it.jsonObject }.single { it.getValue("metric").jsonPrimitive.content == "coolant_median" }
-        assertTrue(change.toString(), change.getValue("delta").jsonPrimitive.content.toDouble() > 0) // ОЖ в новых записях выше
+        assertTrue(change.toString(), change.getValue("delta").jsonPrimitive.content.toDouble() > 0) // coolant is higher in newer recordings
         assertTrue(t.getValue("few_data").jsonArray.map { it.jsonPrimitive.content }.contains("l_per_100km"))
         assertFalse(raw.contains(VIN) || raw.contains("Тестовая"))
     }
@@ -345,14 +345,14 @@ class VehicleDataToolsTest {
         assertTrue(text, lines.first().startsWith("Машина: "))
         assertTrue(text, lines[1].startsWith("Тренды за 180 дн."))
         assertTrue(text, lines.indexOfFirst { it.startsWith("Тренды") } < lines.indexOfFirst { it.startsWith("Коды ошибок") })
-        // вопрос про ошибки — без трендов и поездок
+        // a question about DTCs: no trends or trips
         val dtc = ChatRouter.route("объясни мои ошибки")
         val dtcText = VehicleDataToolbox(described).digest(dtc.digestSections, dtc.periodDays)!!
         assertFalse(dtcText, dtcText.contains("Тренды") || dtcText.contains("Поездки:"))
         assertTrue(dtcText, dtcText.contains("Коды ошибок"))
     }
 
-    /** Признаки JSON в тексте для модели на телефоне: скобки объектов/массивов, кавычки ключей, ключи вида snake_case. */
+    /** Signs of JSON in the text for the on-phone model: object/array brackets, quoted keys, snake_case keys. */
     private fun assertNoJson(text: String) {
         listOf("{", "}", "[", "]", "\"").forEach { assertFalse("«$it» в дайджесте:\n$text", text.contains(it)) }
         assertFalse(text, Regex("\\b[a-z]+_[a-z_]+\\b").containsMatchIn(text))

@@ -200,7 +200,7 @@ private fun Section(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp))
 }
 
-/** Справочник моделей: выбрать (если скачан), иначе подсказка с кнопкой скачать; ручной ввод доступен всегда. */
+/** Model reference database: pick (if downloaded), otherwise a hint with a download button; manual entry is always available. */
 @Composable
 private fun CatalogBlock(state: CarEditUiState, onOpenPicker: () -> Unit, onDownload: () -> Unit) {
     val pack = state.vehiclePack

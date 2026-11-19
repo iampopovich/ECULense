@@ -13,7 +13,7 @@ internal const val DATA_POINT = 0x01274350
 internal const val GPS = 0x1F76FB5C
 internal const val DTC_EVENT = 0x16E13228
 
-/** .NET ticks (100 нс от 0001-01-01) в момент 1970-01-01. */
+/** .NET ticks (100 ns since 0001-01-01) at 1970-01-01. */
 const val DOTNET_EPOCH_TICKS = 621_355_968_000_000_000L
 
 class BrcFormatException(message: String) : Exception(message)
@@ -35,13 +35,13 @@ sealed interface BrcRecord {
 }
 
 /**
- * Читатель записи Car Scanner. Время в файле — «настенное» локальное время телефона без зоны,
- * поэтому zone = зона, в которой записывали (по умолчанию — текущая зона устройства).
+ * Car Scanner recording reader. Times in the file are the phone's wall-clock local time without a zone,
+ * so zone = the zone where it was recorded (defaults to the device's current zone).
  */
 class BrcReader(bytes: ByteArray, private val zone: ZoneId = ZoneId.systemDefault()) {
     private val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
 
-    /** true, если последняя запись оборвана (Car Scanner закрыл файл посреди записи) — это норма, 5 из 73 файлов. */
+    /** true if the last record is truncated (Car Scanner closed the file mid-record); this is normal, 5 of 73 files. */
     var truncated = false
         private set
 
@@ -83,7 +83,7 @@ class BrcReader(bytes: ByteArray, private val zone: ZoneId = ZoneId.systemDefaul
         )
     }
 
-    /** Строка .NET BinaryWriter: длина 7-битными группами, затем UTF-8. */
+    /** .NET BinaryWriter string: length in 7-bit groups, then UTF-8. */
     private fun string(): String {
         var length = 0
         var shift = 0

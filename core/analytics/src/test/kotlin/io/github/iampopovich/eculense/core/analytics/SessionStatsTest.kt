@@ -27,11 +27,11 @@ class SessionStatsTest {
     fun `percentile of a downsampled sample`() {
         assertEquals(95.0, Percentiles.of((1..100).map { it.toDouble() }, 0.95)!!, 1e-9)
         assertEquals(7.0, Percentiles.of(listOf(7.0), 0.95)!!, 1e-9)
-        // мало значений: p95 из трёх — максимум (ближайший ранг), а не середина, иначе p95 < среднего
+        // few values: p95 of three is the maximum (nearest rank), not the middle, otherwise p95 < mean
         assertEquals(24.2, Percentiles.of(listOf(4.7, 4.7, 24.2), 0.95)!!, 1e-9)
         assertEquals(2.0, Percentiles.of(listOf(1.0, 2.0, 3.0, 4.0), 0.5)!!, 1e-9)
         assertNull(Percentiles.of(emptyList(), 0.5))
-        // шаг прореживания: не больше maxSample значений
+        // decimation step: no more than maxSample values
         assertEquals(1, Percentiles.step(count = 1_000, maxSample = 2_000))
         assertEquals(50, Percentiles.step(count = 100_000, maxSample = 2_000))
     }

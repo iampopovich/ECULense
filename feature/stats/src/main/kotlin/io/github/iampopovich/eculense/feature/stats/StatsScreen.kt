@@ -53,7 +53,7 @@ internal fun StatsRoute(viewModel: StatsViewModel = koinViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val navigator = LocalNavigator.current
     val koin = getKoin()
-    // перенос статистики из Car Scanner — в :feature:backup; нет фичи — нет ссылки
+    // Car Scanner statistics import lives in :feature:backup; no feature, no link
     val hasBackup = remember { koin.getAll<RouteHandler>().any { it.routeClass == BackupDestination::class } }
     StatsScreen(state, onPeriod = viewModel::selectPeriod, onImport = if (hasBackup) ({ navigator.navigate(BackupDestination) }) else null)
 }
@@ -78,12 +78,12 @@ internal fun StatsScreen(state: StatsUiState, onPeriod: (StatsPeriod) -> Unit, m
 }
 
 /**
- * Шапка: заголовок + ОДНА кнопка импорта для всего экрана — импорт бэкапа не зависит от выбранного периода
- * (повтор ссылки в каждой ветке читался как «импорт за неделю/месяц»). Нет :feature:backup — нет кнопки.
+ * Header: title + ONE import button for the whole screen; backup import does not depend on the selected period
+ * (repeating the link in every branch read as "import for the week/month"). No :feature:backup, no button.
  */
 @Composable
 private fun Header(carName: String?, onImport: (() -> Unit)?) {
-    // Кнопка — отдельной строкой: в одной строке с заголовком при крупном шрифте «Статистика» переносилась по буквам.
+    // The button goes on its own row: on the same row as the title, with a large font «Статистика» wrapped letter by letter.
     Column(Modifier.fillMaxWidth().padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Column {
             Text("Статистика", style = MaterialTheme.typography.headlineSmall, maxLines = 1)
@@ -129,9 +129,9 @@ private fun PeriodSelector(selected: StatsPeriod, onPeriod: (StatsPeriod) -> Uni
                 selected = selected == p,
                 onClick = { onPeriod(p) },
                 shape = SegmentedButtonDefaults.itemShape(i, periods.size),
-                // без галочки: на узком экране она съедает подпись «Всё время»
+                // no checkmark: on a narrow screen it eats the «Всё время» label
                 icon = {},
-                // при крупном шрифте «Всё время» не влезала и обрезалась до «Всё» — уменьшаем, а не режем
+                // with a large font «Всё время» did not fit and was cut to «Всё»; shrink it rather than clip
                 label = {
                     Text(
                         p.label,

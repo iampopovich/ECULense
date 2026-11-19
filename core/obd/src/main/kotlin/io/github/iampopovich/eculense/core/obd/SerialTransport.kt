@@ -11,16 +11,16 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 
 /**
- * Минимум от последовательного порта. Реализации: Android USB (:core:usb, usb-serial-for-android),
- * в будущем ПК (jSerialComm на JVM или flutter_libserialport в Dart-порте).
- * Все методы блокирующие, вызываются на Dispatchers.IO.
+ * Minimal serial port interface. Implementations: Android USB (:core:usb, usb-serial-for-android),
+ * later desktop (jSerialComm on the JVM or flutter_libserialport in the Dart port).
+ * All methods are blocking and called on Dispatchers.IO.
  */
 interface SerialPortIo {
     fun open()
     fun setBaudRate(baud: Int)
     fun write(data: ByteArray, timeoutMs: Int)
 
-    /** Число прочитанных байт; 0 — если за timeoutMs ничего не пришло. */
+    /** Number of bytes read; 0 if nothing arrived within timeoutMs. */
     fun read(buffer: ByteArray, timeoutMs: Int): Int
     fun close()
 }
@@ -56,7 +56,7 @@ class SerialTransport(
         }
     }
 
-    /** Пустая строка: живой ELM327 на правильной скорости отвечает приглашением '>'. */
+    /** Empty line: a live ELM327 at the correct baud rate responds with the '>' prompt. */
     private fun probe(baud: Int): Boolean {
         port.setBaudRate(baud)
         drain()

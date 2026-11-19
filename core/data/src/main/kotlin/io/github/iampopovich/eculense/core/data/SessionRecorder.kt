@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Пишет в БД то, что сейчас опрашивается (как Car Scanner: «записывается то, что на экране»). */
+/** Writes to the DB whatever is currently being polled (like Car Scanner: "what is on screen gets recorded"). */
 interface SessionRecorder {
     val activeSessionId: StateFlow<Long?>
     fun start(name: String)
@@ -23,7 +23,7 @@ internal class LiveSessionRecorder(
     private val controller: ConnectionController,
     private val repository: SessionRepository,
     private val scope: CoroutineScope,
-    /** После finish: поездка по записи и фоновый анализ (3.9). Ошибки здесь не ломают запись. */
+    /** After finish: trip for the recording and background analysis (3.9). Errors here do not break the recording. */
     private val onFinished: suspend (sessionId: Long) -> Unit = {},
 ) : SessionRecorder {
     private val _active = MutableStateFlow<Long?>(null)

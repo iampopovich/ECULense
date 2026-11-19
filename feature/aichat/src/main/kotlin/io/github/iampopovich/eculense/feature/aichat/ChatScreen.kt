@@ -67,14 +67,14 @@ import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
-/** Подсказки пустого чата: подставляются в поле ввода (не отправляются сами — запрос стоит денег). */
+/** Empty-chat suggestions: inserted into the input field (not sent automatically, since a request costs money). */
 internal val CHAT_SUGGESTIONS = listOf("Как машина вела себя за полгода", "Объясни мои ошибки", "Сколько трачу на топливо", "Что пора обслужить")
 
 @Composable
 internal fun ChatRoute(prefill: String?, viewModel: ChatViewModel = koinViewModel { parametersOf(prefill) }) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val navigator = LocalNavigator.current
-    // вернулись из «Настроек ИИ» — провайдер мог смениться (телефон ↔ облако)
+    // returned from «Настроек ИИ»: the provider may have changed (phone ↔ cloud)
     LifecycleResumeEffect(viewModel) {
         viewModel.refreshProvider()
         onPauseOrDispose { }
@@ -120,12 +120,12 @@ internal fun ChatScreen(
         }
     }
     val listState = rememberLazyListState()
-    // Ответ растёт и после того, как текст пришёл (Markdown дописывает блоки асинхронно), поэтому держимся за низ
-    // списка по фактическому размеру последнего элемента, а не по длине текста.
+    // The answer keeps growing after the text arrives (Markdown appends blocks asynchronously), so we stick to the bottom
+    // of the list by the actual size of the last item, not by text length.
     LaunchedEffect(listState) {
         snapshotFlow {
             val info = listState.layoutInfo
-            // только пока последний элемент виден: пролистанную вверх историю не дёргаем
+            // only while the last item is visible: do not yank history the user has scrolled up
             info.visibleItemsInfo.lastOrNull()?.takeIf { it.index == info.totalItemsCount - 1 }?.let { it.index to it.size }
         }
             .filterNotNull()
@@ -135,7 +135,7 @@ internal fun ChatScreen(
     val lastLength = state.messages.lastOrNull()?.text?.length ?: 0
     LaunchedEffect(state.messages.size, lastLength, state.error, state.streaming) {
         val count = listState.layoutInfo.totalItemsCount
-        // Большое смещение упирается в конец списка: видно низ растущего ответа, а не его начало.
+        // A large offset is clamped to the end of the list: the bottom of the growing answer is visible, not its start.
         if (count > 0) listState.scrollToItem(count - 1, Int.MAX_VALUE)
     }
     Column(modifier.fillMaxSize().aboveKeyboard().padding(horizontal = 16.dp)) {
@@ -163,7 +163,7 @@ internal fun ChatScreen(
             )
         }
         if (state.carDataAvailable) {
-            // Вся строка — одна зона касания (48 dp), подпись читается вместе с переключателем.
+            // The whole row is one touch target (48 dp); the label is read together with the switch.
             Row(
                 Modifier.fillMaxWidth().heightIn(min = 48.dp)
                     .toggleable(value = state.useCarData, enabled = !state.streaming, role = Role.Switch, onValueChange = onUseCarData),
@@ -218,7 +218,7 @@ internal fun ChatScreen(
                     )
                 }
             }
-            // Инструменты между кругами ответа: текст уже есть, ИИ снова смотрит данные.
+            // Tools between answer rounds: text already exists, AI is looking at the data again.
             if (state.toolStatus != null && !state.awaitingFirstToken) item { TypingIndicator(state.toolStatus) }
             state.error?.let { error ->
                 item {
@@ -246,7 +246,7 @@ internal fun ChatScreen(
     }
 }
 
-/** Вопрос пользователя — тональный «пузырь» справа, обычный текст без Markdown. */
+/** User question: a tonal "bubble" on the right, plain text without Markdown. */
 @Composable
 private fun UserBubble(text: String) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
@@ -265,7 +265,7 @@ private fun UserBubble(text: String) {
     }
 }
 
-/** Ответ ИИ — на всю ширину без пузыря (как в Gemini/ChatGPT), Markdown + «Копировать» после завершения. */
+/** AI answer: full width without a bubble (like Gemini/ChatGPT), Markdown + «Копировать» once finished. */
 @Composable
 private fun AssistantMessage(text: String, streaming: Boolean, stopped: Boolean, experts: ExpertsInfo? = null) {
     val shown = HtmlEntities.decode(text, complete = !streaming)
@@ -284,8 +284,8 @@ private fun AssistantMessage(text: String, streaming: Boolean, stopped: Boolean,
 }
 
 /**
- * «Над ответом работали: Аналитик эксплуатации · Моторист · Диагност» и свёрнутый блок «Заметки экспертов»
- * (markdown каждой заметки под заголовком роли). Заметок нет, если роль отвечала сама или модель была на телефоне.
+ * «Над ответом работали: Аналитик эксплуатации · Моторист · Диагност» and a collapsed «Заметки экспертов» block
+ * (markdown of each note under the role heading). There are no notes if a role answered by itself or the model ran on the phone.
  */
 @Composable
 private fun ExpertsFooter(info: ExpertsInfo) {
@@ -320,7 +320,7 @@ private fun ExpertsFooter(info: ExpertsInfo) {
     }
 }
 
-/** Индикатор «печатает» до первого куска ответа: три точки с бегущей прозрачностью; при вызове инструмента — что смотрит ИИ. */
+/** "Typing" indicator until the first answer chunk: three dots with a running opacity; during a tool call, shows what the AI is looking at. */
 @Composable
 private fun TypingIndicator(status: String? = null) {
     val transition = rememberInfiniteTransition(label = "typing")
@@ -345,8 +345,8 @@ private fun TypingIndicator(status: String? = null) {
 }
 
 /**
- * Ответ ИИ как Markdown. Состояние парсера потоковое (append-only): при каждом новом куске текста
- * дописываем только хвост, уже разобранные блоки не перерисовываются.
+ * AI answer as Markdown. Parser state is streaming (append-only): on each new chunk of text
+ * we append only the tail; already parsed blocks are not redrawn.
  */
 @Composable
 private fun AssistantMarkdown(text: String) {
@@ -355,7 +355,7 @@ private fun AssistantMarkdown(text: String) {
         val have = markdown.content.length
         if (text.length > have) markdown.append(text.substring(have))
     }
-    // Заголовки по умолчанию — display-стили (огромные для чата): сжимаем до title/body.
+    // Default headings use display styles (huge for a chat): shrink them to title/body.
     val type = MaterialTheme.typography
     Markdown(
         streamingMarkdownState = markdown,
@@ -375,7 +375,7 @@ private fun AssistantMarkdown(text: String) {
 private fun CopyButton(text: String) {
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
-    // 48 dp — минимальная зона касания; сама иконка 20 dp
+    // 48 dp is the minimum touch target; the icon itself is 20 dp
     IconButton(onClick = { scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("ECULense", text))) } }) {
         Icon(
             painterResource(R.drawable.ic_copy),

@@ -2,13 +2,13 @@ package io.github.iampopovich.eculense.core.dtcdb
 
 import io.github.iampopovich.eculense.core.datapacks.PackDb
 
-/** Заводские расшифровки (Wal33D/dtc-database, таблица dtc_definitions). */
+/** Manufacturer descriptions (Wal33D/dtc-database, dtc_definitions table). */
 fun interface OemDtcSource {
     fun lookup(code: String, manufacturer: String): String?
 }
 
 class Wal33dOemDtc(private val db: PackDb) : OemDtcSource, AutoCloseable {
-    /** Марки в базе (KIA, CHEVY, MERCEDES…) без служебных GENERIC/OTHER. */
+    /** Makes in the database (KIA, CHEVY, MERCEDES…) without the service GENERIC/OTHER. */
     val manufacturers: Set<String> by lazy {
         db.query("SELECT DISTINCT manufacturer FROM dtc_definitions") { it.string(0) }.filterNotNull()
             .filter { it !in OemBrands.NOT_A_BRAND }.toSet()
@@ -23,9 +23,9 @@ class Wal33dOemDtc(private val db: PackDb) : OemDtcSource, AutoCloseable {
     override fun close() = db.close()
 }
 
-/** Марка из профиля машины → марка в базе заводских кодов. Без регистра, с синонимами и русскими названиями. */
+/** Make from the car profile → make in the manufacturer code database. Case-insensitive, with synonyms and Russian names. */
 object OemBrands {
-    /** «OTHER» в базе — смесь кодов разных марок (P1847 там — раздатка), это не марка машины. */
+    /** «OTHER» in the database is a mix of codes from different makes (P1847 there is the transfer case), not a car make. */
     val NOT_A_BRAND = setOf("GENERIC", "OTHER")
 
     private val ALIASES = mapOf(
@@ -39,7 +39,7 @@ object OemBrands {
         "ЯГУАР" to "JAGUAR", "ДЖИП" to "JEEP", "ДОДЖ" to "DODGE", "КРАЙСЛЕР" to "CHRYSLER", "КАДИЛЛАК" to "CADILLAC",
     )
 
-    /** null — марка не указана или её нет в базе: тогда заводские коды не расшифровываем. */
+    /** null — make not set or not in the database: then manufacturer codes are not decoded. */
     fun manufacturer(brand: String?, known: Set<String>): String? {
         val key = brand?.uppercase()?.filter { it.isLetterOrDigit() }?.ifBlank { null } ?: return null
         val m = ALIASES[key] ?: key

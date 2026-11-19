@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 
-/** Диспетчер на таблице формулировок (в том числе как спрашивает Алекс) + реестр ролей и промпты. */
+/** Dispatcher over a table of phrasings (including how Alex asks) + role registry and prompts. */
 class ChatRouterTest {
     private val today = LocalDate.of(2026, 7, 2)
     private fun route(q: String) = ChatRouter.route(q, today)
@@ -80,7 +80,7 @@ class ChatRouterTest {
         assertEquals(listOf("fuel"), ids("сколько я трачу на бензин"))
         assertEquals(listOf("service"), ids("когда менять масло"))
         assertEquals(listOf("electrical"), ids("что с аккумулятором"))
-        // «почему…» — ведущий по теме, Диагност вторым
+        // «почему…»: lead by topic, Diagnostician second
         assertEquals(listOf("engine", "diagnostician"), ids("почему плавают обороты на холостых"))
     }
 
@@ -95,12 +95,12 @@ class ChatRouterTest {
         assertEquals(14, ChatRouter.days("последние 2 недели", today))
         assertEquals(90, ChatRouter.days("за квартал", today))
         assertEquals(10, ChatRouter.days("за 10 дней", today))
-        // с весны = с 1 марта этого года
+        // since spring = since March 1 of this year
         assertEquals(123, ChatRouter.days("как ездил с весны", today))
-        // с зимы: 1 декабря прошлого года
+        // since winter: December 1 of last year
         assertEquals(213, ChatRouter.days("с зимы", today))
         assertNull(ChatRouter.days("объясни мои ошибки", today))
-        // год выпуска — не период
+        // model year is not a period
         assertNull(ChatRouter.days("болячки kia 2005", today))
     }
 
@@ -132,7 +132,7 @@ class ChatRouterTest {
         assertEquals(setOf("dtcHistory", "findings", "carProfile"), ExpertRoles.DIAGNOSTICIAN.tools)
         assertEquals(setOf("trends", "tripStats", "listSessions"), ExpertRoles.USAGE.tools)
         assertEquals(setOf("carProfile"), ExpertRoles.MODEL_EXPERT.tools)
-        // старый шаблон живёт только в форме ответа на вопрос о неисправности
+        // the old template lives on only in the answer format for fault questions
         assertTrue(SystemPrompts.answerForm(ChatIntent.DIAGNOSE).contains("что проверить самому"))
         ChatIntent.entries.filter { it != ChatIntent.DIAGNOSE }.forEach { i ->
             assertFalse(i.name, SystemPrompts.answerForm(i).contains("что проверить самому"))

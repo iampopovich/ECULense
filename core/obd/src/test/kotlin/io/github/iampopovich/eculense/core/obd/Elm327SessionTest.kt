@@ -31,7 +31,7 @@ class Elm327SessionTest {
         assertTrue(0x0C in pids)
         assertTrue(0x21 in pids)
         assertTrue("0120" in transport.sent)
-        assertTrue("0140" !in transport.sent) // в ответе 0120 бит «есть 0x40» не выставлен
+        assertTrue("0140" !in transport.sent) // in the 0120 response the "0x40 supported" bit is not set
     }
 
     @Test

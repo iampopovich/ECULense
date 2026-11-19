@@ -10,14 +10,14 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 
 /**
- * Фильтр модельных годов OBDb: команда действует, если год ≤ to, или ≥ from, или входит в years (объединение).
- * Нет фильтра — действует для всех годов модели.
+ * OBDb model-year filter: a command applies if the year is ≤ to, or ≥ from, or is in years (union).
+ * No filter means it applies to all model years.
  */
 data class YearFilter(val from: Int? = null, val to: Int? = null, val years: Set<Int> = emptySet()) {
     fun matches(year: Int): Boolean = (to != null && year <= to) || (from != null && year >= from) || year in years
 }
 
-/** Формула сигнала (signalset v3 `fmt`): значение = (raw · mul / div + add), raw — len бит с позиции bix. */
+/** Signal formula (signalset v3 `fmt`): value = (raw · mul / div + add), raw is len bits starting at bix. */
 data class SignalFormat(
     val bix: Int = 0,
     val len: Int,
@@ -32,7 +32,7 @@ data class SignalFormat(
 
 data class Signal(val id: String, val name: String, val path: String?, val fmt: SignalFormat?, val description: String? = null)
 
-/** Команда: заголовок ЭБУ (hdr), адрес ответа (rax), сервис → PID (`{"22": "F010"}`), частота опроса, фильтр годов. */
+/** Command: ECU header (hdr), response address (rax), service → PID (`{"22": "F010"}`), polling frequency, year filter. */
 data class SignalCommand(
     val hdr: String,
     val rax: String?,
@@ -55,7 +55,7 @@ data class Signalset(val ecus: List<Ecu>, val commands: List<SignalCommand>) {
     fun forYear(year: Int): List<SignalCommand> = commands.filter { it.appliesTo(year) }
 }
 
-/** Разбор `signalsets/v3/default.json` как есть (формат OBDb, CC BY-SA 4.0). Неизвестные поля пропускаются. */
+/** Parses `signalsets/v3/default.json` as is (OBDb format, CC BY-SA 4.0). Unknown fields are skipped. */
 object SignalsetParser {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -117,13 +117,13 @@ object SignalsetParser {
     private fun JsonArray?.orEmpty(): List<kotlinx.serialization.json.JsonElement> = this ?: emptyList()
 }
 
-/** Поколение из `generations.yaml`: годы включительно, end = null — выпускается сейчас. */
+/** Generation from `generations.yaml`: years inclusive, end = null means still in production. */
 data class Generation(val name: String, val startYear: Int, val endYear: Int?) {
     fun contains(year: Int) = year >= startYear && (endYear == null || year <= endYear)
     val years: String get() = "$startYear–${endYear ?: "н. в."}"
 }
 
-/** Минимальный разбор `generations.yaml` OBDb (плоский список name/start_year/end_year) — без YAML-библиотеки. */
+/** Minimal parser for OBDb `generations.yaml` (flat list of name/start_year/end_year), without a YAML library. */
 object GenerationsParser {
     private val item = Regex("""^\s*-\s*name:\s*"?(.*?)"?\s*$""")
     private val field = Regex("""^\s*(start_year|end_year):\s*(\S+)\s*$""")

@@ -8,15 +8,15 @@ import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
 
-/** Результат проверки OBDb для машины пользователя. */
+/** Result of the OBDb check for the user's car. */
 sealed interface SignalsetResult {
-    /** В профиле нет марки/модели/года — искать нечего. */
+    /** The profile has no make/model/year: nothing to look up. */
     data class NeedsProfile(val missing: List<String>) : SignalsetResult
 
-    /** Репозитория `OBDb/<Make>-<Model>` нет. */
+    /** No `OBDb/<Make>-<Model>` repository. */
     data class NoRepository(val repo: String) : SignalsetResult
 
-    /** Репозиторий есть, но для поколения этого года нет данных с реальных машин (Kia Sorento BL 2002–2009). */
+    /** The repository exists, but there is no real-car data for this year's generation (Kia Sorento BL 2002–2009). */
     data class NotCovered(val repo: String, val year: Int, val generation: Generation?, val coveredYears: List<Int>) : SignalsetResult
 
     data class Covered(
@@ -32,10 +32,10 @@ sealed interface SignalsetResult {
 }
 
 /**
- * OBDb (github.com/OBDb, CC BY-SA 4.0): репозиторий на модель, `signalsets/v3/default.json` + `generations.yaml`.
- * Покрытие года = есть ли в репозитории тестовые данные (`tests/test_cases/<год>/command_support.yaml`) хоть для одного
- * года того же поколения; сами команды фильтруются по `filter` для года машины.
- * Только скачивание и просмотр: опрос расширенных PID требует ATH1/ATSH и сервисов 21/22 (бэклог 1.24 п. 6–7).
+ * OBDb (github.com/OBDb, CC BY-SA 4.0): one repository per model, `signalsets/v3/default.json` + `generations.yaml`.
+ * A year is covered if the repository has test data (`tests/test_cases/<year>/command_support.yaml`) for at least one
+ * year of the same generation; the commands themselves are filtered by `filter` for the car's year.
+ * Download and viewing only: polling extended PIDs requires ATH1/ATSH and services 21/22 (backlog 1.24 items 6–7).
  */
 class ObdbSignalsets(
     private val http: PackHttp,
@@ -63,7 +63,7 @@ class ObdbSignalsets(
         val generations = generationsYaml?.let(GenerationsParser::parse).orEmpty()
         val generation = generations.firstOrNull { it.contains(year!!) }
         val probe = generation?.let { g -> (g.startYear..(g.endYear ?: currentYear())).toList() } ?: listOf(year!!)
-        // ближайшие к году машины — первыми: обычно ответ находится за 1–2 запроса
+        // years closest to the car's year first: the answer is usually found within 1–2 requests
         val hit = probe.sortedBy { kotlin.math.abs(it - year!!) }.firstOrNull { y -> http.status(raw(repo, "tests/test_cases/$y/command_support.yaml")) == 200 }
         if (hit == null) return@withContext SignalsetResult.NotCovered(repo, year!!, generation, emptyList())
         val json = text(raw(repo, "signalsets/v3/default.json"))
@@ -73,7 +73,7 @@ class ObdbSignalsets(
         SignalsetResult.Covered(repo, year!!, generation, version, signalset.ecus, signalset.forYear(year))
     }
 
-    /** Уже скачанный сигналсет модели (офлайн). */
+    /** Already downloaded model signalset (offline). */
     suspend fun stored(make: String, model: String, year: Int): SignalsetResult.Covered? = withContext(Dispatchers.IO) {
         val repo = repoName(make, model)
         val installed = store.installed(packId(repo)) ?: return@withContext null

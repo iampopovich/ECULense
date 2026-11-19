@@ -3,28 +3,28 @@ package io.github.iampopovich.eculense.core.ai
 import ai.koog.agents.core.tools.ToolRegistry
 
 /**
- * Инструменты данных машины для агента (реализует :core:aitools; без него чат работает без данных).
- * Только чтение, ответы — компактный JSON без VIN и координат.
+ * Vehicle data tools for the agent (implements :core:aitools; without it the chat works without data).
+ * Read-only; responses are compact JSON without VIN or coordinates.
  */
 interface VehicleToolbox {
-    /** Новый набор инструментов на один ход диалога (активная машина берётся в момент вызова). */
+    /** A fresh tool set per dialog turn (the active car is resolved at call time). */
     fun registry(): ToolRegistry
 
-    /** Только инструменты с именами из [only] — у каждого эксперта свой набор. */
+    /** Only tools whose names are in [only]: each expert has its own set. */
     fun registry(only: Set<String>): ToolRegistry = ToolRegistry { tools(registry().tools.filter { it.name in only }) }
 
-    /** Подпись прогресса для пользователя: «ИИ смотрит ошибки…». */
+    /** User-facing progress label: «ИИ смотрит ошибки…». */
     fun progressLabel(toolName: String): String
 
     /**
-     * Сводка данных машины одним текстом (ответы инструментов профиля, ошибок, находок, ТО и последней записи) — для
-     * моделей на телефоне, которые инструменты не вызывают: числа всё равно считает приложение. null — нет данных.
+     * Vehicle data digest as a single text (tool outputs for profile, DTCs, findings, maintenance and the latest recording), for
+     * on-phone models that don't call tools: the numbers are still computed by the app. null means no data.
      */
     suspend fun digest(): String? = null
 
     /**
-     * Сводка только из разделов [sections] (имена инструментов, в этом порядке): данные под вопрос, а не всё подряд.
-     * [days] — период трендов и поездок. По умолчанию — полная [digest].
+     * Digest of only the [sections] (tool names, in this order): data relevant to the question, not everything.
+     * [days] is the period for trends and trips. Defaults to the full [digest].
      */
     suspend fun digest(sections: List<String>, days: Int): String? = digest()
 }

@@ -13,7 +13,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** «Анализ» — пункт хаба «Пит-стоп» сразу после «Ошибок». Работает без ИИ; «Спросить ИИ» — только если чат подключён. */
+/** «Анализ» — item of the «Пит-стоп» hub right after «Ошибок». Works without AI; «Спросить ИИ» — only if chat is wired in. */
 @OptIn(KoinExperimentalAPI::class)
 val analysisModule = module {
     viewModel { AnalysisViewModel(get(), get()) }

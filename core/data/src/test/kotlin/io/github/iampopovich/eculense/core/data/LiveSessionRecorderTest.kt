@@ -43,7 +43,7 @@ class LiveSessionRecorderTest {
         repeat(30) { controller.readingsFlow.emit(SensorReading("01.0C", it.toDouble(), "rpm", it.toLong())) }
         runCurrent()
         recorder.stop()
-        runCurrent() // advanceUntilIdle() не исполняет задачи backgroundScope
+        runCurrent() // advanceUntilIdle() does not run backgroundScope tasks
 
         assertEquals(30, repository.appended.size)
         assertEquals(listOf(1L), repository.finished)

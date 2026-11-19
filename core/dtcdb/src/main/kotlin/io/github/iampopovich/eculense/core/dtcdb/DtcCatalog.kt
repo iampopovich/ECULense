@@ -1,9 +1,9 @@
 package io.github.iampopovich.eculense.core.dtcdb
 
 /**
- * Расшифровка кода с учётом марки активной машины.
- * Общие коды: OBDex (если пакет скачан) → встроенный CSV. Заводские: только база марки машины; иначе честное
- * «Заводской код производителя, расшифровка неизвестна» — чужая расшифровка хуже никакой.
+ * Code description that takes the active car's make into account.
+ * Generic codes: OBDex (if the pack is downloaded) → bundled CSV. Manufacturer codes: only the car make's database; otherwise an honest
+ * «Заводской код производителя, расшифровка неизвестна»; another make's description is worse than none.
  */
 class DtcCatalog(
     private val generic: GenericDtcSource?,
@@ -26,6 +26,6 @@ class DtcCatalog(
 
 private val csvLine = Regex("^\"([A-Z0-9]{5})\",\"(.*)\"$")
 
-/** Встроенный `assets/dtc_codes.csv` (lennykean/OBDII.DTC, MIT): только общие диапазоны. */
+/** Bundled `assets/dtc_codes.csv` (lennykean/OBDII.DTC, MIT): generic ranges only. */
 fun parseDtcCsv(lines: Sequence<String>): Map<String, String> =
     lines.mapNotNull { csvLine.find(it.trim())?.destructured }.associate { (code, text) -> code to text }

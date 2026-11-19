@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Список записей. Импорт из Car Scanner переехал в «Настройки → Импорт и резервные копии» (1.27, :feature:backup). */
+/** Recordings list. Car Scanner import moved to «Настройки → Импорт и резервные копии» (1.27, :feature:backup). */
 internal class SessionsViewModel(
     private val repository: SessionRepository,
 ) : ViewModel() {
@@ -42,7 +42,7 @@ internal class SessionDetailViewModel(
     private val _readings = MutableStateFlow<Map<String, List<SensorReading>>>(emptyMap())
     val readingsBySensor: StateFlow<Map<String, List<SensorReading>>> = _readings.asStateFlow()
 
-    /** Импортированная поездка Car Scanner — до ~120 тыс. значений, загрузка занимает секунды. */
+    /** Imported Car Scanner trip: up to ~120k values, loading takes seconds. */
     private val _loading = MutableStateFlow(true)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
@@ -53,7 +53,7 @@ internal class SessionDetailViewModel(
         }
     }
 
-    /** Пишет CSV в cache/exports и возвращает content:// Uri для Intent.ACTION_SEND. */
+    /** Writes CSV to cache/exports and returns a content:// Uri for Intent.ACTION_SEND. */
     suspend fun exportCsv(): Uri = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }
         val file = File(dir, "ecu-session-$sessionId.csv")

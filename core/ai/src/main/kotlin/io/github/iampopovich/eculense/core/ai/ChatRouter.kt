@@ -3,27 +3,27 @@ package io.github.iampopovich.eculense.core.ai
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-/** Решение диспетчера: тип вопроса, эксперты (ведущий первым, 0–4) и период в днях (null — вопрос без периода). */
+/** Dispatcher decision: question type, experts (lead first, 0–4) and period in days (null: question without a period). */
 data class ChatRoute(val intent: ChatIntent, val roles: List<ExpertRole>, val days: Int?) {
-    /** Период для трендов и поездок: из вопроса или полгода. */
+    /** Period for trends and trips: from the question, or half a year. */
     val periodDays: Int get() = days ?: ChatRouter.DEFAULT_DAYS
 
-    /** Разделы сводки для модели на телефоне — по ролям, без повторов; профиль машины первым. */
+    /** Summary sections for the on-phone model: by role, no duplicates; car profile first. */
     val digestSections: List<String>
         get() = if (roles.isEmpty()) emptyList() else (listOf("carProfile") + roles.flatMap { it.digestSections }).distinct()
 }
 
 /**
- * Диспетчер: детерминированный, без модели. По словам вопроса (ру + англ.) выбирает экспертов и период. Неясный вопрос —
- * обзор (Аналитик эксплуатации + Диагност + Моторист); приветствие и вопросы не о машине — без экспертов и данных.
+ * Dispatcher: deterministic, no model. Picks experts and period from the question's words (Russian + English). An unclear
+ * question gets an overview (Operations Analyst + Diagnostician + Engine Specialist); greetings and non-car questions get no experts or data.
  */
 object ChatRouter {
     const val DEFAULT_DAYS = 180
     const val MAX_ROLES = 4
 
     /**
-     * Границы слова — явными lookaround по буквам Юникода: `\b` в JDK 19+ ASCII-шный (на кириллице не срабатывает), а
-     * флаг юникодных классов (U), который это чинит на JVM, Android-регэксп (ICU) не знает — PatternSyntaxException при первом вопросе.
+     * Word boundaries via explicit lookarounds over Unicode letters: `\b` in JDK 19+ is ASCII-only (does not work on Cyrillic), and
+     * the Unicode character class flag (U) that fixes this on the JVM is unknown to Android regex (ICU): PatternSyntaxException on the first question.
      */
     private const val START = "(?<![\\p{L}\\p{N}_])"
     private const val END = "(?![\\p{L}\\p{N}_])"
@@ -36,7 +36,7 @@ object ChatRouter {
 
     private val greeting = rx("привет|здравств|добр(ый|ое|ой) (день|утро|вечер)|хай|hi\\b|hello|hey|спасибо|благодар|thanks|thank you|кто ты|как дела|who are you")
 
-    /** Слова «что не так / почему» — вопрос о неисправности, а не о состоянии. */
+    /** Words like «что не так / почему» mean a question about a fault, not about condition. */
     private val problem = rx("почему|why|плава|глохн|троит|дёрга|дерга|стуч|проблем|неисправ|не заводит|сломал|сбо[ий]|problem|issue|wrong|stall")
 
     private val trend = rx("тренд|динамик|изменил|за последн|последни[ех]|за (полгода|год|месяц|недел|квартал)|с (весны|лета|осени|зимы)|over the (last|past)|trend|changed|lately|recently")
@@ -46,7 +46,7 @@ object ChatRouter {
         val scores = roleKeywords.mapValues { (_, list) -> list.count { it.containsMatchIn(q) } }.filterValues { it > 0 }
         val days = days(q, today)
         if (scores.isEmpty() && greeting.containsMatchIn(q)) return ChatRoute(ChatIntent.SMALLTALK, emptyList(), null)
-        // порядок ролей в реестре — при равных очках
+        // role order in the registry breaks ties on equal scores
         val hit = scores.entries.sortedWith(compareByDescending<Map.Entry<ExpertRole, Int>> { it.value }.thenBy { ExpertRoles.ALL.indexOf(it.key) })
             .map { it.key }
         val lead = hit.firstOrNull()
@@ -60,9 +60,9 @@ object ChatRouter {
             else -> if (problem.containsMatchIn(q)) ChatIntent.DIAGNOSE else ChatIntent.SENSOR
         }
         val roles = when (intent) {
-            // обзор и тренды: эксплуатация ведущая, коды и мотор — всегда рядом (иначе «как машина» = только ошибки)
+            // overview and trends: operations leads, codes and engine always alongside (otherwise «как машина» = errors only)
             ChatIntent.OVERVIEW, ChatIntent.TREND -> listOf(ExpertRoles.USAGE) + hit + listOf(ExpertRoles.DIAGNOSTICIAN, ExpertRoles.ENGINE)
-            // «почему плавают обороты»: ведущий — по теме, Диагност вторым (коды часто объясняют симптом)
+            // «почему плавают обороты»: lead by topic, Diagnostician second (codes often explain the symptom)
             ChatIntent.DIAGNOSE -> hit + if (lead != ExpertRoles.DIAGNOSTICIAN) listOf(ExpertRoles.DIAGNOSTICIAN) else emptyList()
             else -> hit
         }.distinct().take(MAX_ROLES)
@@ -78,7 +78,7 @@ object ChatRouter {
     private val year = rx("(за|последний|прошлый|этот) год|year|годовой")
     private val season = Regex("с (весны|лета|осени|зимы)", RegexOption.IGNORE_CASE)
 
-    /** Период в днях из вопроса; null — период не назван. */
+    /** Period in days from the question; null if no period is named. */
     fun days(q: String, today: LocalDate = LocalDate.now()): Int? {
         val text = q.lowercase().replace('ё', 'е')
         if (halfYear.containsMatchIn(text)) return 180

@@ -10,8 +10,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
 /**
- * Один запуск импорта (то, что делает воркер, без WorkManager): импорт → строка истории (готово / ошибка / отменён).
- * Отменённый импорт оставляет уже перенесённые записи (они целые), повтор продолжит с того же места через дедупликацию.
+ * A single import run (what the worker does, minus WorkManager): import → history row (done / failed / cancelled).
+ * A cancelled import keeps the records already transferred (they are complete); a retry resumes from the same point via deduplication.
  */
 class ImportRunner(
     private val importer: suspend (uri: String, fileName: String, onProgress: (ImportProgress) -> Unit) -> ImportReport,

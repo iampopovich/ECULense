@@ -6,9 +6,9 @@ import androidx.navigation3.runtime.NavKey
 import kotlin.reflect.KClass
 
 /**
- * Пункт нижнего меню. Фича регистрирует его сама:
+ * Bottom navigation item. A feature registers it itself:
  * single(named("dashboard")) { TopLevelEntry(DashboardDestination, "Панель", R.drawable.ic_dashboard, 10) }
- * Квалификатор named(...) обязателен: без него Koin оставит только последнюю регистрацию.
+ * The named(...) qualifier is required: without it Koin keeps only the last registration.
  */
 data class TopLevelEntry(
     val destination: NavKey,
@@ -17,25 +17,25 @@ data class TopLevelEntry(
     val order: Int,
 )
 
-/** Фича объявляет: «я умею показывать экраны этого типа». Другие фичи по наличию решают, рисовать ли ссылку. */
+/** A feature declares: "I can show screens of this type". Other features decide by its presence whether to render a link. */
 data class RouteHandler(val routeClass: KClass<out NavKey>)
 
 /**
- * Возможности конкретной сборки (флейвора `ai` в :app): общий код узнаёт о них без ссылок на необязательные модули.
- * Нет регистрации — сборка без ИИ-модулей, ничего не обещаем.
+ * Capabilities of the specific build (`ai` flavor in :app): shared code learns about them without referencing optional modules.
+ * No registration means a build without AI modules; nothing is promised.
  */
 data class BuildCapabilities(
-    /** true — сборка «Локально» (модель на телефоне); false — облачная сборка, где пункт «На устройстве» недоступен. */
+    /** true: the «Локально» build (on-phone model); false: the cloud build, where the «На устройстве» option is unavailable. */
     val onDeviceModels: Boolean,
 )
 
-/** Вкладки-хабы: экран вкладки — список пунктов, которые регистрируют фичи. */
+/** Hub tabs: the tab screen is a list of items registered by features. */
 enum class Hub { PITSTOP, SETTINGS }
 
 /**
- * Пункт хаба. Фича регистрирует его сама, хаб ничего о ней не знает:
+ * Hub item. A feature registers it itself; the hub knows nothing about it:
  * single(named("connect-hub")) { HubEntry(Hub.SETTINGS, ConnectDestination, "Адаптер", "…", R.drawable.ic_adapter, 10) }
- * Нажатие кладёт destination поверх вкладки; «Назад» возвращает в хаб.
+ * A tap pushes the destination on top of the tab; «Назад» returns to the hub.
  */
 data class HubEntry(
     val hub: Hub,

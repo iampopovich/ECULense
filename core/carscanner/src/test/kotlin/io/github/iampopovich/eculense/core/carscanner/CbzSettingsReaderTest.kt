@@ -16,7 +16,7 @@ class CbzSettingsReaderTest {
     fun `short strings are ascii, not big-endian ints`() {
         val s = CbzSettingsReader.parse(
             mapOf(
-                // как в бэкапе: 3 байта 0x4B6961 — это «Kia», а не число 4942177
+                // as in the backup: 3 bytes 0x4B6961 are «Kia», not the number 4942177
                 "SelectedBrand" to byteArrayOf(0x4B, 0x69, 0x61),
                 "Currency" to "EUR".toByteArray(),
                 "FuelPriceForLitre" to "1.79".toByteArray(),
@@ -75,7 +75,7 @@ class CbzSettingsReaderTest {
         assertEquals(500_000L, newer.drivingMs)
         assertEquals(100_000L, newer.standingMs)
         assertEquals(newer.finishedUtcMs - newer.startedUtcMs, newer.totalMs)
-        // временный файл БД удалён
+        // temporary DB file deleted
         assertEquals(emptyList<String>(), tmp.root.list()!!.filter { it.startsWith("cs-drivecycles") })
     }
 

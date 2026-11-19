@@ -48,7 +48,7 @@ internal fun DataPacksRoute(viewModel: DataPacksViewModel = koinViewModel()) {
     )
 }
 
-/** «Данные и справочники»: что скачано, версия, размер, лицензия, источник; скачать/обновить/удалить. */
+/** «Данные и справочники»: what is downloaded, version, size, license, source; download/update/delete. */
 @Composable
 internal fun DataPacksScreen(
     state: DataPacksUiState,

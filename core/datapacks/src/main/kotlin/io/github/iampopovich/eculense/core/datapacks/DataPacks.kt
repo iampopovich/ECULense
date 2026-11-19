@@ -32,27 +32,27 @@ import org.koin.core.component.inject
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-/** Состояние пакета для экрана «Данные и справочники». progress: null — не качается, -1 — качается, размер неизвестен. */
+/** Pack state for the «Данные и справочники» screen. progress: null — not downloading, -1 — downloading, size unknown. */
 data class PackState(
     val manifest: PackManifest,
     val installed: PackStore.Installed? = null,
     val progress: Int? = null,
     val updateVersion: String? = null,
     val error: String? = null,
-    /** Сколько байт уже скачано (идёт загрузка или лежит недокачанный файл — «Продолжить»). */
+    /** Bytes already downloaded (download in progress or a partial file is present — «Продолжить»). */
     val downloadedBytes: Long = 0,
-    /** Загрузка ждёт повтора после обрыва (WorkManager повторит сам). */
+    /** Download is waiting for a retry after an interruption (WorkManager retries by itself). */
     val retrying: Boolean = false,
 ) {
     val downloading: Boolean get() = progress != null
 }
 
 /**
- * Что нужно экранам от пакетов: состояние, скачать/отменить/удалить, тип сети. Интерфейс — чтобы ViewModel-и
- * тестировались без WorkManager.
+ * What screens need from packs: state, download/cancel/delete, network type. An interface so ViewModels
+ * can be tested without WorkManager.
  */
 interface DataPackService {
-    /** Справочники ([PackGroup.REFERENCE]). */
+    /** Reference data ([PackGroup.REFERENCE]). */
     fun observe(): Flow<List<PackState>>
     fun observe(group: PackGroup): Flow<List<PackState>> = observe()
     fun download(id: String, version: String? = null)
@@ -63,9 +63,9 @@ interface DataPackService {
 }
 
 /**
- * Пакеты данных по запросу: скачивание через WorkManager (переживает уход с экрана), атомарная установка версии,
- * удаление, еженедельная проверка обновлений только по безлимитной сети. Подтверждение на мобильной сети — на экране
- * ([isMeteredNetwork] до вызова [download]). [sources] — каталоги, меняющиеся на ходу (модели ИИ из :core:ailocal).
+ * On-demand data packs: download via WorkManager (survives leaving the screen), atomic version install,
+ * deletion, weekly update check on unmetered networks only. Confirmation on mobile data happens on the screen
+ * ([isMeteredNetwork] before calling [download]). [sources] — catalogs that change at runtime (AI models from :core:ailocal).
  */
 class DataPacks(
     private val context: Context,
@@ -85,7 +85,7 @@ class DataPacks(
 
     fun file(id: String, name: String): File? = store.file(id, name)
 
-    /** Любое изменение пакета (установка, удаление) — читатели переоткрывают файлы. */
+    /** Any pack change (install, delete) — readers reopen their files. */
     val revisions: Flow<Int> get() = changes
 
     override fun observe(): Flow<List<PackState>> = observe(PackGroup.REFERENCE)
@@ -116,11 +116,11 @@ class DataPacks(
         )
     }
 
-    /** version = null — зафиксированная (или для «Обновить» — найденная проверкой) версия. */
+    /** version = null — the pinned version (or, for «Обновить», the one found by the check). */
     override fun download(id: String, version: String?) {
         val resumable = manifest(id)?.resumable == true
-        // Нажатие пользователя заменяет ждущую повтора задачу новой (expedited, из открытого приложения); докачка
-        // продолжается с .part, так что замена идущей загрузки ничего не теряет.
+        // A user tap replaces a task waiting for retry with a new one (expedited, from the open app); the download
+        // resumes from .part, so replacing a running download loses nothing.
         val policy = if (resumable) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
         work.enqueueUniqueWork("$TAG:$id", policy, downloadRequest(id, version, resumable))
     }
@@ -137,7 +137,7 @@ class DataPacks(
         changed()
     }
 
-    /** Сообщить экранам об изменении (установка, удаление, новая модель в каталоге). */
+    /** Notify screens of a change (install, delete, new model in the catalog). */
     fun changed() {
         changes.value++
     }
@@ -145,7 +145,7 @@ class DataPacks(
     override fun isMeteredNetwork(): Boolean =
         context.getSystemService(ConnectivityManager::class.java)?.isActiveNetworkMetered ?: true
 
-    /** Раз в неделю, только Wi-Fi/безлимит; проверяются только скачанные пакеты. */
+    /** Once a week, Wi-Fi/unmetered only; only downloaded packs are checked. */
     fun scheduleUpdateCheck() {
         val request = PeriodicWorkRequestBuilder<PackUpdateWorker>(7, TimeUnit.DAYS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build())
@@ -153,7 +153,7 @@ class DataPacks(
         work.enqueueUniquePeriodicWork("$TAG:update-check", ExistingPeriodicWorkPolicy.KEEP, request)
     }
 
-    /** Проверка обновлений сейчас (её же делает еженедельный воркер). Возвращает найденные новые версии. */
+    /** Check for updates now (the weekly worker does the same). Returns the new versions found. */
     override suspend fun checkUpdates(): Map<String, String> {
         val found = mutableMapOf<String, String>()
         for (m in catalog) {
@@ -168,11 +168,11 @@ class DataPacks(
 
     companion object {
         /**
-         * Многогигабайтные пакеты (модели) — expedited-задача: стартует сразу, пока пользователь ещё в приложении (он
-         * только что нажал «Скачать»), и успевает стать foreground-службой — Android 12+/16 запрещает запуск
-         * foreground-службы из фона (`mAllowStartForeground false`). Если квоты expedited нет — обычная задача; без
-         * foreground-службы система остановит её через ~10 минут, и WorkManager продолжит с места обрыва (Range).
-         * Обрыв сети/DNS — Result.retry() с экспоненциальной паузой от [BACKOFF_SECONDS].
+         * Multi-gigabyte packs (models) use an expedited task: it starts immediately while the user is still in the app
+         * (they just tapped «Скачать») and manages to become a foreground service — Android 12+/16 forbids starting
+         * a foreground service from the background (`mAllowStartForeground false`). If there is no expedited quota — a regular
+         * task; without a foreground service the system stops it after ~10 minutes and WorkManager resumes where it broke off (Range).
+         * Network/DNS failure — Result.retry() with exponential backoff from [BACKOFF_SECONDS].
          */
         internal fun downloadRequest(id: String, version: String?, resumable: Boolean): OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<PackDownloadWorker>()
@@ -194,7 +194,7 @@ class DataPacks(
     }
 }
 
-/** Скачивает и устанавливает один пакет; прогресс в процентах — в WorkInfo.progress. */
+/** Downloads and installs one pack; progress in percent goes to WorkInfo.progress. */
 class PackDownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params), KoinComponent {
     private val packs: DataPacks by inject()
 
@@ -205,16 +205,16 @@ class PackDownloadWorker(context: Context, params: WorkerParameters) : Coroutine
         var lastPct = -2
         var lastDone = 0L
         return try {
-            // Многогигабайтный файл: foreground-задача (обычной WorkManager даёт 10 минут) с уведомлением о прогрессе.
-            // Разрешено, пока приложение на экране (старт по нажатию — expedited); повтор из фона Android 12+ не
-            // пустит в foreground — тогда качаем обычной задачей кусками до остановки системой и докачиваем.
+            // Multi-gigabyte file: foreground task (WorkManager gives a regular one 10 minutes) with a progress notification.
+            // Allowed while the app is on screen (started by a tap — expedited); Android 12+ won't let a retry from the
+            // background into the foreground — then we download as a regular task in chunks until the system stops it, and resume.
             if (manifest.resumable) runCatching { setForeground(foregroundInfo(manifest.title, -1)) }
                 .onSuccess { Log.i(DataPacks.LOG, "pack $id: foreground download (attempt $runAttemptCount)") }
                 .onFailure { Log.w(DataPacks.LOG, "foreground not allowed, continuing in background: ${it.message}") }
             setProgress(workDataOf(DataPacks.KEY_PROGRESS to -1))
             val installed = packs.installer.install(manifest, inputData.getString(DataPacks.KEY_VERSION)) { done, total ->
                 val pct = total?.takeIf { it > 0 }?.let { (done * 100 / it).toInt().coerceIn(0, 100) } ?: -1
-                // байты — для «1,2 из 2,6 ГБ»; не чаще чем раз в 4 МБ, чтобы не дёргать базу WorkManager
+                // bytes — for «1,2 из 2,6 ГБ»; at most once per 4 MB so as not to hammer the WorkManager database
                 if (pct != lastPct || done - lastDone >= 4L shl 20) {
                     val pctChanged = pct != lastPct
                     lastPct = pct
@@ -231,14 +231,14 @@ class PackDownloadWorker(context: Context, params: WorkerParameters) : Coroutine
         } catch (e: Exception) {
             Log.w(DataPacks.LOG, "pack $id failed after ${System.currentTimeMillis() - started} ms (attempt $runAttemptCount): ${e.message}")
             packs.changed()
-            // Обрыв сети на многогигабайтном файле: повтор с докачкой (WorkManager, экспоненциальная пауза).
+            // Network drop on a multi-gigabyte file: retry with resume (WorkManager, exponential backoff).
             val transient = e is java.io.IOException && e !is PackIntegrityException && (e as? HttpStatusException)?.code.let { it == null || it >= 500 || it == 429 }
             if (manifest.resumable && transient && runAttemptCount < MAX_RETRIES) Result.retry()
             else Result.failure(workDataOf(DataPacks.KEY_ERROR to (e.message ?: e.javaClass.simpleName)))
         }
     }
 
-    /** Expedited-задача до Android 12 исполняется как foreground-служба — WorkManager спрашивает уведомление здесь. */
+    /** Before Android 12 an expedited task runs as a foreground service — WorkManager asks for the notification here. */
     override suspend fun getForegroundInfo(): ForegroundInfo =
         foregroundInfo(inputData.getString(DataPacks.KEY_ID)?.let { packs.manifest(it)?.title } ?: "данные", -1)
 
@@ -260,7 +260,7 @@ class PackDownloadWorker(context: Context, params: WorkerParameters) : Coroutine
     }
 
     private companion object {
-        // Каждая попытка продолжает с места обрыва, так что попыток можно дать больше (сеть телефона «моргает»).
+        // Each attempt resumes where it broke off, so we can allow more attempts (the phone's network is flaky).
         const val MAX_RETRIES = 10
         const val CHANNEL = "downloads"
         const val NOTIFICATION_ID = 4201

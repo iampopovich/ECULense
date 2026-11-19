@@ -36,7 +36,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.net.InetSocketAddress
 
-/** Агент чата: стриминг + инструменты + ChatMemory. Сеть не нужна: поддельный исполнитель или локальный SSE-сервер. */
+/** Chat agent: streaming + tools + ChatMemory. No network needed: a fake executor or a local SSE server. */
 class VehicleChatAgentTest {
     @get:Rule val tmp = TemporaryFolder()
 
@@ -60,11 +60,11 @@ class VehicleChatAgentTest {
     @Serializable
     data class DtcArgs(@property:LLMDescription("max codes") val limit: Int = 30)
 
-    /** Инструмент как в :core:aitools — типизированный SimpleTool с @Serializable аргументами. */
+    /** A tool like in :core:aitools — a typed SimpleTool with @Serializable arguments. */
     class FakeDtcTool(val calls: MutableList<Int>) : SimpleTool<DtcArgs>(typeToken<DtcArgs>(), "dtcHistory", "DTC history") {
         override suspend fun execute(args: DtcArgs): String {
             calls += args.limit
-            delay(1) // suspend внутри инструмента
+            delay(1) // suspend inside the tool
             return """{"codes":[{"code":"P0171","events":2}]}"""
         }
     }
@@ -74,7 +74,7 @@ class VehicleChatAgentTest {
         override fun progressLabel(toolName: String) = if (toolName == "dtcHistory") "ИИ смотрит ошибки…" else "ИИ смотрит данные…"
     }
 
-    /** Скрипт ответов: каждый вызов модели отдаёт следующий набор кадров и запоминает промпт и инструменты. */
+    /** Response script: each model call returns the next set of frames and records the prompt and tools. */
     private class ScriptedExecutor(private val script: List<List<StreamFrame>>) : PromptExecutor() {
         val prompts = mutableListOf<Prompt>()
         val toolNames = mutableListOf<List<String>>()
@@ -90,7 +90,7 @@ class VehicleChatAgentTest {
 
     private val toolRound = listOf(StreamFrame.ToolCallComplete("call_1", "dtcHistory", """{"limit":5}"""), StreamFrame.End("tool_calls"))
 
-    /** Тесты агента — с одним экспертом (Диагност): без диспетчера по тексту вопроса «?». */
+    /** Agent tests use a single expert (Diagnostician): no dispatcher, question text «?». */
     private val oneExpert: (String) -> ChatRoute = { ChatRoute(ChatIntent.DIAGNOSE, listOf(ExpertRoles.DIAGNOSTICIAN), null) }
     private fun textRound(vararg chunks: String) =
         chunks.map { StreamFrame.TextDelta(it) } + StreamFrame.TextComplete(chunks.joinToString("")) + StreamFrame.End("stop")
@@ -115,7 +115,7 @@ class VehicleChatAgentTest {
         )
         assertEquals(listOf(5), toolbox.calls)
         assertEquals(listOf("dtcHistory"), exec.toolNames.first())
-        // второй запрос несёт результат инструмента; системный промпт — с правилами про инструменты
+        // the second request carries the tool result; the system prompt includes the tool rules
         val second = exec.prompts[1].messages
         assertTrue(second.first().textContent().contains("Все числа, даты и коды бери только из ответов инструментов"))
         val result = second.filterIsInstance<Message.User>().flatMap { it.parts }.filterIsInstance<MessagePart.Tool.Result>().single()
@@ -137,7 +137,7 @@ class VehicleChatAgentTest {
 
         gateway.chat("c2", "Новый диалог", useCarData = true).toList()
         assertEquals(listOf("Новый диалог"), exec.prompts[3].messages.drop(1).map { it.textContent() })
-        // для экрана — полный текст диалога; новый диалог удаляет старый
+        // for the screen — the full dialogue text; a new dialogue deletes the old one
         assertEquals(
             listOf(ChatMessage(ChatMessage.Role.USER, "Вопрос 1"), ChatMessage(ChatMessage.Role.ASSISTANT, "Первый ответ"), ChatMessage(ChatMessage.Role.USER, "Вопрос 2"), ChatMessage(ChatMessage.Role.ASSISTANT, "Второй ответ")),
             gateway.history("c1"),
@@ -187,7 +187,7 @@ class VehicleChatAgentTest {
         assertEquals(listOf("q", "смотрю", "ответ"), TextOnlyHistory.preprocess(msgs).map { it.textContent() })
     }
 
-    // --- Модель на телефоне (:core:ailocal): без стриминга, свой исполнитель, облачные настройки не нужны.
+    // --- On-device model (:core:ailocal): no streaming, its own executor, cloud settings not needed.
     private class WholeAnswerExecutor(private val script: List<Message.Assistant>) : PromptExecutor() {
         val prompts = mutableListOf<Prompt>()
         val toolNames = mutableListOf<List<String>>()
@@ -223,7 +223,7 @@ class VehicleChatAgentTest {
             ),
         )
         val toolbox = Toolbox()
-        // облачный провайдер тоже сохранён — но выбран локальный, облако не вызывается
+        // a cloud provider is saved too — but the local one is selected, the cloud is not called
         val gateway = KoogLlmGateway(store(), toolbox = toolbox, onDevice = FakeOnDevice(OnDeviceSession(localInfo, localModel, exec, streaming = false, supportsTools = true))) { _, _ ->
             error("облачный исполнитель не должен создаваться")
         }
@@ -266,7 +266,7 @@ class VehicleChatAgentTest {
         assertEquals(ChatEvent.Status("Приложение собирает данные машины…"), events.first())
         val system = exec.prompts.single().messages.first().textContent()
         assertTrue(system, system.contains("\"code\":\"P0171\"") && system.contains("бери только отсюда"))
-        // без переключателя «данные машины» сводки нет
+        // without the «данные машины» toggle there is no digest
         val plain = WholeAnswerExecutor(listOf(Message.Assistant("ок", rmeta)))
         KoogLlmGateway(store(), toolbox = toolbox, onDevice = FakeOnDevice(OnDeviceSession(localInfo, localModel, plain, streaming = false, supportsTools = false)))
             .chat("c2", "?", useCarData = false).toList()
@@ -281,7 +281,7 @@ class VehicleChatAgentTest {
         assertEquals("DEEPSEEK", gateway.provider()?.key)
     }
 
-    // --- Spike (план 3.4): Koog 1.3.0 поддерживает suspend-методы @Tool в ToolSet (ToolFromCallable → callSuspendBy).
+    // --- Spike (plan 3.4): Koog 1.3.0 supports suspend @Tool methods in a ToolSet (ToolFromCallable → callSuspendBy).
     @LLMDescription("spike")
     class SpikeSet : ToolSet {
         @Tool
@@ -300,7 +300,7 @@ class VehicleChatAgentTest {
         assertEquals(listOf("ping"), registry.tools.map { it.name })
     }
 
-    // --- Настоящий клиент DeepSeek (OpenAI-совместимый SSE) с вызовом инструмента.
+    // --- Real DeepSeek client (OpenAI-compatible SSE) with a tool call.
     private fun sse(vararg data: String) = data.joinToString("") { "data: $it\n\n" } + "data: [DONE]\n\n"
 
     @Test
@@ -334,14 +334,14 @@ class VehicleChatAgentTest {
         val toolbox = Toolbox()
         val gateway = KoogLlmGateway(store(), toolbox = toolbox) { s, key -> KoogClients.executor(s, key, presetBaseUrlForTests = root) }
 
-        // DeepSeekLLMClient 1.3.0 требует system_fingerprint в кадрах; без него ошибка разбора маскируется Ktor как «Content-Length mismatch».
+        // DeepSeekLLMClient 1.3.0 requires system_fingerprint in frames; without it the parse error is masked by Ktor as «Content-Length mismatch».
         val events = gateway.chat("c1", "Объясни мои ошибки", useCarData = true).toList()
 
         assertEquals(ChatEvent.ToolCall("dtcHistory", "Диагност смотрит ошибки…"), events.filterIsInstance<ChatEvent.ToolCall>().first())
         assertEquals("P0171 дважды", events.filterIsInstance<ChatEvent.Text>().joinToString("") { it.delta })
         assertEquals(listOf(3), toolbox.calls)
         assertTrue(bodies[0], bodies[0].contains("\"tools\"") && bodies[0].contains("dtcHistory"))
-        // второй запрос содержит результат инструмента (role tool) и вызов (tool_calls)
+        // the second request contains the tool result (role tool) and the call (tool_calls)
         assertTrue(bodies[1], bodies[1].contains("\"tool_call_id\":\"call_0\"") && bodies[1].contains("P0171"))
     }
 }

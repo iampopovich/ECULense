@@ -5,8 +5,8 @@ import org.junit.Test
 import java.io.File
 
 /**
- * JVM-тесты не ловят регэкспы, которые падают только на Android: ICU не знает флаг `(?U)` (UNICODE_CHARACTER_CLASS) —
- * PatternSyntaxException «Invalid value for match mode flags» при первом вопросе в чате (так 0.1.1 падал на 14T Pro).
+ * JVM tests don't catch regexes that fail only on Android: ICU doesn't know the `(?U)` flag (UNICODE_CHARACTER_CLASS) —
+ * PatternSyntaxException "Invalid value for match mode flags" on the first chat question (this is how 0.1.1 crashed on a 14T Pro).
  */
 class AndroidRegexCompatTest {
     @Test

@@ -28,16 +28,16 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlin.math.roundToLong
 
-/** Машины пользователя; одна из них активна — к ней привязываются новые записи, DTC и импорт без своей машины. */
+/** The user's cars; one of them is active — new recordings, DTCs and imports without their own car are attached to it. */
 interface CarRepository {
     fun observeCars(): Flow<List<CarProfile>>
     fun observeActiveCar(): Flow<CarProfile?>
     suspend fun activeCarId(): Long?
     suspend fun cars(): List<CarProfile>
     suspend fun byExternalId(externalId: String): CarProfile?
-    /** id == 0 → новая машина. Возвращает id. */
+    /** id == 0 → new car. Returns the id. */
     suspend fun save(car: CarProfile): Long
-    /** Последнюю машину удалить нельзя: записям нужна машина по умолчанию. */
+    /** The last car cannot be deleted: recordings need a default car. */
     suspend fun delete(id: Long): Boolean
     suspend fun setActive(id: Long)
 }
@@ -45,11 +45,11 @@ interface CarRepository {
 interface TripRepository {
     fun observeTrips(carId: Long): Flow<List<Trip>>
     suspend fun trips(carId: Long): List<Trip> = observeTrips(carId).first()
-    /** Возвращает, сколько поездок добавлено (повторы по externalId пропускаются). */
+    /** Returns how many trips were added (duplicates by externalId are skipped). */
     suspend fun addAll(trips: List<Trip>): Int
     /**
-     * Поездки из бэкапа (1.27): новые добавляются, уже известные (тот же externalId) обновляются, только если в бэкапе
-     * изменились итоги (Car Scanner дописал поездку); машина и id существующей поездки сохраняются.
+     * Trips from a backup (1.27): new ones are added, known ones (same externalId) are updated only if their totals
+     * changed in the backup (Car Scanner extended the trip); the car and id of the existing trip are kept.
      */
     suspend fun mergeImported(trips: List<Trip>): TripMerge {
         val added = addAll(trips)
@@ -59,12 +59,12 @@ interface TripRepository {
 
 data class TripMerge(val added: Int, val updated: Int, val unchanged: Int)
 
-/** Итоги поездки совпадают (в единицах хранения: мм, мкл, мс). */
+/** Trip totals match (in storage units: mm, µl, ms). */
 internal fun TripEntity.sameTotalsAs(o: TripEntity): Boolean =
     endedAtMs == o.endedAtMs && distanceMm == o.distanceMm && fuelUl == o.fuelUl && fuelPricePerL == o.fuelPricePerL &&
         drivingMs == o.drivingMs && standingMs == o.standingMs
 
-/** Флаг «типовой список ТО уже предлагался»: удалённые пользователем работы не возвращаются сами. */
+/** Flag "default maintenance list already offered": service items deleted by the user do not come back on their own. */
 interface MaintenancePrefs {
     suspend fun templateSeeded(carId: Long): Boolean
     suspend fun markTemplateSeeded(carId: Long)
@@ -75,7 +75,7 @@ interface UnitsRepository {
     suspend fun save(units: UnitsSettings)
 }
 
-/** Активная машина и единицы измерения — мелкие настройки в DataStore. */
+/** Active car and units — small settings in DataStore. */
 interface VehiclePrefs {
     val activeCarId: Flow<Long?>
     suspend fun setActiveCarId(id: Long)
@@ -143,8 +143,8 @@ internal class DataStoreVehiclePrefs(private val store: DataStore<Preferences>) 
 }
 
 /**
- * Пробег профиля (odometerKm/odometerAtMs) живёт в журнале odometer_log (v5): профиль показывает последний ручной
- * ввод, а сохранение профиля с новым пробегом добавляет запись в журнал. Колонки cars.odometer* больше не пишутся.
+ * Profile mileage (odometerKm/odometerAtMs) lives in the odometer_log journal (v5): the profile shows the latest manual
+ * entry, and saving the profile with a new mileage adds a journal entry. The cars.odometer* columns are no longer written.
  */
 internal class RoomCarRepository(
     private val dao: CarDao,
@@ -158,7 +158,7 @@ internal class RoomCarRepository(
     override fun observeCars(): Flow<List<CarProfile>> =
         combine(dao.observeAll(), latestOdometer) { list, odo -> list.map { it.toModel().withOdometer(odo[it.id]) } }
 
-    /** Сохранённый id, если такая машина ещё есть; иначе — первая машина. */
+    /** The saved id if that car still exists; otherwise the first car. */
     override fun observeActiveCar(): Flow<CarProfile?> =
         combine(observeCars(), prefs.activeCarId) { cars, id -> cars.firstOrNull { it.id == id } ?: cars.firstOrNull() }
 

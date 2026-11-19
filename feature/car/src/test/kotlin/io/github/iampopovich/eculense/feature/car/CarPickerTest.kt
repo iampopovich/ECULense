@@ -25,7 +25,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Справочник в памяти: эталонная модификация G6CU (значения набраны вручную). */
+/** In-memory reference database: reference G6CU variant (values typed by hand). */
 private class MemCatalog(var available: Boolean = true) : VehicleCatalog {
     val kia = VehicleMake(1, "Kia")
     val acura = VehicleMake(2, "Acura")
@@ -95,7 +95,7 @@ class CarPickerTest {
         assertEquals("79.9", f.tankVolumeL)
         assertEquals("1917", f.curbWeightKg)
         assertEquals("Sorento", f.model)
-        vm.edit { it.copy(engineCode = "G6CU") } // поля остаются редактируемыми
+        vm.edit { it.copy(engineCode = "G6CU") } // fields remain editable
         vm.save()
 
         val saved = cars.all.value.single()

@@ -46,7 +46,7 @@ class BackgroundJobsTest {
         assertEquals(listOf("volt"), notifier.findings.single().second.map { it.ruleId })
         assertEquals("Тестовая", notifier.findings.single().first)
 
-        // второй прогон с теми же находками — тишина
+        // second run with the same findings: silence
         job.run()
         assertEquals(1, notifier.findings.size)
     }

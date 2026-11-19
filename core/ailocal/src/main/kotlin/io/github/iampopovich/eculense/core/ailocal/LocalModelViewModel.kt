@@ -14,20 +14,20 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Строка модели на экране: оценка до скачивания, загрузка, тест, выбор. */
+/** A model row on the screen: pre-download estimate, download, test, selection. */
 internal data class ModelRow(
     val model: LocalModel,
     val fit: FitEstimate,
     val installed: Boolean,
-    /** null — не качается; -1 — качается, процент неизвестен. */
+    /** null — not downloading; -1 — downloading, percentage unknown. */
     val progress: Int? = null,
     val downloadedBytes: Long = 0,
     val retrying: Boolean = false,
     val error: String? = null,
     val report: BenchReport? = null,
-    /** Бэкенд, на котором модель работает в чате; null — модель не выбрана. */
+    /** Backend the model runs on in chat; null — model not selected. */
     val activeBackend: BackendKind? = null,
-    /** Сейчас идёт тест этой модели: какой бэкенд. */
+    /** This model is being tested right now: on which backend. */
     val benchingBackend: BackendKind? = null,
     val benchDone: List<BackendRun> = emptyList(),
 ) {
@@ -36,22 +36,22 @@ internal data class ModelRow(
     val partial: Boolean get() = !installed && !downloading && downloadedBytes > 0
 }
 
-/** Подтверждение скачивания: на свой риск, с оценкой и предупреждением о мобильной сети. [adopt] — модель из поиска HF, её сначала добавить в список. */
+/** Download confirmation: at your own risk, with an estimate and a mobile-data warning. [adopt] — a model from HF search that must first be added to the list. */
 internal data class DownloadConfirm(val packId: String, val title: String, val sizeBytes: Long?, val fit: FitEstimate, val metered: Boolean, val gatedWithoutToken: Boolean, val adopt: LocalModel? = null)
 
 internal data class LocalModelUiState(
     val device: DeviceProfile? = null,
     val nano: NanoStatus? = null,
-    /** Единый список (Koog + Gallery + свои), по размеру от меньшей к большей. */
+    /** Unified list (Koog + Gallery + custom), by size from smallest to largest. */
     val rows: List<ModelRow> = emptyList(),
     val catalogVersion: String = GalleryAllowlist.BUNDLED_VERSION,
     val catalogRefreshing: Boolean = false,
     val searchQuery: String = "",
     val searchBusy: Boolean = false,
     val searchError: String? = null,
-    /** null — поиска не было. */
+    /** null — no search was done. */
     val searchResults: List<ModelRow>? = null,
-    /** Модель, открытая в нижней панели деталей. */
+    /** Model opened in the bottom details sheet. */
     val selected: String? = null,
     val hasToken: Boolean = false,
     val tokenInput: String = "",
@@ -75,13 +75,13 @@ internal class LocalModelViewModel(
     private val _state = MutableStateFlow(LocalModelUiState())
     val state: StateFlow<LocalModelUiState> = _state.asStateFlow()
 
-    /** Модели, для которых тест уже запускался в этом экране (автозапуск — один раз). */
+    /** Models whose test has already run on this screen (auto-run happens once). */
     private val autoBenched = mutableSetOf<String>()
 
     init {
         refreshDevice()
         _state.update { it.copy(catalogVersion = models.catalogVersion) }
-        // Каталог Gallery и статус gated — по запросу (открытие экрана); без сети остаётся сохранённый/вшитый.
+        // Gallery catalog and gated status are fetched on demand (when the screen opens); offline, the saved/bundled one stays.
         refreshCatalog(silent = true)
         viewModelScope.launch {
             val device = _state.value.device ?: probe.profile()
@@ -126,7 +126,7 @@ internal class LocalModelViewModel(
         )
     }
 
-    /** Тест скорости сразу после скачивания (план 3.10). */
+    /** Speed test right after download (plan 3.10). */
     private fun autoBench(rows: List<ModelRow>, progress: BenchProgress?) {
         if (progress != null) return
         val next = rows.firstOrNull { it.installed && it.report == null && it.model.packId !in autoBenched } ?: return
@@ -138,7 +138,7 @@ internal class LocalModelViewModel(
         _state.update { it.copy(device = probe.profile()) }
     }
 
-    /** «Скачать»: всегда можно — но сначала предупреждение «на свой риск» (+ мобильная сеть). */
+    /** «Скачать»: always allowed — but first a «на свой риск» warning (+ mobile data). */
     fun requestDownload(packId: String) {
         val found = _state.value.rows.firstOrNull { it.model.packId == packId }
         val searched = if (found == null) _state.value.searchResults?.firstOrNull { it.model.packId == packId } else null
@@ -160,13 +160,13 @@ internal class LocalModelViewModel(
         val c = _state.value.confirm ?: return
         _state.update { it.copy(confirm = null) }
         viewModelScope.launch {
-            // Модель из поиска HF становится «своей» (иначе пакет неизвестен загрузчику), из результатов поиска уходит.
+            // A model from HF search becomes a custom one (otherwise the downloader doesn't know the pack) and leaves the search results.
             c.adopt?.let { m ->
                 models.add(m)
                 _state.update { s -> s.copy(searchResults = s.searchResults?.filterNot { it.model.packId == m.packId }) }
             }
-            // Нажатие в открытом приложении: загрузка стартует, пока приложение на экране (Android 14+ не даёт
-            // фоновому процессу запустить foreground-службу).
+            // Tap in the open app: the download starts while the app is on screen (Android 14+ doesn't allow
+            // a background process to start a foreground service).
             packs.download(c.packId)
             refreshDevice()
         }
@@ -219,7 +219,7 @@ internal class LocalModelViewModel(
         bench.start(packId)
     }
 
-    /** Выбрать модель для чата: бэкенд — лучший по тесту (без теста — CPU). */
+    /** Select a model for chat: backend is the best by test (no test — CPU). */
     fun use(packId: String) {
         viewModelScope.launch {
             val report = store.reports.first()[packId]
@@ -237,7 +237,7 @@ internal class LocalModelViewModel(
         }
     }
 
-    /** «Не использовать»: чат снова идёт через облачного провайдера (если он настроен). */
+    /** «Не использовать»: chat goes through the cloud provider again (if configured). */
     fun stopUsing() {
         viewModelScope.launch {
             runtime.deactivate()

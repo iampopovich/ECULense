@@ -21,8 +21,8 @@ data class TrendsArgs(
 )
 
 /**
- * Тренды за произвольный период по месяцам/неделям: поездки и расход, датчики (медианы из дайджестов сессий), DTC
- * и «изменение» первая → последняя корзина с достаточными данными. Считает [Trends] (:core:analytics), здесь — только JSON.
+ * Trends over an arbitrary period by months/weeks: trips and fuel consumption, sensors (medians from session digests), DTCs
+ * and the "change" from the first to the last bucket with enough data. [Trends] (:core:analytics) computes; this is JSON only.
  */
 internal class TrendsTool(ctx: ToolContext) : VehicleTool<TrendsArgs>(
     typeToken<TrendsArgs>(), NAME,
@@ -85,7 +85,7 @@ internal class TrendsTool(ctx: ToolContext) : VehicleTool<TrendsArgs>(
         }
     }
 
-    /** Доля стоянки — в процентах (целые), остальное — с одним знаком. */
+    /** Parked share in percent (integers), everything else with one decimal. */
     private fun metricNum(metric: String, v: Double): JsonPrimitive =
         if (metric == "idle_share") Compact.num(v * 100, 0) else Compact.num(v)
 
@@ -129,7 +129,7 @@ internal class TrendsTool(ctx: ToolContext) : VehicleTool<TrendsArgs>(
         const val MIN_DAYS = 7
         const val MAX_DAYS = 730
         private const val MAX_CODES = 6
-        /** Корзин до 7 (полгода по месяцам) + изменение: больше бюджета остальных инструментов. */
+        /** Up to 7 buckets (half a year by months) + change: a bigger budget than the other tools. */
         const val MAX_BYTES = 4_000
         private const val DAY_MS = 86_400_000L
         val TRIM_KEYS = listOf(

@@ -9,7 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Синтетические ряды: скорость/MAF/расход с шагом в секундах, ожидания посчитаны вручную. */
+/** Synthetic series: speed/MAF/fuel rate with a step in seconds, expectations computed by hand. */
 class TripCalculatorTest {
     private data class P(val id: String, val v: Double, val tMs: Long)
 
@@ -31,7 +31,7 @@ class TripCalculatorTest {
 
     @Test
     fun `trapezoids integrate a linear acceleration exactly`() {
-        // 0 → 72 км/ч за 20 с: средняя 36 км/ч → 200 м
+        // 0 → 72 km/h in 20 s: average 36 km/h → 200 m
         val m = compute(series(SPEED, 0, 20, { it * 3.6 }))!!
         assertEquals(0.2, m.distanceKm, 1e-9)
     }
@@ -51,7 +51,7 @@ class TripCalculatorTest {
         val points = series(SPEED, 0, 30, { if (it <= 30) 0.0 else 0.0 }) + series(SPEED, 31, 90, { 36.0 })
         val m = compute(points)!!
         assertEquals(30_000L, m.standingMs)
-        // интервал 30→31 с (0 → 36 км/ч) — средняя 18 км/ч, это уже движение
+        // interval 30→31 s (0 → 36 km/h) — average 18 km/h, that already counts as moving
         assertEquals(60_000L, m.drivingMs)
     }
 

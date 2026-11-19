@@ -12,7 +12,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** «Автомобиль» — пункт хаба «Настройки»: список машин, профиль, выбор активной, единицы. Статистика — вкладка :feature:stats. */
+/** «Автомобиль» is an item in the «Настройки» hub: car list, profile, active car selection, units. Statistics is the :feature:stats tab. */
 @OptIn(KoinExperimentalAPI::class)
 val carModule = module {
     viewModel { CarViewModel(get(), get()) }

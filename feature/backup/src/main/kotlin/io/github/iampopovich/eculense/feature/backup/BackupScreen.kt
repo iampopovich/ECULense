@@ -49,7 +49,7 @@ internal fun BackupRoute(viewModel: BackupViewModel = koinViewModel()) {
     val resolver = context.contentResolver
     fun persist(uri: Uri) = runCatching { resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
     val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        // доступ к файлу должен пережить экран: импорт идёт в WorkManager; воркер отпустит его по окончании
+        // file access must outlive the screen: import runs in WorkManager; the worker releases it when done
         if (uri != null) { persist(uri); viewModel.importFile(uri, displayName(context, uri)) }
     }
     val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
@@ -161,7 +161,7 @@ private fun CopyCard(state: BackupUiState, onIncludeAiChat: (Boolean) -> Unit, o
                 Checkbox(checked = state.includeAiChat, onCheckedChange = onIncludeAiChat)
                 Text("Включить историю чата ИИ")
             }
-            // на крупном шрифте две кнопки не помещаются в строку — переносим вторую, а не текст «Восстановит/ь»
+            // with large fonts two buttons don't fit on one line, so wrap the second button rather than the text «Восстановит/ь»
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(onClick = onExport, enabled = !state.copy.busy) { Text("Сохранить копию") }
                 OutlinedButton(onClick = onRestore, enabled = !state.copy.busy && !state.importing) { Text("Восстановить") }
@@ -185,7 +185,7 @@ private fun Secondary(text: String, modifier: Modifier = Modifier) {
     Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier)
 }
 
-/** Итог последнего импорта — что именно добавлено и обновлено (видимость состояния системы). */
+/** Result of the last import: exactly what was added and updated (visibility of system status). */
 internal fun reportText(item: ImportHistoryItem): String = when (item.status) {
     ImportStatus.DONE -> "Готово: " + historyLine(item)
     ImportStatus.CANCELLED -> item.message ?: "Импорт отменён"

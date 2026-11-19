@@ -8,8 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * «Что по ТО?»: работы со статусом (просрочено/скоро/в норме/нет данных), сколько осталось км и дней, текущий пробег
- * (последний ручной ввод + поездки после него — оценка). Только чтение: шаблон работ не создаёт.
+ * «Что по ТО?»: service items with status (overdue/soon/OK/no data), km and days remaining, current mileage
+ * (last manual entry + trips after it — an estimate). Read-only: does not create the service template.
  */
 internal class MaintenanceDueTool(ctx: ToolContext) : VehicleTool<NoArgs>(
     typeToken<NoArgs>(), "maintenanceDue",

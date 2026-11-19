@@ -28,7 +28,7 @@ class LlmSettingsStoreTest {
 
         store.save(LlmProviderKind.OPENAI, model = "gpt-4.1-mini", baseUrl = null, apiKey = "sk-123")
 
-        // Адрес по умолчанию — из настроек клиента Koog, не наша строка.
+        // The default URL comes from the Koog client settings, not our own string.
         assertEquals(LlmSettings(LlmProviderKind.OPENAI, "gpt-4.1-mini", OpenAIClientSettings().baseUrl, hasKey = true), store.settings.first())
         assertEquals("sk-123", store.apiKey())
         assertEquals("321-ks", dataStore.data.first()[stringPreferencesKey("api_key")])
@@ -73,7 +73,7 @@ class LlmSettingsStoreTest {
 
     @Test
     fun `old custom server config saved with the former default address keeps that address`() = runTest {
-        // Прежний адрес по умолчанию не сохранялся в файл — восстанавливаем его при чтении.
+        // The former default URL was not saved to the file — restore it on read.
         val dataStore = PreferenceDataStoreFactory.create(scope = backgroundScope) { File(tmp.root, "legacy2.preferences_pb") }
         dataStore.edit {
             it[stringPreferencesKey("provider")] = "OPENAI_COMPATIBLE"

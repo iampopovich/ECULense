@@ -26,7 +26,7 @@ import java.io.File
 import java.sql.DriverManager
 import java.util.zip.ZipInputStream
 
-/** Резервная копия ECULense на синтетике: SQLite через sqlite-jdbc, настройки — настоящие файлы DataStore. */
+/** ECULense backup on synthetic data: SQLite via sqlite-jdbc, settings are real DataStore files. */
 class EcuBackupTest {
     @get:Rule val tmp = TemporaryFolder()
 
@@ -66,7 +66,7 @@ class EcuBackupTest {
         PreferenceDataStoreFactory.create(scope = scope) { File(dir, "$name.preferences_pb") }.data.first().also { scope.cancel() }
     }
 
-    /** Телефон «A»: база v6 с записями/показаниями/поездками, настройки с ключом API и токеном HF. */
+    /** Phone "A": v6 database with recordings/readings/trips, settings with an API key and an HF token. */
     private fun deviceA(): Triple<File, File, File> {
         val root = tmp.newFolder("a")
         val db = File(root, "databases/ecu.db").apply { parentFile.mkdirs() }
@@ -116,7 +116,7 @@ class EcuBackupTest {
         assertEquals(6, manifest.schemaVersion)
         assertEquals("0.1.0-test", manifest.appVersion)
         assertEquals(1, manifest.secretsExcluded)
-        // ни значения ключа/токена, ни самих ключей — ни в одном файле архива (zip + распакованные файлы)
+        // neither the key/token values nor the keys themselves appear in any archive file (zip + extracted files)
         for ((name, bytes) in files + ("<zip>" to zip)) {
             val text = String(bytes, Charsets.ISO_8859_1)
             assertFalse(name, text.contains("sk-test-secret-value"))

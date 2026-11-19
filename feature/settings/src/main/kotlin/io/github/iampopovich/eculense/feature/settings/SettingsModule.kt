@@ -19,7 +19,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** Вкладка «Настройки»: хаб, в который фичи сами добавляют пункты (адаптер, ИИ-провайдеры, …). */
+/** «Настройки» tab: a hub where features add their own items (adapter, AI providers, …). */
 @OptIn(KoinExperimentalAPI::class)
 val settingsModule = module {
     navigation<SettingsDestination> { SettingsRoute() }

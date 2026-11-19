@@ -10,16 +10,16 @@ import org.junit.Test
 import java.net.InetSocketAddress
 
 /**
- * Проверка подключения идёт через настоящие клиенты Koog (models(), у Ollama — getModels()) против локального
- * JDK HttpServer, который отвечает как провайдер. Пути запросов задаёт Koog; тест лишь фиксирует, что ответы
- * сервера превращаются в правильные состояния.
+ * The connection check runs through real Koog clients (models(), getModels() for Ollama) against a local
+ * JDK HttpServer that responds like a provider. Request paths are set by Koog; the test only verifies that server
+ * responses turn into the correct states.
  */
 class KoogConnectionCheckerTest {
     private var server: HttpServer? = null
     private val seen = mutableListOf<String>()
     private val bodies = mutableListOf<String>()
 
-    /** Корень локального сервера: пресеты в тестах направляются на него через тестовый вход KoogClients. */
+    /** Local server root: in tests, presets are pointed at it via the KoogClients test entry point. */
     private var currentRoot = "http://127.0.0.1:1"
     private val checker = KoogConnectionChecker { kind, otherUrl, key ->
         KoogClients.client(kind, key, otherBaseUrl = otherUrl, presetBaseUrlForTests = currentRoot.takeIf { kind != LlmProviderKind.OTHER })
@@ -31,7 +31,7 @@ class KoogConnectionCheckerTest {
         server?.stop(0)
     }
 
-    /** routes: путь запроса → ответ; всё остальное — 404. Возвращает корень сервера (http://127.0.0.1:port). */
+    /** routes: request path → response; everything else is 404. Returns the server root (http://127.0.0.1:port). */
     private fun serve(routes: Map<String, Reply>): String {
         val http = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         http.createContext("/") { ex ->
@@ -83,7 +83,7 @@ class KoogConnectionCheckerTest {
 
         assertTrue(result.toString(), result is ConnectionCheck.Ok)
         val models = (result as ConnectionCheck.Ok).models
-        // Рекомендованная модель первой, остальные по алфавиту; «:free» помечается бесплатной.
+        // Recommended model first, the rest alphabetically; «:free» is marked as free.
         assertEquals(listOf("openai/gpt-4.1-mini", "meta-llama/llama-3.3-70b-instruct:free", "z-ai/glm-4.6"), models.map { it.id })
         assertTrue(models.first().recommended)
         assertEquals(true, models[1].isFree)
@@ -182,7 +182,7 @@ class KoogConnectionCheckerTest {
         )
         val ok = checker.check(LlmProviderKind.ANTHROPIC, null, "sk-ant-1") as ConnectionCheck.Ok
         assertEquals("claude-sonnet-4-5-20250929", ok.models.single().id)
-        // Датированный id тоже считается рекомендованным (курируемый список хранит алиас).
+        // A dated id also counts as recommended (the curated list stores the alias).
         assertTrue(ok.models.single().recommended)
         assertTrue(seen.single(), seen.single().startsWith("GET /v1/models") && seen.single().endsWith("x-api-key=sk-ant-1"))
     }
@@ -243,7 +243,7 @@ class KoogConnectionCheckerTest {
         val ok = checker.check(LlmProviderKind.OTHER, "$root/v1", "") as ConnectionCheck.Ok
         assertEquals(listOf("qwen2.5-7b-instruct"), ok.models.map { it.id })
         assertTrue(ok.listed)
-        // Koog требует непустой ключ; локальные серверы заголовок игнорируют.
+        // Koog requires a non-empty key; local servers ignore the header.
         assertEquals(listOf("GET /v1/models Authorization=Bearer not-needed"), seen)
     }
 
@@ -256,7 +256,7 @@ class KoogConnectionCheckerTest {
 
     @Test
     fun `other server that cannot list models allows a manual model id`() = runBlocking {
-        // 404 (нет /models) и нестандартный список (LM Studio без поля created) — модель вводится вручную.
+        // 404 (no /models) and a non-standard list (LM Studio without the created field): the model is entered manually.
         val root = serve(mapOf("/lms/v1/models" to Reply(200, """{"object":"list","data":[{"id":"x","object":"model"}]}""")))
         assertEquals(ConnectionCheck.Ok(emptyList(), listed = false), checker.check(LlmProviderKind.OTHER, "$root/v1", null))
         assertEquals(ConnectionCheck.Ok(emptyList(), listed = false), checker.check(LlmProviderKind.OTHER, "$root/lms/v1", null))
@@ -281,14 +281,14 @@ class KoogConnectionCheckerTest {
     fun `wrong address answering html is unreachable, 404 on a preset means a wrong address`() = runBlocking {
         val root = serve(mapOf("/v1/models" to Reply(200, "<html>hello</html>", "text/html")))
         assertTrue(checker.check(LlmProviderKind.OPENAI, null, "sk-1") is ConnectionCheck.Unreachable)
-        // DeepSeek ходит на /models — здесь его нет: 404 у пресета = неверный адрес.
+        // DeepSeek calls /models, which is absent here: 404 for a preset = wrong URL.
         assertTrue(checker.check(LlmProviderKind.DEEPSEEK, null, "sk-1") is ConnectionCheck.Unreachable)
     }
 
     @Test
     fun `presets ignore any passed address, only Other validates it`() = runBlocking {
         serve(mapOf("/v1/models" to Reply(200, openAiCatalog("gpt-4.1-mini"))))
-        // Адрес у пресета игнорируется — даже публичный http не мешает: клиент Koog идёт по своему адресу.
+        // The preset URL is ignored, so even public http is no problem: the Koog client uses its own URL.
         assertTrue(checker.check(LlmProviderKind.OPENAI, "http://example.com", "sk-1") is ConnectionCheck.Ok)
         assertTrue(checker.check(LlmProviderKind.OTHER, null, null) is ConnectionCheck.InvalidUrl)
     }

@@ -22,8 +22,8 @@ import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
 /**
- * Вкладка «Пит-стоп»: хаб помощников (ошибки, история поездок, анализ…). Пункты регистрируют сами фичи
- * через HubEntry(Hub.PITSTOP, …); ИИ-помощник показывается, только если какая-то фича объявила RouteHandler(AiChatDestination).
+ * The «Пит-стоп» tab: a hub of helpers (codes, trip history, analysis…). Features register items themselves
+ * via HubEntry(Hub.PITSTOP, …); the AI assistant is shown only if some feature declared RouteHandler(AiChatDestination).
  */
 @OptIn(KoinExperimentalAPI::class)
 val pitstopModule = module {
@@ -36,7 +36,7 @@ internal fun PitstopRoute() {
     val koin = getKoin()
     val entries = remember { koin.getAll<HubEntry>().forHub(Hub.PITSTOP) }
     val hasAssistant = remember { koin.getAll<RouteHandler>().any { it.routeClass == AiChatDestination::class } }
-    // Чат сам регистрирует свой HubEntry — тогда отдельная карточка-заглушка не нужна (одна карточка ИИ).
+    // The chat registers its own HubEntry — then a separate placeholder card isn't needed (one AI card).
     val assistantListed = entries.any { it.destination is AiChatDestination }
     val navigator = LocalNavigator.current
     HubScaffold(title = "Пит-стоп") {

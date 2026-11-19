@@ -3,9 +3,9 @@ package io.github.iampopovich.eculense.core.ailocal
 import kotlin.math.roundToInt
 
 /**
- * Что телефон может предложить локальной модели (снимается до скачивания, см. [DeviceProbe]).
- * [gpu] — есть ли OpenCL-драйвер для GPU-бэкенда LiteRT-LM; [npu] — название NPU, если вендорские библиотеки найдены
- * (без модели, скомпилированной под этот NPU, бэкенд NPU всё равно не заработает); [aicore] — установлен ли Google AICore.
+ * What the phone can offer a local model (probed before download, see [DeviceProbe]).
+ * [gpu]: whether there is an OpenCL driver for the LiteRT-LM GPU backend; [npu]: NPU name if vendor libraries were found
+ * (without a model compiled for that NPU the NPU backend still won't work); [aicore]: whether Google AICore is installed.
  */
 data class DeviceProfile(
     val totalRamBytes: Long,
@@ -23,7 +23,7 @@ data class DeviceProfile(
     val soc: String get() = listOfNotNull(socManufacturer, socModel).joinToString(" ").ifBlank { "неизвестен" }
 }
 
-/** Предварительная оценка до скачивания. UNKNOWN — размер файла неизвестен (своя ссылка без размера). */
+/** Preliminary estimate before download. UNKNOWN: file size is unknown (custom link without size). */
 enum class Fit(val label: String) {
     OK("Потянет"),
     TIGHT("Впритык"),
@@ -34,19 +34,19 @@ enum class Fit(val label: String) {
 data class FitEstimate(val fit: Fit, val reasons: List<String>, val needRamBytes: Long?)
 
 /**
- * Эвристика «потянет ли» по размеру файла и памяти телефона — до скачивания, с запасом. Точный ответ даёт только
- * тест после скачивания ([BenchVerdict]); оценка лишь предупреждает и никогда не запрещает скачать.
+ * "Will it run" heuristic from file size and phone memory, before download, with a margin. Only the test after
+ * download ([BenchVerdict]) gives an exact answer; the estimate only warns and never forbids downloading.
  *
- * Рабочий набор LiteRT-LM ≈ веса (файл отображается в память и читается почти целиком) + KV-кэш и буферы рантайма
- * ([RUNTIME_OVERHEAD]). Android держит под приложение не всю память: система и фоновые приложения занимают 3–4 ГБ даже
- * на флагмане, поэтому сравниваем с общим объёмом ОЗУ с коэффициентами: ×[OK_RATIO] — с запасом, ×[TIGHT_RATIO] — впритык.
- * Калибровка (14T Pro, 11 ГБ): Gemma 4 E2B 2,6 ГБ — работает; Redmi Note 9 (3,6 ГБ): Qwen3 0,6 ГБ — 1,8 ГБ RSS.
+ * LiteRT-LM working set ≈ weights (file is memory-mapped and read almost entirely) + KV cache and runtime buffers
+ * ([RUNTIME_OVERHEAD]). Android doesn't give the app all memory: the system and background apps take 3–4 GB even
+ * on a flagship, so we compare against total RAM with ratios: ×[OK_RATIO] = with margin, ×[TIGHT_RATIO] = tight.
+ * Calibration (14T Pro, 11 GB): Gemma 4 E2B 2.6 GB works; Redmi Note 9 (3.6 GB): Qwen3 0.6 GB = 1.8 GB RSS.
  */
 object FitEstimator {
     const val RUNTIME_OVERHEAD = 600L shl 20
     const val OK_RATIO = 2.5
     const val TIGHT_RATIO = 1.6
-    /** Запас места сверх размера файла: кэш движка (XNNPack) и временные файлы. */
+    /** Space reserve beyond file size: engine cache (XNNPack) and temp files. */
     const val STORAGE_MARGIN = 1L shl 30
     const val MIN_RAM_FAR_BELOW = 0.75
 
@@ -70,8 +70,8 @@ object FitEstimator {
             Fit.TIGHT -> "Модели нужно ≈ ${gb(need)} ГБ ОЗУ, в телефоне ${gb(device.totalRamBytes)} ГБ — система может закрывать другие приложения или саму модель."
             else -> "Модели нужно ≈ ${gb(need)} ГБ ОЗУ, а в телефоне всего ${gb(device.totalRamBytes)} ГБ — вероятна нехватка памяти."
         }
-        // Минимум ОЗУ из allowlist Google AI Edge Gallery (в ГиБ, как totalMem/1024³). Телефоны «на 12 ГБ» сообщают
-        // ≈ 11 ГиБ, поэтому ниже минимума — не запрет, а «впритык»; сильно ниже (< 75 %) — «скорее всего нет».
+        // Minimum RAM from the Google AI Edge Gallery allowlist (in GiB, as totalMem/1024³). "12 GB" phones report
+        // ≈ 11 GiB, so below the minimum is not a ban but "tight"; far below (< 75 %) means "most likely not".
         if (minRamGb != null) {
             val totalGib = device.totalRamBytes.toDouble() / (1L shl 30)
             if (totalGib < minRamGb) {
@@ -87,12 +87,12 @@ object FitEstimator {
         return FitEstimate(fit, reasons, need)
     }
 
-    /** «2,6» — ГБ (десятичные, как в настройках Android и на Hugging Face) с одним знаком, по-русски. */
+    /** «2,6»: GB (decimal, as in Android settings and on Hugging Face) with one decimal, Russian formatting. */
     fun gb(bytes: Long): String {
         val tenths = (bytes / 1e8).roundToInt()
         return "${tenths / 10},${tenths % 10}"
     }
 
-    /** Размер для людей: до 0,1 ГБ — в МБ («73 МБ»), дальше — «2,6 ГБ». */
+    /** Human-readable size: below 0.1 GB in MB («73 МБ»), above that «2,6 ГБ». */
     fun size(bytes: Long): String = if (bytes < 100_000_000L) "${(bytes / 1_000_000L).coerceAtLeast(0)} МБ" else "${gb(bytes)} ГБ"
 }

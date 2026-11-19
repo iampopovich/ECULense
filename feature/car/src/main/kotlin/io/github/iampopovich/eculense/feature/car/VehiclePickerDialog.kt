@@ -30,7 +30,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.iampopovich.eculense.core.vehicledb.VehicleEngine
 
-/** Полноэкранный пошаговый выбор из справочника: поиск, список, на последнем шаге — ТТХ и «Заполнить». */
+/** Full-screen step-by-step picker from the reference database: search, list, and on the last step specs and «Заполнить». */
 @Composable
 internal fun VehiclePickerDialog(
     state: PickerState,
@@ -40,7 +40,7 @@ internal fun VehiclePickerDialog(
     onFill: () -> Unit,
     onClose: () -> Unit,
 ) {
-    // поле поиска открывает клавиатуру; после «Заполнить»/«Закрыть» она не должна остаться поверх формы
+    // the search field opens the keyboard; after «Заполнить»/«Закрыть» it must not stay over the form
     val keyboard = LocalSoftwareKeyboardController.current
     DisposableEffect(Unit) { onDispose { keyboard?.hide() } }
     Dialog(onDismissRequest = onBack, properties = DialogProperties(usePlatformDefaultWidth = false)) {

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <!-- скачивание пакетов и проверка «мобильная сеть или Wi-Fi» перед загрузкой -->
+    <!-- downloading packs and the «мобильная сеть или Wi-Fi» check before downloading -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- многогигабайтные пакеты (модели ИИ) качаются foreground-задачей WorkManager: дольше 10 минут и с уведомлением -->
+    <!-- multi-gigabyte packs (AI models) are downloaded by a WorkManager foreground task: longer than 10 minutes and with a notification -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 

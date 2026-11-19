@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Инструменты Koog для ИИ на локальных данных (этап 3): зависит от :core:ai и :core:data, не наоборот.
+// Koog tools for AI over local data (stage 3): depends on :core:ai and :core:data, not the other way around.
 dependencies {
     implementation(project(":core:ai"))
     implementation(project(":core:data"))

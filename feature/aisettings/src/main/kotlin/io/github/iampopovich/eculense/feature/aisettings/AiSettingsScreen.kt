@@ -49,7 +49,7 @@ import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
-/** Действия экрана; по умолчанию пустые — удобно в UI-тестах. */
+/** Screen actions; empty by default — handy in UI tests. */
 internal class AiSettingsActions(
     val onProvider: (LlmProviderKind) -> Unit = {},
     val onBaseUrl: (String) -> Unit = {},
@@ -62,11 +62,11 @@ internal class AiSettingsActions(
     val onCancelEdit: () -> Unit = {},
     val onClearKey: () -> Unit = {},
     val onReset: () -> Unit = {},
-    /** Пункт «На устройстве» — открыть экран модели на телефоне. */
+    /** The «На устройстве» item — open the on-device model screen. */
     val onOnDevice: () -> Unit = {},
-    /** Перестать использовать модель на телефоне. */
+    /** Stop using the on-device model. */
     val onUseCloud: () -> Unit = {},
-    /** Открыть мастер облачного провайдера (когда сохранена только модель на телефоне). */
+    /** Open the cloud provider wizard (when only the on-device model is saved). */
     val onStartWizard: () -> Unit = {},
 )
 
@@ -248,7 +248,7 @@ private fun ProviderStep(
                 }
             }
             if (onDeviceAvailable) {
-                // Не облачный провайдер: свой экран (проверка телефона → скачивание → тест), ключ и адрес не нужны.
+                // Not a cloud provider: its own screen (phone check → download → test); no key or URL needed.
                 Row(
                     Modifier.fillMaxWidth().selectable(selected = false, onClick = onOnDevice, role = Role.Button).padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -264,7 +264,7 @@ private fun ProviderStep(
                     }
                 }
             } else if (onDeviceInOtherBuild) {
-                // Облачная сборка: пункта нет, одна приглушённая строка (не нажимается).
+                // Cloud build: no item, just one dimmed line (not clickable).
                 Text(
                     "Локальные модели доступны в сборке «Локально»",
                     style = MaterialTheme.typography.bodySmall,

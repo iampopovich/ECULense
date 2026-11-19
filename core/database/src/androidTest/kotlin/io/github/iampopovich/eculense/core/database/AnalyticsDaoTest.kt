@@ -44,7 +44,7 @@ class AnalyticsDaoTest {
         val all = dao.sensorAggregate(EcuDatabase.DEFAULT_CAR_ID, "01.05", 0, Long.MAX_VALUE)!!
         assertEquals(3, all.count)
         assertEquals(2, all.sessions)
-        assertEquals(100.0, all.max, 1e-9) // чужая машина не попала
+        assertEquals(100.0, all.max, 1e-9) // the other car was not included
         assertNull(dao.sensorAggregate(EcuDatabase.DEFAULT_CAR_ID, "01.05", 150, 160))
         assertEquals(listOf(70.0, 90.0, 100.0), dao.sensorSample(EcuDatabase.DEFAULT_CAR_ID, "01.05", 0, Long.MAX_VALUE, 1).sorted())
     }

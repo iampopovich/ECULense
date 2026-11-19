@@ -12,41 +12,41 @@ import java.time.temporal.TemporalAdjusters
 enum class TrendBucket { MONTH, WEEK }
 
 /**
- * Одна корзина тренда (месяц или неделя, по местному времени; крайние обрезаны периодом).
- * Числа по датчикам — только где датчик есть: null = в корзине нет замеров, а не «ноль».
+ * One trend bucket (month or week, local time; the edge buckets are clipped to the period).
+ * Per-sensor numbers only where the sensor exists: null = no samples in the bucket, not "zero".
  */
 data class BucketTrend(
-    /** Месяц «2026-01» или дата начала недели «2026-01-05». */
+    /** Month «2026-01» or week start date «2026-01-05». */
     val label: String,
     val fromMs: Long,
     val toMs: Long,
     val trips: TripStats,
-    /** Доля времени на месте (стоянка с работающим мотором по данным поездки) от всего времени поездок. */
+    /** Share of time stationary (idling with the engine running, per trip data) out of total trip time. */
     val idleShare: Double?,
     val avgTripKm: Double?,
-    /** Записей (сессий OBD) в корзине. */
+    /** Recordings (OBD sessions) in the bucket. */
     val sessions: Int,
     val coolantN: Int,
     val coolantMax: Double?,
     val coolantMedian: Double?,
     val voltageN: Int,
     val voltageMedian: Double?,
-    /** Минимум напряжения на работающем двигателе (стартер не считается). */
+    /** Minimum voltage with the engine running (cranking excluded). */
     val voltageMinRunning: Double?,
-    /** Медианы коррекций на прогретом двигателе по id датчика (01.06–01.09). */
+    /** Median fuel trims on a warm engine, by sensor id (01.06–01.09). */
     val trimMedians: Map<String, Double>,
     val trimN: Map<String, Int>,
     val idleRpmN: Int,
     val idleRpmMedian: Double?,
-    /** Событий DTC (код × момент чтения) в корзине. */
+    /** DTC events (code × read time) in the bucket. */
     val dtcEvents: Int,
-    /** Коды, впервые появившиеся в истории именно в этой корзине. */
+    /** Codes that first appeared in history in this very bucket. */
     val newCodes: List<String>,
 ) {
     val empty: Boolean get() = trips.trips == 0 && sessions == 0 && dtcEvents == 0
 }
 
-/** Изменение метрики между первой и последней корзиной, где данных достаточно. */
+/** Metric change between the first and last bucket with enough data. */
 data class TrendChange(val metric: String, val fromLabel: String, val toLabel: String, val from: Double, val to: Double) {
     val delta: Double get() = to - from
 }
@@ -54,31 +54,31 @@ data class TrendChange(val metric: String, val fromLabel: String, val toLabel: S
 data class TrendReport(
     val days: Int,
     val bucket: TrendBucket,
-    /** От старых к новым. */
+    /** Oldest to newest. */
     val buckets: List<BucketTrend>,
     val totals: TripStats,
     val changes: List<TrendChange>,
-    /** Метрики, для которых меньше двух корзин с достаточными данными. */
+    /** Metrics with fewer than two buckets of sufficient data. */
     val insufficient: List<String>,
 )
 
 /**
- * Тренды за произвольный период: детерминированно из поездок, дайджестов сессий ([SessionDigest]) и истории DTC.
- * Замеры датчиков не грузятся — медианы берутся из гистограмм дайджестов.
+ * Trends over an arbitrary period: deterministic, from trips, session digests ([SessionDigest]) and DTC history.
+ * Sensor samples are not loaded — medians come from the digest histograms.
  */
 object Trends {
     private const val DAY_MS = 86_400_000L
 
-    /** Меньше замеров датчика в корзине — для «изменения» корзина не годится. */
+    /** Fewer sensor samples than this in a bucket — the bucket is not usable for "change". */
     const val MIN_SAMPLES = 30
 
-    /** Меньше поездок в корзине — расход/доля стоянки/длина поездки не сравниваются. */
+    /** Fewer trips than this in a bucket — fuel use/idle share/trip length are not compared. */
     const val MIN_TRIPS = 2
 
-    /** Неделя, если период ≤ 45 дней, иначе месяц. */
+    /** Week if the period is ≤ 45 days, otherwise month. */
     fun defaultBucket(days: Int): TrendBucket = if (days <= 45) TrendBucket.WEEK else TrendBucket.MONTH
 
-    /** Порядок метрик «изменения» (он же — в ответе инструмента). */
+    /** Order of "change" metrics (also used in the tool response). */
     val CHANGE_METRICS = listOf(
         "l_per_100km", "avg_trip_km", "idle_share", "coolant_median", "coolant_max", "voltage_median", "voltage_min_running",
         "ltft1_median", "ltft2_median", "idle_rpm_median",
@@ -117,7 +117,7 @@ object Trends {
         return TrendReport(d, kind, buckets, TripStats.of(inPeriodTrips), changes, insufficient)
     }
 
-    /** Значение метрики корзины, только если данных достаточно для сравнения. */
+    /** Bucket metric value, only if there is enough data for comparison. */
     private fun metricValue(b: BucketTrend, metric: String): Double? {
         val tripsOk = b.trips.trips >= MIN_TRIPS
         return when (metric) {
@@ -174,7 +174,7 @@ object Trends {
         )
     }
 
-    /** Корзины [from, to] (включительно), обрезанные периодом; метка — месяц или дата начала (обрезанного) отрезка. */
+    /** Buckets [from, to] (inclusive), clipped to the period; label is the month or start date of the (clipped) span. */
     private fun ranges(fromMs: Long, nowMs: Long, zone: ZoneId, kind: TrendBucket): List<Triple<String, Long, Long>> {
         fun startOf(day: LocalDate) = day.atStartOfDay(zone).toInstant().toEpochMilli()
         val firstDay = Instant.ofEpochMilli(fromMs).atZone(zone).toLocalDate()

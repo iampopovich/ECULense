@@ -8,7 +8,7 @@ import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.prompt.Generation
 import java.io.File
 
-/** Снимает [DeviceProfile]: память, SoC, ABI, место, драйвер OpenCL для GPU, вендорские библиотеки NPU, AICore. */
+/** Captures a [DeviceProfile]: memory, SoC, ABI, storage, OpenCL driver for GPU, vendor NPU libraries, AICore. */
 class DeviceProbe(private val context: Context) {
     fun profile(): DeviceProfile {
         val am = context.getSystemService(ActivityManager::class.java)
@@ -46,7 +46,7 @@ class DeviceProbe(private val context: Context) {
     }
 }
 
-/** Gemini Nano через AICore: доступен ли и почему нет. */
+/** Gemini Nano via AICore: whether it is available and why not. */
 data class NanoStatus(val available: Boolean, val text: String)
 
 class NanoProbe {

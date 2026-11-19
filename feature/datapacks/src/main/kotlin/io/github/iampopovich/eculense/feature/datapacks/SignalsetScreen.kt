@@ -32,8 +32,8 @@ internal fun SignalsetRoute(viewModel: SignalsetViewModel = koinViewModel()) {
 }
 
 /**
- * Сигналсет OBDb для активной машины: только просмотр. Год можно поменять, чтобы посмотреть покрытое поколение
- * (проверка формата); опрос расширенных PID — бэклог 1.24 п. 6–7.
+ * OBDb signalset for the active car: view only. The year can be changed to view a covered generation
+ * (format check); polling extended PIDs is backlog 1.24 items 6–7.
  */
 @Composable
 internal fun SignalsetScreen(state: SignalsetUiState, onYear: (String) -> Unit, onCheck: () -> Unit, modifier: Modifier = Modifier) {

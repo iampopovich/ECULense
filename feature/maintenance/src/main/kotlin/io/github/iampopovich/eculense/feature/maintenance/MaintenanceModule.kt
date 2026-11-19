@@ -9,7 +9,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** «Обслуживание» — пункт «Пит-стопа» после «Анализа» (3.9 п.2). Работает без сети и без ИИ. */
+/** «Обслуживание» — a «Пит-стопа» item after «Анализа» (3.9 item 2). Works offline and without AI. */
 @OptIn(KoinExperimentalAPI::class)
 val maintenanceModule = module {
     viewModel { MaintenanceViewModel(get(), get()) }

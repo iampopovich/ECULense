@@ -7,8 +7,8 @@ enum class Gearbox { MANUAL, AUTOMATIC, CVT, ROBOT, OTHER }
 enum class DriveType { FRONT, REAR, ALL }
 
 /**
- * Профиль автомобиля. Заполняется вручную или импортом из Car Scanner (тогда externalId = id машины в бэкапе).
- * VIN хранится только локально и никогда не уходит в промпты ИИ: для этого есть [withoutVin].
+ * Car profile. Filled in manually or imported from Car Scanner (then externalId = car id in the backup).
+ * The VIN is stored only locally and never goes into AI prompts: that's what [withoutVin] is for.
  */
 data class CarProfile(
     val id: Long = 0,
@@ -25,20 +25,20 @@ data class CarProfile(
     val gearbox: Gearbox? = null,
     val drive: DriveType? = null,
     val tankVolumeL: Double? = null,
-    /** Снаряжённая масса, кг (справочник или вручную). */
+    /** Curb weight, kg (reference database or manual). */
     val curbWeightKg: Int? = null,
     val odometerKm: Long? = null,
     val odometerAtMs: Long? = null,
     val vin: String? = null,
     val fuelPrice: Double? = null,
     val currency: String? = null,
-    /** Профиль диагностики Car Scanner («OBD-II / EOBD»), информационно. */
+    /** Car Scanner diagnostic profile («OBD-II / EOBD»), informational. */
     val diagProfile: String? = null,
     val service: ServiceIntervals = ServiceIntervals(),
 ) {
     /**
-     * Машина по умолчанию, созданная миграцией/первым запуском и ещё не тронутая пользователем.
-     * Импорт Car Scanner заполняет её, а не создаёт вторую машину.
+     * Default car created by a migration/first launch and not yet touched by the user.
+     * Car Scanner import fills it in instead of creating a second car.
      */
     val isUntouchedDefault: Boolean
         get() = externalId == null && name == DEFAULT_NAME && brand == null && model == null && year == null && vin == null
@@ -50,7 +50,7 @@ data class CarProfile(
     }
 }
 
-/** Интервалы ТО в километрах (используются аналитикой этапа 3). */
+/** Maintenance intervals in kilometers (used by stage 3 analytics). */
 data class ServiceIntervals(
     val oilKm: Int? = null,
     val sparkPlugsKm: Int? = null,
@@ -58,22 +58,22 @@ data class ServiceIntervals(
     val fuelFilterKm: Int? = null,
 )
 
-/** LIVE — посчитана ECULense по записи (своей или импортированной без поездки Car Scanner). */
+/** LIVE: computed by ECULense from a recording (own, or imported without a Car Scanner trip). */
 enum class TripSource { LIVE, IMPORT_CARSCANNER }
 
-/** Откуда взято топливо поездки, посчитанной по записи. null — поездка из Car Scanner (там своё). */
+/** Where the fuel of a trip computed from a recording came from. null: trip from Car Scanner (it has its own). */
 enum class FuelMethod {
-    /** PID 01.5E — расход топлива двигателя, л/ч. */
+    /** PID 01.5E: engine fuel rate, L/h. */
     OBD_FUEL_RATE,
 
-    /** Оценка по MAF: стехиометрия бензина 14,7 и плотность 0,745 кг/л. */
+    /** MAF-based estimate: gasoline stoichiometry 14.7 and density 0.745 kg/L. */
     MAF_ESTIMATE,
 
-    /** Нечем посчитать (дизель/газ, нет MAF и 01.5E) — fuelL = 0, в расход не идёт. */
+    /** Nothing to compute from (diesel/LPG, no MAF and 01.5E): fuelL = 0, excluded from consumption. */
     NOT_AVAILABLE,
 }
 
-/** Поездка как в Car Scanner (таблица trips): итоги без трека. */
+/** Trip as in Car Scanner (trips table): totals without a track. */
 data class Trip(
     val id: Long = 0,
     val carId: Long,
@@ -91,7 +91,7 @@ data class Trip(
     val fuelKnown: Boolean get() = fuelMethod != FuelMethod.NOT_AVAILABLE
 }
 
-/** Пробег: MANUAL — ввёл пользователь (или перенесён из профиля/Car Scanner); ESTIMATED — оценка по поездкам. */
+/** Mileage: MANUAL = entered by the user (or carried over from the profile/Car Scanner); ESTIMATED = estimated from trips. */
 enum class OdometerSource { MANUAL, ESTIMATED }
 
 data class OdometerEntry(
@@ -103,8 +103,8 @@ data class OdometerEntry(
 )
 
 /**
- * Работа ТО. Интервалы — по пробегу и/или времени (null — не задан). lastDone* — когда делали в последний раз
- * (null — неизвестно: статус «отметьте, когда делали»).
+ * Maintenance item. Intervals by mileage and/or time (null: not set). lastDone*: when it was last done
+ * (null: unknown, status «отметьте, когда делали»).
  */
 data class MaintenanceItem(
     val id: Long = 0,

@@ -17,16 +17,16 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Четыре вкладки: «Панель» (старт), «Статистика», «Пит-стоп», «Настройки». Экран адаптера — пункт хаба настроек. */
+/** Four tabs: «Панель» (start), «Статистика», «Пит-стоп», «Настройки». The adapter screen is an item in the settings hub. */
 @RunWith(AndroidJUnit4::class)
 class AppShellTest {
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
-    /** Пункт нижнего меню (заголовок хаба с тем же текстом не выбираемый). */
+    /** Bottom navigation item (the hub title with the same text is not selectable). */
     private fun tab(label: String): SemanticsNodeInteraction = rule.onNode(hasText(label) and isSelectable())
 
-    /** Экран адаптера просит разрешения: выдаём заранее, иначе системный диалог закроет Compose-иерархию. */
+    /** The adapter screen requests permissions: grant them up front, otherwise the system dialog tears down the Compose hierarchy. */
     @Before
     fun grantPermissions() {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
@@ -49,7 +49,7 @@ class AppShellTest {
         tab("Настройки").performClick()
         rule.onNodeWithText("Адаптер").assertIsDisplayed()
         rule.onNodeWithText("Выбор и подключение ELM327").assertIsDisplayed()
-        // Модуль ИИ подключён: пункт настроек ИИ в хабе.
+        // AI module is wired in: AI settings item in the hub.
         rule.onNodeWithText("ИИ-помощник").assertIsDisplayed()
         rule.onNodeWithText("Провайдер, адрес, ключ, модель").assertIsDisplayed()
     }
@@ -59,7 +59,7 @@ class AppShellTest {
         tab("Пит-стоп").performClick()
         rule.onNodeWithText("Ошибки (DTC)").assertIsDisplayed()
         rule.onNodeWithText("Поездки").assertIsDisplayed()
-        // Ровно одна карточка ИИ (onNodeWithText падает на дубликатах), заглушки нет.
+        // Exactly one AI card (onNodeWithText fails on duplicates), no placeholder.
         rule.onNodeWithText("ИИ-помощник").assertIsDisplayed()
         rule.onNodeWithText("ИИ-помощник появится позже").assertDoesNotExist()
     }

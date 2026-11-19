@@ -46,7 +46,7 @@ import java.time.ZoneId
 
 data class StoredFinding(val id: Long, val carId: Long, val finding: Finding, val createdAtMs: Long)
 
-/** Состояние пересчёта — общее для экрана «Анализ» и пересчёта после импорта. */
+/** Recompute state — shared by the «Анализ» screen and the post-import recompute. */
 sealed interface AnalysisState {
     data object Idle : AnalysisState
     data class Running(val done: Int, val total: Int) : AnalysisState
@@ -56,7 +56,7 @@ sealed interface AnalysisState {
 
 data class SessionSummary(val id: Long, val startedAtMs: Long, val endedAtMs: Long?, val source: SessionSource, val readings: Int)
 
-/** Сводка датчика: min/max/mean/count — из SQL, перцентили — по прореженной выборке. */
+/** Sensor summary: min/max/mean/count from SQL, percentiles from a decimated sample. */
 data class SensorSummary(
     val sensorId: String,
     val unit: String,
@@ -72,23 +72,23 @@ data class SensorSummary(
 data class SessionReport(val session: SessionSummary, val sensors: List<SensorSummary>, val findings: List<Finding>)
 
 /**
- * Аналитика по локальным данным (этап 3): пересчёт находок и данные для инструментов ИИ.
- * Всё только на чтение, кроме таблицы находок. Числа считает код — модель их лишь объясняет.
+ * Analytics over local data (stage 3): recomputing findings and data for AI tools.
+ * Everything is read-only except the findings table. The code computes the numbers — the model only explains them.
  */
 interface AnalyticsRepository {
     val state: StateFlow<AnalysisState>
     fun observeFindings(carId: Long): Flow<List<StoredFinding>>
     suspend fun findings(carId: Long): List<StoredFinding>
     suspend fun finding(id: Long): StoredFinding?
-    /** Пересчитать находки машины по всей истории; прогресс — в [state]. */
+    /** Recompute the car's findings over its entire history; progress goes to [state]. */
     suspend fun recompute(carId: Long): List<Finding>
     suspend fun sessions(carId: Long, fromMs: Long = 0, toMs: Long = Long.MAX_VALUE, limit: Int = 20): List<SessionSummary>
     suspend fun sessionReport(carId: Long, sessionId: Long): SessionReport?
     suspend fun sensorSummary(carId: Long, sensorId: String, fromMs: Long, toMs: Long, warmOnly: Boolean): SensorSummary?
     suspend fun dtcEvents(carId: Long): List<DtcEvent>
     /**
-     * Дайджесты сессий машины, начавшихся в [fromMs]..[toMs] (тренды): из кэша процесса или потоково —
-     * по одной сессии за раз, без загрузки всех значений в память.
+     * Digests of the car's sessions that started in [fromMs]..[toMs] (trends): from the process cache or streamed —
+     * one session at a time, without loading all values into memory.
      */
     suspend fun sessionDigests(carId: Long, fromMs: Long, toMs: Long): List<SessionDigest> = emptyList()
 }
@@ -107,8 +107,8 @@ internal class RoomAnalyticsRepository(
     override val state: StateFlow<AnalysisState> = _state.asStateFlow()
     private val mutex = Mutex()
     /**
-     * Дайджесты законченных сессий не меняются — держим их в памяти процесса: повторный пересчёт
-     * (кнопка, импорт, правка профиля) читает из БД только новые записи. Ключ — id (AUTOINCREMENT не повторяется).
+     * Digests of finished sessions never change — keep them in process memory: a repeated recompute
+     * (button, import, profile edit) reads only new recordings from the DB. Key is the id (AUTOINCREMENT is never reused).
      */
     private val digestCache = java.util.concurrent.ConcurrentHashMap<Long, SessionDigest>()
 
@@ -149,7 +149,7 @@ internal class RoomAnalyticsRepository(
         }
     }
 
-    /** Одна сессия: её значения грузятся из БД, сворачиваются в дайджест и отпускаются; законченная — в кэш. */
+    /** One session: its values are loaded from the DB, folded into a digest and released; a finished one goes to the cache. */
     private suspend fun digestOf(s: SessionStartRow): Pair<SessionDigest, Int> {
         val rows = dao.points(s.id, SensorIds.FOR_RULES)
         val digest = withContext(compute) {
@@ -215,7 +215,7 @@ internal class RoomAnalyticsRepository(
     }
 }
 
-/** Доказательства хранятся JSON-ом: {"evidence":[{"label","value"}],"sessions":[…]}. */
+/** Evidence is stored as JSON: {"evidence":[{"label","value"}],"sessions":[…]}. */
 internal object FindingJson {
     fun encode(f: Finding): String = buildJsonObject {
         put("evidence", JsonArray(f.evidence.map { e -> buildJsonObject { put("label", e.label); put("value", e.value) } }))

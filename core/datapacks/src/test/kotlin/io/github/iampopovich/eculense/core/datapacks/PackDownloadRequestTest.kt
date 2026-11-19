@@ -8,7 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Запрос загрузки: модели стартуют expedited (из открытого приложения → foreground-служба разрешена). */
+/** Download request: models start expedited (from the open app → a foreground service is allowed). */
 class PackDownloadRequestTest {
     @Test
     fun `resumable packs are expedited with a non-expedited fallback, network required, exponential backoff`() {

@@ -57,7 +57,7 @@ internal fun SessionDetailRoute(sessionId: Long, viewModel: SessionDetailViewMod
 
     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Датчик по умолчанию — первым, иначе выбранный чип может оказаться за краем экрана.
+            // Default sensor goes first, otherwise the selected chip may end up off-screen.
             bySensor.keys.sortedBy { it != defaultSensor(bySensor.keys.toList()) }.forEach { id ->
                 val label = id.removePrefix("01.").toIntOrNull(16)?.let { StandardPids.byCode(it)?.name } ?: id
                 FilterChip(selected = id == sensor, onClick = { selected = id }, label = { Text(label) })

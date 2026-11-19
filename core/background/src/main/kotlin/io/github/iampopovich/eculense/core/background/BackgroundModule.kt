@@ -23,7 +23,7 @@ import org.koin.dsl.bind
 import org.koin.dsl.module
 import java.util.concurrent.TimeUnit
 
-/** Анализ после записи/импорта; mode = backfill — только поездки по старым записям (запуск приложения). */
+/** Analysis after recording/import; mode = backfill — only trips from old recordings (app startup). */
 class AnalysisWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params), KoinComponent {
     override suspend fun doWork(): Result = runCatching {
         if (inputData.getString(KEY_MODE) == MODE_BACKFILL) {
@@ -45,7 +45,7 @@ class AnalysisWorker(context: Context, params: WorkerParameters) : CoroutineWork
     }
 }
 
-/** Ежедневная проверка ТО (без сети). */
+/** Daily maintenance check (offline). */
 class MaintenanceWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params), KoinComponent {
     override suspend fun doWork(): Result = runCatching {
         val n = get<MaintenanceCheck>().run()
@@ -54,7 +54,7 @@ class MaintenanceWorker(context: Context, params: WorkerParameters) : CoroutineW
     }.getOrElse { Result.retry() }
 }
 
-/** Ставит фоновые задачи. Реализует [DataEvents]: слой данных зовёт его после записи и импорта. */
+/** Schedules background work. Implements [DataEvents]: the data layer calls it after recording and import. */
 class BackgroundScheduler(private val context: Context) : DataEvents {
     private val work get() = WorkManager.getInstance(context)
 
@@ -62,7 +62,7 @@ class BackgroundScheduler(private val context: Context) : DataEvents {
 
     override fun importFinished() = enqueueAnalysis()
 
-    /** APPEND_OR_REPLACE: новая запись во время анализа — ещё один прогон после текущего, не параллельно. */
+    /** APPEND_OR_REPLACE: a new recording during analysis — one more run after the current one, not in parallel. */
     fun enqueueAnalysis() {
         work.enqueueUniqueWork(ANALYSIS_WORK, ExistingWorkPolicy.APPEND_OR_REPLACE, OneTimeWorkRequestBuilder<AnalysisWorker>().build())
     }
@@ -86,7 +86,7 @@ class BackgroundScheduler(private val context: Context) : DataEvents {
     }
 }
 
-/** Добавить/убрать = строка в AppModules + settings.gradle.kts; без модуля находки пересчитывает слой данных. */
+/** Add/remove = a line in AppModules + settings.gradle.kts; without the module the data layer recomputes findings. */
 val backgroundModule = module {
     single<Notifier> { AndroidNotifier(androidContext()) }
     single<AlertLedger>(named("findings-ledger")) { PrefsAlertLedger(androidContext(), "findings") }

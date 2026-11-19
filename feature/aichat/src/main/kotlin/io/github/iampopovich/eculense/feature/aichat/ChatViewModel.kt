@@ -17,48 +17,48 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-/** Вопрос ждёт согласия: какие данные и какому провайдеру уйдут. */
+/** Question awaiting consent: which data goes to which provider. */
 internal data class ConsentRequest(val provider: ProviderInfo, val text: String)
 
-/** «Над ответом работали: …» и раскрываемые «Заметки экспертов». */
+/** «Над ответом работали: …» and expandable «Заметки экспертов». */
 internal data class ExpertsInfo(val roles: List<String>, val notes: List<ExpertNote>)
 
 internal data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val streaming: Boolean = false,
     val error: String? = null,
-    /** Индекс ответа, который пользователь остановил кнопкой «Стоп» (подпись «Ответ остановлен»). */
+    /** Index of the answer the user stopped with the «Стоп» button (label «Ответ остановлен»). */
     val stoppedIndex: Int? = null,
-    /** Подключены инструменты данных машины — показываем переключатель. */
+    /** Car data tools are connected: show the toggle. */
     val carDataAvailable: Boolean = false,
     /** «Использовать данные моей машины». */
     val useCarData: Boolean = false,
-    /** Что сейчас смотрит ИИ («ИИ смотрит ошибки…») — пока идёт вызов инструмента. */
+    /** What the AI is looking at now («ИИ смотрит ошибки…») while a tool call is running. */
     val toolStatus: String? = null,
-    /** Чат идёт через модель на телефоне — честная пометка о качестве и скорости. */
+    /** Chat runs on the on-phone model: an honest note about quality and speed. */
     val onDevice: Boolean = false,
-    /** Ждём согласия на отправку данных машины этому провайдеру. */
+    /** Waiting for consent to send car data to this provider. */
     val consent: ConsentRequest? = null,
-    /** Текст, который надо вернуть в поле ввода (диалог согласия закрыли). */
+    /** Text to put back into the input field (consent dialog was dismissed). */
     val draft: String? = null,
     /**
-     * Кто работал над ответом — по индексу сообщения ответа. Только для текущего показа: в историю (ai_chat.db) пишется
-     * лишь финальный ответ, после перезапуска подписи и заметок нет.
+     * Who worked on the answer, keyed by the answer message index. Only for the current display: history (ai_chat.db) stores
+     * just the final answer; after a restart the label and notes are gone.
      */
     val experts: Map<Int, ExpertsInfo> = emptyMap(),
 ) {
-    /** Запрос ушёл, но первый кусок ответа ещё не пришёл — показываем индикатор «печатает». */
+    /** Request sent but the first answer chunk hasn't arrived yet: show the «печатает» indicator. */
     val awaitingFirstToken: Boolean
         get() = streaming && messages.lastOrNull()?.let { it.role == ChatMessage.Role.ASSISTANT && it.text.isEmpty() } == true
 
-    /** Можно повторить: последний вопрос остался без ответа из-за ошибки. */
+    /** Retry available: the last question got no answer because of an error. */
     val canRetry: Boolean
         get() = !streaming && error != null && messages.lastOrNull()?.role == ChatMessage.Role.USER
 }
 
 /**
- * Чат через агента Koog ([LlmGateway.chat]): история диалога — у агента (ChatMemory по conversationId),
- * здесь — только то, что видно на экране. Ответ стримится; во время вызова инструментов — подпись «ИИ смотрит…».
+ * Chat via the Koog agent ([LlmGateway.chat]): dialog history lives in the agent (ChatMemory by conversationId),
+ * here only what's visible on screen. The answer is streamed; during tool calls the label «ИИ смотрит…» is shown.
  */
 internal class ChatViewModel(
     private val gateway: LlmGateway,
@@ -74,7 +74,7 @@ internal class ChatViewModel(
     init {
         viewModelScope.launch {
             val saved = prefs.useCarData()
-            // Диалог переживает перезапуск: id — в настройках, тексты — в ai_chat.db (ChatMemory).
+            // The dialog survives restarts: id in settings, texts in ai_chat.db (ChatMemory).
             conversationId = prefs.conversationId() ?: conversationId.also { prefs.setConversationId(it) }
             val history = runCatching { gateway.history(conversationId) }.getOrDefault(emptyList())
             val onDevice = runCatching { gateway.provider()?.onDevice == true }.getOrDefault(false)
@@ -83,7 +83,7 @@ internal class ChatViewModel(
         }
     }
 
-    /** Пометка «модель на телефоне» — заново при каждом показе экрана: провайдера меняют в настройках, а VM живёт дальше. */
+    /** «модель на телефоне» note, recomputed on every screen show: the provider is changed in settings while the VM lives on. */
     fun refreshProvider() {
         viewModelScope.launch {
             val onDevice = runCatching { gateway.provider()?.onDevice == true }.getOrDefault(false)
@@ -91,7 +91,7 @@ internal class ChatViewModel(
         }
     }
 
-    /** «Новый диалог»: текущая переписка удаляется, ИИ её больше не видит. */
+    /** «Новый диалог»: the current conversation is deleted, the AI no longer sees it. */
     fun newDialog() {
         if (_uiState.value.streaming) stop()
         val old = conversationId
@@ -104,8 +104,8 @@ internal class ChatViewModel(
     }
 
     /**
-     * Перед первой отправкой данных машины облачному провайдеру — диалог согласия (что уходит и куда);
-     * без согласия вопрос не уходит.
+     * Before car data is first sent to a cloud provider, a consent dialog (what is sent and where);
+     * without consent the question is not sent.
      */
     fun send(text: String) {
         if (text.isBlank() || _uiState.value.streaming || _uiState.value.consent != null) return
@@ -113,7 +113,7 @@ internal class ChatViewModel(
         viewModelScope.launch {
             if (_uiState.value.useCarData) {
                 val provider = gateway.provider()
-                // модель на телефоне: данные не покидают устройство — согласие не нужно
+                // on-phone model: data doesn't leave the device, no consent needed
                 if (provider != null && !provider.onDevice && !prefs.hasConsent(provider.key)) {
                     _uiState.update { it.copy(consent = ConsentRequest(provider, question)) }
                     return@launch
@@ -123,7 +123,7 @@ internal class ChatViewModel(
         }
     }
 
-    /** «Разрешить»: запоминаем согласие для этого провайдера и отправляем вопрос с данными машины. */
+    /** «Разрешить»: remember consent for this provider and send the question with car data. */
     fun acceptConsent() {
         val request = _uiState.value.consent ?: return
         viewModelScope.launch {
@@ -133,7 +133,7 @@ internal class ChatViewModel(
         }
     }
 
-    /** «Без данных машины»: переключатель выключается, вопрос уходит без инструментов. */
+    /** «Без данных машины»: the toggle is turned off, the question is sent without tools. */
     fun declineConsent() {
         val request = _uiState.value.consent ?: return
         _uiState.update { it.copy(consent = null, useCarData = false) }
@@ -141,7 +141,7 @@ internal class ChatViewModel(
         ask(_uiState.value.messages + ChatMessage(ChatMessage.Role.USER, request.text), request.text)
     }
 
-    /** Закрыли диалог: ничего не отправляем, текст возвращается в поле ввода. */
+    /** Dialog dismissed: send nothing, text goes back into the input field. */
     fun cancelConsent() {
         val request = _uiState.value.consent ?: return
         _uiState.update { it.copy(consent = null, draft = request.text) }
@@ -151,7 +151,7 @@ internal class ChatViewModel(
         _uiState.update { it.copy(draft = null) }
     }
 
-    /** Повтор вопроса после ошибки — без повторного ввода (неудачный ход агент в историю не записал). */
+    /** Retry the question after an error without retyping (the agent didn't record the failed turn in history). */
     fun retry() {
         val s = _uiState.value
         if (!s.canRetry) return
@@ -164,7 +164,7 @@ internal class ChatViewModel(
         viewModelScope.launch { prefs.setUseCarData(enabled) }
     }
 
-    /** «Стоп»: обрываем поток; уже полученный текст остаётся, пустой пузырь ответа убирается. */
+    /** «Стоп»: cut the stream; text already received stays, an empty answer bubble is removed. */
     fun stop() {
         if (!_uiState.value.streaming) return
         job?.cancel()
@@ -205,7 +205,7 @@ internal class ChatViewModel(
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message ?: "Ошибка ИИ", messages = it.messages.filterNot { m -> m.text.isEmpty() }) }
             } finally {
-                // остановленный поток не должен сбросить состояние уже начатого следующего запроса
+                // a stopped stream must not reset the state of an already started next request
                 if (gen == generation) _uiState.update { it.copy(streaming = false, toolStatus = null) }
             }
         }

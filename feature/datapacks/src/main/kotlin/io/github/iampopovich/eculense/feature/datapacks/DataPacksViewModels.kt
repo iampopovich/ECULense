@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Что подтверждает пользователь: скачивание по мобильной сети или удаление. */
+/** What the user confirms: download over mobile data or deletion. */
 internal sealed interface PackConfirm {
     val pack: PackState
 
@@ -38,7 +38,7 @@ internal class DataPacksViewModel(private val service: DataPackService) : ViewMo
     val uiState: StateFlow<DataPacksUiState> = combine(service.observe(), local) { packs, l -> l.copy(packs = packs) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DataPacksUiState())
 
-    /** «Скачать»/«Обновить»: на мобильной сети — сначала вопрос с размером (предотвращение ошибок). */
+    /** «Скачать»/«Обновить»: on mobile data, first ask with the size (error prevention). */
     fun download(pack: PackState, version: String? = null) {
         if (service.isMeteredNetwork()) {
             local.update { it.copy(confirm = PackConfirm.Metered(pack, version)) }
@@ -82,7 +82,7 @@ internal data class SignalsetUiState(
     val make: String? = null,
     val model: String? = null,
     val carYear: Int? = null,
-    /** Год, для которого смотрим (по умолчанию год машины; можно поменять для проверки покрытого года). */
+    /** Year being viewed (defaults to the car's year; can be changed to check a covered year). */
     val year: String = "",
     val loading: Boolean = false,
     val result: SignalsetResult? = null,

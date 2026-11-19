@@ -1,8 +1,8 @@
 package io.github.iampopovich.eculense.core.model
 
 /**
- * Единицы измерения (аналог флагов Car Scanner Use_km, Use_celcium, UseL100ForFuel …).
- * Значения в БД всегда метрические; пересчёт — только при показе и экспорте.
+ * Units of measurement (counterpart of Car Scanner flags Use_km, Use_celcium, UseL100ForFuel …).
+ * Values in the DB are always metric; conversion happens only for display and export.
  */
 data class UnitsSettings(
     val metricDistance: Boolean = true,
@@ -16,7 +16,7 @@ data class UnitsSettings(
     val flowGramsPerSecond: Boolean = true,
     val accelerationG: Boolean = false,
 ) {
-    /** Пересчёт показания датчика из метрической единицы в выбранную пользователем. */
+    /** Converts a sensor reading from its metric unit to the one chosen by the user. */
     fun display(value: Double, unit: String): Pair<Double, String> = when {
         unit == "km/h" && !metricDistance -> value / KM_PER_MILE to "mph"
         unit == "km" && !metricDistance -> value / KM_PER_MILE to "mi"
@@ -25,7 +25,7 @@ data class UnitsSettings(
         else -> value to unit
     }
 
-    /** Расход: л/100 км либо миль на галлон (US/Imp). */
+    /** Fuel consumption: L/100 km or miles per gallon (US/Imp). */
     fun consumption(lPer100Km: Double): Pair<Double, String> = when {
         litersPer100Km || lPer100Km <= 0.0 -> lPer100Km to "л/100 км"
         else -> (if (usGallon) MPG_US else MPG_IMP) / lPer100Km to if (usGallon) "mpg (US)" else "mpg (Imp)"

@@ -6,8 +6,8 @@ import org.koin.core.module.Module
 import org.koin.dsl.module
 
 /**
- * Сборка «Локально» (флейвор `local`): модель на телефоне (3.10, :core:ailocal) + облачные провайдеры. Единственное
- * место, где приложение знает о модуле; в флейворе `cloud` этот файл без :core:ailocal (см. src/cloud).
+ * «Локально» build (`local` flavor): on-phone model (3.10, :core:ailocal) + cloud providers. The only
+ * place where the app knows about the module; in the `cloud` flavor this file has no :core:ailocal (see src/cloud).
  */
 val onDeviceModules: List<Module> = listOf(
     aiLocalModule,

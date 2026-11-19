@@ -2,9 +2,9 @@ plugins {
     id("ecu.android.feature")
 }
 
-// 3.10: модель на устройстве — провайдер «На устройстве» для LlmGateway (:core:ai), каталог Koog LiteRT, проверка
-// телефона, скачивание через :core:datapacks, тест скорости в отдельном процессе :bench. Модуль удаляемый: убрать
-// include + зависимость app + строку в AppModules — приложение и облачный ИИ работают без него.
+// 3.10: on-device model: the «На устройстве» provider for LlmGateway (:core:ai), Koog LiteRT catalog, phone
+// check, download via :core:datapacks, speed test in a separate :bench process. The module is removable: drop the
+// include + app dependency + the line in AppModules, and the app and cloud AI work without it.
 dependencies {
     implementation(project(":core:ai"))
     implementation(project(":core:datapacks"))

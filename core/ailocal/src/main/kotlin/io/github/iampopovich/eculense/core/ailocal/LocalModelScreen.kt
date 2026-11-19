@@ -68,7 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.compose.viewmodel.koinViewModel
 
-/** Действия экрана; по умолчанию пустые — удобно в UI-тестах. */
+/** Screen actions; empty by default, handy in UI tests. */
 internal class LocalModelActions(
     val onDownload: (String) -> Unit = {},
     val onConfirmDownload: () -> Unit = {},
@@ -137,8 +137,8 @@ internal fun LocalModelRoute(viewModel: LocalModelViewModel = koinViewModel()) {
 }
 
 /**
- * Экран «На устройстве»: компактная карточка телефона, затем ОДИН список моделей по размеру (строка = название,
- * размер, бейдж источника, оценка, иконка действия/результата), детали и действия — в нижней панели по нажатию.
+ * «На устройстве» screen: compact phone card, then ONE list of models by size (row = name,
+ * size, source badge, estimate, action/result icon); details and actions in a bottom sheet on tap.
  */
 @Composable
 internal fun LocalModelScreen(state: LocalModelUiState, actions: LocalModelActions, modifier: Modifier = Modifier) {
@@ -235,7 +235,7 @@ private fun DeviceCard(device: DeviceProfile?, nano: NanoStatus?) {
     }
 }
 
-/** Зелёный/янтарный с контрастом ≥ 4,5:1 и на светлой, и на тёмной теме (поверхность определяется по яркости). */
+/** Green/amber with contrast ≥ 4.5:1 on both light and dark themes (surface detected by luminance). */
 private fun ColorScheme.dark(): Boolean = surface.luminance() < 0.5f
 private fun ColorScheme.good(): Color = if (dark()) Color(0xFF81C784) else Color(0xFF1B5E20)
 private fun ColorScheme.warn(): Color = if (dark()) Color(0xFFFFB74D) else Color(0xFF8D5A00)
@@ -253,7 +253,7 @@ private fun verdictColor(v: Verdict, scheme: ColorScheme): Color = when (v) {
     Verdict.UNSUITABLE -> scheme.error
 }
 
-/** Маленький бейдж: источник, «только действия», «нужен токен HF», оценка. */
+/** Small badge: source, «только действия», «нужен токен HF», estimate. */
 @Composable
 private fun Badge(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant, strong: Boolean = false) {
     Surface(shape = MaterialTheme.shapes.extraSmall, color = MaterialTheme.colorScheme.surfaceVariant) {
@@ -280,7 +280,7 @@ private fun ModelBadges(row: ModelRow, hasToken: Boolean, withFit: Boolean = tru
     }
 }
 
-/** Одна строка списка: название, размер, бейджи — и иконка действия/состояния справа. Нажатие — детали. */
+/** One list row: name, size, badges, and an action/state icon on the right. Tap opens details. */
 @Composable
 private fun ModelListRow(row: ModelRow, hasToken: Boolean, actions: LocalModelActions) {
     val m = row.model
@@ -311,8 +311,8 @@ private fun RowTrailing(row: ModelRow, actions: LocalModelActions) {
     when {
         row.downloading -> {
             if (row.progress != null && row.progress >= 0) {
-                // Лямбда стабильна, значение читается при отрисовке: частые обновления прогресса не перекомпоновывают
-                // индикатор (иначе на телефоне застревала прокрутка списка жестом).
+                // Lambda is stable and the value is read at draw time: frequent progress updates don't recompose
+                // the indicator (otherwise list scroll gestures got stuck on the phone).
                 val pct by rememberUpdatedState(row.progress / 100f)
                 CircularProgressIndicator(progress = { pct }, modifier = Modifier.size(32.dp).semantics { contentDescription = "Скачивание" }, strokeWidth = 3.dp)
             } else {
@@ -411,7 +411,7 @@ private fun ModelSheet(row: ModelRow, hasToken: Boolean, actions: LocalModelActi
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Ждёт повтора после обрыва: нажатие перезапускает загрузку сразу (из открытого приложения).
+                        // Waiting to retry after a drop: tapping restarts the download immediately (from the open app).
                         if (row.retrying) Button(onClick = { actions.onDownload(m.packId) }) { Text("Повторить сейчас") }
                         OutlinedButton(onClick = { actions.onCancelDownload(m.packId) }) { Text("Остановить") }
                     }

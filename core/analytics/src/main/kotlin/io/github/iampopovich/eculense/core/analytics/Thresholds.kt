@@ -1,65 +1,65 @@
 package io.github.iampopovich.eculense.core.analytics
 
 /**
- * Все пороги аналитики в одном месте. Это ориентиры для бензинового атмосферного двигателя,
- * а не заводские допуски конкретной машины; источник указан рядом с каждым значением.
+ * All analytics thresholds in one place. These are guidelines for a naturally aspirated gasoline engine,
+ * not factory tolerances of a specific car; the source is given next to each value.
  */
 object Thresholds {
-    // --- Состояние двигателя ---
-    /** «Прогретый двигатель»: ОЖ ≥ 80 °C (план 3.8; термостаты открываются при ~82–88 °C). */
+    // --- Engine state ---
+    /** "Warm engine": coolant ≥ 80 °C (plan 3.8; thermostats open at ~82–88 °C). */
     const val WARM_COOLANT_C = 80.0
-    /** «Двигатель работает»: обороты выше 400 (ниже — стартер или заглушен; план 3.8). */
+    /** "Engine running": RPM above 400 (below — cranking or stopped; plan 3.8). */
     const val RUNNING_RPM = 400.0
-    /** Верхняя граница холостого хода: перегазовка на месте — уже не ХХ (типичный ХХ 650–900 об/мин). */
+    /** Upper idle bound: revving while stationary is no longer idle (typical idle 650–900 rpm). */
     const val IDLE_MAX_RPM = 1_100.0
-    /** Сколько последнее значение оборотов/скорости считается актуальным (цикл опроса K-Line ~1,7 с). */
+    /** How long the last RPM/speed value is considered current (K-Line polling cycle ~1.7 s). */
     const val STATE_MAX_AGE_MS = 10_000L
-    /** ОЖ меняется медленно — её значение живёт дольше. */
+    /** Coolant temperature changes slowly — its value lives longer. */
     const val COOLANT_MAX_AGE_MS = 60_000L
 
-    // --- Перегрев ОЖ ---
-    /** Рабочая температура 85–100 °C, вентилятор обычно включается при 95–102 °C. */
+    // --- Coolant overheating ---
+    /** Operating temperature 85–100 °C; the fan usually turns on at 95–102 °C. */
     const val OVERHEAT_WARN_C = 105.0
-    /** ≥ 110 °C — близко к закипанию антифриза под давлением крышки (~120 °C), риск для ГБЦ. */
+    /** ≥ 110 °C — close to antifreeze boiling under cap pressure (~120 °C), a risk for the cylinder head. */
     const val OVERHEAT_CRIT_C = 110.0
-    /** Сколько держаться выше порога подряд, чтобы не ловить единичные выбросы (план 3.2: 30 с). */
+    /** How long to stay above the threshold continuously, to avoid catching single outliers (plan 3.2: 30 s). */
     const val OVERHEAT_MIN_MS = 30_000L
 
-    // --- Напряжение бортсети на работающем двигателе ---
-    /** Генератор держит 13,5–14,7 В; ниже 13,2 В дольше минуты — недозаряд (план 3.8). */
+    // --- System voltage with the engine running ---
+    /** The alternator holds 13.5–14.7 V; below 13.2 V for over a minute — undercharging (plan 3.8). */
     const val VOLTAGE_LOW_V = 13.2
     const val VOLTAGE_LOW_MIN_MS = 60_000L
-    /** Выше 14,8 В — перезаряд (регулятор напряжения), вредно для АКБ. */
+    /** Above 14.8 V — overcharging (voltage regulator), harmful to the battery. */
     const val VOLTAGE_HIGH_V = 14.8
     const val VOLTAGE_HIGH_MIN_MS = 10_000L
 
-    // --- Топливные коррекции (прогретый двигатель) ---
-    /** Долгосрочная коррекция в пределах ±10 % — норма (план 3.8; многие ЭБУ пишут P0171/P0174 около ±25 %). */
+    // --- Fuel trims (warm engine) ---
+    /** Long-term trim within ±10 % is normal (plan 3.8; many ECUs set P0171/P0174 around ±25 %). */
     const val LTFT_LIMIT_PCT = 10.0
-    /** Сумма STFT+LTFT за ±25 % — ЭБУ на пределе регулирования смеси. */
+    /** STFT+LTFT sum beyond ±25 % — the ECU is at the limit of mixture control. */
     const val TOTAL_TRIM_CRIT_PCT = 25.0
-    /** Разница долгосрочных коррекций банков V-образного двигателя больше 8 % — проблема на одной стороне. */
+    /** Long-term trim difference between banks of a V engine over 8 % — a problem on one side. */
     const val BANK_ASYMMETRY_PCT = 8.0
-    /** Меньше замеров — вывод предварительный: severity не поднимается до CRITICAL. */
+    /** Fewer samples — the conclusion is preliminary: severity is not raised to CRITICAL. */
     const val MIN_TRIM_SAMPLES = 10
 
-    // --- Расход воздуха на прогретом ХХ ---
-    /** Ориентир ≈ 0,9–1,3 г/с на литр рабочего объёма (параметр правила, план 3.8). */
+    // --- Airflow at warm idle ---
+    /** Guideline ≈ 0.9–1.3 g/s per liter of displacement (rule parameter, plan 3.8). */
     const val MAF_IDLE_MIN_G_PER_L = 0.9
     const val MAF_IDLE_MAX_G_PER_L = 1.3
     const val MAF_IDLE_MIN_SAMPLES = 5
 
-    // --- Коды ошибок ---
-    /** Повтор кода: ≥ 2 события за 30 дней (план 3.8). */
+    // --- Trouble codes ---
+    /** Recurring code: ≥ 2 events within 30 days (plan 3.8). */
     const val DTC_REPEAT_WINDOW_MS = 30L * 24 * 3_600_000
-    /** Чтения одного кода чаще раза в 6 часов — одно и то же событие (кнопку «Прочитать» жмут несколько раз). */
+    /** Reads of the same code more often than once per 6 hours are the same event (the «Прочитать» button gets pressed several times). */
     const val DTC_SAME_EVENT_MS = 6L * 3_600_000
 
-    // --- Прогрев ---
-    /** «Холодный пуск»: ОЖ в начале записи ≤ 30 °C. */
+    // --- Warm-up ---
+    /** "Cold start": coolant at the start of the recording ≤ 30 °C. */
     const val COLD_START_MAX_C = 30.0
-    /** Медиана последних прогревов дольше прежней в 1,3 раза — тренд (термостат, датчик ОЖ). */
+    /** Median of recent warm-ups 1.3× longer than the earlier one — a trend (thermostat, coolant sensor). */
     const val WARMUP_TREND_RATIO = 1.3
-    /** Холодных пусков в каждой половине истории, чтобы говорить о тренде. */
+    /** Cold starts needed in each half of the history to talk about a trend. */
     const val WARMUP_MIN_STARTS_PER_HALF = 3
 }

@@ -12,7 +12,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** «Данные и справочники» и «О приложении» — пункты хаба «Настройки». */
+/** «Данные и справочники» and «О приложении» — items of the «Настройки» hub. */
 @OptIn(KoinExperimentalAPI::class)
 val dataPacksFeatureModule = module {
     includes(obdbModule)

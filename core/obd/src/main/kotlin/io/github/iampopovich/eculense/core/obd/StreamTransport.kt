@@ -12,7 +12,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 
-/** База для транспортов поверх InputStream/OutputStream (Bluetooth SPP, TCP). */
+/** Base for transports over InputStream/OutputStream (Bluetooth SPP, TCP). */
 abstract class StreamTransport : ObdTransport {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val chunks = Channel<ByteArray>(Channel.UNLIMITED)
@@ -20,10 +20,10 @@ abstract class StreamTransport : ObdTransport {
     @Volatile
     private var output: OutputStream? = null
 
-    /** Блокирующее открытие соединения; вызывается на Dispatchers.IO. */
+    /** Blocking connection open; called on Dispatchers.IO. */
     protected abstract fun openStreams(): Pair<InputStream, OutputStream>
 
-    /** Закрыть сокет. Это же разблокирует read() в фоновом чтении. */
+    /** Close the socket. This also unblocks read() in the background reader. */
     protected abstract fun closeStreams()
 
     override suspend fun open() {

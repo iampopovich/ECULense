@@ -15,8 +15,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 
 /**
- * Содержимое над клавиатурой. Экраны живут внутри Scaffold над нижним меню (edge-to-edge, adjustResize не сжимает окно),
- * поэтому imePadding() не подходит: отступ = на сколько клавиатура перекрывает нижний край самого экрана.
+ * Content above the keyboard. Screens live inside a Scaffold above the bottom bar (edge-to-edge, adjustResize doesn't shrink the window),
+ * so imePadding() doesn't fit: padding = how much the keyboard overlaps the bottom edge of the screen itself.
  */
 @Composable
 fun Modifier.aboveKeyboard(): Modifier {

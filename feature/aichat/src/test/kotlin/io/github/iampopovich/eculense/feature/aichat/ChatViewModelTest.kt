@@ -26,7 +26,7 @@ import org.junit.Test
 
 internal data class ChatCall(val conversationId: String, val text: String, val useCarData: Boolean)
 
-/** Поддельный шлюз: n-й вызов chat() отдаёт поток из responder(n). */
+/** Fake gateway: the n-th chat() call returns the flow from responder(n). */
 internal class FakeGateway(
     override val hasVehicleTools: Boolean = true,
     private val provider: ProviderInfo? = null,
@@ -118,7 +118,7 @@ class ChatViewModelTest {
         vm.setUseCarData(false)
         vm.send("второй")
         assertEquals(listOf(true, false), gateway.calls.map { it.useCarData })
-        // один диалог — один conversationId (историю ведёт агент)
+        // one dialog = one conversationId (the agent keeps the history)
         assertEquals(1, gateway.calls.map { it.conversationId }.distinct().size)
     }
 
@@ -147,7 +147,7 @@ class ChatViewModelTest {
         assertNull(vm.uiState.value.consent)
         assertEquals(listOf(ChatCall(gateway.calls.single().conversationId, "Объясни мои ошибки", true)), gateway.calls)
 
-        // согласие запомнено — второй вопрос уходит сразу
+        // consent remembered: the second question is sent immediately
         vm.send("Как прошла последняя поездка?")
         assertNull(vm.uiState.value.consent)
         assertEquals(2, gateway.calls.size)
@@ -246,7 +246,7 @@ class ChatViewModelTest {
         vm.send("как машина вела себя за полгода")
         val s = vm.uiState.value
         assertEquals(ExpertsInfo(listOf("Аналитик эксплуатации", "Моторист"), notes), s.experts[1])
-        // следующий ответ без экспертов — у него своей подписи нет, у первого остаётся
+        // next answer has no experts: it gets no label of its own, the first one keeps its label
         vm.send("привет")
         assertEquals(setOf(1), vm.uiState.value.experts.keys)
         vm.newDialog()
@@ -264,7 +264,7 @@ class ChatViewModelTest {
         val vm = ChatViewModel(FakeGateway { flow { throw IllegalStateException("ИИ не настроен") } }, FakePrefs(), prefill = null)
         vm.send("привет")
         assertEquals("ИИ не настроен", vm.uiState.value.error)
-        // Пустой пузырь ответа убирается, вопрос пользователя остаётся.
+        // The empty answer bubble is removed, the user's question stays.
         assertEquals(listOf(ChatMessage(ChatMessage.Role.USER, "привет")), vm.uiState.value.messages)
     }
 

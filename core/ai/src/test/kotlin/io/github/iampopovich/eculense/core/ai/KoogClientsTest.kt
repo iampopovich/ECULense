@@ -57,7 +57,7 @@ class KoogClientsTest {
 
     @Test
     fun `openai models declare the chat completions endpoint`() {
-        // Без этой способности OpenAILLMClient 1.3.0 падает: «Cannot determine proper LLM params».
+        // Without this capability OpenAILLMClient 1.3.0 fails: «Cannot determine proper LLM params».
         listOf(LlmProviderKind.OPENAI, LlmProviderKind.OTHER).forEach { kind ->
             val model = KoogClients.model(LlmSettings(kind, "gpt-4.1-mini", "https://api.openai.com", true))
             assertTrue(LLMCapability.OpenAIEndpoint.Completions in model.capabilities.orEmpty())
