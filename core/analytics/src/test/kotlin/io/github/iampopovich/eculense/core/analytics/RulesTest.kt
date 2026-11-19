@@ -24,6 +24,8 @@ class RulesTest {
     private fun ms(y: Int, m: Int, d: Int) = LocalDate.of(y, m, d).atStartOfDay(zone).toInstant().toEpochMilli()
 
     private fun AnalyticsRule.only(input: AnalysisInput): Finding = evaluate(input).single()
+    private fun en(t: FindingText) = FindingEnglish.render(t, zone)
+    private fun msg(f: Finding) = FindingEnglish.message(f, zone)
 
     // --- overheating ---
     @Test
@@ -31,11 +33,14 @@ class RulesTest {
         val crit = CoolantOverheatRule.only(input(listOf(digest().copy(coolant = aggOf(112.0), overheatWarnMs = 40_000, overheatCritMs = 40_000))))
         assertEquals(Severity.CRITICAL, crit.severity)
         assertEquals(listOf(1L), crit.sessionIds)
+        // typed text: key + numeric params, rendered per locale by the UI
+        assertEquals(FindingText(FindingKey.COOLANT_OVERHEAT, FindingArg.Count(1), FindingArg.Num(110.0, 0), FindingArg.Count(30)), crit.message.single())
+        assertEquals("Coolant stayed at ≥ 110 °C for longer than 30 s in 1 recording.", msg(crit))
         val warn = CoolantOverheatRule.only(input(listOf(digest().copy(coolant = aggOf(107.0), overheatWarnMs = 31_000))))
         assertEquals(Severity.WARNING, warn.severity)
         val ok = CoolantOverheatRule.only(input(listOf(digest().copy(coolant = aggOf(90.0, 106.0), overheatWarnMs = 5_000))))
         assertEquals(Severity.OK, ok.severity)
-        assertTrue(ok.evidence.any { it.value.contains("106") })
+        assertTrue(ok.evidence.any { en(it.value).contains("106") })
     }
 
     @Test
@@ -59,8 +64,8 @@ class RulesTest {
         val ok = digest().copy(voltageSensor = ELM_VOLTAGE, runningVoltage = aggOf(13.3, 14.0, 14.0, 14.1), runningVoltageHist = hist)
         val low = VoltageRule.evaluate(input(listOf(ok))).first { it.ruleId == "voltage-low" }
         assertEquals(Severity.OK, low.severity)
-        val text = low.evidence.joinToString { it.value }
-        assertTrue(text, text.contains("13,3") && text.contains("14,0"))
+        val text = low.evidence.joinToString { en(it.value) }
+        assertTrue(text, text.contains("13.3") && text.contains("14.0"))
         assertEquals(Severity.NO_DATA, VoltageRule.evaluate(input(listOf(digest()))).first().severity)
     }
 
@@ -69,9 +74,9 @@ class RulesTest {
         val hist = (1..199).fold(Histogram.EMPTY) { h, _ -> h.add(12.8) }.add(10.1)
         val low = digest().copy(voltageSensor = ELM_VOLTAGE, runningVoltage = aggOf(10.1, 12.8), runningVoltageHist = hist, lowVoltageMs = 241_000)
         val f = VoltageRule.evaluate(input(listOf(low))).first { it.ruleId == "voltage-low" }
-        assertTrue(f.message, f.message.contains("адаптер"))
+        assertTrue(msg(f), f.message.any { it.key == FindingKey.VOLTAGE_ADAPTER_NOTE })
         // a brief dip (starter, restart) is separated from the steady level
-        assertTrue(f.evidence.joinToString(), f.evidence.any { it.label.startsWith("1 %") && it.value == "12,8 В" })
+        assertTrue(f.evidence.joinToString(), f.evidence.any { it.label.key == FindingKey.EVIDENCE_VOLTAGE_P1 && en(it.value) == "12.8 V" })
     }
 
     @Test
@@ -87,8 +92,8 @@ class RulesTest {
         val f = FuelTrimRule.evaluate(input(listOf(d)))
         val lt = f.first { it.ruleId == "fuel-trim-long" }
         assertEquals(Severity.WARNING, lt.severity)
-        assertTrue(lt.message, lt.message.contains("банк 1") && lt.message.contains("банк 2"))
-        assertTrue(lt.evidence.any { it.value.contains("+12,5") })
+        assertTrue(msg(lt), msg(lt).contains("bank 1") && msg(lt).contains("bank 2"))
+        assertTrue(lt.evidence.any { en(it.value).contains("+12.5") })
         // few samples: sum 12.5+14.6 > 25, but no CRITICAL
         assertEquals(Severity.WARNING, f.first { it.ruleId == "fuel-trim-total" }.severity)
         assertEquals(Severity.OK, f.first { it.ruleId == "fuel-trim-bank-asymmetry" }.severity)
@@ -116,8 +121,8 @@ class RulesTest {
         val may = digest(2).copy(warmTrims = mapOf(LTFT1 to aggOf(12.5, 12.5), LTFT2 to aggOf(12.5, 12.5, 12.5)))
         val lt = FuelTrimRule.evaluate(input(listOf(dec, may))).first { it.ruleId == "fuel-trim-long" }
         assertEquals(Severity.WARNING, lt.severity)
-        assertTrue(lt.message, lt.message.contains("банк 1 +12,5 %") && lt.message.contains("банк 2 +12,5 %"))
-        assertTrue(lt.evidence.joinToString { it.value }, lt.evidence.any { it.value.contains("−8,6") || it.value.contains("-8,6") })
+        assertTrue(msg(lt), msg(lt).contains("bank 1 +12.5 %") && msg(lt).contains("bank 2 +12.5 %"))
+        assertTrue(lt.evidence.joinToString { en(it.value) }, lt.evidence.any { en(it.value).contains("-8.6") })
         assertEquals(listOf(2L), lt.sessionIds)
     }
 
@@ -132,7 +137,8 @@ class RulesTest {
         val d = digest().copy(warmIdleMaf = aggOf(3.0, 3.2, 3.1, 3.0, 3.1, 3.2))
         val noVolume = MafIdleRule.only(input(listOf(d), car = CarProfile(name = "c", brand = "Kia", year = 2005)))
         assertEquals(Severity.NO_DATA, noVolume.severity)
-        assertTrue(noVolume.message, noVolume.message.contains("объём двигателя") && noVolume.message.contains("Автомобиль"))
+        assertEquals(FindingKey.MAF_NO_VOLUME, noVolume.message.first().key)
+        assertTrue(msg(noVolume), msg(noVolume).contains("engine displacement") && msg(noVolume).contains("Measured: 3.1 g/s"))
         val low = MafIdleRule.only(input(listOf(d), car = CarProfile(name = "c", engineVolumeL = 3.5)))
         assertEquals(Severity.WARNING, low.severity) // ~0.89 g/s per liter
         val ok = MafIdleRule.only(input(listOf(digest().copy(warmIdleMaf = aggOf(4.0, 4.0, 4.0, 4.0, 4.0))), car = CarProfile(name = "c", engineVolumeL = 3.5)))
@@ -147,7 +153,7 @@ class RulesTest {
         val b = digest(2).copy(milDistanceKm = aggOf(700.0, 753.0))
         val f = MilDistanceRule.only(input(listOf(a, b)))
         assertEquals(Severity.WARNING, f.severity)
-        assertTrue(f.message, f.message.contains("753"))
+        assertTrue(msg(f), msg(f).contains("753"))
         assertEquals(listOf(2L), f.sessionIds)
         assertEquals(Severity.OK, MilDistanceRule.only(input(listOf(a))).severity)
         assertEquals(Severity.NO_DATA, MilDistanceRule.only(input(listOf(digest()))).severity)
@@ -184,16 +190,17 @@ class RulesTest {
         val f = DtcRule.evaluate(input(dtc = events)).associateBy { it.ruleId }
         val air = f.getValue("dtc-air-sensors")
         assertEquals(Severity.WARNING, air.severity)
-        assertTrue(air.message, air.message.contains("P0102") && air.message.contains("P0107") && air.message.contains("P0113"))
-        assertTrue(air.evidence.any { it.label == "P0107" && it.value.startsWith("2 ") })
-        assertTrue(air.evidence.any { it.label == "P0102" && it.value.startsWith("1 ") })
+        assertTrue(msg(air), msg(air).contains("P0102") && msg(air).contains("P0107") && msg(air).contains("P0113"))
+        assertTrue(air.evidence.any { it.rawLabel == "P0107" && it.value.key == FindingKey.DTC_OCCURRENCES && it.value.quantity == 2 })
+        assertTrue(air.evidence.any { it.rawLabel == "P0102" && en(it.value).startsWith("1 time: ") })
         val mix = f.getValue("dtc-mixture")
         assertEquals(Severity.WARNING, mix.severity)
-        assertTrue(mix.message.contains("P0171") && mix.message.contains("P0174"))
+        assertTrue(msg(mix).contains("P0171") && msg(mix).contains("P0174"))
         // P0300 twice, but 2 months apart — not a "repeat within 30 days"; P1847 — once
         val single = f.getValue("dtc-other")
         assertEquals(Severity.INFO, single.severity)
-        assertTrue(single.message.contains("P1847") && single.message.contains("P0300"))
+        assertTrue(msg(single).contains("P1847") && msg(single).contains("P0300"))
+        assertTrue(single.evidence.any { it.rawLabel == "P1847" && it.value.key == FindingKey.DTC_OCCURRENCES_PENDING })
         assertFalse(f.containsKey("dtc-repeat"))
     }
 
@@ -204,17 +211,17 @@ class RulesTest {
         ).single { it.ruleId == "dtc-mixture" }
 
         val bank1 = mixture("P0171")
-        assertEquals("Смесь (P0171)", bank1.title)
-        assertTrue(bank1.message, bank1.message.contains("бедная") && bank1.message.contains("банке 1"))
-        assertFalse(bank1.message, bank1.message.contains("обоих"))
+        assertEquals("Mixture (P0171)", en(bank1.title))
+        assertTrue(msg(bank1), msg(bank1).contains("lean") && msg(bank1).contains("on bank 1"))
+        assertFalse(msg(bank1), msg(bank1).contains("both"))
 
         val both = mixture("P0171", "P0174")
-        assertEquals("Смесь (P0171/P0174)", both.title)
-        assertTrue(both.message, both.message.contains("бедная") && both.message.contains("обоих банках"))
+        assertEquals("Mixture (P0171/P0174)", en(both.title))
+        assertTrue(msg(both), msg(both).contains("lean") && msg(both).contains("on both banks"))
 
         val rich2 = mixture("P0175")
-        assertTrue(rich2.message, rich2.message.contains("богатая") && rich2.message.contains("банке 2"))
-        assertFalse(rich2.message, rich2.message.contains("подсос"))
+        assertTrue(msg(rich2), msg(rich2).contains("rich") && msg(rich2).contains("on bank 2"))
+        assertFalse(msg(rich2), msg(rich2).contains("air leak"))
     }
 
     @Test
@@ -237,5 +244,33 @@ class RulesTest {
         assertEquals(Severity.CRITICAL, all.first().severity)
         assertTrue(all.map { it.ruleId }.containsAll(listOf("coolant-overheat", "voltage-low", "fuel-trim-long", "maf-idle", "mil-distance", "warmup-trend")))
         assertTrue(all.zipWithNext().all { (a, b) -> a.severity.rank >= b.severity.rank })
+    }
+
+    // --- typed text ---
+    @Test
+    fun `english renderer uses plural forms, locale-neutral numbers and dates`() {
+        val two = FindingText(FindingKey.VOLTAGE_HIGH, FindingArg.Count(2), FindingArg.Num(14.8))
+        assertEquals("Voltage above 14.8 V in 2 recordings — the voltage regulator may be faulty.", en(two))
+        val one = two.copy(args = listOf(FindingArg.Count(1), FindingArg.Num(14.8)))
+        assertEquals("Voltage above 14.8 V in 1 recording — the voltage regulator may be faulty.", en(one))
+        assertEquals("1%% of samples below".replace("%%", "%"), en(FindingText(FindingKey.EVIDENCE_VOLTAGE_P1)))
+        val range = FindingText(FindingKey.MINUTES_IN_RANGE, FindingArg.Count(12), FindingArg.DateRange(ms(2026, 5, 1), ms(2026, 5, 8)))
+        assertEquals("12 min (1 May 2026 – 8 May 2026)", en(range))
+        assertEquals("P0171", en(FindingText.raw("P0171")))
+    }
+
+    @Test
+    fun `every plural key takes its quantity as the first integer argument`() {
+        val plural = FindingKey.entries.filter { it.isPlural }
+        assertTrue(plural.isNotEmpty())
+        plural.forEach { k -> assertTrue(k.name, k.en.contains("%1\$d") && k.enOne!!.contains("%1\$d")) }
+    }
+
+    @Test
+    fun `legacy findings with raw text are recognized`() {
+        val legacy = Finding("coolant-overheat", Severity.OK, FindingText.raw("old title"), FindingText.raw("old message"))
+        assertTrue(legacy.isLegacyText)
+        assertEquals("old message", msg(legacy))
+        assertFalse(CoolantOverheatRule.only(input()).isLegacyText)
     }
 }

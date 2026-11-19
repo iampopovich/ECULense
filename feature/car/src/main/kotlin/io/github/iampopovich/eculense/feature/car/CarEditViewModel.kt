@@ -7,6 +7,7 @@ import io.github.iampopovich.eculense.core.datapacks.DataPackService
 import io.github.iampopovich.eculense.core.datapacks.PackCatalog
 import io.github.iampopovich.eculense.core.datapacks.PackState
 import io.github.iampopovich.eculense.core.model.CarProfile
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +20,7 @@ import java.time.ZoneId
 internal data class CarEditUiState(
     val loading: Boolean = true,
     val form: CarForm = CarForm(),
-    val errors: Map<CarField, String> = emptyMap(),
+    val errors: Map<CarField, UiText> = emptyMap(),
     /** Deletion is allowed only if the car is not the only one. */
     val canDelete: Boolean = false,
     val isNew: Boolean = true,
@@ -40,6 +41,8 @@ internal class CarEditViewModel(
     private val clock: () -> Long = System::currentTimeMillis,
     private val catalog: VehicleCatalog? = null,
     private val packs: DataPackService? = null,
+    /** Localized default car name: shown in the form for a car the user never named; saved back as «unnamed» if unchanged. */
+    private val defaultName: () -> String = { "" },
 ) : ViewModel() {
     private val _state = MutableStateFlow(CarEditUiState())
     val state: StateFlow<CarEditUiState> = _state.asStateFlow()
@@ -52,7 +55,7 @@ internal class CarEditViewModel(
         viewModelScope.launch {
             val all = cars.cars()
             original = all.firstOrNull { it.id == carId }
-            val form = original?.let(CarForm::from) ?: CarForm()
+            val form = original?.let { car -> CarForm.from(car).let { if (car.hasDefaultName) it.copy(name = defaultName()) else it } } ?: CarForm()
             _state.update {
                 it.copy(
                     loading = false,
@@ -82,7 +85,8 @@ internal class CarEditViewModel(
     }
 
     fun save() {
-        val profile = _state.value.form.toProfile(original, clock(), currentYear) ?: return
+        val profile = _state.value.form.toProfile(original, clock(), currentYear)
+            ?.let { p -> if (original?.hasDefaultName == true && p.name == defaultName()) p.copy(name = original!!.name) else p } ?: return
         viewModelScope.launch {
             val id = cars.save(profile)
             // a new car becomes active: the user creates it to drive it
@@ -153,7 +157,7 @@ internal class CarEditViewModel(
         }
     }
 
-    /** «Назад» inside the picker: from specs to the trim list, from trims to generations, etc. */
+    /** «Back» inside the picker: from specs to the trim list, from trims to generations, etc. */
     fun pickerBack() {
         val p = _state.value.picker ?: return
         if (p.engine != null) {
@@ -168,7 +172,7 @@ internal class CarEditViewModel(
         }
     }
 
-    /** «Заполнить»: specs of the selected trim go into the form; the user saves it themselves. */
+    /** «Fill in»: specs of the selected trim go into the form; the user saves it themselves. */
     fun fillFromPicker() {
         val p = _state.value.picker ?: return
         val e = p.engine ?: return
@@ -180,7 +184,7 @@ internal class CarEditViewModel(
         pickerJob?.cancel()
         _state.update { it.copy(picker = start.copy(loading = true, error = null)) }
         pickerJob = viewModelScope.launch {
-            val next = runCatching { block() }.getOrElse { e -> start.copy(loading = false, error = e.message ?: "Ошибка справочника") }
+            val next = runCatching { block() }.getOrElse { e -> start.copy(loading = false, error = e.message?.let { UiText.Raw(it) } ?: UiText.Res(R.string.car_picker_error)) }
             _state.update { it.copy(picker = next.copy(loading = false)) }
         }
     }
@@ -202,7 +206,7 @@ internal class CarEditViewModel(
         val q = query.trim()
         val year = _state.value.form.year.toIntOrNull()
         val options = gens.filter { q.isEmpty() || it.name.contains(q, true) || it.years.contains(q) }
-            .map { PickerOption(it.id, it.name, it.years + if (year != null && year in (it.yearStart ?: 0)..(it.yearEnd ?: 9999)) " · ваш год" else "") }
+            .map { PickerOption(it.id, it.name, if (year != null && year in (it.yearStart ?: 0)..(it.yearEnd ?: 9999)) UiText.Res(R.string.car_your_year, listOf(it.years)) else UiText.Raw(it.years)) }
         return PickerState(PickerStep.GENERATION, query, make = p.make, model = model, options = options)
     }
 
@@ -211,11 +215,15 @@ internal class CarEditViewModel(
         val engines = catalog?.engines(gen.id, query) ?: return notDownloaded()
         return PickerState(
             PickerStep.ENGINE, query, make = p.make, model = p.model, generation = gen,
-            options = engines.map { e -> PickerOption(e.id, e.label, listOfNotNull(e.fuelType, e.transmission, e.drivetrain).joinToString(" · ")) },
+            options = engines.map { e -> PickerOption(e.id, e.label, UiText.Raw(listOfNotNull(e.fuelType, e.transmission, e.drivetrain).joinToString(" · "))) },
         )
     }
 
-    private fun notDownloaded() = PickerState(error = "Справочник моделей не скачан")
+    private fun notDownloaded() = PickerState(error = UiText.Res(R.string.car_catalog_not_downloaded))
 
-    private fun years(from: Int?, to: Int?) = if (from == null) null else "$from–${to ?: "н. в."}"
+    private fun years(from: Int?, to: Int?): UiText? = when {
+        from == null -> null
+        to == null -> UiText.Res(R.string.car_years_open, listOf(from))
+        else -> UiText.Res(R.string.car_years_range, listOf(from, to))
+    }
 }

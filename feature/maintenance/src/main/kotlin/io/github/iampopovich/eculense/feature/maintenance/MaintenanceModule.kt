@@ -9,7 +9,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** «Обслуживание» — a «Пит-стопа» item after «Анализа» (3.9 item 2). Works offline and without AI. */
+/** «Maintenance» — a «Pit stop» item after «Analysis» (3.9 item 2). Works offline and without AI. */
 @OptIn(KoinExperimentalAPI::class)
 val maintenanceModule = module {
     viewModel { MaintenanceViewModel(get(), get()) }

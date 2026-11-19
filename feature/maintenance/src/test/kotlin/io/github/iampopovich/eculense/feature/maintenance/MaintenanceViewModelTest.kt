@@ -9,7 +9,11 @@ import io.github.iampopovich.eculense.core.analytics.OdometerEstimator
 import io.github.iampopovich.eculense.core.data.CarRepository
 import io.github.iampopovich.eculense.core.data.MaintenanceRepository
 import io.github.iampopovich.eculense.core.model.CarProfile
+import io.github.iampopovich.eculense.core.analyticstext.AnalyticsText
 import io.github.iampopovich.eculense.core.model.MaintenanceItem
+import io.github.iampopovich.eculense.core.model.MaintenanceKind
+import io.github.iampopovich.eculense.core.model.MaintenanceNote
+import io.github.iampopovich.eculense.core.ui.UiText
 import io.github.iampopovich.eculense.core.model.OdometerEntry
 import kotlinx.coroutines.Dispatchers
 import java.util.Locale
@@ -83,7 +87,7 @@ private class MemMaintenance(private val now: Long) : MaintenanceRepository {
 class MaintenanceViewModelTest {
     private val now = LocalDate.parse("2026-06-01").atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
     private val repo = MemMaintenance(now)
-    private val car = CarProfile(id = 1, name = "Тестовая")
+    private val car = CarProfile(id = 1, name = "Test car")
 
     @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
     @After fun tearDown() = Dispatchers.resetMain()
@@ -106,6 +110,7 @@ class MaintenanceViewModelTest {
         val withOdo = vm.uiState.first { it.estimate != null }
         assertEquals(10_000.0, withOdo.estimate!!.km, 0.0)
         assertTrue(withOdo.undo is Undo.Odometer)
+        assertEquals(UiText.Res(R.string.maint_undo_odometer, listOf(MaintenanceFormat.km(10_000))), withOdo.undo!!.text)
         vm.undo()
         assertNull(vm.uiState.first { it.estimate == null && it.undo == null }.estimate)
         assertTrue(repo.log.value.isEmpty())
@@ -114,10 +119,11 @@ class MaintenanceViewModelTest {
     @Test
     fun `mark done then undo restores the previous item`() = runTest {
         val vm = vm()
-        val item = vm.uiState.first { it.items.isNotEmpty() }.items.first { it.item.title.startsWith("Масло и") }.item
+        val item = vm.uiState.first { it.items.isNotEmpty() }.items.first { it.item.kind == MaintenanceKind.OIL_AND_FILTER }.item
         vm.markDone(item.id, 9_000, now)
         val done = vm.uiState.first { s -> s.items.any { it.item.id == item.id && it.item.lastDoneKm == 9_000L } }
         assertTrue(done.undo is Undo.Item)
+        assertEquals(UiText.Res(R.string.maint_undo_marked, listOf(UiText.Res(AnalyticsText.maintenanceKindRes(MaintenanceKind.OIL_AND_FILTER)))), done.undo!!.text)
         assertEquals(MaintenanceStatus.OK, done.items.first { it.item.id == item.id }.status)
         vm.undo()
         val restored = vm.uiState.first { s -> s.items.any { it.item.id == item.id && it.item.lastDoneKm == null } }
@@ -133,14 +139,14 @@ class MaintenanceViewModelTest {
         vm.uiState.first { it.items.size == count - 1 }
         vm.undo()
         val back = vm.uiState.first { it.items.size == count }
-        assertTrue(back.items.any { it.item.title == item.title })
+        assertTrue(back.items.any { it.item.title == item.title && it.item.kind == item.kind })
     }
 }
 
 class MaintenanceFormatTest {
     private val zone = ZoneOffset.UTC
 
-    // Numbers follow the app locale; the texts are Russian until the module is migrated (B2).
+    // Numbers follow the app locale (pinned to ru here: decimal comma); words are string resources.
     private val savedLocale = Locale.getDefault()
 
     @Before fun russianLocale() = Locale.setDefault(Locale.forLanguageTag("ru"))
@@ -149,16 +155,36 @@ class MaintenanceFormatTest {
     private fun ms(d: String) = LocalDate.parse(d).atStartOfDay(zone).toInstant().toEpochMilli()
 
     @Test
-    fun `numbers dates and remaining texts`() {
-        assertEquals("120\u00A0000\u00A0км", MaintenanceFormat.km(120_000))
-        assertEquals("0,2\u00A0км", MaintenanceFormat.addedKm(0.23))
-        assertEquals("1\u00A0234\u00A0км", MaintenanceFormat.addedKm(1_234.4))
-        assertEquals("Каждые 10\u00A0000\u00A0км или 12\u00A0мес.", MaintenanceFormat.interval(MaintenanceItem(carId = 1, title = "x", intervalKm = 10_000, intervalMonths = 12)))
-        assertEquals("Интервал не задан", MaintenanceFormat.interval(MaintenanceItem(carId = 1, title = "x")))
+    fun `numbers dates and remaining texts are typed and use the locale for numbers`() {
+        assertEquals("120\u00A0000", MaintenanceFormat.number(120_000))
+        assertEquals(UiText.Res(R.string.maint_km, listOf("120\u00A0000")), MaintenanceFormat.km(120_000))
+        assertEquals(UiText.Res(R.string.maint_km, listOf("0,2")), MaintenanceFormat.addedKm(0.23))
+        assertEquals(UiText.Res(R.string.maint_km, listOf("1\u00A0234")), MaintenanceFormat.addedKm(1_234.4))
+        assertEquals(
+            UiText.Res(R.string.maint_interval_every_or, listOf(MaintenanceFormat.km(10_000), UiText.Res(R.string.maint_months_short, listOf(12)))),
+            MaintenanceFormat.interval(MaintenanceItem(carId = 1, title = "x", intervalKm = 10_000, intervalMonths = 12)),
+        )
+        assertEquals(UiText.Res(R.string.maint_interval_none), MaintenanceFormat.interval(MaintenanceItem(carId = 1, title = "x")))
         val item = MaintenanceItem(carId = 1, title = "x", intervalKm = 10_000, intervalMonths = 12, lastDoneKm = 50_000, lastDoneAtMs = ms("2026-01-01"))
-        assertEquals("просрочено на 300\u00A0км · через 7\u00A0мес.", MaintenanceFormat.remaining(MaintenanceDue(item, MaintenanceStatus.OVERDUE, 60_000, -300.0, 0, 214)))
-        assertEquals("Последний раз: 01.01.2026, 50\u00A0000\u00A0км", MaintenanceFormat.lastDone(item, zone))
-        assertEquals("Отметьте, когда делали", MaintenanceFormat.remaining(MaintenanceDue(item.copy(lastDoneKm = null, lastDoneAtMs = null), MaintenanceStatus.UNKNOWN)))
+        assertEquals(
+            listOf(UiText.Res(R.string.maint_overdue_by, listOf(MaintenanceFormat.km(300))), UiText.Res(R.string.maint_in_months, listOf(7))),
+            MaintenanceFormat.remaining(MaintenanceDue(item, MaintenanceStatus.OVERDUE, 60_000, -300.0, 0, 214)),
+        )
+        assertEquals(UiText.Res(R.string.maint_last_done_two, listOf("01.01.2026", MaintenanceFormat.km(50_000))), MaintenanceFormat.lastDone(item, zone))
+        assertEquals(
+            listOf(UiText.Res(R.string.maint_mark_when_done)),
+            MaintenanceFormat.remaining(MaintenanceDue(item.copy(lastDoneKm = null, lastDoneAtMs = null), MaintenanceStatus.UNKNOWN)),
+        )
+    }
+
+    @Test
+    fun `template items show the localized kind, own titles and notes win`() {
+        val oil = MaintenanceItem(carId = 1, title = "", kind = MaintenanceKind.OIL_AND_FILTER, noteKind = MaintenanceNote.OIL_SEVERE_CONDITIONS)
+        assertEquals(UiText.Res(AnalyticsText.maintenanceKindRes(MaintenanceKind.OIL_AND_FILTER)), MaintenanceFormat.title(oil))
+        assertEquals(UiText.Res(AnalyticsText.maintenanceNoteRes(MaintenanceNote.OIL_SEVERE_CONDITIONS)), MaintenanceFormat.note(oil))
+        assertEquals(UiText.Raw("Synthetic oil"), MaintenanceFormat.title(oil.copy(title = "Synthetic oil")))
+        assertEquals(UiText.Raw("own"), MaintenanceFormat.note(oil.copy(note = "own")))
+        assertNull(MaintenanceFormat.note(oil.copy(noteKind = null)))
     }
 
     @Test

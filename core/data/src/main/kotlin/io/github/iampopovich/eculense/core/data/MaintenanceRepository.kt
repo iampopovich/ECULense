@@ -11,6 +11,8 @@ import io.github.iampopovich.eculense.core.database.OdometerDao
 import io.github.iampopovich.eculense.core.database.OdometerEntity
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.MaintenanceItem
+import io.github.iampopovich.eculense.core.model.MaintenanceKind
+import io.github.iampopovich.eculense.core.model.MaintenanceNote
 import io.github.iampopovich.eculense.core.model.OdometerEntry
 import io.github.iampopovich.eculense.core.model.OdometerSource
 import kotlinx.coroutines.flow.Flow
@@ -29,10 +31,10 @@ interface MaintenanceRepository {
     suspend fun items(carId: Long): List<MaintenanceItem>
     /** Offer the default list once per car; true — the list was added just now. */
     suspend fun ensureTemplate(car: CarProfile): Boolean
-    /** id == 0 → new task. Returns the id. «Отменить» also uses this to restore the task's previous state. */
+    /** id == 0 → new task. Returns the id. «Undo» also uses this to restore the task's previous state. */
     suspend fun save(item: MaintenanceItem): Long
     suspend fun delete(id: Long)
-    /** Mark as «сделано»; returns the state before marking (for «Отменить»). */
+    /** Mark as «done»; returns the state before marking (for «Undo»). */
     suspend fun markDone(id: Long, km: Long?, atMs: Long): MaintenanceItem?
     fun observeOdometer(carId: Long): Flow<List<OdometerEntry>>
     suspend fun addOdometer(carId: Long, km: Long, atMs: Long): Long
@@ -96,9 +98,13 @@ internal class RoomMaintenanceRepository(
     override suspend fun due(carId: Long): List<MaintenanceDue> = MaintenanceRule.due(items(carId), estimate(carId)?.km, clock(), zone())
 }
 
-internal fun MaintenanceItemEntity.toModel() = MaintenanceItem(id, carId, title, intervalKm, intervalMonths, lastDoneKm, lastDoneAtMs, note)
+internal fun MaintenanceItemEntity.toModel() = MaintenanceItem(
+    id, carId, title, intervalKm, intervalMonths, lastDoneKm, lastDoneAtMs, note,
+    kind = kind?.let { k -> MaintenanceKind.entries.firstOrNull { it.name == k } },
+    noteKind = noteKind?.let { k -> MaintenanceNote.entries.firstOrNull { it.name == k } },
+)
 
-internal fun MaintenanceItem.toEntity() = MaintenanceItemEntity(id, carId, title, intervalKm, intervalMonths, lastDoneKm, lastDoneAtMs, note)
+internal fun MaintenanceItem.toEntity() = MaintenanceItemEntity(id, carId, title, intervalKm, intervalMonths, lastDoneKm, lastDoneAtMs, note, kind?.name, noteKind?.name)
 
 internal fun OdometerEntity.toModel() = OdometerEntry(
     id, carId, km, atMs, runCatching { OdometerSource.valueOf(source) }.getOrDefault(OdometerSource.MANUAL),

@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Generated from core/analytics FindingKey: the English text must equal FindingKey.en (checked by FindingResourcesTest). -->
+    <string name="finding_title_coolant_overheat">Engine overheating</string>
+    <string name="finding_title_voltage_low">Battery undercharge</string>
+    <string name="finding_title_voltage_high">Battery overcharge</string>
+    <string name="finding_title_fuel_trim_long">Long-term fuel trim</string>
+    <string name="finding_title_fuel_trim_total">Total fuel trim</string>
+    <string name="finding_title_bank_asymmetry">Bank difference</string>
+    <string name="finding_title_maf_idle">Idle air flow</string>
+    <string name="finding_title_mil_distance">Distance with Check Engine on</string>
+    <string name="finding_title_warmup">Warm-up time</string>
+    <string name="finding_title_dtc_history">Trouble codes</string>
+    <string name="finding_title_dtc_air_sensors">Air sensors (MAF/MAP/IAT)</string>
+    <string name="finding_title_dtc_mixture">Mixture (%1$s)</string>
+    <string name="finding_title_dtc_repeat">Recurring codes</string>
+    <string name="finding_title_dtc_other">Other codes</string>
+    <string name="finding_value_count" translatable="false">%1$d</string>
+    <string name="finding_value_celsius" translatable="false">%1$s °C</string>
+    <string name="finding_value_volts">%1$s V</string>
+    <string name="finding_value_percent" translatable="false">%1$s %%</string>
+    <string name="finding_value_liters">%1$s L</string>
+    <string name="finding_value_km">%1$s km</string>
+    <string name="finding_value_seconds">%1$d s</string>
+    <string name="finding_value_plain" translatable="false">%1$s</string>
+    <string name="finding_evidence_longest">Longest stretch</string>
+    <string name="finding_coolant_no_data">No coolant temperature recordings (PID 01.05).</string>
+    <string name="finding_evidence_coolant_max">Max coolant temperature</string>
+    <string name="finding_evidence_coolant_recordings">Recordings with coolant temperature</string>
+    <plurals name="finding_coolant_overheat">
+        <item quantity="one">Coolant stayed at ≥ %2$s °C for longer than %3$d s in %1$d recording.</item>
+        <item quantity="other">Coolant stayed at ≥ %2$s °C for longer than %3$d s in %1$d recordings.</item>
+    </plurals>
+    <string name="finding_coolant_ok">No overheating: never above %1$s °C for longer than 30 s.</string>
+    <string name="finding_voltage_no_data">No voltage readings with the engine running (PID 01.42 or adapter voltage).</string>
+    <string name="finding_evidence_voltage_p1">1%% of samples below</string>
+    <string name="finding_evidence_median">Median</string>
+    <string name="finding_evidence_maximum">Maximum</string>
+    <string name="finding_evidence_voltage_min">Minimum (brief, incl. restarts)</string>
+    <string name="finding_evidence_source">Source</string>
+    <string name="finding_voltage_adapter_note">The voltage was measured by the adapter at the OBD port — it can read 0.2–0.3 V lower than at the battery terminals: check with a multimeter.</string>
+    <string name="finding_voltage_low_ok">The alternator is charging: never below %1$s V for longer than a minute.</string>
+    <plurals name="finding_voltage_low">
+        <item quantity="one">Voltage below %2$s V with the engine running for longer than a minute in %1$d recording — check the alternator, belt and terminals.</item>
+        <item quantity="other">Voltage below %2$s V with the engine running for longer than a minute in %1$d recordings — check the alternator, belt and terminals.</item>
+    </plurals>
+    <string name="finding_voltage_high_ok">Never above %1$s V.</string>
+    <plurals name="finding_voltage_high">
+        <item quantity="one">Voltage above %2$s V in %1$d recording — the voltage regulator may be faulty.</item>
+        <item quantity="other">Voltage above %2$s V in %1$d recordings — the voltage regulator may be faulty.</item>
+    </plurals>
+    <string name="finding_fuel_trim_no_data">No long-term fuel trims (01.07/01.09) on a warm engine (coolant ≥ 80 °C).</string>
+    <string name="finding_evidence_ltft_bank">LTFT bank %1$d</string>
+    <string name="finding_evidence_stft_bank">STFT bank %1$d</string>
+    <string name="finding_ltft_value">%1$s %% (recording %2$s, samples: %3$d)%4$s</string>
+    <string name="finding_ltft_all_time">; all time %1$s…%2$s %%</string>
+    <string name="finding_stft_value">%1$s %%, max %2$s %% (samples: %3$d)</string>
+    <string name="finding_few_samples_note">Few samples — confirm with a long recording on a warm engine.</string>
+    <string name="finding_ltft_ok">Long-term trims within ±%1$s %%.</string>
+    <string name="finding_bank_percent">bank %1$d %2$s %%</string>
+    <string name="finding_ltft_out">Long-term trim outside ±%1$s %% on a warm engine: %2$s.</string>
+    <string name="finding_lean_note">The ECU is adding fuel — the mixture is lean (air leak, MAF, fuel pressure).</string>
+    <string name="finding_total_trim_no_data">No short-term fuel trims (01.06/01.08) on a warm engine.</string>
+    <string name="finding_total_trim_ok">STFT+LTFT within ±%1$s %%.</string>
+    <string name="finding_total_trim_out">STFT+LTFT beyond ±%1$s %%: %2$s — the ECU is at the limit of mixture control.</string>
+    <string name="finding_preliminary_note">Few samples, the conclusion is preliminary.</string>
+    <string name="finding_bank_asymmetry_no_data">Long-term trim is available for one bank only.</string>
+    <string name="finding_evidence_ltft_difference">LTFT difference</string>
+    <string name="finding_bank_asymmetry">Long-term trims of the banks differ by %1$s %% — the problem is on one side (air leak, injectors, O2 sensor).</string>
+    <string name="finding_bank_asymmetry_ok">Both banks are trimmed the same (difference %1$s %%).</string>
+    <string name="finding_maf_no_volume">No data: enter the engine displacement in Settings → Car — the MAF norm can’t be computed without it.</string>
+    <string name="finding_maf_measured">Measured: %1$s g/s at warm idle.</string>
+    <string name="finding_maf_no_samples">No MAF (01.10) samples at warm idle (coolant ≥ 80 °C, speed 0, 400–1100 rpm).</string>
+    <string name="finding_evidence_maf_warm_idle">MAF at warm idle</string>
+    <string name="finding_maf_value">%1$s g/s (samples: %2$d)</string>
+    <string name="finding_evidence_engine_volume">Engine displacement</string>
+    <string name="finding_evidence_per_liter">Per liter</string>
+    <string name="finding_per_liter_value">%1$s g/s·L (reference %2$s–%3$s)</string>
+    <string name="finding_maf_low">Idle MAF is below the reference: %1$s g/s per liter. The MAF sensor may be dirty or air may leak in after it.</string>
+    <string name="finding_maf_high">Idle MAF is above the reference: %1$s g/s per liter (high idle speed, load, sensor).</string>
+    <string name="finding_maf_ok">Idle MAF is normal: %1$s g/s per liter.</string>
+    <string name="finding_mil_no_data">No PID 01.21 samples.</string>
+    <string name="finding_mil_ok">Check Engine was off: 0 km driven with the MIL on.</string>
+    <string name="finding_evidence_pid21_recordings">Recordings with PID 01.21</string>
+    <string name="finding_evidence_mil_distance">Distance with MIL on</string>
+    <string name="finding_evidence_first_nonzero">First non-zero value</string>
+    <string name="finding_km_on_date">%1$s km, %2$s</string>
+    <string name="finding_evidence_mil_recordings">Recordings with MIL on</string>
+    <string name="finding_mil_driven">The car has been driven %1$s km with Check Engine on.</string>
+    <string name="finding_mil_growth">Up from %1$s to %2$s km.</string>
+    <string name="finding_mil_fix">The fault should be fixed rather than driven with.</string>
+    <string name="finding_warmup_few_starts">Few cold starts with a warm-up to 80 °C: %1$d (at least %2$d needed).</string>
+    <string name="finding_evidence_warmup_early">Median warm-up, earlier</string>
+    <string name="finding_evidence_warmup_late">Median warm-up, later</string>
+    <string name="finding_minutes_in_range">%1$d min (%2$s)</string>
+    <string name="finding_evidence_cold_starts">Cold starts</string>
+    <string name="finding_warmup_longer">Warm-up to 80 °C got longer: %1$d min → %2$d min. Weather matters; if it hasn’t got colder, check the thermostat.</string>
+    <string name="finding_warmup_ok">Warm-up time is stable.</string>
+    <string name="finding_dtc_none">No trouble codes in the history.</string>
+    <plurals name="finding_dtc_occurrences">
+        <item quantity="one">%1$d time: %2$s</item>
+        <item quantity="other">%1$d times: %2$s</item>
+    </plurals>
+    <plurals name="finding_dtc_occurrences_pending">
+        <item quantity="one">%1$d time, pending: %2$s</item>
+        <item quantity="other">%1$d times, pending: %2$s</item>
+    </plurals>
+    <string name="finding_dtc_group" translatable="false">%1$s: %2$s.</string>
+    <string name="finding_dtc_air_sensors_explain">codes of one air metering system — often a shared connector, wiring or sensor supply</string>
+    <string name="finding_mixture_lean">the mixture is lean %1$s — the ECU can’t enrich it: air leak, MAF, fuel pressure</string>
+    <string name="finding_mixture_rich">the mixture is rich %1$s — the ECU can’t lean it: injectors, fuel pressure, MAF, oxygen sensor</string>
+    <string name="finding_banks_both">on both banks</string>
+    <string name="finding_bank_one">on bank %1$d</string>
+    <string name="finding_dtc_repeat">Codes recurred within 30 days: %1$s — the fault didn’t go away by itself.</string>
+    <string name="finding_dtc_other">One-off or old codes: %1$s.</string>
+</resources>

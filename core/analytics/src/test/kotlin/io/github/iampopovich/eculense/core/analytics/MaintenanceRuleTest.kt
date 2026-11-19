@@ -11,6 +11,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import io.github.iampopovich.eculense.core.model.MaintenanceKind
+import io.github.iampopovich.eculense.core.model.MaintenanceNote
 import java.time.LocalDate
 import java.time.ZoneOffset
 
@@ -56,7 +58,7 @@ class MaintenanceRuleTest {
     private val now = ms("2026-06-01")
 
     private fun item(km: Int? = 10_000, months: Int? = 12, lastKm: Long? = 50_000, lastAt: Long? = ms("2026-01-01")) =
-        MaintenanceItem(id = 1, carId = 1, title = "Масло", intervalKm = km, intervalMonths = months, lastDoneKm = lastKm, lastDoneAtMs = lastAt)
+        MaintenanceItem(id = 1, carId = 1, title = "Oil", intervalKm = km, intervalMonths = months, lastDoneKm = lastKm, lastDoneAtMs = lastAt)
 
     @Test
     fun `well within both intervals is ok with remaining km and days`() {
@@ -118,35 +120,40 @@ class MaintenanceRuleTest {
 class MaintenanceTemplateTest {
     @Test
     fun `petrol template has the standard works`() {
-        val items = MaintenanceTemplate.forCar(io.github.iampopovich.eculense.core.model.CarProfile(id = 7, name = "Тестовая"))
-        val byTitle = items.associateBy { it.title }
-        assertEquals(10_000, byTitle.getValue("Масло и масляный фильтр двигателя").intervalKm)
-        assertEquals(12, byTitle.getValue("Масло и масляный фильтр двигателя").intervalMonths)
-        assertEquals(20_000, byTitle.getValue("Воздушный фильтр").intervalKm)
-        assertEquals(48, byTitle.getValue("Охлаждающая жидкость").intervalMonths)
-        assertEquals(24, byTitle.getValue("Тормозная жидкость").intervalMonths)
-        assertEquals(60_000, byTitle.getValue("Масло АКПП").intervalKm)
-        assertTrue(byTitle.containsKey("Свечи зажигания"))
-        assertTrue(byTitle.containsKey("Ремень/цепь ГРМ"))
+        val items = MaintenanceTemplate.forCar(io.github.iampopovich.eculense.core.model.CarProfile(id = 7, name = "Test"))
+        val byTitle = items.associateBy { it.kind }
+        assertEquals(10_000, byTitle.getValue(MaintenanceKind.OIL_AND_FILTER).intervalKm)
+        assertEquals(12, byTitle.getValue(MaintenanceKind.OIL_AND_FILTER).intervalMonths)
+        assertEquals(20_000, byTitle.getValue(MaintenanceKind.AIR_FILTER).intervalKm)
+        assertEquals(48, byTitle.getValue(MaintenanceKind.COOLANT).intervalMonths)
+        assertEquals(24, byTitle.getValue(MaintenanceKind.BRAKE_FLUID).intervalMonths)
+        assertEquals(60_000, byTitle.getValue(MaintenanceKind.AUTOMATIC_TRANSMISSION_OIL).intervalKm)
+        assertTrue(byTitle.containsKey(MaintenanceKind.SPARK_PLUGS))
+        assertTrue(byTitle.containsKey(MaintenanceKind.TIMING_BELT))
+        // template items carry a kind and a typed note instead of (Russian) text
+        assertTrue(items.all { it.title.isEmpty() && it.kind != null })
+        assertEquals(MaintenanceNote.OIL_SEVERE_CONDITIONS, byTitle.getValue(MaintenanceKind.OIL_AND_FILTER).noteKind)
+        assertEquals("Engine oil and filter", MaintenanceEnglish.title(byTitle.getValue(MaintenanceKind.OIL_AND_FILTER)))
+        assertEquals("Own name", MaintenanceEnglish.title(byTitle.getValue(MaintenanceKind.OIL_AND_FILTER).copy(title = "Own name")))
         assertTrue(items.all { it.carId == 7L && it.lastDoneKm == null && it.lastDoneAtMs == null })
     }
 
     @Test
     fun `profile intervals override the template and manual gearbox has no atf`() {
         val car = io.github.iampopovich.eculense.core.model.CarProfile(
-            id = 1, name = "Тестовая", gearbox = io.github.iampopovich.eculense.core.model.Gearbox.MANUAL,
+            id = 1, name = "Test", gearbox = io.github.iampopovich.eculense.core.model.Gearbox.MANUAL,
             service = io.github.iampopovich.eculense.core.model.ServiceIntervals(oilKm = 7_500, sparkPlugsKm = 45_000, fuelFilterKm = 30_000),
         )
-        val byTitle = MaintenanceTemplate.forCar(car).associateBy { it.title }
-        assertEquals(7_500, byTitle.getValue("Масло и масляный фильтр двигателя").intervalKm)
-        assertEquals(45_000, byTitle.getValue("Свечи зажигания").intervalKm)
-        assertEquals(30_000, byTitle.getValue("Топливный фильтр").intervalKm)
-        assertFalse(byTitle.containsKey("Масло АКПП"))
+        val byTitle = MaintenanceTemplate.forCar(car).associateBy { it.kind }
+        assertEquals(7_500, byTitle.getValue(MaintenanceKind.OIL_AND_FILTER).intervalKm)
+        assertEquals(45_000, byTitle.getValue(MaintenanceKind.SPARK_PLUGS).intervalKm)
+        assertEquals(30_000, byTitle.getValue(MaintenanceKind.FUEL_FILTER).intervalKm)
+        assertFalse(byTitle.containsKey(MaintenanceKind.AUTOMATIC_TRANSMISSION_OIL))
     }
 
     @Test
     fun `diesel has no spark plugs`() {
-        val car = io.github.iampopovich.eculense.core.model.CarProfile(id = 1, name = "Тестовая", fuelType = io.github.iampopovich.eculense.core.model.FuelType.DIESEL)
-        assertFalse(MaintenanceTemplate.forCar(car).any { it.title == "Свечи зажигания" })
+        val car = io.github.iampopovich.eculense.core.model.CarProfile(id = 1, name = "Test", fuelType = io.github.iampopovich.eculense.core.model.FuelType.DIESEL)
+        assertFalse(MaintenanceTemplate.forCar(car).any { it.kind == MaintenanceKind.SPARK_PLUGS })
     }
 }

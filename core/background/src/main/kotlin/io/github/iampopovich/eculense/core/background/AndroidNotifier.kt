@@ -15,8 +15,9 @@ import androidx.core.content.ContextCompat
 import io.github.iampopovich.eculense.core.analytics.Finding
 import io.github.iampopovich.eculense.core.analytics.MaintenanceDue
 import io.github.iampopovich.eculense.core.analytics.MaintenanceStatus
-import io.github.iampopovich.eculense.core.analytics.Severity
+import io.github.iampopovich.eculense.core.analyticstext.AnalyticsText
 import io.github.iampopovich.eculense.core.navigation.DeepLinks
+import io.github.iampopovich.eculense.core.ui.CarNames
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
@@ -30,20 +31,28 @@ internal class PrefsAlertLedger(context: Context, private val name: String) : Al
 }
 
 /**
- * Notifications: channel «Анализ» (new findings) and «Обслуживание» (maintenance due). Tapping opens the right screen
+ * Notifications: channel «Analysis» (new findings) and «Maintenance» (maintenance due), texts in the app language. Tapping opens the right screen
  * via [DeepLinks]. Without the POST_NOTIFICATIONS permission (API 33+) we silently skip — the analysis is in the DB anyway.
  */
 internal class AndroidNotifier(private val context: Context) : Notifier {
     override fun findings(carName: String, items: List<Finding>) {
-        val title = if (items.size == 1) "Анализ: ${items.single().title}" else "Анализ: новых находок — ${items.size}"
-        val lines = items.map { "${it.severity.label}: ${it.title} — ${it.message}" }
-        post(CHANNEL_ANALYSIS, ID_ANALYSIS, title, "$carName · " + lines.first(), lines, DeepLinks.ANALYSIS)
+        val title = if (items.size == 1) {
+            context.getString(R.string.bg_findings_one, AnalyticsText.title(context, items.single()))
+        } else {
+            context.getString(R.string.bg_findings_many, items.size)
+        }
+        val lines = items.map { "${AnalyticsText.severity(context, it.severity)}: ${AnalyticsText.title(context, it)} — ${AnalyticsText.message(context, it)}" }
+        post(CHANNEL_ANALYSIS, ID_ANALYSIS, title, CarNames.display(context, carName) + " · " + lines.first(), lines, DeepLinks.ANALYSIS)
     }
 
     override fun maintenance(carName: String, items: List<MaintenanceDue>) {
-        val title = if (items.size == 1) "Пора ТО: ${items.single().item.title}" else "Пора ТО: работ — ${items.size}"
-        val lines = items.map { "${it.item.title} — ${it.describe()}" }
-        post(CHANNEL_MAINTENANCE, ID_MAINTENANCE, title, "$carName · " + lines.first(), lines, DeepLinks.MAINTENANCE)
+        val title = if (items.size == 1) {
+            context.getString(R.string.bg_maintenance_one, AnalyticsText.maintenanceTitle(context, items.single().item))
+        } else {
+            context.getString(R.string.bg_maintenance_many, items.size)
+        }
+        val lines = items.map { "${AnalyticsText.maintenanceTitle(context, it.item)} — ${it.describe(context)}" }
+        post(CHANNEL_MAINTENANCE, ID_MAINTENANCE, title, CarNames.display(context, carName) + " · " + lines.first(), lines, DeepLinks.MAINTENANCE)
     }
 
     private fun post(channel: String, id: Int, title: String, text: String, lines: List<String>, screen: String) {
@@ -84,38 +93,37 @@ internal class AndroidNotifier(private val context: Context) : Notifier {
         const val ID_ANALYSIS = 4101
         const val ID_MAINTENANCE = 4102
 
+        /** Called before every post: re-creating a channel with the same id updates its name after a language change. */
         fun ensureChannels(context: Context) {
             if (Build.VERSION.SDK_INT < 26) return
             val nm = context.getSystemService(NotificationManager::class.java) ?: return
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ANALYSIS, "Анализ", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "Новые находки после поездки или импорта (предупреждения и критичные)"
+                NotificationChannel(CHANNEL_ANALYSIS, context.getString(R.string.bg_channel_analysis), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    description = context.getString(R.string.bg_channel_analysis_description)
                 },
             )
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_MAINTENANCE, "Обслуживание", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "Напоминания о плановом ТО"
+                NotificationChannel(CHANNEL_MAINTENANCE, context.getString(R.string.bg_channel_maintenance), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    description = context.getString(R.string.bg_channel_maintenance_description)
                 },
             )
         }
     }
 }
 
-internal val Severity.label: String
-    get() = when (this) {
-        Severity.CRITICAL -> "Критично"
-        Severity.WARNING -> "Внимание"
-        Severity.INFO -> "Справка"
-        Severity.NO_DATA -> "Нет данных"
-        Severity.OK -> "В норме"
-    }
-
-/** «просрочено на 300 км», «через 9 дн.», «осталось 800 км» — whichever comes first. */
-internal fun MaintenanceDue.describe(): String {
+/** «overdue by 300 km», «in 9 days», «800 km left» — whichever comes first. */
+internal fun MaintenanceDue.describe(context: Context): String {
+    val res = context.resources
     val parts = buildList {
-        kmLeft?.let { km -> val v = abs(km).roundToLong(); add(if (km <= 0) "просрочено на $v км" else "осталось $v км") }
-        daysLeft?.let { d -> add(if (d <= 0) "срок прошёл ${abs(d)} дн. назад" else "через $d дн.") }
+        kmLeft?.let { km ->
+            val v = abs(km).roundToLong().toInt()
+            add(context.getString(if (km <= 0) R.string.bg_overdue_by_km else R.string.bg_km_left, v))
+        }
+        daysLeft?.let { d ->
+            val n = abs(d).toInt()
+            add(res.getQuantityString(if (d <= 0) R.plurals.bg_due_days_ago else R.plurals.bg_in_days, n, n))
+        }
     }
-    val prefix = if (status == MaintenanceStatus.OVERDUE) "просрочено" else "скоро"
+    val prefix = context.getString(if (status == MaintenanceStatus.OVERDUE) R.string.bg_overdue else R.string.bg_soon)
     return if (parts.isEmpty()) prefix else parts.joinToString(", ")
 }

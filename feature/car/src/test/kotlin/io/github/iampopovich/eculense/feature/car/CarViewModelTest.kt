@@ -24,6 +24,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import io.github.iampopovich.eculense.core.model.LegacyValues
 
 internal class MemCars : CarRepository {
     val all = MutableStateFlow(listOf(CarProfile(id = 1, name = CarProfile.DEFAULT_NAME)))
@@ -125,5 +126,23 @@ class CarViewModelTest {
         assertEquals("Lada", cars.all.value.last().brand)
         CarEditViewModel(2, cars, clock = { now }).delete()
         assertEquals(listOf(1L), cars.all.value.map { it.id })
+    }
+
+    @Test
+    fun `default car shows the localized name in the form and keeps its stored name when unchanged`() = runTest {
+        val cars = MemCars().apply { all.value = listOf(CarProfile(id = 1, name = LegacyValues.DEFAULT_CAR_NAME_RU)) }
+        val vm = CarEditViewModel(1, cars, clock = { now }, defaultName = { "My car" })
+        assertEquals("My car", vm.state.value.form.name)
+        assertTrue(vm.state.value.errors.isEmpty())
+        vm.edit { it.copy(brand = "Lada") }
+        vm.save()
+        // unchanged name: the stored (legacy) default stays, so the UI keeps showing it in the app language
+        assertEquals(LegacyValues.DEFAULT_CAR_NAME_RU, cars.all.value.single().name)
+        assertEquals("Lada", cars.all.value.single().brand)
+
+        val renamed = CarEditViewModel(1, cars, clock = { now }, defaultName = { "My car" })
+        renamed.edit { it.copy(name = "Family car") }
+        renamed.save()
+        assertEquals("Family car", cars.all.value.single().name)
     }
 }

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sensor_engine_load">Нагрузка двигателя</string>
+    <string name="sensor_coolant">Температура ОЖ</string>
+    <string name="sensor_stft1">Краткосрочная коррекция топлива, банк 1</string>
+    <string name="sensor_ltft1">Долгосрочная коррекция топлива, банк 1</string>
+    <string name="sensor_stft2">Краткосрочная коррекция топлива, банк 2</string>
+    <string name="sensor_ltft2">Долгосрочная коррекция топлива, банк 2</string>
+    <string name="sensor_rpm">Обороты</string>
+    <string name="sensor_speed">Скорость</string>
+    <string name="sensor_timing_advance">Угол опережения зажигания</string>
+    <string name="sensor_iat">Температура впускного воздуха</string>
+    <string name="sensor_maf">Массовый расход воздуха</string>
+    <string name="sensor_throttle">Положение дроссельной заслонки</string>
+    <string name="sensor_mil_distance">Пробег с горящим Check Engine</string>
+    <string name="sensor_module_voltage">Напряжение блока управления</string>
+    <string name="sensor_elm_voltage">Напряжение на разъёме OBD (адаптер)</string>
+    <string name="maint_kind_oil_and_filter">Масло и масляный фильтр двигателя</string>
+    <string name="maint_kind_air_filter">Воздушный фильтр</string>
+    <string name="maint_kind_spark_plugs">Свечи зажигания</string>
+    <string name="maint_kind_fuel_filter">Топливный фильтр</string>
+    <string name="maint_kind_coolant">Охлаждающая жидкость</string>
+    <string name="maint_kind_brake_fluid">Тормозная жидкость</string>
+    <string name="maint_kind_timing_belt">Ремень/цепь ГРМ</string>
+    <string name="maint_kind_cvt_oil">Масло вариатора</string>
+    <string name="maint_kind_automatic_transmission_oil">Масло АКПП</string>
+    <string name="maint_note_oil_severe_conditions">В тяжёлых условиях (пробки, короткие поездки) — чаще</string>
+    <string name="maint_note_spark_plugs_type">30 000–60 000 км в зависимости от типа свечей (никель/иридий)</string>
+    <string name="maint_note_timing_interval">Интервал — по регламенту двигателя: укажите его</string>
+    <string name="severity_critical">Критично</string>
+    <string name="severity_warning">Внимание</string>
+    <string name="severity_info">Справка</string>
+    <string name="severity_no_data">Нет данных</string>
+    <string name="severity_ok">В норме</string>
+</resources>

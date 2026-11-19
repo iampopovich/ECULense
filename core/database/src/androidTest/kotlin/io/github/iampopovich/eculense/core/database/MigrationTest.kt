@@ -207,6 +207,39 @@ class MigrationTest {
     }
 
     @Test
+    fun v6TemplateMaintenanceGetsKindsUserTextIsKept() = runTest {
+        helper.createDatabase(dbName, 6).use { db ->
+            db.execSQL("INSERT INTO cars (id, name) VALUES (1, 'Мой автомобиль')")
+            db.execSQL(
+                "INSERT INTO maintenance_items (id, carId, title, intervalKm, intervalMonths, lastDoneKm, lastDoneAtMs, note) " +
+                    "VALUES (1, 1, 'Масло и масляный фильтр двигателя', 10000, 12, 50000, 5, 'В тяжёлых условиях (пробки, короткие поездки) — чаще')",
+            )
+            db.execSQL("INSERT INTO maintenance_items (id, carId, title, intervalKm, intervalMonths, lastDoneKm, lastDoneAtMs, note) VALUES (2, 1, 'Тормозная жидкость', NULL, 24, NULL, NULL, NULL)")
+            db.execSQL("INSERT INTO maintenance_items (id, carId, title, intervalKm, intervalMonths, lastDoneKm, lastDoneAtMs, note) VALUES (3, 1, 'Мойка', NULL, 1, NULL, NULL, 'своя заметка')")
+        }
+        helper.runMigrationsAndValidate(dbName, 7, true, MIGRATION_6_7).use { db ->
+            db.query("SELECT id, title, kind, note, noteKind, intervalKm, lastDoneKm FROM maintenance_items ORDER BY id").use { c ->
+                c.moveToNext()
+                assertEquals("", c.getString(1))
+                assertEquals("OIL_AND_FILTER", c.getString(2))
+                assertTrue(c.isNull(3))
+                assertEquals("OIL_SEVERE_CONDITIONS", c.getString(4))
+                assertEquals(10000, c.getInt(5))
+                assertEquals(50000L, c.getLong(6))
+                c.moveToNext()
+                assertEquals("BRAKE_FLUID", c.getString(2))
+                c.moveToNext()
+                assertEquals("Мойка", c.getString(1))
+                assertTrue(c.isNull(2))
+                assertEquals("своя заметка", c.getString(3))
+                assertTrue(c.isNull(4))
+            }
+            // the default car keeps its stored name: the app treats the legacy literal as the default name
+            db.query("SELECT name FROM cars WHERE id = 1").use { c -> c.moveToFirst(); assertEquals("Мой автомобиль", c.getString(0)) }
+        }
+    }
+
+    @Test
     fun importedRecordingOverlappingCarScannerTripGetsNoSecondTrip() = runTest {
         val room = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java).build()
         try {

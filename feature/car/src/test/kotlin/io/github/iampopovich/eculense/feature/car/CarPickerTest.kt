@@ -24,6 +24,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import io.github.iampopovich.eculense.core.ui.UiText
 
 /** In-memory reference database: reference G6CU variant (values typed by hand). */
 private class MemCatalog(var available: Boolean = true) : VehicleCatalog {
@@ -62,7 +63,7 @@ class CarPickerTest {
 
     private val now = 1_800_000_000_000L
     private fun cars() = MemCars().apply {
-        all.value = listOf(CarProfile(id = 1, name = "Тестовая", brand = "Kia", year = 2005, externalId = "carscanner:1"))
+        all.value = listOf(CarProfile(id = 1, name = "Test car", brand = "Kia", year = 2005, externalId = "carscanner:1"))
     }
 
     @Test
@@ -77,7 +78,7 @@ class CarPickerTest {
         assertEquals(listOf("Sorento"), vm.state.value.picker!!.options.map { it.title })
         vm.choose(vm.state.value.picker!!.options.single())
         val gens = vm.state.value.picker!!.options
-        assertEquals("2002–2006 · ваш год", gens.first { it.id == 101L }.subtitle)
+        assertEquals(UiText.Res(R.string.car_your_year, listOf("2002–2006")), gens.first { it.id == 101L }.subtitle)
         vm.choose(gens.first { it.id == 101L })
         vm.search("V6")
         assertEquals(listOf("3.5L V6 4AT AWD (195 HP)"), vm.state.value.picker!!.options.map { it.title })
@@ -99,7 +100,7 @@ class CarPickerTest {
         vm.save()
 
         val saved = cars.all.value.single()
-        assertEquals("Тестовая", saved.name)
+        assertEquals("Test car", saved.name)
         assertEquals("Kia", saved.brand)
         assertEquals(2005, saved.year)
         assertEquals(3.5, saved.engineVolumeL!!, 0.0)
@@ -138,7 +139,7 @@ class CarPickerTest {
 
     @Test
     fun `mass is validated`() {
-        assertEquals("От 300 до 10000", CarForm(name = "Тестовая", curbWeightKg = "50").errors(2026)[CarField.MASS])
-        assertNull(CarForm(name = "Тестовая", curbWeightKg = "1917").errors(2026)[CarField.MASS])
+        assertEquals(UiText.Res(R.string.car_error_range, listOf("300", "10000")), CarForm(name = "Test car", curbWeightKg = "50").errors(2026)[CarField.MASS])
+        assertNull(CarForm(name = "Test car", curbWeightKg = "1917").errors(2026)[CarField.MASS])
     }
 }

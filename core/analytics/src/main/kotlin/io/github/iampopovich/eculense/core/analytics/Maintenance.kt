@@ -4,6 +4,8 @@ import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.FuelType
 import io.github.iampopovich.eculense.core.model.Gearbox
 import io.github.iampopovich.eculense.core.model.MaintenanceItem
+import io.github.iampopovich.eculense.core.model.MaintenanceKind
+import io.github.iampopovich.eculense.core.model.MaintenanceNote
 import io.github.iampopovich.eculense.core.model.OdometerEntry
 import io.github.iampopovich.eculense.core.model.OdometerSource
 import io.github.iampopovich.eculense.core.model.Trip
@@ -43,7 +45,7 @@ data class MaintenanceDue(
 )
 
 /**
- * «Просрочено / скоро / в норме» (3.9 item 2). Soon means ≤ 10 % of the mileage interval left, or by time
+ * «Overdue / soon / OK» (3.9 item 2). Soon means ≤ 10 % of the mileage interval left, or by time
  * ≤ 2 weeks (or ≤ 10 % of the interval if that is larger). Whichever comes first triggers: mileage or date.
  */
 object MaintenanceRule {
@@ -90,38 +92,39 @@ object MaintenanceRule {
         return MaintenanceDue(item, status, dueKm, kmLeft, dueAt, daysLeft)
     }
 
-    /** All tasks: overdue first, then «скоро», «в норме», «неизвестно»; within each, in insertion order (template: oil first). */
+    /** All tasks: overdue first, then «soon», «OK», «unknown»; within each, in insertion order (template: oil first). */
     fun evaluateAll(items: List<MaintenanceItem>, odometerKm: Double?, nowMs: Long, zone: ZoneId = ZoneId.systemDefault()): List<MaintenanceDue> =
         items.map { evaluate(it, odometerKm, nowMs, zone) }.sortedWith(compareByDescending<MaintenanceDue> { it.status.rank }.thenBy { it.item.id })
 
-    /** What is due: overdue and «скоро». */
+    /** What is due: overdue and «soon». */
     fun due(items: List<MaintenanceItem>, odometerKm: Double?, nowMs: Long, zone: ZoneId = ZoneId.systemDefault()): List<MaintenanceDue> =
         evaluateAll(items, odometerKm, nowMs, zone).filter { it.status == MaintenanceStatus.OVERDUE || it.status == MaintenanceStatus.SOON }
 }
 
 /**
- * Typical task list for a petrol car (3.9 item 2). The user edits it on the «Обслуживание» screen;
+ * Typical task list for a petrol car (3.9 item 2). The user edits it on the «Maintenance» screen;
  * intervals from the car profile (Car Scanner import/manual entry) take precedence over the template. Reference values come
  * from typical service schedules of mass-market petrol models; exact values are in the service book.
+ * Items carry a [MaintenanceKind] and a blank title: the UI shows the localized name (see [MaintenanceItem]).
  */
 object MaintenanceTemplate {
     fun forCar(car: CarProfile): List<MaintenanceItem> {
         val s = car.service
         val diesel = car.fuelType == FuelType.DIESEL
-        fun item(title: String, km: Int?, months: Int?, note: String? = null) =
-            MaintenanceItem(carId = car.id, title = title, intervalKm = km, intervalMonths = months, note = note)
+        fun item(kind: MaintenanceKind, km: Int?, months: Int?, note: MaintenanceNote? = null) =
+            MaintenanceItem(carId = car.id, title = "", intervalKm = km, intervalMonths = months, kind = kind, noteKind = note)
         return buildList {
-            add(item("Масло и масляный фильтр двигателя", s.oilKm ?: 10_000, 12, "В тяжёлых условиях (пробки, короткие поездки) — чаще"))
-            add(item("Воздушный фильтр", s.airFilterKm ?: 20_000, 24))
-            if (!diesel) add(item("Свечи зажигания", s.sparkPlugsKm ?: 30_000, null, "30 000–60 000 км в зависимости от типа свечей (никель/иридий)"))
-            s.fuelFilterKm?.let { add(item("Топливный фильтр", it, null)) }
-            add(item("Охлаждающая жидкость", null, 48))
-            add(item("Тормозная жидкость", null, 24))
-            add(item("Ремень/цепь ГРМ", null, null, "Интервал — по регламенту двигателя: укажите его"))
+            add(item(MaintenanceKind.OIL_AND_FILTER, s.oilKm ?: 10_000, 12, MaintenanceNote.OIL_SEVERE_CONDITIONS))
+            add(item(MaintenanceKind.AIR_FILTER, s.airFilterKm ?: 20_000, 24))
+            if (!diesel) add(item(MaintenanceKind.SPARK_PLUGS, s.sparkPlugsKm ?: 30_000, null, MaintenanceNote.SPARK_PLUGS_TYPE))
+            s.fuelFilterKm?.let { add(item(MaintenanceKind.FUEL_FILTER, it, null)) }
+            add(item(MaintenanceKind.COOLANT, null, 48))
+            add(item(MaintenanceKind.BRAKE_FLUID, null, 24))
+            add(item(MaintenanceKind.TIMING_BELT, null, null, MaintenanceNote.TIMING_INTERVAL))
             when (car.gearbox) {
                 Gearbox.MANUAL -> Unit
-                Gearbox.CVT -> add(item("Масло вариатора", 60_000, null))
-                else -> add(item("Масло АКПП", 60_000, null))
+                Gearbox.CVT -> add(item(MaintenanceKind.CVT_OIL, 60_000, null))
+                else -> add(item(MaintenanceKind.AUTOMATIC_TRANSMISSION_OIL, 60_000, null))
             }
         }
     }

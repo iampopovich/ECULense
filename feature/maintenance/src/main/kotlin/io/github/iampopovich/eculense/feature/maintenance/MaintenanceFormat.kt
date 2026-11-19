@@ -1,8 +1,11 @@
 package io.github.iampopovich.eculense.feature.maintenance
 
+import androidx.annotation.StringRes
 import io.github.iampopovich.eculense.core.analytics.MaintenanceDue
 import io.github.iampopovich.eculense.core.analytics.MaintenanceStatus
+import io.github.iampopovich.eculense.core.analyticstext.AnalyticsText
 import io.github.iampopovich.eculense.core.model.MaintenanceItem
+import io.github.iampopovich.eculense.core.ui.UiText
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -11,61 +14,92 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
-/** Texts for the «Обслуживание» screen: numbers with a non-breaking space as the thousands separator, all in Russian. */
+/** Texts for the «Maintenance» screen as [UiText]: numbers use a non-breaking space as the thousands separator. */
 internal object MaintenanceFormat {
     // Numeric input pattern: independent of the app language.
     private val dateInput = DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale.ROOT)
 
-    fun km(v: Number): String = String.format(Locale.getDefault(), "%,d", v.toDouble().roundToLong()).replace('\u202F', '\u00A0').replace(' ', '\u00A0') + "\u00A0км"
+    /** Whole number in the current locale, thousands separated by a non-breaking space. */
+    fun number(v: Number): String =
+        String.format(Locale.getDefault(), "%,d", v.toDouble().roundToLong()).replace('\u202F', '\u00A0').replace(' ', '\u00A0')
 
-    /** A small mileage increment is shown with tenths («0,2 км»), otherwise a short trip looks like «плюс 0 км». */
-    fun addedKm(v: Double): String = if (v < 10.0) String.format(Locale.getDefault(), "%.1f", v) + "\u00A0км" else km(v)
+    fun km(v: Number): UiText = UiText.Res(R.string.maint_km, listOf(number(v)))
 
-    fun status(s: MaintenanceStatus): String = when (s) {
-        MaintenanceStatus.OVERDUE -> "Просрочено"
-        MaintenanceStatus.SOON -> "Скоро"
-        MaintenanceStatus.OK -> "В норме"
-        MaintenanceStatus.UNKNOWN -> "Нет данных"
+    /** A small mileage increment is shown with tenths («0.2 km»), otherwise a short trip looks like «plus 0 km». */
+    fun addedKm(v: Double): UiText =
+        if (v < 10.0) UiText.Res(R.string.maint_km, listOf(String.format(Locale.getDefault(), "%.1f", v))) else km(v)
+
+    @StringRes
+    fun status(s: MaintenanceStatus): Int = when (s) {
+        MaintenanceStatus.OVERDUE -> R.string.maint_status_overdue
+        MaintenanceStatus.SOON -> R.string.maint_status_soon
+        MaintenanceStatus.OK -> R.string.maint_status_ok
+        MaintenanceStatus.UNKNOWN -> R.string.maint_status_unknown
     }
 
-    fun interval(item: MaintenanceItem): String {
-        val parts = listOfNotNull(item.intervalKm?.let { km(it) }, item.intervalMonths?.let { "$it\u00A0мес." })
-        return if (parts.isEmpty()) "Интервал не задан" else "Каждые " + parts.joinToString(" или ")
+    /** The user's title, or the localized name of a template work. */
+    fun title(item: MaintenanceItem): UiText = when {
+        item.title.isNotBlank() -> UiText.Raw(item.title)
+        item.kind != null -> UiText.Res(AnalyticsText.maintenanceKindRes(item.kind!!))
+        else -> UiText.Raw("")
     }
 
-    /** null — never marked yet (then [remaining] gives the hint «Отметьте, когда делали»). */
-    fun lastDone(item: MaintenanceItem, zone: ZoneId): String? {
-        val parts = listOfNotNull(item.lastDoneAtMs?.let { date(it, zone) }, item.lastDoneKm?.let { km(it) })
-        return if (parts.isEmpty()) null else "Последний раз: " + parts.joinToString(", ")
+    /** The user's note, or the localized template note; null when there is none. */
+    fun note(item: MaintenanceItem): UiText? = when {
+        !item.note.isNullOrBlank() -> UiText.Raw(item.note!!)
+        item.noteKind != null -> UiText.Res(AnalyticsText.maintenanceNoteRes(item.noteKind!!))
+        else -> null
     }
 
-    /** «осталось 1 200 км · через 3 мес.», «просрочено на 300 км», «отметьте, когда делали». */
-    fun remaining(d: MaintenanceDue): String {
-        if (d.status == MaintenanceStatus.UNKNOWN) {
-            return when {
-                d.item.intervalKm == null && d.item.intervalMonths == null -> "Укажите интервал"
-                d.item.lastDoneAtMs == null && d.item.lastDoneKm == null -> "Отметьте, когда делали"
-                else -> "Введите пробег, чтобы считать по километрам"
-            }
+    fun interval(item: MaintenanceItem): UiText {
+        val parts = listOfNotNull(item.intervalKm?.let { km(it) }, item.intervalMonths?.let { UiText.Res(R.string.maint_months_short, listOf(it)) })
+        return when (parts.size) {
+            0 -> UiText.Res(R.string.maint_interval_none)
+            1 -> UiText.Res(R.string.maint_interval_every, parts)
+            else -> UiText.Res(R.string.maint_interval_every_or, parts)
         }
-        val parts = buildList {
-            d.kmLeft?.let { left -> add(if (left <= 0) "просрочено на ${km(abs(left))}" else "осталось ${km(left)}") }
+    }
+
+    /** null — never marked yet (then [remaining] gives the hint «Mark when it was done»). */
+    fun lastDone(item: MaintenanceItem, zone: ZoneId): UiText? {
+        val parts = listOfNotNull<Any>(item.lastDoneAtMs?.let { date(it, zone) }, item.lastDoneKm?.let { km(it) })
+        return when (parts.size) {
+            0 -> null
+            1 -> UiText.Res(R.string.maint_last_done, parts)
+            else -> UiText.Res(R.string.maint_last_done_two, parts)
+        }
+    }
+
+    /** «1,200 km left · in 3 mo.», «overdue by 300 km», «Mark when it was done»; the parts are joined with « · ». */
+    fun remaining(d: MaintenanceDue): List<UiText> {
+        if (d.status == MaintenanceStatus.UNKNOWN) {
+            return listOf(
+                when {
+                    d.item.intervalKm == null && d.item.intervalMonths == null -> UiText.Res(R.string.maint_set_interval)
+                    d.item.lastDoneAtMs == null && d.item.lastDoneKm == null -> UiText.Res(R.string.maint_mark_when_done)
+                    else -> UiText.Res(R.string.maint_enter_odometer_for_km)
+                },
+            )
+        }
+        return buildList {
+            d.kmLeft?.let { left -> add(if (left <= 0) UiText.Res(R.string.maint_overdue_by, listOf(km(abs(left)))) else UiText.Res(R.string.maint_km_left, listOf(km(left)))) }
             d.daysLeft?.let { days -> add(days(days)) }
         }
-        return parts.joinToString(" · ")
     }
 
-    private fun days(d: Long): String = when {
-        d == 0L -> "срок — сегодня"
-        d < 0 -> if (-d > 60) "срок прошёл ${-d / 30}\u00A0мес. назад" else "срок прошёл ${-d}\u00A0дн. назад"
-        d > 60 -> "через ${d / 30}\u00A0мес."
-        else -> "через $d\u00A0дн."
+    private fun days(d: Long): UiText = when {
+        d == 0L -> UiText.Res(R.string.maint_due_today)
+        d < 0 -> if (-d > 60) UiText.Res(R.string.maint_due_months_ago, listOf((-d / 30).toInt())) else UiText.Res(R.string.maint_due_days_ago, listOf((-d).toInt()))
+        d > 60 -> UiText.Res(R.string.maint_in_months, listOf((d / 30).toInt()))
+        else -> UiText.Res(R.string.maint_in_days, listOf(d.toInt()))
     }
+
+    const val SEPARATOR = " · "
 
     fun date(ms: Long, zone: ZoneId): String = dateInput.format(Instant.ofEpochMilli(ms).atZone(zone))
 
     /** Mileage from the input field: «120 000» → 120000; empty/garbage/outside 0..5 000 000 → null. */
-    fun parseKm(text: String): Long? = text.filterNot { it.isWhitespace() || it == '\u00A0' }.toLongOrNull()?.takeIf { it in 0..5_000_000 }
+    fun parseKm(text: String): Long? = text.filterNot { it.isWhitespace() || it == '\u00A0' || it == ',' }.toLongOrNull()?.takeIf { it in 0..5_000_000 }
 
     fun parseInt(text: String, max: Int): Int? = text.filterNot { it.isWhitespace() || it == '\u00A0' }.toIntOrNull()?.takeIf { it in 1..max }
 

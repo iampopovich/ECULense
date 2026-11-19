@@ -7,6 +7,8 @@ plugins {
 dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:navigation"))
+    implementation(project(":core:analyticstext"))
+    implementation(project(":core:ui"))
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.core.ktx)
     implementation(platform(libs.koin.bom))

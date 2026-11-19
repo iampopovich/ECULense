@@ -46,6 +46,7 @@ import io.github.iampopovich.eculense.core.model.TripStats
 import io.github.iampopovich.eculense.core.model.UnitsSettings
 import io.github.iampopovich.eculense.feature.stats.StatsFormat.label
 import org.koin.compose.viewmodel.koinViewModel
+import io.github.iampopovich.eculense.core.ui.CarNames
 import io.github.iampopovich.eculense.core.ui.EcuDates
 
 @Composable
@@ -61,7 +62,7 @@ internal fun StatsRoute(viewModel: StatsViewModel = koinViewModel()) {
 @Composable
 internal fun StatsScreen(state: StatsUiState, onPeriod: (StatsPeriod) -> Unit, modifier: Modifier = Modifier, onImport: (() -> Unit)? = null) {
     Column(modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Header(state.car?.name, onImport)
+        Header(state.car?.let { CarNames.display(it) }, onImport)
         if (state.loading) return@Column
         PeriodSelector(state.period, onPeriod)
         if (state.trips.isEmpty()) {

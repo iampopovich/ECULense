@@ -5,12 +5,15 @@ import io.github.iampopovich.eculense.core.model.DriveType
 import io.github.iampopovich.eculense.core.model.FuelType
 import io.github.iampopovich.eculense.core.model.Gearbox
 import io.github.iampopovich.eculense.core.model.ServiceIntervals
+import io.github.iampopovich.eculense.core.ui.UiText
+import java.text.DecimalFormatSymbols
+import java.util.Locale
 
 internal enum class CarField { NAME, YEAR, ENGINE_VOLUME, CYLINDERS, TANK, MASS, ODOMETER, VIN, FUEL_PRICE, CURRENCY, OIL, PLUGS, AIR_FILTER, FUEL_FILTER }
 
 /**
  * Editor form: everything is strings, as the user types them. Errors are computed immediately (Nielsen's error prevention):
- * the «Сохранить» button is disabled while there is at least one, and the field highlights the cause.
+ * the «Save» button is disabled while there is at least one, and the field highlights the cause.
  */
 internal data class CarForm(
     val id: Long = 0,
@@ -39,17 +42,17 @@ internal data class CarForm(
     val airFilterKm: String = "",
     val fuelFilterKm: String = "",
 ) {
-    fun errors(currentYear: Int): Map<CarField, String> = buildMap {
-        if (name.isBlank()) put(CarField.NAME, "Укажите название")
+    fun errors(currentYear: Int): Map<CarField, UiText> = buildMap {
+        if (name.isBlank()) put(CarField.NAME, UiText.Res(R.string.car_error_name))
         checkInt(year, 1900, currentYear + 1)?.let { put(CarField.YEAR, it) }
         checkDouble(engineVolumeL, 0.1, 10.0)?.let { put(CarField.ENGINE_VOLUME, it) }
         checkInt(cylinders, 1, 16)?.let { put(CarField.CYLINDERS, it) }
         checkDouble(tankVolumeL, 5.0, 300.0)?.let { put(CarField.TANK, it) }
         checkInt(curbWeightKg, 300, 10_000)?.let { put(CarField.MASS, it) }
         checkInt(odometerKm, 0, 5_000_000)?.let { put(CarField.ODOMETER, it) }
-        if (vin.isNotBlank() && !VIN.matches(vin.trim().uppercase())) put(CarField.VIN, "VIN — 17 символов: латиница без I, O, Q и цифры")
+        if (vin.isNotBlank() && !VIN.matches(vin.trim().uppercase())) put(CarField.VIN, UiText.Res(R.string.car_error_vin))
         checkDouble(fuelPrice, 0.01, 100_000.0)?.let { put(CarField.FUEL_PRICE, it) }
-        if (currency.isNotBlank() && !CURRENCY.matches(currency.trim().uppercase())) put(CarField.CURRENCY, "Код валюты из 3 букв, например RUB")
+        if (currency.isNotBlank() && !CURRENCY.matches(currency.trim().uppercase())) put(CarField.CURRENCY, UiText.Res(R.string.car_error_currency))
         checkInt(oilKm, 500, 200_000)?.let { put(CarField.OIL, it) }
         checkInt(sparkPlugsKm, 500, 300_000)?.let { put(CarField.PLUGS, it) }
         checkInt(airFilterKm, 500, 200_000)?.let { put(CarField.AIR_FILTER, it) }
@@ -133,16 +136,18 @@ private fun String.toIntOrNullTrim(): Int? = trim().replace(" ", "").toIntOrNull
 private fun String.toLongOrNullTrim(): Long? = trim().replace(" ", "").toLongOrNull()
 internal fun String.toDoubleOrNullLocal(): Double? = trim().replace(" ", "").replace(',', '.').toDoubleOrNull()
 
-private fun checkInt(s: String, min: Int, max: Int): String? {
+private fun checkInt(s: String, min: Int, max: Int): UiText? {
     if (s.isBlank()) return null
-    val v = s.trim().replace(" ", "").toLongOrNull() ?: return "Только целое число"
-    return if (v < min || v > max) "От $min до $max" else null
+    val v = s.trim().replace(" ", "").toLongOrNull() ?: return UiText.Res(R.string.car_error_integer)
+    return if (v < min || v > max) UiText.Res(R.string.car_error_range, listOf(min.toString(), max.toString())) else null
 }
 
-private fun checkDouble(s: String, min: Double, max: Double): String? {
+private fun checkDouble(s: String, min: Double, max: Double): UiText? {
     if (s.isBlank()) return null
-    val v = s.toDoubleOrNullLocal() ?: return "Число, например 2,5"
-    return if (v < min || v > max) "От ${fmt(min)} до ${fmt(max)}" else null
+    val v = s.toDoubleOrNullLocal() ?: return UiText.Res(R.string.car_error_number)
+    return if (v < min || v > max) UiText.Res(R.string.car_error_range, listOf(fmt(min), fmt(max))) else null
 }
 
-private fun fmt(v: Double) = if (v == Math.floor(v)) v.toLong().toString() else v.toString().replace('.', ',')
+/** 0.1 → «0,1» in Russian, «0.1» in English; whole numbers without a fraction. */
+private fun fmt(v: Double) =
+    if (v == Math.floor(v)) v.toLong().toString() else v.toString().replace('.', DecimalFormatSymbols.getInstance(Locale.getDefault()).decimalSeparator)

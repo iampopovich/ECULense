@@ -19,6 +19,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import io.github.iampopovich.eculense.core.model.MaintenanceKind
+import io.github.iampopovich.eculense.core.model.MaintenanceNote
 import java.time.LocalDate
 import java.time.ZoneOffset
 
@@ -71,7 +73,7 @@ class MaintenanceRepositoryTest {
     fun `template is seeded once per car and not again after the user deletes everything`() = runTest {
         assertTrue(repo.ensureTemplate(car))
         val seeded = repo.items(1)
-        assertTrue(seeded.any { it.title == "Масло и масляный фильтр двигателя" })
+        assertTrue(seeded.any { it.kind == MaintenanceKind.OIL_AND_FILTER && it.noteKind == MaintenanceNote.OIL_SEVERE_CONDITIONS })
         assertFalse(repo.ensureTemplate(car))
         seeded.forEach { repo.delete(it.id) }
         assertFalse(repo.ensureTemplate(car))

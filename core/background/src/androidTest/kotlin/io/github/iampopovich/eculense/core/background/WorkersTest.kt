@@ -11,10 +11,14 @@ import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.workDataOf
 import io.github.iampopovich.eculense.core.analytics.Finding
+import io.github.iampopovich.eculense.core.analytics.FindingArg
+import io.github.iampopovich.eculense.core.analytics.FindingKey
+import io.github.iampopovich.eculense.core.analytics.FindingText
 import io.github.iampopovich.eculense.core.analytics.MaintenanceDue
 import io.github.iampopovich.eculense.core.analytics.MaintenanceStatus
 import io.github.iampopovich.eculense.core.analytics.Severity
 import io.github.iampopovich.eculense.core.model.MaintenanceItem
+import io.github.iampopovich.eculense.core.model.MaintenanceKind
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -48,14 +52,14 @@ class WorkersTest {
         nm().cancelAll()
         val analysis = PostTripAnalysis(
             backfill = { backfilled++; 1 },
-            cars = { listOf(1L to "Тестовая") },
+            cars = { listOf(1L to "Test car") },
             findings = { emptyList() },
-            recompute = { recomputed++; listOf(Finding("volt", Severity.CRITICAL, "Низкое напряжение", "Тест")) },
+            recompute = { recomputed++; listOf(Finding("volt", Severity.CRITICAL, FindingText(FindingKey.TITLE_VOLTAGE_LOW), FindingText(FindingKey.VOLTAGE_HIGH_OK, FindingArg.Num(14.8)))) },
             ledger = Ledger(), notifier = notifier,
         )
         val check = MaintenanceCheck(
-            cars = { listOf(1L to "Тестовая") },
-            due = { listOf(MaintenanceDue(MaintenanceItem(id = 1, carId = 1, title = "Масло", lastDoneAtMs = 1), MaintenanceStatus.OVERDUE, kmLeft = -300.0)) },
+            cars = { listOf(1L to "Test car") },
+            due = { listOf(MaintenanceDue(MaintenanceItem(id = 1, carId = 1, title = "", kind = MaintenanceKind.OIL_AND_FILTER, lastDoneAtMs = 1), MaintenanceStatus.OVERDUE, kmLeft = -300.0)) },
             ledger = Ledger(), notifier = notifier,
         )
         startKoin {
@@ -84,7 +88,7 @@ class WorkersTest {
         assertEquals(1, recomputed)
         val posted = nm().activeNotifications.single { it.id == AndroidNotifier.ID_ANALYSIS }
         assertEquals(AndroidNotifier.CHANNEL_ANALYSIS, posted.notification.channelId)
-        assertTrue(posted.notification.extras.getString("android.title")!!.contains("Низкое напряжение"))
+        assertTrue(posted.notification.extras.getString("android.title")!!.contains(context.getString(io.github.iampopovich.eculense.core.analyticstext.R.string.finding_title_voltage_low)))
         // contentIntent is empty in the library's test APK: it has no launcher activity (in the app it's MainActivity)
     }
 
@@ -103,7 +107,10 @@ class WorkersTest {
         assertEquals(ListenableWorker.Result.success(), TestListenableWorkerBuilder<MaintenanceWorker>(context).build().doWork())
         val posted = nm().activeNotifications.single { it.id == AndroidNotifier.ID_MAINTENANCE }
         assertEquals(AndroidNotifier.CHANNEL_MAINTENANCE, posted.notification.channelId)
-        assertEquals("Пора ТО: Масло", posted.notification.extras.getString("android.title"))
+        assertEquals(
+            context.getString(R.string.bg_maintenance_one, context.getString(io.github.iampopovich.eculense.core.analyticstext.R.string.maint_kind_oil_and_filter)),
+            posted.notification.extras.getString("android.title"),
+        )
         nm().cancelAll()
         TestListenableWorkerBuilder<MaintenanceWorker>(context).build().doWork()
         assertTrue(nm().activeNotifications.none { it.id == AndroidNotifier.ID_MAINTENANCE })

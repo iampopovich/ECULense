@@ -14,6 +14,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
 import androidx.room.migration.Migration
+import io.github.iampopovich.eculense.core.model.LegacyValues
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 import org.koin.android.ext.koin.androidContext
@@ -323,6 +324,10 @@ data class MaintenanceItemEntity(
     val lastDoneKm: Long?,
     val lastDoneAtMs: Long?,
     val note: String?,
+    /** MaintenanceKind name of a template work (title is blank then), null for the user's own works. */
+    val kind: String? = null,
+    /** MaintenanceNote name of a template note (note is null then). */
+    val noteKind: String? = null,
 )
 
 /** Odometer entries: MANUAL is user input (or migrated from the car profile), ESTIMATED is an estimate. */
@@ -469,12 +474,13 @@ abstract class EcuDatabase : RoomDatabase() {
 
     companion object {
         /** Schema version; an ECULense backup with a newer version is not restored. */
-        const val VERSION = 6
+        const val VERSION = 7
         const val FILE_NAME = "ecu.db"
-        val MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+        val MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
 
         const val DEFAULT_CAR_ID = 1L
-        const val DEFAULT_CAR_NAME = "Мой автомобиль"
+        /** Blank: the UI shows the localized default name (older DBs keep their Russian literal, see LegacyValues). */
+        const val DEFAULT_CAR_NAME = ""
 
         /** The first car always exists: new recordings and legacy data are attached to it. */
         val defaultCar = object : Callback() {
@@ -627,6 +633,24 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
                 "`importedAtMs` INTEGER NOT NULL, PRIMARY KEY(`name`))",
         )
         db.execSQL("CREATE TABLE IF NOT EXISTS `import_snapshots` (`key` TEXT NOT NULL, `json` TEXT NOT NULL, PRIMARY KEY(`key`))")
+    }
+}
+
+/**
+ * 6 → 7 (localization): maintenance works get a typed kind/note. Template works written in Russian by older versions are
+ * recognized by their exact title/note ([LegacyValues]) and switched to kind + blank title, so the UI shows them in the
+ * app language. Works the user created or renamed keep their text. Only ADD COLUMN and UPDATE: nothing is deleted.
+ */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `maintenance_items` ADD COLUMN `kind` TEXT")
+        db.execSQL("ALTER TABLE `maintenance_items` ADD COLUMN `noteKind` TEXT")
+        LegacyValues.MAINTENANCE_TITLES_RU.forEach { (title, kind) ->
+            db.execSQL("UPDATE maintenance_items SET kind = ?, title = '' WHERE kind IS NULL AND title = ?", arrayOf<Any>(kind.name, title))
+        }
+        LegacyValues.MAINTENANCE_NOTES_RU.forEach { (note, kind) ->
+            db.execSQL("UPDATE maintenance_items SET noteKind = ?, note = NULL WHERE noteKind IS NULL AND note = ?", arrayOf<Any>(kind.name, note))
+        }
     }
 }
 

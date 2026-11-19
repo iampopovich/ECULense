@@ -28,23 +28,23 @@ object SensorIds {
     /** Everything [SessionDigester] reads: the rules need no other sensors, and those are not loaded from the DB. */
     val FOR_RULES: Set<String> = setOf(COOLANT, RPM, SPEED, MAF, MIL_DISTANCE, MODULE_VOLTAGE, ELM_VOLTAGE) + TRIMS
 
-    /** Labels for the AI and the screen; unknown ids are shown as is. */
+    /** Labels for the AI and logs (English); the UI uses string resources of :core:analyticstext. */
     val NAMES: Map<String, String> = mapOf(
-        "01.04" to "Нагрузка двигателя",
-        COOLANT to "Температура ОЖ",
-        STFT1 to "Краткосрочная коррекция топлива, банк 1",
-        LTFT1 to "Долгосрочная коррекция топлива, банк 1",
-        STFT2 to "Краткосрочная коррекция топлива, банк 2",
-        LTFT2 to "Долгосрочная коррекция топлива, банк 2",
-        RPM to "Обороты",
-        SPEED to "Скорость",
-        "01.0E" to "Угол опережения зажигания",
-        IAT to "Температура впускного воздуха",
-        MAF to "Массовый расход воздуха",
-        "01.11" to "Положение дроссельной заслонки",
-        MIL_DISTANCE to "Пробег с горящим Check Engine",
-        MODULE_VOLTAGE to "Напряжение блока управления",
-        ELM_VOLTAGE to "Напряжение на разъёме OBD (адаптер)",
+        "01.04" to "Engine load",
+        COOLANT to "Coolant temperature",
+        STFT1 to "Short-term fuel trim, bank 1",
+        LTFT1 to "Long-term fuel trim, bank 1",
+        STFT2 to "Short-term fuel trim, bank 2",
+        LTFT2 to "Long-term fuel trim, bank 2",
+        RPM to "Engine speed",
+        SPEED to "Vehicle speed",
+        "01.0E" to "Ignition timing advance",
+        IAT to "Intake air temperature",
+        MAF to "Mass air flow",
+        "01.11" to "Throttle position",
+        MIL_DISTANCE to "Distance with Check Engine on",
+        MODULE_VOLTAGE to "Control module voltage",
+        ELM_VOLTAGE to "OBD port voltage (adapter)",
     )
 
     /** Coordinates and any other location traces never leave the app (AI tools, summary export). */

@@ -1,5 +1,8 @@
 package io.github.iampopovich.eculense.feature.car
 
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.DriveType
 import io.github.iampopovich.eculense.core.model.FuelType
@@ -13,39 +16,43 @@ internal object CarFormat {
     /** «Kia · Sorento · BL · 2005». */
     fun title(car: CarProfile): String = listOfNotNull(car.brand, car.model, car.generation, car.year?.toString()).joinToString(" · ")
 
+    @Composable
     fun engine(car: CarProfile): String = listOfNotNull(
         car.engineCode,
-        car.engineVolumeL?.let { "${number(it)} л" },
-        car.cylinders?.let { "$it цил." },
-        car.fuelType?.label,
-        car.gearbox?.label,
-        car.drive?.let { "${it.label} привод" },
+        car.engineVolumeL?.let { stringResource(R.string.car_engine_liters, number(it)) },
+        car.cylinders?.let { stringResource(R.string.car_engine_cylinders, it) },
+        car.fuelType?.let { stringResource(it.labelRes) },
+        car.gearbox?.let { stringResource(it.labelRes) },
+        car.drive?.let { stringResource(R.string.car_drive_suffix, stringResource(it.labelRes)) },
     ).joinToString(" · ")
 }
 
-internal val FuelType.label: String
+@get:StringRes
+internal val FuelType.labelRes: Int
     get() = when (this) {
-        FuelType.PETROL -> "Бензин"
-        FuelType.DIESEL -> "Дизель"
-        FuelType.LPG -> "Пропан"
-        FuelType.CNG -> "Метан"
-        FuelType.HYBRID -> "Гибрид"
-        FuelType.ELECTRIC -> "Электро"
-        FuelType.OTHER -> "Другое"
+        FuelType.PETROL -> R.string.car_fuel_petrol
+        FuelType.DIESEL -> R.string.car_fuel_diesel
+        FuelType.LPG -> R.string.car_fuel_lpg
+        FuelType.CNG -> R.string.car_fuel_cng
+        FuelType.HYBRID -> R.string.car_fuel_hybrid
+        FuelType.ELECTRIC -> R.string.car_fuel_electric
+        FuelType.OTHER -> R.string.car_fuel_other
     }
 
-internal val Gearbox.label: String
+@get:StringRes
+internal val Gearbox.labelRes: Int
     get() = when (this) {
-        Gearbox.MANUAL -> "Механика"
-        Gearbox.AUTOMATIC -> "Автомат"
-        Gearbox.CVT -> "Вариатор"
-        Gearbox.ROBOT -> "Робот"
-        Gearbox.OTHER -> "Другая"
+        Gearbox.MANUAL -> R.string.car_gearbox_manual
+        Gearbox.AUTOMATIC -> R.string.car_gearbox_automatic
+        Gearbox.CVT -> R.string.car_gearbox_cvt
+        Gearbox.ROBOT -> R.string.car_gearbox_robot
+        Gearbox.OTHER -> R.string.car_gearbox_other
     }
 
-internal val DriveType.label: String
+@get:StringRes
+internal val DriveType.labelRes: Int
     get() = when (this) {
-        DriveType.FRONT -> "Передний"
-        DriveType.REAR -> "Задний"
-        DriveType.ALL -> "Полный"
+        DriveType.FRONT -> R.string.car_drive_front
+        DriveType.REAR -> R.string.car_drive_rear
+        DriveType.ALL -> R.string.car_drive_all
     }

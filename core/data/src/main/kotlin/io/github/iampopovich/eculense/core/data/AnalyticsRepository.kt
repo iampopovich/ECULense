@@ -7,6 +7,10 @@ import io.github.iampopovich.eculense.core.analytics.DtcEvent
 import io.github.iampopovich.eculense.core.analytics.DtcRule
 import io.github.iampopovich.eculense.core.analytics.Evidence
 import io.github.iampopovich.eculense.core.analytics.Finding
+import io.github.iampopovich.eculense.core.analytics.FindingArg
+import io.github.iampopovich.eculense.core.analytics.FindingEnglish
+import io.github.iampopovich.eculense.core.analytics.FindingKey
+import io.github.iampopovich.eculense.core.analytics.FindingText
 import io.github.iampopovich.eculense.core.analytics.Percentiles
 import io.github.iampopovich.eculense.core.analytics.SensorIds
 import io.github.iampopovich.eculense.core.analytics.SessionDigest
@@ -35,8 +39,14 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -46,7 +56,7 @@ import java.time.ZoneId
 
 data class StoredFinding(val id: Long, val carId: Long, val finding: Finding, val createdAtMs: Long)
 
-/** Recompute state — shared by the «Анализ» screen and the post-import recompute. */
+/** Recompute state — shared by the «Analysis» screen and the post-import recompute. */
 sealed interface AnalysisState {
     data object Idle : AnalysisState
     data class Running(val done: Int, val total: Int) : AnalysisState
@@ -215,34 +225,102 @@ internal class RoomAnalyticsRepository(
     }
 }
 
-/** Evidence is stored as JSON: {"evidence":[{"label","value"}],"sessions":[…]}. */
+/**
+ * Finding payload in the evidenceJson column. Version 2 (localization) stores the typed text:
+ * {"v":2,"title":T,"message":[T…],"evidence":[{"label":T,"value":T}],"sessions":[…]}, T = {"k":"KEY","a":[arg…]}.
+ * The title/message columns then hold the English rendering (readable in SQL, fallback when a key is unknown).
+ * Version 1 rows (before localization) have {"evidence":[{"label","value"}],"sessions":[…]} with Russian strings: they are
+ * read as raw text ([Finding.isLegacyText]) until the next recompute replaces them. No schema change is needed:
+ * findings are derived data, recomputed from recordings.
+ */
 internal object FindingJson {
+    private const val VERSION = 2
+
     fun encode(f: Finding): String = buildJsonObject {
-        put("evidence", JsonArray(f.evidence.map { e -> buildJsonObject { put("label", e.label); put("value", e.value) } }))
+        put("v", VERSION)
+        put("title", text(f.title))
+        put("message", JsonArray(f.message.map(::text)))
+        put("evidence", JsonArray(f.evidence.map { e -> buildJsonObject { put("label", text(e.label)); put("value", text(e.value)) } }))
         put("sessions", JsonArray(f.sessionIds.map { JsonPrimitive(it) }))
     }.toString()
 
-    fun decode(json: String): Pair<List<Evidence>, List<Long>> = runCatching {
+    /** Typed parts of a stored finding; null title means "use the text columns" (v1 row or unknown key). */
+    data class Decoded(val title: FindingText?, val message: List<FindingText>?, val evidence: List<Evidence>, val sessions: List<Long>)
+
+    fun decode(json: String): Decoded = runCatching {
         val o = Json.parseToJsonElement(json).jsonObject
-        val evidence = o["evidence"]?.jsonArray?.map { e ->
-            val eo = e.jsonObject
-            Evidence(eo.getValue("label").jsonPrimitive.content, eo.getValue("value").jsonPrimitive.content)
-        }.orEmpty()
         val sessions = o["sessions"]?.jsonArray?.map { it.jsonPrimitive.long }.orEmpty()
-        evidence to sessions
-    }.getOrDefault(emptyList<Evidence>() to emptyList())
+        val v = o["v"]?.jsonPrimitive?.intOrNull ?: 1
+        if (v >= 2) {
+            runCatching {
+                Decoded(
+                    title = text(o.getValue("title")),
+                    message = o.getValue("message").jsonArray.map(::text),
+                    evidence = o["evidence"]?.jsonArray?.map { e -> Evidence(text(e.jsonObject.getValue("label")), text(e.jsonObject.getValue("value"))) }.orEmpty(),
+                    sessions = sessions,
+                )
+            }.getOrElse { Decoded(null, null, emptyList(), sessions) }
+        } else {
+            val evidence = o["evidence"]?.jsonArray?.map { e ->
+                val eo = e.jsonObject
+                Evidence(FindingText.raw(eo.getValue("label").jsonPrimitive.content), FindingText.raw(eo.getValue("value").jsonPrimitive.content))
+            }.orEmpty()
+            Decoded(null, null, evidence, sessions)
+        }
+    }.getOrDefault(Decoded(null, null, emptyList(), emptyList()))
+
+    private fun text(t: FindingText): JsonObject = buildJsonObject {
+        put("k", t.key.name)
+        if (t.args.isNotEmpty()) put("a", JsonArray(t.args.map(::arg)))
+    }
+
+    private fun arg(a: FindingArg): JsonObject = buildJsonObject {
+        when (a) {
+            is FindingArg.Num -> { put("t", "n"); put("v", a.value); put("d", a.decimals); if (a.signed) put("s", true) }
+            is FindingArg.Count -> { put("t", "i"); put("v", a.n) }
+            is FindingArg.Date -> { put("t", "date"); put("v", a.ms) }
+            is FindingArg.DateRange -> { put("t", "range"); put("f", a.fromMs); put("to", a.toMs) }
+            is FindingArg.Sensor -> { put("t", "sensor"); put("v", a.id) }
+            is FindingArg.Raw -> { put("t", "raw"); put("v", a.text) }
+            is FindingArg.Text -> { put("t", "text"); a.text?.let { put("v", text(it)) } }
+            is FindingArg.Join -> { put("t", "join"); put("v", JsonArray(a.items.map(::text))); put("sep", a.separator) }
+        }
+    }
+
+    private fun text(e: JsonElement): FindingText {
+        val o = e.jsonObject
+        return FindingText(FindingKey.valueOf(o.getValue("k").jsonPrimitive.content), o["a"]?.jsonArray?.map(::arg).orEmpty())
+    }
+
+    private fun arg(e: JsonElement): FindingArg {
+        val o = e.jsonObject
+        fun p(name: String) = o.getValue(name).jsonPrimitive
+        return when (val type = p("t").content) {
+            "n" -> FindingArg.Num(p("v").double, p("d").int, o["s"]?.jsonPrimitive?.booleanOrNull ?: false)
+            "i" -> FindingArg.Count(p("v").int)
+            "date" -> FindingArg.Date(p("v").long)
+            "range" -> FindingArg.DateRange(p("f").long, p("to").long)
+            "sensor" -> FindingArg.Sensor(p("v").content)
+            "raw" -> FindingArg.Raw(p("v").content)
+            "text" -> FindingArg.Text(o["v"]?.let(::text))
+            "join" -> FindingArg.Join(o.getValue("v").jsonArray.map(::text), p("sep").content)
+            else -> error("unknown finding argument type $type")
+        }
+    }
 }
 
 internal fun Finding.toEntity(carId: Long, now: Long) = FindingEntity(
-    carId = carId, ruleId = ruleId, severity = severity.name, title = title, message = message,
+    carId = carId, ruleId = ruleId, severity = severity.name, title = FindingEnglish.title(this), message = FindingEnglish.message(this),
     evidenceJson = FindingJson.encode(this), periodFromMs = fromMs, periodToMs = toMs, createdAtMs = now,
 )
 
 internal fun FindingEntity.toModel(): StoredFinding {
-    val (evidence, sessions) = FindingJson.decode(evidenceJson)
+    val d = FindingJson.decode(evidenceJson)
+    val title = d.title ?: FindingText.raw(title)
+    val message = d.message ?: listOf(FindingText.raw(message))
     return StoredFinding(
         id, carId,
-        Finding(ruleId, runCatching { Severity.valueOf(severity) }.getOrDefault(Severity.INFO), title, message, evidence, sessions, periodFromMs, periodToMs),
+        Finding(ruleId, runCatching { Severity.valueOf(severity) }.getOrDefault(Severity.INFO), title, message, d.evidence, d.sessions, periodFromMs, periodToMs),
         createdAtMs,
     )
 }

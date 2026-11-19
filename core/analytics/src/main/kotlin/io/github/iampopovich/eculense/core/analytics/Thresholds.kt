@@ -52,7 +52,7 @@ object Thresholds {
     // --- Trouble codes ---
     /** Recurring code: ≥ 2 events within 30 days (plan 3.8). */
     const val DTC_REPEAT_WINDOW_MS = 30L * 24 * 3_600_000
-    /** Reads of the same code more often than once per 6 hours are the same event (the «Прочитать» button gets pressed several times). */
+    /** Reads of the same code more often than once per 6 hours are the same event (the «Read» button gets pressed several times). */
     const val DTC_SAME_EVENT_MS = 6L * 3_600_000
 
     // --- Warm-up ---

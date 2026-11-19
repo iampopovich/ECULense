@@ -7,4 +7,14 @@
     <string name="common_delete">Delete</string>
     <string name="common_ok">OK</string>
     <string name="common_back">Back</string>
+    <!-- Default name of a car the user hasn't named, and units of measurement. -->
+    <string name="common_car_default_name">My car</string>
+    <string name="common_unit_km">km</string>
+    <string name="common_unit_mi">mi</string>
+    <string name="common_unit_l">L</string>
+    <string name="common_unit_gal_us">gal (US)</string>
+    <string name="common_unit_gal_imp">gal (Imp)</string>
+    <string name="common_unit_l_per_100km">L/100 km</string>
+    <string name="common_unit_mpg_us" translatable="false">mpg (US)</string>
+    <string name="common_unit_mpg_imp" translatable="false">mpg (Imp)</string>
 </resources>

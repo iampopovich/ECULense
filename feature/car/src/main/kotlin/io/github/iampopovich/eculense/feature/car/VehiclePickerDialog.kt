@@ -25,12 +25,14 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
 import io.github.iampopovich.eculense.core.vehicledb.VehicleEngine
 
-/** Full-screen step-by-step picker from the reference database: search, list, and on the last step specs and «Заполнить». */
+/** Full-screen step-by-step picker from the reference database: search, list, and on the last step specs and «Fill in». */
 @Composable
 internal fun VehiclePickerDialog(
     state: PickerState,
@@ -40,38 +42,38 @@ internal fun VehiclePickerDialog(
     onFill: () -> Unit,
     onClose: () -> Unit,
 ) {
-    // the search field opens the keyboard; after «Заполнить»/«Закрыть» it must not stay over the form
+    // the search field opens the keyboard; after «Fill in»/«Close» it must not stay over the form
     val keyboard = LocalSoftwareKeyboardController.current
     DisposableEffect(Unit) { onDispose { keyboard?.hide() } }
     Dialog(onDismissRequest = onBack, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onBack) { Text("Назад") }
+                    TextButton(onClick = onBack) { Text(stringResource(CoreUiR.string.common_back)) }
                     Text(
-                        if (state.engine != null) "Характеристики" else "Справочник: ${state.step.title.lowercase()}",
+                        if (state.engine != null) stringResource(R.string.car_picker_specs) else stringResource(R.string.car_picker_title, stringResource(state.step.title).lowercase()),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = onClose) { Text("Закрыть") }
+                    TextButton(onClick = onClose) { Text(stringResource(R.string.car_picker_close)) }
                 }
                 if (state.path.isNotEmpty()) Text(state.path, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                state.error?.let { Text(it.asString(), color = MaterialTheme.colorScheme.error) }
                 val engine = state.engine
                 if (engine != null) {
                     EngineCard(engine, onFill)
                 } else {
                     OutlinedTextField(
-                        value = state.query, onValueChange = onSearch, label = { Text("Поиск") }, singleLine = true,
+                        value = state.query, onValueChange = onSearch, label = { Text(stringResource(R.string.car_picker_search)) }, singleLine = true,
                         modifier = Modifier.fillMaxWidth().testTag("picker-search"),
                     )
                     if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    if (!state.loading && state.options.isEmpty() && state.error == null) Text("Ничего не найдено")
+                    if (!state.loading && state.options.isEmpty() && state.error == null) Text(stringResource(R.string.car_picker_nothing))
                     LazyColumn(Modifier.weight(1f)) {
                         items(state.options, key = { it.id }) { o ->
                             ListItem(
                                 headlineContent = { Text(o.title) },
-                                supportingContent = o.subtitle?.takeIf { it.isNotBlank() }?.let { { Text(it) } },
+                                supportingContent = o.subtitle?.asString()?.takeIf { it.isNotBlank() }?.let { { Text(it) } },
                                 modifier = Modifier.clickable { onChoose(o) },
                             )
                         }
@@ -90,24 +92,25 @@ private fun EngineCard(e: VehicleEngine, onFill: () -> Unit) {
             Row { Text("$k: ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(v, style = MaterialTheme.typography.bodyMedium) }
         }
         Text(
-            "Заполнятся объём, цилиндры, топливо, КПП, привод, бак и масса. Название, марка и год останутся вашими; всё можно поправить.",
+            stringResource(R.string.car_picker_fill_hint),
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 8.dp),
         )
-        Button(onClick = onFill, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Заполнить") }
-        Text("Данные: gor3a/vehicle-makes-models (ODbL 1.0)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Button(onClick = onFill, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(stringResource(R.string.car_picker_fill)) }
+        Text(stringResource(R.string.car_picker_source), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
+@Composable
 internal fun specRows(e: VehicleEngine): List<Pair<String, String>> = listOfNotNull(
-    e.displacementCc?.let { "Объём" to "$it см³ (${CarFormat.number(it / 1000.0)} л)" },
-    e.cylinders?.let { "Цилиндров" to "$it" },
-    e.powerHp?.let { "Мощность" to "${CarFormat.number(it, 0)} л. с." },
-    e.torqueNm?.let { "Момент" to "${CarFormat.number(it, 0)} Н·м" },
-    e.fuelType?.let { "Топливо" to (e.fuel?.label ?: it) },
-    e.transmission?.let { "КПП" to "${e.gearbox?.label ?: ""} ($it)".trim() },
-    e.drivetrain?.let { "Привод" to (e.drive?.label ?: it) },
-    e.tankL?.let { "Бак" to "${CarFormat.number(it)} л" },
-    e.curbWeightKg?.let { "Масса" to "$it кг" },
-    e.fuelEconomyL100?.let { "Расход (смеш.)" to "${CarFormat.number(it)} л/100 км" },
+    e.displacementCc?.let { stringResource(R.string.car_spec_volume) to stringResource(R.string.car_spec_volume_value, it, CarFormat.number(it / 1000.0)) },
+    e.cylinders?.let { stringResource(R.string.car_spec_cylinders) to "$it" },
+    e.powerHp?.let { stringResource(R.string.car_spec_power) to stringResource(R.string.car_spec_power_value, CarFormat.number(it, 0)) },
+    e.torqueNm?.let { stringResource(R.string.car_spec_torque) to stringResource(R.string.car_spec_torque_value, CarFormat.number(it, 0)) },
+    e.fuelType?.let { stringResource(R.string.car_spec_fuel) to (e.fuel?.let { f -> stringResource(f.labelRes) } ?: it) },
+    e.transmission?.let { stringResource(R.string.car_spec_gearbox) to "${e.gearbox?.let { g -> stringResource(g.labelRes) } ?: ""} ($it)".trim() },
+    e.drivetrain?.let { stringResource(R.string.car_spec_drive) to (e.drive?.let { d -> stringResource(d.labelRes) } ?: it) },
+    e.tankL?.let { stringResource(R.string.car_spec_tank) to stringResource(R.string.car_spec_liters_value, CarFormat.number(it)) },
+    e.curbWeightKg?.let { stringResource(R.string.car_spec_mass) to stringResource(R.string.car_spec_mass_value, it) },
+    e.fuelEconomyL100?.let { stringResource(R.string.car_spec_economy) to stringResource(R.string.car_spec_economy_value, CarFormat.number(it)) },
 )

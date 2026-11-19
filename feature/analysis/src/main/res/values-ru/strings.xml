@@ -2,4 +2,28 @@
 <resources>
     <string name="analysis_hub_title">Анализ</string>
     <string name="analysis_hub_subtitle">Находки по записям и кодам ошибок</string>
+    <string name="analysis_empty">Находок пока нет. Импортируйте записи из Car Scanner или запишите поездку с адаптером, затем нажмите «Пересчитать».</string>
+    <string name="analysis_section_attention">Требует внимания</string>
+    <string name="analysis_no_problems">Проблем не найдено.</string>
+    <string name="analysis_section_no_data">Нет данных</string>
+    <string name="analysis_section_ok">В норме</string>
+    <string name="analysis_disclaimer">Числа считает приложение по записям; это подсказка, а не диагноз.</string>
+    <string name="analysis_progress">Анализ записей: %1$d из %2$d</string>
+    <string name="analysis_done">Обновлено %1$s · записей: %2$d · %3$s</string>
+    <string name="analysis_seconds">%1$s с</string>
+    <string name="analysis_failed">Не удалось пересчитать: %1$s</string>
+    <string name="analysis_updated">Обновлено %1$s</string>
+    <string name="analysis_recompute">Пересчитать</string>
+    <string name="analysis_loading">Загрузка…</string>
+    <string name="analysis_finding_missing">Находка не найдена — возможно, анализ пересчитан. Вернитесь к списку.</string>
+    <string name="analysis_evidence">Доказательства</string>
+    <string name="analysis_common_causes">Частые причины: %1$s</string>
+    <string name="analysis_period">Период: %1$s – %2$s</string>
+    <string name="analysis_recordings">Записи (%1$d)</string>
+    <string name="analysis_and_more">…и ещё %1$d</string>
+    <string name="analysis_ask_ai">Спросить ИИ</string>
+    <string name="analysis_computed">Рассчитано %1$s</string>
+    <string name="analysis_ask_ai_prompt">Объясни находку анализа «%1$s» (%2$s): %3$s</string>
+    <string name="analysis_ask_ai_evidence">Доказательства: %1$s.</string>
+    <string name="analysis_ask_ai_question">Что это значит и что проверить?</string>
 </resources>

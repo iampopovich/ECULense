@@ -2,6 +2,7 @@ package io.github.iampopovich.eculense.core.aitools
 
 import ai.koog.serialization.typeToken
 import io.github.iampopovich.eculense.core.analytics.MaintenanceDue
+import io.github.iampopovich.eculense.core.analytics.MaintenanceEnglish
 import io.github.iampopovich.eculense.core.analytics.MaintenanceStatus
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -43,7 +44,7 @@ internal class MaintenanceDueTool(ctx: ToolContext) : VehicleTool<NoArgs>(
 
     private fun render(d: MaintenanceDue, zone: java.time.ZoneId) = buildJsonObject {
         val i = d.item
-        put("work", i.title)
+        put("work", MaintenanceEnglish.title(i))
         put("status", d.status.name.lowercase())
         i.intervalKm?.let { put("interval_km", it) }
         i.intervalMonths?.let { put("interval_months", it) }
@@ -53,7 +54,7 @@ internal class MaintenanceDueTool(ctx: ToolContext) : VehicleTool<NoArgs>(
         d.kmLeft?.let { put("km_left", Compact.num(it, 0)) }
         d.dueAtMs?.let { put("due_date", Dates.date(it, zone)) }
         d.daysLeft?.let { put("days_left", it) }
-        i.note?.takeIf { it.isNotBlank() }?.let { put("note", it.take(80)) }
+        MaintenanceEnglish.note(i)?.let { put("note", it.take(80)) }
     }
 
 }

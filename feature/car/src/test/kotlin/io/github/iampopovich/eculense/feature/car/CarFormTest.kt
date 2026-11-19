@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import io.github.iampopovich.eculense.core.ui.UiText
 
 class CarFormTest {
     private val year = 2026
@@ -14,6 +15,7 @@ class CarFormTest {
     @Test
     fun `name is required, everything else optional`() {
         assertEquals(setOf(CarField.NAME), CarForm().errors(year).keys)
+        assertEquals(UiText.Res(R.string.car_error_name), CarForm().errors(year)[CarField.NAME])
         assertTrue(CarForm(name = "Моя").errors(year).isEmpty())
     }
 

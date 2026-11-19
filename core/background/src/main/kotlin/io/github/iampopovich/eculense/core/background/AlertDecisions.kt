@@ -31,7 +31,7 @@ object FindingAlerts {
 
 /**
  * Daily maintenance check: one reminder per task state (overdue/due soon + when last done).
- * «Сделано» changes the key: the next "due" fires for the new deadline.
+ * «Done» changes the key: the next "due" fires for the new deadline.
  */
 object MaintenanceAlerts {
     fun key(carId: Long, d: MaintenanceDue) = "m:$carId:${d.item.id}:${d.status.name}:${d.item.lastDoneAtMs}:${d.item.lastDoneKm}"

@@ -18,7 +18,7 @@ data class TripStats(
     /** Distance of trips with known fuel. */
     val fuelDistanceKm: Double = distanceKm,
 ) {
-    /** null when there is no distance: division by zero must not turn into «бесконечный расход». */
+    /** null when there is no distance: division by zero must not turn into «infinite consumption». */
     val avgLPer100Km: Double? get() = if (fuelDistanceKm > 0.0) fuelL / fuelDistanceKm * 100.0 else null
 
     companion object {

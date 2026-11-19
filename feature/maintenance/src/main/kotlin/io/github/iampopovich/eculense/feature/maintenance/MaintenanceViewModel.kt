@@ -10,6 +10,7 @@ import io.github.iampopovich.eculense.core.data.MaintenanceRepository
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.MaintenanceItem
 import io.github.iampopovich.eculense.core.model.OdometerEntry
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,12 +25,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.ZoneId
 
-/** What can be undone via the snackbar: a new mileage entry, a «сделано» mark, deleting a job. */
+/** What can be undone via the snackbar: a new mileage entry, a «done» mark, deleting a job. */
 internal sealed interface Undo {
-    val text: String
-    data class Odometer(val entryId: Long, override val text: String) : Undo
-    data class Item(val previous: MaintenanceItem, override val text: String) : Undo
-    data class Deleted(val item: MaintenanceItem, override val text: String) : Undo
+    val text: UiText
+    data class Odometer(val entryId: Long, override val text: UiText) : Undo
+    data class Item(val previous: MaintenanceItem, override val text: UiText) : Undo
+    data class Deleted(val item: MaintenanceItem, override val text: UiText) : Undo
 }
 
 internal data class MaintenanceUiState(
@@ -42,7 +43,7 @@ internal data class MaintenanceUiState(
     val nowMs: Long = 0,
 )
 
-/** «Обслуживание» for the active car (3.9 item 2): job list with statuses, mileage input, «Сделано» with undo. */
+/** «Maintenance» for the active car (3.9 item 2): job list with statuses, mileage input, «Done» with undo. */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class MaintenanceViewModel(
     private val cars: CarRepository,
@@ -75,21 +76,21 @@ internal class MaintenanceViewModel(
 
     fun addOdometer(km: Long) = launchForCar { car ->
         val id = repo.addOdometer(car.id, km, clock())
-        undo.value = Undo.Odometer(id, "Пробег сохранён: ${MaintenanceFormat.km(km)}")
+        undo.value = Undo.Odometer(id, UiText.Res(R.string.maint_undo_odometer, listOf(MaintenanceFormat.km(km))))
     }
 
     fun deleteOdometer(entryId: Long) = viewModelScope.launch { repo.deleteOdometer(entryId) }
 
     fun markDone(itemId: Long, km: Long?, atMs: Long) = viewModelScope.launch {
         val previous = repo.markDone(itemId, km, atMs) ?: return@launch
-        undo.value = Undo.Item(previous, "Отмечено: ${previous.title}")
+        undo.value = Undo.Item(previous, UiText.Res(R.string.maint_undo_marked, listOf(MaintenanceFormat.title(previous))))
     }
 
     fun save(item: MaintenanceItem) = launchForCar { car -> repo.save(item.copy(carId = car.id)) }
 
     fun delete(item: MaintenanceItem) = viewModelScope.launch {
         repo.delete(item.id)
-        undo.value = Undo.Deleted(item, "Удалено: ${item.title}")
+        undo.value = Undo.Deleted(item, UiText.Res(R.string.maint_undo_deleted, listOf(MaintenanceFormat.title(item))))
     }
 
     fun undo() {

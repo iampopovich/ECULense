@@ -10,7 +10,9 @@ class UnitsSettingsTest {
     fun `metric settings leave values untouched`() {
         assertEquals(100.0 to "km/h", UnitsSettings().display(100.0, "km/h"))
         assertEquals(90.0 to "°C", UnitsSettings().display(90.0, "°C"))
-        assertEquals(8.0 to "л/100 км", UnitsSettings().consumption(8.0))
+        assertEquals(Measured(8.0, ConsumptionUnit.L_PER_100KM), UnitsSettings().consumption(8.0))
+        assertEquals(Measured(12.0, DistanceUnit.KM), UnitsSettings().distance(12.0))
+        assertEquals(Measured(3.0, VolumeUnit.L), UnitsSettings().volume(3.0))
     }
 
     @Test
@@ -21,8 +23,13 @@ class UnitsSettingsTest {
         assertEquals(194.0 to "°F", imperial.display(90.0, "°C"))
         assertEquals(14.504, imperial.display(100.0, "kPa").first, 1e-3)
         assertEquals(1500.0 to "rpm", imperial.display(1500.0, "rpm"))
-        assertEquals(29.4, imperial.consumption(8.0).first, 0.01)
-        assertEquals(10.0, imperial.volume(37.85411784).first, 1e-9)
-        assertEquals(35.31, imperial.copy(usGallon = false).consumption(8.0).first, 0.01)
+        assertEquals(29.4, imperial.consumption(8.0).value, 0.01)
+        assertEquals(ConsumptionUnit.MPG_US, imperial.consumption(8.0).unit)
+        assertEquals(DistanceUnit.MI, imperial.distance(10.0).unit)
+        assertEquals(VolumeUnit.GAL_US, imperial.volume(1.0).unit)
+        assertEquals(10.0, imperial.volume(37.85411784).value, 1e-9)
+        assertEquals(35.31, imperial.copy(usGallon = false).consumption(8.0).value, 0.01)
+        assertEquals(ConsumptionUnit.MPG_IMP, imperial.copy(usGallon = false).consumption(8.0).unit)
+        assertEquals(VolumeUnit.GAL_IMP, imperial.copy(usGallon = false).volume(1.0).unit)
     }
 }

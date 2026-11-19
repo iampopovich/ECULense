@@ -2,6 +2,10 @@ package io.github.iampopovich.eculense.core.data
 
 import io.github.iampopovich.eculense.core.analytics.Evidence
 import io.github.iampopovich.eculense.core.analytics.Finding
+import io.github.iampopovich.eculense.core.analytics.FindingArg
+import io.github.iampopovich.eculense.core.analytics.FindingEnglish
+import io.github.iampopovich.eculense.core.analytics.FindingKey
+import io.github.iampopovich.eculense.core.analytics.FindingText
 import io.github.iampopovich.eculense.core.analytics.Severity
 import io.github.iampopovich.eculense.core.database.AnalyticsDao
 import io.github.iampopovich.eculense.core.database.DtcDao
@@ -20,6 +24,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -93,7 +98,9 @@ class AnalyticsRepositoryTest {
         val stored = repo.findings(1)
         val overheat = stored.single { it.finding.ruleId == "coolant-overheat" }.finding
         assertEquals(listOf(1L), overheat.sessionIds)
-        assertTrue(overheat.evidence.contains(Evidence("Максимум ОЖ", "112,0 °C")))
+        assertTrue(overheat.evidence.contains(Evidence(FindingText(FindingKey.EVIDENCE_COOLANT_MAX), FindingText(FindingKey.VALUE_CELSIUS, FindingArg.Num(112.0)))))
+        // typed text survives the DB round trip; the text columns hold English for SQL readers
+        assertFalse(overheat.isLegacyText)
         assertEquals(Severity.WARNING, stored.single { it.finding.ruleId == "dtc-air-sensors" }.finding.severity)
         val done = repo.state.value as AnalysisState.Done
         assertEquals(2, done.sessions)
@@ -134,7 +141,7 @@ class AnalyticsRepositoryTest {
         val repo = repo(StandardTestDispatcher(testScheduler))
         val maf = repo.recompute(1).single { it.ruleId == "maf-idle" }
         assertEquals(Severity.NO_DATA, maf.severity)
-        assertTrue(maf.message.contains("Автомобиль"))
+        assertEquals(FindingKey.MAF_NO_VOLUME, maf.message.first().key)
     }
 
     @Test
@@ -153,9 +160,40 @@ class AnalyticsRepositoryTest {
 
     @Test
     fun `finding json round trip`() {
-        val f = Finding("r", Severity.WARNING, "t", "m", listOf(Evidence("a", "1,0 \"В\"")), listOf(5, 6), 1, 2)
-        val back = f.toEntity(1, 3).copy(id = 9).toModel()
+        val f = Finding(
+            "r", Severity.WARNING, FindingText(FindingKey.TITLE_DTC_MIXTURE, FindingArg.Raw("P0171")),
+            listOf(
+                FindingText(FindingKey.LTFT_OUT, FindingArg.Num(10.0, 0), FindingArg.Join(listOf(FindingText(FindingKey.BANK_PERCENT, FindingArg.Count(1), FindingArg.Num(12.5, signed = true))))),
+                FindingText(FindingKey.MIXTURE_LEAN, FindingArg.Text(null)),
+            ),
+            listOf(
+                Evidence(FindingText.raw("P0171"), FindingText(FindingKey.DTC_OCCURRENCES, FindingArg.Count(2), FindingArg.DateRange(1, 2))),
+                Evidence(FindingText(FindingKey.EVIDENCE_SOURCE), FindingText(FindingKey.VALUE_PLAIN, FindingArg.Sensor("elm.voltage"))),
+                Evidence(FindingText(FindingKey.EVIDENCE_FIRST_NONZERO), FindingText(FindingKey.KM_ON_DATE, FindingArg.Num(5.0, 0), FindingArg.Date(7))),
+            ),
+            listOf(5, 6), 1, 2,
+        )
+        val entity = f.toEntity(1, 3).copy(id = 9)
+        assertEquals("Mixture (P0171)", entity.title)
+        val back = entity.toModel()
         assertEquals(f, back.finding)
         assertEquals(9, back.id)
+    }
+
+    @Test
+    fun `rows stored before localization stay readable as raw text`() {
+        val old = FindingEntity(
+            id = 4, carId = 1, ruleId = "coolant-overheat", severity = "OK", title = "Перегрев двигателя", message = "Перегрева нет.",
+            evidenceJson = """{"evidence":[{"label":"Максимум ОЖ","value":"98,0 °C"}],"sessions":[3]}""", periodFromMs = null, periodToMs = null, createdAtMs = 5,
+        )
+        val f = old.toModel().finding
+        assertTrue(f.isLegacyText)
+        assertEquals("Перегрев двигателя", FindingEnglish.title(f))
+        assertEquals("Перегрева нет.", FindingEnglish.message(f))
+        assertEquals(mapOf("Максимум ОЖ" to "98,0 °C"), FindingEnglish.evidence(f))
+        assertEquals(listOf(3L), f.sessionIds)
+        // an unknown key (e.g. from a newer version) falls back to the stored text instead of failing
+        val unknown = old.copy(evidenceJson = """{"v":2,"title":{"k":"NO_SUCH_KEY"},"message":[],"sessions":[]}""").toModel().finding
+        assertTrue(unknown.isLegacyText)
     }
 }

@@ -6,4 +6,11 @@
     <string name="common_delete">Удалить</string>
     <string name="common_ok">ОК</string>
     <string name="common_back">Назад</string>
+    <string name="common_car_default_name">Мой автомобиль</string>
+    <string name="common_unit_km">км</string>
+    <string name="common_unit_mi">ми</string>
+    <string name="common_unit_l">л</string>
+    <string name="common_unit_gal_us">гал (US)</string>
+    <string name="common_unit_gal_imp">гал (Imp)</string>
+    <string name="common_unit_l_per_100km">л/100 км</string>
 </resources>

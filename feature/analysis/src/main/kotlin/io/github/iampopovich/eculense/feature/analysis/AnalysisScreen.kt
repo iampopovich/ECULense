@@ -22,10 +22,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.analytics.Severity
+import io.github.iampopovich.eculense.core.analyticstext.AnalyticsText
 import io.github.iampopovich.eculense.core.data.AnalysisState
 import io.github.iampopovich.eculense.core.data.SessionSummary
 import io.github.iampopovich.eculense.core.data.StoredFinding
@@ -33,6 +36,7 @@ import io.github.iampopovich.eculense.core.navigation.AiChatDestination
 import io.github.iampopovich.eculense.core.navigation.FindingDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import io.github.iampopovich.eculense.core.navigation.SessionDetailDestination
+import io.github.iampopovich.eculense.core.ui.CarNames
 import io.github.iampopovich.eculense.core.ui.EcuDates
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -59,31 +63,31 @@ internal fun AnalysisScreen(
     LazyColumn(modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Column(Modifier.padding(top = 16.dp)) {
-                Text("Анализ", style = MaterialTheme.typography.headlineSmall)
-                state.car?.let { Secondary(it.name) }
+                Text(stringResource(R.string.analysis_hub_title), style = MaterialTheme.typography.headlineSmall)
+                state.car?.let { Secondary(CarNames.display(it)) }
             }
         }
         item { StatusRow(state, onRecompute) }
         if (state.loading) return@LazyColumn
         if (state.findings.isEmpty() && !state.running) {
-            item { Secondary("Находок пока нет. Импортируйте записи из Car Scanner или запишите поездку с адаптером, затем нажмите «Пересчитать».") }
+            item { Secondary(stringResource(R.string.analysis_empty)) }
             return@LazyColumn
         }
         if (state.problems.isNotEmpty()) {
-            item { SectionTitle("Требует внимания") }
+            item { SectionTitle(stringResource(R.string.analysis_section_attention)) }
             items(state.problems, key = { it.id }) { FindingCard(it, onOpen) }
         } else if (state.findings.isNotEmpty()) {
-            item { Secondary("Проблем не найдено.") }
+            item { Secondary(stringResource(R.string.analysis_no_problems)) }
         }
         if (state.noData.isNotEmpty()) {
-            item { SectionTitle("Нет данных") }
+            item { SectionTitle(stringResource(R.string.analysis_section_no_data)) }
             items(state.noData, key = { it.id }) { FindingCard(it, onOpen) }
         }
         if (state.ok.isNotEmpty()) {
-            item { SectionTitle("В норме") }
+            item { SectionTitle(stringResource(R.string.analysis_section_ok)) }
             items(state.ok, key = { it.id }) { FindingCard(it, onOpen) }
         }
-        item { Secondary("Числа считает приложение по записям; это подсказка, а не диагноз.", Modifier.padding(bottom = 16.dp)) }
+        item { Secondary(stringResource(R.string.analysis_disclaimer), Modifier.padding(bottom = 16.dp)) }
     }
 }
 
@@ -92,32 +96,33 @@ private fun StatusRow(state: AnalysisUiState, onRecompute: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         when (val a = state.analysis) {
             is AnalysisState.Running -> {
-                Secondary("Анализ записей: ${a.done} из ${a.total}")
+                Secondary(stringResource(R.string.analysis_progress, a.done, a.total))
                 LinearProgressIndicator(
                     progress = { if (a.total == 0) 0f else a.done.toFloat() / a.total },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            is AnalysisState.Done -> Secondary("Обновлено ${EcuDates.dateTime(a.atMs)} · записей: ${a.sessions} · ${seconds(a.durationMs)}")
-            is AnalysisState.Failed -> Text("Не удалось пересчитать: ${a.message}", color = MaterialTheme.colorScheme.error)
-            AnalysisState.Idle -> state.findings.maxOfOrNull { it.createdAtMs }?.let { Secondary("Обновлено ${EcuDates.dateTime(it)}") }
+            is AnalysisState.Done -> Secondary(stringResource(R.string.analysis_done, EcuDates.dateTime(a.atMs), a.sessions, stringResource(R.string.analysis_seconds, seconds(a.durationMs))))
+            is AnalysisState.Failed -> Text(stringResource(R.string.analysis_failed, a.message), color = MaterialTheme.colorScheme.error)
+            AnalysisState.Idle -> state.findings.maxOfOrNull { it.createdAtMs }?.let { Secondary(stringResource(R.string.analysis_updated, EcuDates.dateTime(it))) }
         }
-        OutlinedButton(onClick = onRecompute, enabled = !state.running) { Text("Пересчитать") }
+        OutlinedButton(onClick = onRecompute, enabled = !state.running) { Text(stringResource(R.string.analysis_recompute)) }
     }
 }
 
-private fun seconds(ms: Long) = String.format(Locale.getDefault(), "%.1f с", ms / 1000.0)
+private fun seconds(ms: Long) = String.format(Locale.getDefault(), "%.1f", ms / 1000.0)
 
 @Composable
 private fun FindingCard(f: StoredFinding, onOpen: (StoredFinding) -> Unit) {
     val (container, content) = f.finding.severity.colors()
+    val context = LocalContext.current
     Card(onClick = { onOpen(f) }, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = container)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SeverityBadge(f.finding.severity)
-                Text(f.finding.title, style = MaterialTheme.typography.titleMedium, color = content)
+                Text(AnalyticsText.title(context, f.finding), style = MaterialTheme.typography.titleMedium, color = content)
             }
-            Text(f.finding.message, style = MaterialTheme.typography.bodyMedium, color = content, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Text(AnalyticsText.message(context, f.finding), style = MaterialTheme.typography.bodyMedium, color = content, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -137,7 +142,7 @@ internal fun SeverityBadge(severity: Severity) {
         Severity.NO_DATA, Severity.OK -> MaterialTheme.colorScheme.surface
     }
     Surface(color = color, shape = MaterialTheme.shapes.small) {
-        Text(severity.label, style = MaterialTheme.typography.labelMedium, color = onColor, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+        Text(AnalyticsText.severity(LocalContext.current, severity), style = MaterialTheme.typography.labelMedium, color = onColor, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
     }
 }
 
@@ -153,14 +158,15 @@ private fun Severity.colors(): Pair<Color, Color> = when (this) {
 internal fun FindingRoute(findingId: Long, viewModel: FindingViewModel = koinViewModel { parametersOf(findingId) }) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val navigator = LocalNavigator.current
+    val context = LocalContext.current
     FindingScreen(
         state,
-        onAskAi = { navigator.navigate(AiChatDestination(askAiPrompt(it))) },
+        onAskAi = { navigator.navigate(AiChatDestination(askAiPrompt(context, it))) },
         onOpenSession = { navigator.navigate(SessionDetailDestination(it)) },
     )
 }
 
-/** Finding details: text, evidence (numbers and recordings), «Спросить ИИ» if the chat module is present. */
+/** Finding details: text, evidence (numbers and recordings), «Ask AI» if the chat module is present. */
 @Composable
 internal fun FindingScreen(
     state: FindingUiState,
@@ -168,49 +174,50 @@ internal fun FindingScreen(
     onOpenSession: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     LazyColumn(modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         val f = state.finding
         if (f == null) {
-            item { Secondary(if (state.loading) "Загрузка…" else "Находка не найдена — возможно, анализ пересчитан. Вернитесь к списку.", Modifier.padding(top = 16.dp)) }
+            item { Secondary(stringResource(if (state.loading) R.string.analysis_loading else R.string.analysis_finding_missing), Modifier.padding(top = 16.dp)) }
             return@LazyColumn
         }
         val x = f.finding
         item {
             Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SeverityBadge(x.severity)
-                Text(x.title, style = MaterialTheme.typography.headlineSmall)
-                Text(x.message, style = MaterialTheme.typography.bodyLarge)
+                Text(AnalyticsText.title(context, x), style = MaterialTheme.typography.headlineSmall)
+                Text(AnalyticsText.message(context, x), style = MaterialTheme.typography.bodyLarge)
             }
         }
         if (x.evidence.isNotEmpty()) {
-            item { SectionTitle("Доказательства") }
+            item { SectionTitle(stringResource(R.string.analysis_evidence)) }
             items(x.evidence) { e ->
                 Column {
-                    Text(e.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(e.value, style = MaterialTheme.typography.bodyLarge)
-                    state.dtc[e.label]?.let { note ->
+                    Text(AnalyticsText.label(context, e), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(AnalyticsText.value(context, e), style = MaterialTheme.typography.bodyLarge)
+                    e.rawLabel?.let { state.dtc[it] }?.let { note ->
                         Text(note.text, style = MaterialTheme.typography.bodyMedium)
                         if (note.causes.isNotEmpty()) {
-                            Text("Частые причины: " + note.causes.joinToString("; "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.analysis_common_causes, note.causes.joinToString("; ")), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
             }
         }
         if (x.fromMs != null && x.toMs != null) {
-            item { Secondary("Период: ${EcuDates.date(x.fromMs!!)} – ${EcuDates.date(x.toMs!!)}") }
+            item { Secondary(stringResource(R.string.analysis_period, EcuDates.date(x.fromMs!!), EcuDates.date(x.toMs!!))) }
         }
         if (state.sessions.isNotEmpty()) {
-            item { SectionTitle("Записи (${state.sessions.size})") }
+            item { SectionTitle(stringResource(R.string.analysis_recordings, state.sessions.size)) }
             items(state.sessions.take(MAX_SESSIONS), key = { it.id }) { s -> SessionLink(s, onOpenSession) }
-            if (state.sessions.size > MAX_SESSIONS) item { Secondary("…и ещё ${state.sessions.size - MAX_SESSIONS}") }
+            if (state.sessions.size > MAX_SESSIONS) item { Secondary(stringResource(R.string.analysis_and_more, state.sessions.size - MAX_SESSIONS)) }
         }
         if (state.canAskAi && x.severity != Severity.OK) {
             item {
-                Button(onClick = { onAskAi(f) }, modifier = Modifier.padding(vertical = 8.dp)) { Text("Спросить ИИ") }
+                Button(onClick = { onAskAi(f) }, modifier = Modifier.padding(vertical = 8.dp)) { Text(stringResource(R.string.analysis_ask_ai)) }
             }
         }
-        item { Secondary("Рассчитано ${EcuDates.dateTime(f.createdAtMs)}", Modifier.padding(bottom = 16.dp)) }
+        item { Secondary(stringResource(R.string.analysis_computed, EcuDates.dateTime(f.createdAtMs)), Modifier.padding(bottom = 16.dp)) }
     }
 }
 

@@ -6,6 +6,7 @@ import io.github.iampopovich.eculense.core.analytics.Agg
 import io.github.iampopovich.eculense.core.analytics.DtcEvent
 import io.github.iampopovich.eculense.core.analytics.Evidence
 import io.github.iampopovich.eculense.core.analytics.Finding
+import io.github.iampopovich.eculense.core.analytics.FindingText
 import io.github.iampopovich.eculense.core.analytics.Histogram
 import io.github.iampopovich.eculense.core.analytics.SessionDigest
 import io.github.iampopovich.eculense.core.analytics.Severity
@@ -72,8 +73,8 @@ private class Analytics : AnalyticsRepository {
         recomputes++
         stored = (1..15).map { i ->
             val sev = when { i <= 2 -> Severity.CRITICAL; i <= 8 -> Severity.WARNING; i <= 10 -> Severity.NO_DATA; else -> Severity.OK }
-            StoredFinding(i.toLong(), carId, Finding("rule-$i", sev, "Находка номер $i с длинным заголовком", "Сообщение ".repeat(20),
-                (1..5).map { Evidence("Доказательство $it", "+12,5 % (запись 8 мая 2026, замеров: 4)") }, listOf(1)), NOW)
+            StoredFinding(i.toLong(), carId, Finding("rule-$i", sev, FindingText.raw("Находка номер $i с длинным заголовком"), FindingText.raw("Сообщение ".repeat(20)),
+                (1..5).map { Evidence(FindingText.raw("Доказательство $it"), FindingText.raw("+12,5 % (запись 8 мая 2026, замеров: 4)")) }, listOf(1)), NOW)
         }
         return stored.map { it.finding }
     }
@@ -85,7 +86,7 @@ private class Analytics : AnalyticsRepository {
         SessionSummary(sessionId, NOW - DAY, NOW - DAY + 3_600_000, SessionSource.IMPORT_CARSCANNER, 100_000),
         // the repository already strips coordinates; here we check that the tools themselves don't add anything like that
         (1..24).map { SensorSummary("01.%02X".format(it), "u", 10_000, 1, 1.23456, 99.98765, 50.5555, 50.0, 95.0) },
-        listOf(Finding("coolant-overheat", Severity.WARNING, "Перегрев", "m", listOf(Evidence("Максимум ОЖ", "106,0 °C")))),
+        listOf(Finding("coolant-overheat", Severity.WARNING, FindingText.raw("Перегрев"), FindingText.raw("m"), listOf(Evidence(FindingText.raw("Максимум ОЖ"), FindingText.raw("106,0 °C"))))),
     )
     override suspend fun sensorSummary(carId: Long, sensorId: String, fromMs: Long, toMs: Long, warmOnly: Boolean): SensorSummary? {
         requests += "sensor $sensorId $fromMs $warmOnly"

@@ -1,5 +1,7 @@
 package io.github.iampopovich.eculense.feature.car
 
+import androidx.annotation.StringRes
+import io.github.iampopovich.eculense.core.ui.UiText
 import io.github.iampopovich.eculense.core.vehicledb.VehicleEngine
 import io.github.iampopovich.eculense.core.vehicledb.VehicleGeneration
 import io.github.iampopovich.eculense.core.vehicledb.VehicleMake
@@ -27,13 +29,14 @@ internal class RepositoryVehicleCatalog(private val repo: VehicleRepository) : V
     override suspend fun engine(id: Long) = repo.query { it.engine(id) }
 }
 
-internal enum class PickerStep(val title: String) {
-    MAKE("Марка"), MODEL("Модель"), GENERATION("Поколение"), ENGINE("Модификация"),
+internal enum class PickerStep(@param:StringRes val title: Int) {
+    MAKE(R.string.car_picker_step_make), MODEL(R.string.car_picker_step_model),
+    GENERATION(R.string.car_picker_step_generation), ENGINE(R.string.car_picker_step_engine),
 }
 
-internal data class PickerOption(val id: Long, val title: String, val subtitle: String? = null)
+internal data class PickerOption(val id: Long, val title: String, val subtitle: UiText? = null)
 
-/** Step-by-step «марка → модель → поколение → модификация» picker with search; the last step shows a specs card. */
+/** Step-by-step «make → model → generation → trim» picker with search; the last step shows a specs card. */
 internal data class PickerState(
     val step: PickerStep = PickerStep.MAKE,
     val query: String = "",
@@ -43,14 +46,14 @@ internal data class PickerState(
     val options: List<PickerOption> = emptyList(),
     val engine: VehicleEngine? = null,
     val loading: Boolean = false,
-    val error: String? = null,
+    val error: UiText? = null,
 ) {
     /** «Kia › Sorento › 2002–2006». */
     val path: String get() = listOfNotNull(make?.name, model?.name, generation?.let { "${it.name} (${it.years})" }).joinToString(" › ")
 }
 
 /**
- * Filling the form from the reference database: engine specs are overwritten (the user tapped «Заполнить» themselves), while name, make
+ * Filling the form from the reference database: engine specs are overwritten (the user tapped «Fill in» themselves), while name, make
  * and year, if already present, are kept since this is the user's profile. All fields can be edited afterwards.
  */
 internal fun CarForm.fillFrom(make: VehicleMake, model: VehicleModel, generation: VehicleGeneration, engine: VehicleEngine): CarForm = copy(

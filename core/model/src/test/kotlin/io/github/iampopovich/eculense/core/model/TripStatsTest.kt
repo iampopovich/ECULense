@@ -66,6 +66,10 @@ class TripStatsTest {
         assertTrue(CarProfile(name = CarProfile.DEFAULT_NAME).isUntouchedDefault)
         assertFalse(CarProfile(name = CarProfile.DEFAULT_NAME, year = 2005).isUntouchedDefault)
         assertFalse(CarProfile(name = "Моя").isUntouchedDefault)
+        // Rows written by pre-localization versions keep the Russian default name: still the default car.
+        assertTrue(CarProfile(name = LegacyValues.DEFAULT_CAR_NAME_RU).isUntouchedDefault)
+        assertTrue(CarProfile(name = "  ").hasDefaultName)
+        assertFalse(CarProfile(name = "Test").hasDefaultName)
         assertNull(CarProfile(name = "x", vin = "TESTVIN0000000000").withoutVin().vin)
     }
 }

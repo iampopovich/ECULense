@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bg_channel_analysis">Analysis</string>
+    <string name="bg_channel_analysis_description">New findings after a trip or import (warnings and critical)</string>
+    <string name="bg_channel_maintenance">Maintenance</string>
+    <string name="bg_channel_maintenance_description">Scheduled maintenance reminders</string>
+    <string name="bg_findings_one">Analysis: %1$s</string>
+    <string name="bg_findings_many">Analysis: %1$d new findings</string>
+    <string name="bg_maintenance_one">Service due: %1$s</string>
+    <string name="bg_maintenance_many">Service due: %1$d items</string>
+    <string name="bg_overdue_by_km">overdue by %1$d km</string>
+    <string name="bg_km_left">%1$d km left</string>
+    <plurals name="bg_due_days_ago">
+        <item quantity="one">due %1$d day ago</item>
+        <item quantity="other">due %1$d days ago</item>
+    </plurals>
+    <plurals name="bg_in_days">
+        <item quantity="one">in %1$d day</item>
+        <item quantity="other">in %1$d days</item>
+    </plurals>
+    <string name="bg_overdue">overdue</string>
+    <string name="bg_soon">due soon</string>
+</resources>

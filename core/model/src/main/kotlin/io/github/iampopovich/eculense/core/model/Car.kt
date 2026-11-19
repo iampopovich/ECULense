@@ -41,12 +41,19 @@ data class CarProfile(
      * Car Scanner import fills it in instead of creating a second car.
      */
     val isUntouchedDefault: Boolean
-        get() = externalId == null && name == DEFAULT_NAME && brand == null && model == null && year == null && vin == null
+        get() = externalId == null && hasDefaultName && brand == null && model == null && year == null && vin == null
+
+    /** The name was never set by the user: the UI shows the localized «car_default_name» instead. */
+    val hasDefaultName: Boolean get() = isDefaultName(name)
 
     fun withoutVin(): CarProfile = copy(vin = null)
 
     companion object {
-        const val DEFAULT_NAME = "Мой автомобиль"
+        /** New default cars get a blank name; the UI substitutes a localized one. */
+        const val DEFAULT_NAME = ""
+
+        /** Blank, or the Russian literal that pre-localization versions stored in the DB. */
+        fun isDefaultName(name: String): Boolean = name.isBlank() || name.trim() == LegacyValues.DEFAULT_CAR_NAME_RU
     }
 }
 
@@ -102,9 +109,19 @@ data class OdometerEntry(
     val source: OdometerSource = OdometerSource.MANUAL,
 )
 
+/** Standard maintenance works of the template; names are string resources, English names for the AI are in :core:analytics. */
+enum class MaintenanceKind {
+    OIL_AND_FILTER, AIR_FILTER, SPARK_PLUGS, FUEL_FILTER, COOLANT, BRAKE_FLUID, TIMING_BELT, CVT_OIL, AUTOMATIC_TRANSMISSION_OIL,
+}
+
+/** Standard notes of the template. */
+enum class MaintenanceNote { OIL_SEVERE_CONDITIONS, SPARK_PLUGS_TYPE, TIMING_INTERVAL }
+
 /**
  * Maintenance item. Intervals by mileage and/or time (null: not set). lastDone*: when it was last done
- * (null: unknown, status «отметьте, когда делали»).
+ * (null: unknown, status «mark when it was done»).
+ * Template items have a [kind] and a blank [title]: the UI shows the localized name. A non-blank title is the user's own
+ * name and wins. Likewise [note] (user text) wins over [noteKind] (localized template note).
  */
 data class MaintenanceItem(
     val id: Long = 0,
@@ -115,4 +132,6 @@ data class MaintenanceItem(
     val lastDoneKm: Long? = null,
     val lastDoneAtMs: Long? = null,
     val note: String? = null,
+    val kind: MaintenanceKind? = null,
+    val noteKind: MaintenanceNote? = null,
 )

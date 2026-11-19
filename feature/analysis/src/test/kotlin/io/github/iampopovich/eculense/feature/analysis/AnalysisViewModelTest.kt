@@ -3,6 +3,9 @@ package io.github.iampopovich.eculense.feature.analysis
 import io.github.iampopovich.eculense.core.analytics.DtcEvent
 import io.github.iampopovich.eculense.core.analytics.Evidence
 import io.github.iampopovich.eculense.core.analytics.Finding
+import io.github.iampopovich.eculense.core.analytics.FindingArg
+import io.github.iampopovich.eculense.core.analytics.FindingKey
+import io.github.iampopovich.eculense.core.analytics.FindingText
 import io.github.iampopovich.eculense.core.analytics.Severity
 import io.github.iampopovich.eculense.core.data.AnalysisState
 import io.github.iampopovich.eculense.core.data.AnalyticsRepository
@@ -35,7 +38,7 @@ import org.junit.Before
 import org.junit.Test
 
 private class OneCar : CarRepository {
-    val car = CarProfile(id = 1, name = "Тестовая")
+    val car = CarProfile(id = 1, name = "Test car")
     override fun observeCars(): Flow<List<CarProfile>> = flowOf(listOf(car))
     override fun observeActiveCar(): Flow<CarProfile?> = flowOf(car)
     override suspend fun activeCarId(): Long = 1
@@ -55,7 +58,10 @@ private class FakeAnalytics(initial: List<StoredFinding> = emptyList()) : Analyt
     override suspend fun finding(id: Long) = stored.value.firstOrNull { it.id == id }
     override suspend fun recompute(carId: Long): List<Finding> {
         recomputes++
-        val f = Finding("coolant-overheat", Severity.WARNING, "Перегрев двигателя", "ОЖ ≥ 105 °C", listOf(Evidence("Максимум ОЖ", "106,0 °C")), listOf(7))
+        val f = Finding(
+            "coolant-overheat", Severity.WARNING, FindingText(FindingKey.TITLE_COOLANT_OVERHEAT), FindingText(FindingKey.COOLANT_OK, FindingArg.Num(105.0, 0)),
+            listOf(Evidence(FindingText(FindingKey.EVIDENCE_COOLANT_MAX), FindingText(FindingKey.VALUE_CELSIUS, FindingArg.Num(106.0)))), listOf(7),
+        )
         stored.value = listOf(StoredFinding(1, carId, f, 10))
         state.value = AnalysisState.Done(10, 1234, 74)
         return listOf(f)
@@ -79,14 +85,14 @@ class AnalysisViewModelTest {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
         assertEquals(1, analytics.recomputes)
         val s = vm.uiState.value
-        assertEquals("Тестовая", s.car?.name)
+        assertEquals("Test car", s.car?.name)
         assertEquals(listOf("coolant-overheat"), s.problems.map { it.finding.ruleId })
         assertTrue(s.analysis is AnalysisState.Done)
     }
 
     @Test
     fun `existing findings are shown without recompute, button recomputes`() = runTest {
-        val f = StoredFinding(5, 1, Finding("voltage-low", Severity.OK, "Недозаряд АКБ", "ok"), 1)
+        val f = StoredFinding(5, 1, Finding("voltage-low", Severity.OK, FindingText(FindingKey.TITLE_VOLTAGE_LOW), FindingText(FindingKey.VOLTAGE_LOW_OK, FindingArg.Num(13.2))), 1)
         val analytics = FakeAnalytics(listOf(f))
         val vm = AnalysisViewModel(analytics, OneCar())
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
@@ -107,20 +113,29 @@ class AnalysisViewModelTest {
 
     @Test
     fun `dtc evidence of a finding gets descriptions, other labels are not looked up`() = runTest {
-        val f = Finding("dtc-other", Severity.INFO, "Прочие коды", "P1847×1", listOf(Evidence("P1847", "1 раз"), Evidence("Период", "1 день")))
+        val f = Finding(
+            "dtc-other", Severity.INFO, FindingText(FindingKey.TITLE_DTC_OTHER), FindingText(FindingKey.DTC_OTHER, FindingArg.Raw("P1847×1")),
+            listOf(
+                Evidence(FindingText.raw("P1847"), FindingText(FindingKey.DTC_OCCURRENCES, FindingArg.Count(1), FindingArg.DateRange(1, 1))),
+                Evidence(FindingText(FindingKey.EVIDENCE_MEDIAN), FindingText.raw("P0000")),
+            ),
+        )
         val analytics = FakeAnalytics(listOf(StoredFinding(3, 1, f, 10)))
         val asked = mutableListOf<Collection<String>>()
-        val vm = FindingViewModel(3, analytics, emptyList()) { codes -> asked += codes; codes.associateWith { DtcNote("Заводской код производителя, расшифровка неизвестна") } }
+        val vm = FindingViewModel(3, analytics, emptyList()) { codes -> asked += codes; codes.associateWith { DtcNote("OEM code") } }
         assertEquals(listOf(listOf("P1847")), asked.map { it.toList() })
-        assertEquals("Заводской код производителя, расшифровка неизвестна", vm.uiState.value.dtc["P1847"]?.text)
-        assertEquals(null, vm.uiState.value.dtc["Период"])
+        assertEquals("OEM code", vm.uiState.value.dtc["P1847"]?.text)
+        // only raw DTC labels are looked up: a typed label whose value happens to look like a code is not
+        assertEquals(1, vm.uiState.value.dtc.size)
     }
 
     @Test
-    fun `ask ai prompt carries the computed numbers`() {
-        val f = StoredFinding(1, 1, Finding("fuel-trim-long", Severity.WARNING, "Долгосрочная коррекция топлива", "Банк 1 +12,5 %.", listOf(Evidence("LTFT банк 1", "+12,5 %"))), 1)
-        val text = askAiPrompt(f)
-        assertTrue(text, text.startsWith("Объясни находку анализа «Долгосрочная коррекция топлива» (Внимание)"))
-        assertTrue(text, text.contains("LTFT банк 1 — +12,5 %"))
+    fun `findings stored before localization are recomputed once into typed text`() = runTest {
+        val legacy = StoredFinding(5, 1, Finding("voltage-low", Severity.OK, FindingText.raw("old title"), FindingText.raw("old text")), 1)
+        val analytics = FakeAnalytics(listOf(legacy))
+        val vm = AnalysisViewModel(analytics, OneCar())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
+        assertEquals(1, analytics.recomputes)
+        assertFalse(vm.uiState.value.findings.any { it.finding.isLegacyText })
     }
 }

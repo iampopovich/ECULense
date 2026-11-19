@@ -1,10 +1,12 @@
 package io.github.iampopovich.eculense.core.background
 
 import io.github.iampopovich.eculense.core.analytics.Finding
+import io.github.iampopovich.eculense.core.analytics.FindingText
 import io.github.iampopovich.eculense.core.analytics.MaintenanceDue
 import io.github.iampopovich.eculense.core.analytics.MaintenanceStatus
 import io.github.iampopovich.eculense.core.analytics.Severity
 import io.github.iampopovich.eculense.core.model.MaintenanceItem
+import io.github.iampopovich.eculense.core.model.MaintenanceKind
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -29,12 +31,12 @@ class BackgroundJobsTest {
 
     @Test
     fun `post trip analysis builds trips, recomputes and announces only new problems`() = runTest {
-        var stored = listOf(Finding("ltft", Severity.WARNING, "Коррекции", "m"))
-        var next = stored + Finding("volt", Severity.CRITICAL, "Напряжение", "m")
+        var stored = listOf(Finding("ltft", Severity.WARNING, FindingText.raw("Trims"), FindingText.raw("m")))
+        var next = stored + Finding("volt", Severity.CRITICAL, FindingText.raw("Voltage"), FindingText.raw("m"))
         var backfills = 0
         val job = PostTripAnalysis(
             backfill = { backfills++; 1 },
-            cars = { listOf(1L to "Тестовая") },
+            cars = { listOf(1L to "Test car") },
             findings = { stored },
             recompute = { stored = next; next },
             ledger = ledger, notifier = notifier,
@@ -44,7 +46,7 @@ class BackgroundJobsTest {
         assertEquals(1, backfills)
         assertEquals(1, r.tripsAdded)
         assertEquals(listOf("volt"), notifier.findings.single().second.map { it.ruleId })
-        assertEquals("Тестовая", notifier.findings.single().first)
+        assertEquals("Test car", notifier.findings.single().first)
 
         // second run with the same findings: silence
         job.run()
@@ -53,17 +55,17 @@ class BackgroundJobsTest {
 
     @Test
     fun `nothing new means no notification at all`() = runTest {
-        val same = listOf(Finding("ltft", Severity.WARNING, "Коррекции", "m"))
-        PostTripAnalysis({ 0 }, { listOf(1L to "Тестовая") }, { same }, { same }, ledger, notifier).run()
+        val same = listOf(Finding("ltft", Severity.WARNING, FindingText.raw("Trims"), FindingText.raw("m")))
+        PostTripAnalysis({ 0 }, { listOf(1L to "Test car") }, { same }, { same }, ledger, notifier).run()
         assertTrue(notifier.findings.isEmpty())
     }
 
     @Test
     fun `daily maintenance check reminds once`() = runTest {
-        val due = listOf(MaintenanceDue(MaintenanceItem(id = 3, carId = 1, title = "Масло", lastDoneAtMs = 1), MaintenanceStatus.OVERDUE))
-        val job = MaintenanceCheck(cars = { listOf(1L to "Тестовая") }, due = { due }, ledger = ledger, notifier = notifier)
+        val due = listOf(MaintenanceDue(MaintenanceItem(id = 3, carId = 1, title = "", kind = MaintenanceKind.OIL_AND_FILTER, lastDoneAtMs = 1), MaintenanceStatus.OVERDUE))
+        val job = MaintenanceCheck(cars = { listOf(1L to "Test car") }, due = { due }, ledger = ledger, notifier = notifier)
         assertEquals(1, job.run())
         assertEquals(0, job.run())
-        assertEquals(listOf("Масло"), notifier.maintenance.single().second.map { it.item.title })
+        assertEquals(listOf(MaintenanceKind.OIL_AND_FILTER), notifier.maintenance.single().second.map { it.item.kind })
     }
 }

@@ -33,13 +33,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.analytics.MaintenanceDue
 import io.github.iampopovich.eculense.core.analytics.MaintenanceStatus
+import io.github.iampopovich.eculense.core.analyticstext.AnalyticsText
 import io.github.iampopovich.eculense.core.model.MaintenanceItem
+import io.github.iampopovich.eculense.core.ui.CarNames
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
 import org.koin.compose.viewmodel.koinViewModel
 import java.time.ZoneId
 import kotlin.math.roundToLong
@@ -80,34 +85,36 @@ private sealed interface Dialog {
 
 /**
  * Mileage and the list of maintenance tasks. Mileage cannot be read over OBD-II — entered manually, then estimated from trips («≈»).
- * Status is labeled with a word, not just a color; the «Сделано» action can be undone from the snackbar (guards against accidental taps).
+ * Status is labeled with a word, not just a color; the «Done» action can be undone from the snackbar (guards against accidental taps).
  */
 @Composable
 internal fun MaintenanceScreen(state: MaintenanceUiState, zone: ZoneId, actions: MaintenanceActions, modifier: Modifier = Modifier) {
     var dialog by remember { mutableStateOf<Dialog?>(null) }
     val snackbar = remember { SnackbarHostState() }
+    val undoText = state.undo?.text?.asString()
+    val undoLabel = stringResource(R.string.maint_undo)
     LaunchedEffect(state.undo) {
-        val u = state.undo ?: return@LaunchedEffect
-        val r = snackbar.showSnackbar(u.text, actionLabel = "Отменить", duration = SnackbarDuration.Long)
+        if (state.undo == null || undoText == null) return@LaunchedEffect
+        val r = snackbar.showSnackbar(undoText, actionLabel = undoLabel, duration = SnackbarDuration.Long)
         if (r == SnackbarResult.ActionPerformed) actions.undo() else actions.dismissUndo()
     }
     Box(modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 Column(Modifier.padding(top = 16.dp)) {
-                    Text("Обслуживание", style = MaterialTheme.typography.headlineSmall)
-                    state.car?.let { Secondary(it.name) }
+                    Text(stringResource(R.string.maint_hub_title), style = MaterialTheme.typography.headlineSmall)
+                    state.car?.let { Secondary(CarNames.display(it)) }
                 }
             }
             if (state.loading) return@LazyColumn
             item { OdometerCard(state, zone) { dialog = Dialog.Odometer } }
-            item { Text("Работы", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp)) }
-            if (state.items.isEmpty()) item { Secondary("Список работ пуст. Добавьте работу — название и интервал.") }
+            item { Text(stringResource(R.string.maint_items), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp)) }
+            if (state.items.isEmpty()) item { Secondary(stringResource(R.string.maint_empty)) }
             items(state.items, key = { it.item.id }) { d ->
                 ItemCard(d, zone, onDone = { dialog = Dialog.Done(d) }, onEdit = { dialog = Dialog.Edit(d.item) })
             }
             item {
-                OutlinedButton(onClick = { dialog = Dialog.Edit(null) }, modifier = Modifier.fillMaxWidth()) { Text("Добавить работу") }
+                OutlinedButton(onClick = { dialog = Dialog.Edit(null) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.maint_add)) }
             }
             item { Text(" ", Modifier.padding(bottom = 72.dp)) }
         }
@@ -126,16 +133,16 @@ private fun OdometerCard(state: MaintenanceUiState, zone: ZoneId, onEnter: () ->
     val e = state.estimate
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Пробег", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.maint_odometer), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (e == null) {
-                Text("Не указан", style = MaterialTheme.typography.titleLarge)
-                Secondary("OBD-II не передаёт показания одометра. Введите пробег с приборной панели — дальше он будет расти по записанным поездкам.")
+                Text(stringResource(R.string.maint_odometer_not_set), style = MaterialTheme.typography.titleLarge)
+                Secondary(stringResource(R.string.maint_odometer_hint))
             } else {
-                Text((if (e.estimated) "≈ " else "") + MaintenanceFormat.km(e.km), style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("odometer"))
-                val base = "Введено ${MaintenanceFormat.km(e.baseKm)} · ${MaintenanceFormat.date(e.baseAtMs, zone)}"
-                Secondary(if (e.estimated) "$base, плюс ${MaintenanceFormat.addedKm(e.addedKm)} по записанным поездкам (оценка)" else base)
+                Text((if (e.estimated) "≈ " else "") + MaintenanceFormat.km(e.km).asString(), style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("odometer"))
+                val base = stringResource(R.string.maint_odometer_entered, MaintenanceFormat.km(e.baseKm).asString(), MaintenanceFormat.date(e.baseAtMs, zone))
+                Secondary(if (e.estimated) stringResource(R.string.maint_odometer_entered_plus, base, MaintenanceFormat.addedKm(e.addedKm).asString()) else base)
             }
-            FilledTonalButton(onClick = onEnter) { Text(if (e == null) "Ввести пробег" else "Обновить пробег") }
+            FilledTonalButton(onClick = onEnter) { Text(stringResource(if (e == null) R.string.maint_odometer_enter else R.string.maint_odometer_update)) }
         }
     }
 }
@@ -145,16 +152,16 @@ private fun ItemCard(d: MaintenanceDue, zone: ZoneId, onDone: () -> Unit, onEdit
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(d.item.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text(MaintenanceFormat.title(d.item).asString(), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 StatusChip(d.status)
             }
-            Secondary(MaintenanceFormat.interval(d.item))
-            MaintenanceFormat.lastDone(d.item, zone)?.let { Secondary(it) }
-            Text(MaintenanceFormat.remaining(d), style = MaterialTheme.typography.bodyMedium)
-            d.item.note?.takeIf { it.isNotBlank() }?.let { Secondary(it) }
+            Secondary(MaintenanceFormat.interval(d.item).asString())
+            MaintenanceFormat.lastDone(d.item, zone)?.let { Secondary(it.asString()) }
+            Text(MaintenanceFormat.remaining(d).map { it.asString() }.joinToString(MaintenanceFormat.SEPARATOR), style = MaterialTheme.typography.bodyMedium)
+            MaintenanceFormat.note(d.item)?.let { Secondary(it.asString()) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = onDone) { Text("Сделано") }
-                TextButton(onClick = onEdit) { Text("Изменить") }
+                FilledTonalButton(onClick = onDone) { Text(stringResource(R.string.maint_done)) }
+                TextButton(onClick = onEdit) { Text(stringResource(CoreUiR.string.common_edit)) }
             }
         }
     }
@@ -170,7 +177,7 @@ private fun StatusChip(s: MaintenanceStatus) {
         MaintenanceStatus.UNKNOWN -> c.surfaceVariant to c.onSurfaceVariant
     }
     Surface(color = bg, contentColor = fg, shape = MaterialTheme.shapes.small) {
-        Text(MaintenanceFormat.status(s), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+        Text(stringResource(MaintenanceFormat.status(s)), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
     }
 }
 
@@ -182,30 +189,30 @@ private fun OdometerDialog(state: MaintenanceUiState, zone: ZoneId, onSave: (Lon
     val lower = last != null && km != null && km < last.km
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Пробег по одометру") },
+        title = { Text(stringResource(R.string.maint_odometer_dialog_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
-                    value = text, onValueChange = { text = it }, singleLine = true, label = { Text("Пробег, км") },
+                    value = text, onValueChange = { text = it }, singleLine = true, label = { Text(stringResource(R.string.maint_mileage_km)) },
                     isError = text.isNotBlank() && km == null,
                     supportingText = {
                         when {
-                            text.isNotBlank() && km == null -> Text("Целое число от 0 до 5 000 000")
-                            lower -> Text("Меньше прошлой записи (${MaintenanceFormat.km(last!!.km)}) — проверьте")
-                            else -> Text("Дата — сегодня")
+                            text.isNotBlank() && km == null -> Text(stringResource(R.string.maint_odometer_invalid))
+                            lower -> Text(stringResource(R.string.maint_odometer_lower, MaintenanceFormat.km(last!!.km).asString()))
+                            else -> Text(stringResource(R.string.maint_date_today))
                         }
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.testTag("odometer-input"),
                 )
                 if (last != null) {
-                    Secondary("Последняя запись: ${MaintenanceFormat.km(last.km)} · ${MaintenanceFormat.date(last.atMs, zone)}")
-                    TextButton(onClick = { onDelete(last.id) }) { Text("Удалить последнюю запись") }
+                    Secondary(stringResource(R.string.maint_odometer_last, MaintenanceFormat.km(last.km).asString(), MaintenanceFormat.date(last.atMs, zone)))
+                    TextButton(onClick = { onDelete(last.id) }) { Text(stringResource(R.string.maint_odometer_delete_last)) }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { km?.let(onSave) }, enabled = km != null) { Text("Сохранить") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+        confirmButton = { TextButton(onClick = { km?.let(onSave) }, enabled = km != null) { Text(stringResource(CoreUiR.string.common_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(CoreUiR.string.common_cancel)) } },
     )
 }
 
@@ -218,34 +225,47 @@ private fun DoneDialog(d: MaintenanceDue, state: MaintenanceUiState, zone: ZoneI
     val kmOk = kmText.isBlank() || km != null
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Сделано: ${d.item.title}") },
+        title = { Text(stringResource(R.string.maint_done_title, MaintenanceFormat.title(d.item).asString())) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
-                    value = kmText, onValueChange = { kmText = it }, singleLine = true, label = { Text("Пробег, км") },
+                    value = kmText, onValueChange = { kmText = it }, singleLine = true, label = { Text(stringResource(R.string.maint_mileage_km)) },
                     isError = !kmOk,
-                    supportingText = { Text(if (!kmOk) "Целое число или пусто" else if (state.estimate?.estimated == true) "Подставлена оценка — поправьте по одометру" else "Можно оставить пустым") },
+                    supportingText = {
+                        Text(
+                            stringResource(
+                                when {
+                                    !kmOk -> R.string.maint_done_km_invalid
+                                    state.estimate?.estimated == true -> R.string.maint_done_km_estimated
+                                    else -> R.string.maint_done_km_optional
+                                },
+                            ),
+                        )
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.testTag("done-km"),
                 )
                 OutlinedTextField(
-                    value = dateText, onValueChange = { dateText = it }, singleLine = true, label = { Text("Дата (дд.мм.гггг)") },
-                    isError = at == null, supportingText = { if (at == null) Text("Дата в формате дд.мм.гггг, не в будущем") },
+                    value = dateText, onValueChange = { dateText = it }, singleLine = true, label = { Text(stringResource(R.string.maint_done_date)) },
+                    isError = at == null, supportingText = { if (at == null) Text(stringResource(R.string.maint_done_date_invalid)) },
                     modifier = Modifier.testTag("done-date"),
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { if (at != null && kmOk) onConfirm(km, at) }, enabled = at != null && kmOk) { Text("Отметить") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+        confirmButton = { TextButton(onClick = { if (at != null && kmOk) onConfirm(km, at) }, enabled = at != null && kmOk) { Text(stringResource(R.string.maint_mark)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(CoreUiR.string.common_cancel)) } },
     )
 }
 
 @Composable
 private fun EditDialog(item: MaintenanceItem?, onSave: (MaintenanceItem) -> Unit, onDelete: (MaintenanceItem) -> Unit, onDismiss: () -> Unit) {
-    var title by rememberSaveable { mutableStateOf(item?.title.orEmpty()) }
+    val context = LocalContext.current
+    val templateTitle = item?.kind?.let { AnalyticsText.maintenanceKind(context, it) }
+    val templateNote = item?.noteKind?.let { AnalyticsText.maintenanceNote(context, it) }
+    var title by rememberSaveable { mutableStateOf(item?.title?.ifBlank { null } ?: templateTitle.orEmpty()) }
     var km by rememberSaveable { mutableStateOf(item?.intervalKm?.toString().orEmpty()) }
     var months by rememberSaveable { mutableStateOf(item?.intervalMonths?.toString().orEmpty()) }
-    var note by rememberSaveable { mutableStateOf(item?.note.orEmpty()) }
+    var note by rememberSaveable { mutableStateOf(item?.note ?: templateNote.orEmpty()) }
     val kmVal = MaintenanceFormat.parseInt(km, 1_000_000)
     val monthsVal = MaintenanceFormat.parseInt(months, 240)
     val kmOk = km.isBlank() || kmVal != null
@@ -253,25 +273,25 @@ private fun EditDialog(item: MaintenanceItem?, onSave: (MaintenanceItem) -> Unit
     val valid = title.isNotBlank() && kmOk && monthsOk
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (item == null) "Новая работа" else "Изменить работу") },
+        title = { Text(stringResource(if (item == null) R.string.maint_new_item else R.string.maint_edit_item)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                OutlinedTextField(title, { title = it }, singleLine = true, label = { Text("Название") }, isError = title.isBlank(), modifier = Modifier.testTag("edit-title"))
+                OutlinedTextField(title, { title = it }, singleLine = true, label = { Text(stringResource(R.string.maint_name)) }, isError = title.isBlank(), modifier = Modifier.testTag("edit-title"))
                 OutlinedTextField(
-                    km, { km = it }, singleLine = true, label = { Text("Интервал, км") }, isError = !kmOk,
+                    km, { km = it }, singleLine = true, label = { Text(stringResource(R.string.maint_interval_km_label)) }, isError = !kmOk,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.testTag("edit-km"),
                 )
                 OutlinedTextField(
-                    months, { months = it }, singleLine = true, label = { Text("Интервал, месяцев") }, isError = !monthsOk,
+                    months, { months = it }, singleLine = true, label = { Text(stringResource(R.string.maint_interval_months_label)) }, isError = !monthsOk,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.testTag("edit-months"),
                 )
-                OutlinedTextField(note, { note = it }, label = { Text("Заметка") }, maxLines = 3)
-                Secondary("Пустой интервал — не считать по нему. Срабатывает то, что наступит раньше.")
+                OutlinedTextField(note, { note = it }, label = { Text(stringResource(R.string.maint_note)) }, maxLines = 3)
+                Secondary(stringResource(R.string.maint_interval_hint))
                 if (item != null && (item.lastDoneKm != null || item.lastDoneAtMs != null)) {
-                    // Marked «сделано» by mistake and the snackbar is already gone — revert to «ещё не отмечали».
-                    TextButton(onClick = { onSave(item.copy(lastDoneKm = null, lastDoneAtMs = null)) }) { Text("Сбросить отметку «сделано»") }
+                    // Marked «done» by mistake and the snackbar is already gone — revert to «not marked yet».
+                    TextButton(onClick = { onSave(item.copy(lastDoneKm = null, lastDoneAtMs = null)) }) { Text(stringResource(R.string.maint_reset_done)) }
                 }
-                if (item != null) TextButton(onClick = { onDelete(item) }) { Text("Удалить работу", color = MaterialTheme.colorScheme.error) }
+                if (item != null) TextButton(onClick = { onDelete(item) }) { Text(stringResource(R.string.maint_delete_item), color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = {
@@ -279,11 +299,20 @@ private fun EditDialog(item: MaintenanceItem?, onSave: (MaintenanceItem) -> Unit
                 enabled = valid,
                 onClick = {
                     val base = item ?: MaintenanceItem(carId = 0, title = "")
-                    onSave(base.copy(title = title.trim(), intervalKm = kmVal, intervalMonths = monthsVal, note = note.trim().ifBlank { null }))
+                    // An unchanged template name/note stays typed (follows the app language); edited text becomes the user's own.
+                    val newTitle = title.trim().takeUnless { base.kind != null && it == templateTitle } ?: ""
+                    val keepNoteKind = base.noteKind != null && note.trim() == templateNote
+                    onSave(
+                        base.copy(
+                            title = newTitle, intervalKm = kmVal, intervalMonths = monthsVal,
+                            note = if (keepNoteKind) null else note.trim().ifBlank { null },
+                            noteKind = if (keepNoteKind) base.noteKind else null,
+                        ),
+                    )
                 },
-            ) { Text("Сохранить") }
+            ) { Text(stringResource(CoreUiR.string.common_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(CoreUiR.string.common_cancel)) } },
     )
 }
 

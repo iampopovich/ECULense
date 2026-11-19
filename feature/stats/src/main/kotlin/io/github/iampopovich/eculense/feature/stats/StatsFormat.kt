@@ -1,20 +1,27 @@
 package io.github.iampopovich.eculense.feature.stats
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import io.github.iampopovich.eculense.core.model.StatsPeriod
 import io.github.iampopovich.eculense.core.model.UnitsSettings
+import io.github.iampopovich.eculense.core.ui.labelRes
 import java.util.Locale
 
 internal object StatsFormat {
     /** Thousands separator is always a non-breaking space (ICU yields either U+00A0 or the narrow U+202F). */
     fun number(v: Double, decimals: Int = 1): String = String.format(Locale.getDefault(), "%,.${decimals}f", v).replace('\u202F', '\u00A0')
 
-    fun distance(km: Double, units: UnitsSettings): String = units.distance(km).let { (v, u) -> "${number(v)} $u" }
+    @Composable
+    fun distance(km: Double, units: UnitsSettings): String = units.distance(km).let { m -> "${number(m.value)} ${stringResource(m.unit.labelRes)}" }
 
     /** Under a liter — with hundredths: otherwise a short trip shows «0,0 л». */
-    fun volume(l: Double, units: UnitsSettings): String = units.volume(l).let { (v, u) -> "${number(v, if (v < 1.0) 2 else 1)} $u" }
+    @Composable
+    fun volume(l: Double, units: UnitsSettings): String =
+        units.volume(l).let { m -> "${number(m.value, if (m.value < 1.0) 2 else 1)} ${stringResource(m.unit.labelRes)}" }
 
+    @Composable
     fun consumption(lPer100: Double?, units: UnitsSettings): String =
-        lPer100?.let { units.consumption(it).let { (v, u) -> "${number(v)} $u" } } ?: "—"
+        lPer100?.let { units.consumption(it).let { m -> "${number(m.value)} ${stringResource(m.unit.labelRes)}" } } ?: "—"
 
     fun duration(ms: Long): String {
         val minutes = ms / 60_000

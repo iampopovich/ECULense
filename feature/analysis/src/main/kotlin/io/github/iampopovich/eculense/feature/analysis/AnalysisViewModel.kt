@@ -1,8 +1,10 @@
 package io.github.iampopovich.eculense.feature.analysis
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.iampopovich.eculense.core.analytics.Severity
+import io.github.iampopovich.eculense.core.analyticstext.AnalyticsText
 import io.github.iampopovich.eculense.core.data.AnalysisState
 import io.github.iampopovich.eculense.core.data.AnalyticsRepository
 import io.github.iampopovich.eculense.core.data.CarRepository
@@ -53,9 +55,11 @@ internal class AnalysisViewModel(
 
     init {
         // First visit: no findings yet — compute right away (in the background, with progress) instead of waiting for the button.
+        // Findings stored before localization hold Russian text: recompute them once into typed text.
         viewModelScope.launch {
             val id = cars.activeCarId() ?: return@launch
-            if (analytics.findings(id).isEmpty() && analytics.state.value !is AnalysisState.Running) recompute()
+            val stored = analytics.findings(id)
+            if ((stored.isEmpty() || stored.any { it.finding.isLegacyText }) && analytics.state.value !is AnalysisState.Running) recompute()
         }
     }
 
@@ -77,7 +81,7 @@ internal data class FindingUiState(
     val dtc: Map<String, DtcNote> = emptyMap(),
 )
 
-/** What to show under the code: the title (or «заводской код, расшифровка неизвестна») and a couple of common causes. */
+/** What to show under the code: the title (or «OEM code, description unknown») and a couple of common causes. */
 internal data class DtcNote(val text: String, val causes: List<String> = emptyList())
 
 internal class FindingViewModel(
@@ -94,7 +98,7 @@ internal class FindingViewModel(
             val f = analytics.finding(findingId)
             val ids = f?.finding?.sessionIds.orEmpty().toSet()
             val sessions = if (f == null || ids.isEmpty()) emptyList() else analytics.sessions(f.carId, limit = 10_000).filter { it.id in ids }
-            val codes = f?.finding?.evidence.orEmpty().map { it.label }.filter { DTC_CODE.matches(it) }
+            val codes = f?.finding?.evidence.orEmpty().mapNotNull { it.rawLabel }.filter { DTC_CODE.matches(it) }
             val dtc = if (codes.isEmpty()) emptyMap() else runCatching { describeDtc(codes) }.getOrDefault(emptyMap())
             _uiState.value = _uiState.value.copy(loading = false, finding = f, sessions = sessions, dtc = dtc)
         }
@@ -105,19 +109,18 @@ internal class FindingViewModel(
     }
 }
 
-/** Text for the chat: what the code found and on which numbers — the model explains rather than recomputes. */
-internal fun askAiPrompt(f: StoredFinding): String = buildString {
+/**
+ * Text for the chat composer, in the app language (the user sends it): what the code found and on which numbers —
+ * the model explains rather than recomputes.
+ */
+internal fun askAiPrompt(context: Context, f: StoredFinding): String {
     val x = f.finding
-    append("Объясни находку анализа «${x.title}» (${x.severity.label}): ${x.message}")
-    if (x.evidence.isNotEmpty()) append(" Доказательства: " + x.evidence.joinToString("; ") { "${it.label} — ${it.value}" } + ".")
-    append(" Что это значит и что проверить?")
-}
-
-internal val Severity.label: String
-    get() = when (this) {
-        Severity.CRITICAL -> "Критично"
-        Severity.WARNING -> "Внимание"
-        Severity.INFO -> "Справка"
-        Severity.NO_DATA -> "Нет данных"
-        Severity.OK -> "В норме"
+    val parts = buildList {
+        add(context.getString(R.string.analysis_ask_ai_prompt, AnalyticsText.title(context, x), AnalyticsText.severity(context, x.severity), AnalyticsText.message(context, x)))
+        if (x.evidence.isNotEmpty()) {
+            add(context.getString(R.string.analysis_ask_ai_evidence, x.evidence.joinToString("; ") { "${AnalyticsText.label(context, it)} — ${AnalyticsText.value(context, it)}" }))
+        }
+        add(context.getString(R.string.analysis_ask_ai_question))
     }
+    return parts.joinToString(" ")
+}

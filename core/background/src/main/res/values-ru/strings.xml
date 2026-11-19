@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bg_channel_analysis">Анализ</string>
+    <string name="bg_channel_analysis_description">Новые находки после поездки или импорта (предупреждения и критичные)</string>
+    <string name="bg_channel_maintenance">Обслуживание</string>
+    <string name="bg_channel_maintenance_description">Напоминания о плановом ТО</string>
+    <string name="bg_findings_one">Анализ: %1$s</string>
+    <string name="bg_findings_many">Анализ: новых находок — %1$d</string>
+    <string name="bg_maintenance_one">Пора ТО: %1$s</string>
+    <string name="bg_maintenance_many">Пора ТО: работ — %1$d</string>
+    <string name="bg_overdue_by_km">просрочено на %1$d км</string>
+    <string name="bg_km_left">осталось %1$d км</string>
+    <plurals name="bg_due_days_ago">
+        <item quantity="one">срок прошёл %1$d дн. назад</item>
+        <item quantity="few">срок прошёл %1$d дн. назад</item>
+        <item quantity="many">срок прошёл %1$d дн. назад</item>
+        <item quantity="other">срок прошёл %1$d дн. назад</item>
+    </plurals>
+    <plurals name="bg_in_days">
+        <item quantity="one">через %1$d дн.</item>
+        <item quantity="few">через %1$d дн.</item>
+        <item quantity="many">через %1$d дн.</item>
+        <item quantity="other">через %1$d дн.</item>
+    </plurals>
+    <string name="bg_overdue">просрочено</string>
+    <string name="bg_soon">скоро</string>
+</resources>

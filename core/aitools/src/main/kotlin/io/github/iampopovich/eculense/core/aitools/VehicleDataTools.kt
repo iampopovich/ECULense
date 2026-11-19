@@ -10,6 +10,7 @@ import io.github.iampopovich.eculense.core.analytics.Severity
 import io.github.iampopovich.eculense.core.data.AnalyticsRepository
 import io.github.iampopovich.eculense.core.data.CarRepository
 import io.github.iampopovich.eculense.core.data.MaintenanceRepository
+import io.github.iampopovich.eculense.core.analytics.FindingEnglish
 import io.github.iampopovich.eculense.core.data.StoredFinding
 import io.github.iampopovich.eculense.core.data.TripRepository
 import io.github.iampopovich.eculense.core.dtcdb.DtcInfo
@@ -314,7 +315,7 @@ internal class SessionStatsTool(ctx: ToolContext) : VehicleTool<SessionArgs>(
     override suspend fun answer(args: SessionArgs, carId: Long): JsonObject {
         val report = ctx.analytics.sessionReport(carId, args.sessionId) ?: return Compact.noData("no such session")
         val zone = ctx.zone()
-        val findings = report.findings.map { f -> findingJson(f.ruleId, f.severity, f.title, f.evidence.associate { it.label to it.value }) }
+        val findings = report.findings.map { f -> findingJson(f.ruleId, f.severity, FindingEnglish.title(f), FindingEnglish.evidence(f)) }
         return Compact.fit(
             report.sensors.sortedByDescending { it.sensorId in SENSOR_NAMES },
             { s ->
@@ -392,13 +393,13 @@ internal class FindingsTool(ctx: ToolContext) : VehicleTool<LimitArgs>(
         val problems = stored.filter { it.finding.severity.rank >= Severity.INFO.rank }.sortedByDescending { it.finding.severity.rank }.take(args.limit.coerceIn(1, 20))
         return Compact.fit(
             problems,
-            { s -> findingJson(s.finding.ruleId, s.finding.severity, s.finding.title, s.finding.evidence.associate { it.label to it.value }) },
+            { s -> findingJson(s.finding.ruleId, s.finding.severity, FindingEnglish.title(s.finding), FindingEnglish.evidence(s.finding)) },
         ) { items, truncated ->
             buildJsonObject {
                 put("computed_at", Dates.dateTime(stored.maxOf { it.createdAtMs }, zone))
                 put("problems", items)
                 if (truncated) put("truncated", true)
-                put("no_data", JsonArray(stored.filter { it.finding.severity == Severity.NO_DATA }.map { JsonPrimitive("${it.finding.ruleId}: ${it.finding.message.take(90)}") }))
+                put("no_data", JsonArray(stored.filter { it.finding.severity == Severity.NO_DATA }.map { JsonPrimitive("${it.finding.ruleId}: ${FindingEnglish.message(it.finding).take(90)}") }))
                 put("ok", JsonArray(stored.filter { it.finding.severity == Severity.OK }.map { JsonPrimitive(it.finding.ruleId) }))
             }
         }

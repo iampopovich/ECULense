@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sensor_engine_load">Engine load</string>
+    <string name="sensor_coolant">Coolant temperature</string>
+    <string name="sensor_stft1">Short-term fuel trim, bank 1</string>
+    <string name="sensor_ltft1">Long-term fuel trim, bank 1</string>
+    <string name="sensor_stft2">Short-term fuel trim, bank 2</string>
+    <string name="sensor_ltft2">Long-term fuel trim, bank 2</string>
+    <string name="sensor_rpm">Engine speed</string>
+    <string name="sensor_speed">Vehicle speed</string>
+    <string name="sensor_timing_advance">Ignition timing advance</string>
+    <string name="sensor_iat">Intake air temperature</string>
+    <string name="sensor_maf">Mass air flow</string>
+    <string name="sensor_throttle">Throttle position</string>
+    <string name="sensor_mil_distance">Distance with Check Engine on</string>
+    <string name="sensor_module_voltage">Control module voltage</string>
+    <string name="sensor_elm_voltage">OBD port voltage (adapter)</string>
+    <string name="maint_kind_oil_and_filter">Engine oil and filter</string>
+    <string name="maint_kind_air_filter">Air filter</string>
+    <string name="maint_kind_spark_plugs">Spark plugs</string>
+    <string name="maint_kind_fuel_filter">Fuel filter</string>
+    <string name="maint_kind_coolant">Coolant</string>
+    <string name="maint_kind_brake_fluid">Brake fluid</string>
+    <string name="maint_kind_timing_belt">Timing belt/chain</string>
+    <string name="maint_kind_cvt_oil">CVT fluid</string>
+    <string name="maint_kind_automatic_transmission_oil">Automatic transmission fluid</string>
+    <string name="maint_note_oil_severe_conditions">More often in severe conditions (traffic jams, short trips)</string>
+    <string name="maint_note_spark_plugs_type">30,000–60,000 km depending on the plug type (nickel/iridium)</string>
+    <string name="maint_note_timing_interval">The interval follows the engine’s service schedule: enter it</string>
+    <string name="severity_critical">Critical</string>
+    <string name="severity_warning">Warning</string>
+    <string name="severity_info">Info</string>
+    <string name="severity_no_data">No data</string>
+    <string name="severity_ok">OK</string>
+</resources>

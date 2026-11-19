@@ -2,4 +2,28 @@
 <resources>
     <string name="analysis_hub_title">Analysis</string>
     <string name="analysis_hub_subtitle">Findings from recordings and trouble codes</string>
+    <string name="analysis_empty">No findings yet. Import recordings from Car Scanner or record a trip with the adapter, then tap “Recalculate”.</string>
+    <string name="analysis_section_attention">Needs attention</string>
+    <string name="analysis_no_problems">No problems found.</string>
+    <string name="analysis_section_no_data">No data</string>
+    <string name="analysis_section_ok">OK</string>
+    <string name="analysis_disclaimer">The app computes the numbers from your recordings; this is a hint, not a diagnosis.</string>
+    <string name="analysis_progress">Analyzing recordings: %1$d of %2$d</string>
+    <string name="analysis_done">Updated %1$s · recordings: %2$d · %3$s</string>
+    <string name="analysis_seconds">%1$s s</string>
+    <string name="analysis_failed">Couldn’t recalculate: %1$s</string>
+    <string name="analysis_updated">Updated %1$s</string>
+    <string name="analysis_recompute">Recalculate</string>
+    <string name="analysis_loading">Loading…</string>
+    <string name="analysis_finding_missing">Finding not found — the analysis may have been recalculated. Go back to the list.</string>
+    <string name="analysis_evidence">Evidence</string>
+    <string name="analysis_common_causes">Common causes: %1$s</string>
+    <string name="analysis_period">Period: %1$s – %2$s</string>
+    <string name="analysis_recordings">Recordings (%1$d)</string>
+    <string name="analysis_and_more">…and %1$d more</string>
+    <string name="analysis_ask_ai">Ask AI</string>
+    <string name="analysis_computed">Calculated %1$s</string>
+    <string name="analysis_ask_ai_prompt">Explain the analysis finding “%1$s” (%2$s): %3$s</string>
+    <string name="analysis_ask_ai_evidence">Evidence: %1$s.</string>
+    <string name="analysis_ask_ai_question">What does it mean and what should I check?</string>
 </resources>

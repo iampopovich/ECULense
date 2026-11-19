@@ -1,6 +1,7 @@
 package io.github.iampopovich.eculense.core.background
 
 import io.github.iampopovich.eculense.core.analytics.Finding
+import io.github.iampopovich.eculense.core.analytics.FindingText
 import io.github.iampopovich.eculense.core.analytics.MaintenanceDue
 import io.github.iampopovich.eculense.core.analytics.MaintenanceStatus
 import io.github.iampopovich.eculense.core.analytics.MaintenanceRule
@@ -11,7 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AlertDecisionsTest {
-    private fun f(rule: String, sev: Severity) = Finding(rule, sev, rule, "m")
+    private fun f(rule: String, sev: Severity) = Finding(rule, sev, FindingText.raw(rule), FindingText.raw("m"))
 
     @Test
     fun `only warning and critical findings that are new since the previous analysis are announced`() {
