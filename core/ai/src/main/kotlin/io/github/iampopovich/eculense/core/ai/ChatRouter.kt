@@ -21,7 +21,16 @@ object ChatRouter {
     const val DEFAULT_DAYS = 180
     const val MAX_ROLES = 4
 
-    private fun rx(fragment: String) = Regex("(?iU)\\b(?:$fragment)")
+    /**
+     * Границы слова — явными lookaround по буквам Юникода: `\b` в JDK 19+ ASCII-шный (на кириллице не срабатывает), а
+     * флаг юникодных классов (U), который это чинит на JVM, Android-регэксп (ICU) не знает — PatternSyntaxException при первом вопросе.
+     */
+    private const val START = "(?<![\\p{L}\\p{N}_])"
+    private const val END = "(?![\\p{L}\\p{N}_])"
+
+    internal fun portable(pattern: String) = pattern.replace("\\b", END)
+
+    private fun rx(fragment: String) = Regex(START + "(?:" + portable(fragment) + ")", RegexOption.IGNORE_CASE)
 
     private val roleKeywords: Map<ExpertRole, List<Regex>> = ExpertRoles.ALL.associateWith { r -> r.keywords.map(::rx) }
 
@@ -62,12 +71,12 @@ object ChatRouter {
     }
 
     private val halfYear = rx("полгода|пол года|полугод|half a year|half-year|six months|шесть месяц")
-    private val nUnits = Regex("(?iU)(?<!\\d)(\\d{1,3})\\s*-?\\s*(дн|день|дня|дней|сут|days?|недел|нед\\b|weeks?|месяц|мес\\b|months?|год|года|лет|years?)")
+    private val nUnits = Regex(portable("(?<!\\d)(\\d{1,3})\\s*-?\\s*(дн|день|дня|дней|сут|days?|недел|нед\\b|weeks?|месяц|мес\\b|months?|год|года|лет|years?)"), RegexOption.IGNORE_CASE)
     private val month = rx("(за|последний|прошлый|этот) месяц|month")
     private val week = rx("(за|последнюю|прошлую|эту) неделю|week")
     private val quarter = rx("квартал|quarter|три месяц")
     private val year = rx("(за|последний|прошлый|этот) год|year|годовой")
-    private val season = Regex("(?iU)с (весны|лета|осени|зимы)")
+    private val season = Regex("с (весны|лета|осени|зимы)", RegexOption.IGNORE_CASE)
 
     /** Период в днях из вопроса; null — период не назван. */
     fun days(q: String, today: LocalDate = LocalDate.now()): Int? {
