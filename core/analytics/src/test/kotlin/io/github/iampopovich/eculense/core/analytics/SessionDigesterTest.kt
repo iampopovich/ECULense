@@ -109,4 +109,32 @@ class SessionDigesterTest {
         assertEquals(0, d.coolant.count)
         assertNull(d.voltageSensor)
     }
+
+    @Test
+    fun `histograms give medians of coolant, warm trims and running voltage`() {
+        val readings = buildList {
+            add(r(RPM, 800.0, 0))
+            listOf(70.0, 85.0, 90.0, 91.0, 92.0).forEachIndexed { i, v -> add(r(COOLANT, v, 1L + i)) }
+            listOf(2.0, 3.0, 9.0).forEachIndexed { i, v -> add(r(LTFT1, v, 10L + i)) }
+            listOf(13.9, 14.1, 14.0).forEachIndexed { i, v -> add(r(RPM, 800.0, 10L + i)); add(r(ELM_VOLTAGE, v, 10L + i)) }
+        }
+        val d = digest(readings)
+        assertEquals(90.0, d.coolantHist.quantile(0.5)!!, 1e-9)
+        assertEquals(3.0, d.warmTrimHist.getValue(LTFT1).quantile(0.5)!!, 1e-9)
+        assertEquals(14.0, d.runningVoltageHist.quantile(0.5)!!, 1e-9)
+    }
+
+    @Test
+    fun `idle rpm is taken on a warm engine standing still`() {
+        val readings = listOf(
+            r(COOLANT, 40.0, 0), r(SPEED, 0.0, 0), r(RPM, 1200.0, 1), // холодный — не считается
+            r(COOLANT, 88.0, 10), r(SPEED, 0.0, 10), r(RPM, 760.0, 11), r(RPM, 740.0, 12),
+            r(SPEED, 50.0, 13), r(RPM, 2000.0, 14), // едем
+            r(SPEED, 0.0, 15), r(RPM, 2500.0, 16), // перегазовка на месте
+        )
+        val d = digest(readings)
+        assertEquals(2, d.warmIdleRpm.count)
+        assertEquals(750.0, d.warmIdleRpm.mean!!, 1e-9)
+        assertEquals(740.0, d.warmIdleRpmHist.quantile(0.5)!!, 1e-9)
+    }
 }

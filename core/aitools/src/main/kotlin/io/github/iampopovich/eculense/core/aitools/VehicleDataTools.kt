@@ -70,10 +70,10 @@ internal object Compact {
         if (decimals == 0) JsonPrimitive(Math.round(v)) else JsonPrimitive(BigDecimal(v).setScale(decimals, RoundingMode.HALF_UP).toDouble())
 
     /** Сколько элементов списка влезает в бюджет вместе с остальным ответом; truncated = true, если обрезали. */
-    fun <T> fit(items: List<T>, render: (T) -> JsonElement, build: (JsonArray, Boolean) -> JsonObject): JsonObject {
+    fun <T> fit(items: List<T>, render: (T) -> JsonElement, maxBytes: Int = MAX_BYTES, build: (JsonArray, Boolean) -> JsonObject): JsonObject {
         val rendered = items.map(render)
         var n = rendered.size
-        while (n > 0 && bytes(build(JsonArray(rendered.take(n)), n < rendered.size)) > MAX_BYTES) n--
+        while (n > 0 && bytes(build(JsonArray(rendered.take(n)), n < rendered.size)) > maxBytes) n--
         return build(JsonArray(rendered.take(n)), n < rendered.size)
     }
 
@@ -109,6 +109,17 @@ internal fun period(value: String?): StatsPeriod = when (value?.lowercase()) {
 internal fun periodFrom(p: StatsPeriod, now: Long): Long = p.days?.let { now - it * 86_400_000L } ?: 0L
 
 /**
+ * Начало периода: [days] (произвольный, «полгода» = 180) приоритетнее именованного [period].
+ * Возвращает (начало, подпись периода для ответа).
+ */
+internal fun periodStart(period: String?, days: Int?, now: Long): Pair<Long, String> {
+    val d = days?.coerceIn(1, 3_650)
+    if (d != null) return now - d * 86_400_000L to "$d days"
+    val p = period(period)
+    return periodFrom(p, now) to p.name.lowercase()
+}
+
+/**
  * Базовый инструмент: только чтение по активной машине; ответ — компактный JSON, размер пишется в лог.
  * Типизированные [SimpleTool] с @Serializable-аргументами, а не @Tool-методы [ai.koog.agents.core.tools.reflect.ToolSet]:
  * без kotlin-reflect во время вызова, аргументы проверяет kotlinx.serialization.
@@ -138,7 +149,10 @@ internal abstract class VehicleTool<A>(
 class NoArgs
 
 @Serializable
-data class PeriodArgs(@property:LLMDescription("week, month, year or all") val period: String = "all")
+data class PeriodArgs(
+    @property:LLMDescription("week, month, year or all") val period: String = "all",
+    @property:LLMDescription("optional number of days back from today (e.g. 180 for half a year); overrides period") val days: Int? = null,
+)
 
 @Serializable
 data class ListSessionsArgs(
@@ -156,6 +170,7 @@ data class SensorArgs(
     val sensorId: String,
     @property:LLMDescription("week, month, year or all") val period: String = "all",
     @property:LLMDescription("only readings after the engine reached 80 C in that session") val warmOnly: Boolean = false,
+    @property:LLMDescription("optional number of days back from today; overrides period") val days: Int? = null,
 )
 
 @Serializable
@@ -211,10 +226,10 @@ internal class TripStatsTool(ctx: ToolContext) : VehicleTool<PeriodArgs>(
     override suspend fun answer(args: PeriodArgs, carId: Long): JsonObject {
         val all = ctx.trips.observeTrips(carId).first()
         if (all.isEmpty()) return Compact.noData("no trips; trips come from Car Scanner import or from recordings with speed data")
-        val p = period(args.period)
         val now = ctx.clock()
         val zone = ctx.zone()
-        val inPeriod = TripStatistics.inPeriod(all, p, now)
+        val (from, label) = periodStart(args.period, args.days, now)
+        val inPeriod = all.filter { it.startedAtMs in from..now }
         val currency = ctx.cars.cars().firstOrNull { it.id == carId }?.currency
         fun JsonObjectBuilder.stats(s: TripStats, count: Boolean = true) {
             if (count) put("trips", s.trips)
@@ -226,7 +241,7 @@ internal class TripStatsTool(ctx: ToolContext) : VehicleTool<PeriodArgs>(
             if (s.fuelCost > 0) put("fuel_cost", Compact.num(s.fuelCost, 0))
         }
         return buildJsonObject {
-            put("period", p.name.lowercase())
+            put("period", label)
             stats(TripStats.of(inPeriod))
             currency?.let { put("currency", it) }
             all.maxByOrNull { it.startedAtMs }?.let { t ->
@@ -333,14 +348,14 @@ internal class SensorSummaryTool(ctx: ToolContext) : VehicleTool<SensorArgs>(
     ctx,
 ) {
     override suspend fun answer(args: SensorArgs, carId: Long): JsonObject {
-        val p = period(args.period)
-        val s = ctx.analytics.sensorSummary(carId, args.sensorId, periodFrom(p, ctx.clock()), Long.MAX_VALUE, args.warmOnly)
-            ?: return Compact.noData("no readings of ${args.sensorId}${if (args.warmOnly) " on a warm engine" else ""} in period ${p.name.lowercase()}")
+        val (from, label) = periodStart(args.period, args.days, ctx.clock())
+        val s = ctx.analytics.sensorSummary(carId, args.sensorId, from, Long.MAX_VALUE, args.warmOnly)
+            ?: return Compact.noData("no readings of ${args.sensorId}${if (args.warmOnly) " on a warm engine" else ""} in period $label")
         return buildJsonObject {
             put("sensor", s.sensorId)
             SENSOR_NAMES[s.sensorId]?.let { put("name", it) }
             put("unit", s.unit)
-            put("period", p.name.lowercase())
+            put("period", label)
             put("warm_only", args.warmOnly)
             put("n", s.count)
             put("sessions", s.sessions)

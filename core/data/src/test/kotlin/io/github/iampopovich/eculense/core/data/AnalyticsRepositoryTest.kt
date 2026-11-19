@@ -138,6 +138,20 @@ class AnalyticsRepositoryTest {
     }
 
     @Test
+    fun `session digests for a period reuse the cache and skip other cars and periods`() = runTest {
+        dao.add(1, 1, 100, Triple("01.05", 90.0, 1), Triple("01.05", 92.0, 2))
+        dao.add(2, 1, 5_000, Triple("01.05", 95.0, 1))
+        dao.add(3, 2, 200, Triple("01.05", 130.0, 1))
+        val repo = repo(StandardTestDispatcher(testScheduler))
+        val first = repo.sessionDigests(1, 0, 1_000)
+        assertEquals(listOf(1L), first.map { it.sessionId })
+        assertEquals(92.0, first.single().coolant.max, 1e-9)
+        assertTrue(logs.last(), logs.last().startsWith("digests car=1 sessions=1 computed=1"))
+        repo.sessionDigests(1, 0, Long.MAX_VALUE)
+        assertTrue(logs.last(), logs.last().startsWith("digests car=1 sessions=2 computed=1"))
+    }
+
+    @Test
     fun `finding json round trip`() {
         val f = Finding("r", Severity.WARNING, "t", "m", listOf(Evidence("a", "1,0 \"В\"")), listOf(5, 6), 1, 2)
         val back = f.toEntity(1, 3).copy(id = 9).toModel()

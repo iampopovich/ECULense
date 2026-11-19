@@ -28,23 +28,41 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
         tool(FindingsTool(ctx))
         tool(DtcHistoryTool(ctx))
         tool(MaintenanceDueTool(ctx))
+        tool(TrendsTool(ctx))
     }
 
     override fun progressLabel(toolName: String): String = LABELS[toolName] ?: "ИИ смотрит данные машины…"
 
     /** Модель на телефоне инструменты не вызывает: та же информация обычным текстом (без JSON — его она пересказывала). */
-    override suspend fun digest(): String? {
-        val parts = listOf(
-            "carProfile" to suspend { CarProfileTool(ctx).json(NoArgs()) },
-            "dtcHistory" to suspend { DtcHistoryTool(ctx).json(LimitArgs(15)) },
-            "findings" to suspend { FindingsTool(ctx).json(LimitArgs(8)) },
-            "maintenanceDue" to suspend { MaintenanceDueTool(ctx).json(NoArgs()) },
-            "listSessions" to suspend { ListSessionsTool(ctx).json(ListSessionsArgs(limit = 1)) },
-        ).mapNotNull { (name, call) -> runCatching { DigestText.section(name, call()) }.getOrNull() }
+    override suspend fun digest(): String? = digest(DEFAULT_SECTIONS, DEFAULT_DAYS)
+
+    /**
+     * Сводка только из разделов [sections] (имена инструментов, в этом порядке); [days] — период трендов и поездок.
+     * Раздел, который не удалось собрать, пропускается.
+     */
+    internal suspend fun digest(sections: List<String>, days: Int): String? {
+        val parts = sections.distinct().mapNotNull { name ->
+            runCatching {
+                when (name) {
+                    "carProfile" -> DigestText.section(name, CarProfileTool(ctx).json(NoArgs()))
+                    TrendsTool.NAME -> DigestText.trends(TrendsTool(ctx).json(TrendsArgs(days)))
+                    "tripStats" -> DigestText.section(name, TripStatsTool(ctx).json(PeriodArgs(days = days)))
+                    "dtcHistory" -> DigestText.section(name, DtcHistoryTool(ctx).json(LimitArgs(15)))
+                    "findings" -> DigestText.section(name, FindingsTool(ctx).json(LimitArgs(8)))
+                    "maintenanceDue" -> DigestText.section(name, MaintenanceDueTool(ctx).json(NoArgs()))
+                    "listSessions" -> DigestText.section(name, ListSessionsTool(ctx).json(ListSessionsArgs(limit = 1)))
+                    else -> null
+                }
+            }.getOrNull()
+        }
         return parts.takeIf { it.isNotEmpty() }?.joinToString("\n")
     }
 
     companion object {
+        /** Сводка без маршрутизации вопроса: профиль, тренды за полгода, ошибки, находки, ТО, последняя запись. */
+        val DEFAULT_SECTIONS = listOf("carProfile", TrendsTool.NAME, "dtcHistory", "findings", "maintenanceDue", "listSessions")
+        const val DEFAULT_DAYS = 180
+
         val LABELS = mapOf(
             "carProfile" to "ИИ смотрит профиль машины…",
             "tripStats" to "ИИ смотрит статистику поездок…",
@@ -54,6 +72,7 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
             "findings" to "ИИ смотрит находки анализа…",
             "dtcHistory" to "ИИ смотрит ошибки…",
             "maintenanceDue" to "ИИ смотрит план ТО…",
+            TrendsTool.NAME to "ИИ смотрит тренды по месяцам…",
         )
     }
 }

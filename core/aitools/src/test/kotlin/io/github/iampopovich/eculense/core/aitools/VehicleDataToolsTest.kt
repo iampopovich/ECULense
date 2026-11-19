@@ -1,8 +1,11 @@
 package io.github.iampopovich.eculense.core.aitools
 
+import io.github.iampopovich.eculense.core.analytics.Agg
 import io.github.iampopovich.eculense.core.analytics.DtcEvent
 import io.github.iampopovich.eculense.core.analytics.Evidence
 import io.github.iampopovich.eculense.core.analytics.Finding
+import io.github.iampopovich.eculense.core.analytics.Histogram
+import io.github.iampopovich.eculense.core.analytics.SessionDigest
 import io.github.iampopovich.eculense.core.analytics.Severity
 import io.github.iampopovich.eculense.core.data.AnalysisState
 import io.github.iampopovich.eculense.core.data.AnalyticsRepository
@@ -88,6 +91,18 @@ private class Analytics : AnalyticsRepository {
     }
     override suspend fun dtcEvents(carId: Long) = if (noDtc) emptyList() else (1..40).flatMap { i ->
         listOf(DtcEvent("P0%03d".format(100 + i), DtcKind.STORED, NOW - i * DAY), DtcEvent("P0%03d".format(100 + i), DtcKind.STORED, NOW - i * DAY + 5 * DAY))
+    }
+    /** По записи раз в 3 дня за ~200 дней: ОЖ растёт от 88 к ~94 °C, напряжение 14,1 В. */
+    var digests: List<SessionDigest> = (1..66).map { i ->
+        val coolant = 88.0 + (66 - i) * 0.1
+        val many = { v: Double -> (1..40).fold(Agg.EMPTY to Histogram.EMPTY) { (a, h), _ -> a.add(v) to h.add(v) } }
+        val (ca, ch) = many(coolant)
+        val (va, vh) = many(14.1)
+        SessionDigest(i.toLong(), NOW - i * 3 * DAY, coolant = ca, coolantHist = ch, voltageSensor = "elm.voltage", runningVoltage = va, runningVoltageHist = vh)
+    }
+    override suspend fun sessionDigests(carId: Long, fromMs: Long, toMs: Long): List<SessionDigest> {
+        requests += "digests $fromMs $toMs"
+        return digests.filter { it.startedAtMs in fromMs..toMs }
     }
 }
 
@@ -243,15 +258,70 @@ class VehicleDataToolsTest {
     }
 
     @Test
-    fun `toolbox registers eight read-only tools with labels and argument schemas`() {
+    fun `toolbox registers nine read-only tools with labels and argument schemas`() {
         val box = VehicleDataToolbox(ctx)
         val tools = box.registry().tools
-        assertEquals(setOf("carProfile", "tripStats", "listSessions", "sessionStats", "sensorSummary", "findings", "dtcHistory", "maintenanceDue"), tools.map { it.name }.toSet())
+        assertEquals(setOf("carProfile", "tripStats", "listSessions", "sessionStats", "sensorSummary", "findings", "dtcHistory", "maintenanceDue", "trends"), tools.map { it.name }.toSet())
         assertEquals("ИИ смотрит ошибки…", box.progressLabel("dtcHistory"))
         val session = tools.single { it.name == "sessionStats" }.descriptor
         assertEquals(listOf("sessionId"), session.requiredParameters.map { it.name })
         val sensor = tools.single { it.name == "sensorSummary" }.descriptor
-        assertTrue(sensor.optionalParameters.map { it.name }.containsAll(listOf("period", "warmOnly")))
+        assertTrue(sensor.optionalParameters.map { it.name }.containsAll(listOf("period", "warmOnly", "days")))
+        assertTrue(tools.single { it.name == "tripStats" }.descriptor.optionalParameters.map { it.name }.contains("days"))
+        assertTrue(tools.single { it.name == "trends" }.descriptor.optionalParameters.map { it.name }.containsAll(listOf("days", "bucket")))
+    }
+
+    @Test
+    fun `trip stats accept an arbitrary number of days`() = runBlocking {
+        val half = obj(TripStatsTool(ctx).execute(PeriodArgs(period = "week", days = 180)))
+        assertEquals("180 days", half.getValue("period").jsonPrimitive.content)
+        assertEquals(2, half.getValue("trips").jsonPrimitive.content.toInt())
+        assertEquals(1, obj(TripStatsTool(ctx).execute(PeriodArgs(days = 30))).getValue("trips").jsonPrimitive.content.toInt())
+    }
+
+    @Test
+    fun `sensor summary days override the period`() = runBlocking {
+        SensorSummaryTool(ctx).execute(SensorArgs("01.07", "year", days = 180))
+        assertEquals("sensor 01.07 ${NOW - 180 * DAY} false", analytics.requests.last())
+    }
+
+    @Test
+    fun `trends for half a year are monthly, newest first, within budget and with a change`() = runBlocking {
+        val raw = TrendsTool(ctx).execute(TrendsArgs(days = 180))
+        assertTrue("${raw.toByteArray().size}: $raw", raw.toByteArray().size <= TrendsTool.MAX_BYTES)
+        assertEquals("trends", logged.last().first)
+        assertEquals("digests ${NOW - 180 * DAY} $NOW", analytics.requests.last())
+        val t = obj(raw)
+        assertEquals("month", t.getValue("bucket").jsonPrimitive.content)
+        val labels = t.getValue("buckets").jsonArray.map { it.jsonObject.getValue("label").jsonPrimitive.content }
+        assertEquals(labels.sortedDescending(), labels)
+        assertEquals(7, labels.size)
+        val change = t.getValue("change").jsonArray.map { it.jsonObject }.single { it.getValue("metric").jsonPrimitive.content == "coolant_median" }
+        assertTrue(change.toString(), change.getValue("delta").jsonPrimitive.content.toDouble() > 0) // ОЖ в новых записях выше
+        assertTrue(t.getValue("few_data").jsonArray.map { it.jsonPrimitive.content }.contains("l_per_100km"))
+        assertFalse(raw.contains(VIN) || raw.contains("Тестовая"))
+    }
+
+    @Test
+    fun `short trends use weeks and empty periods say no data`() = runBlocking {
+        assertEquals("week", obj(TrendsTool(ctx).execute(TrendsArgs(days = 30))).getValue("bucket").jsonPrimitive.content)
+        analytics.digests = emptyList()
+        analytics.noDtc = true
+        val empty = ToolContext(analytics, Cars(car), Trips(emptyList()), clock = { NOW }, zone = { ZoneOffset.UTC }, log = { _, _, _ -> })
+        assertTrue(obj(TrendsTool(empty).execute(TrendsArgs(days = 180))).containsKey("no_data"))
+        assertEquals("Тренды: за период нет ни поездок, ни записей, ни ошибок", VehicleDataToolbox(empty).digest(listOf("trends"), 180))
+    }
+
+    @Test
+    fun `trends digest is plain Russian lines per month`() = runBlocking {
+        val text = VehicleDataToolbox(ctx).digest(listOf("trends", "tripStats"), 180)!!
+        println(text)
+        assertNoJson(text)
+        val lines = text.lines()
+        assertTrue(text, lines.first().startsWith("Тренды за 180 дн. (по месяцам)"))
+        assertTrue(text, lines.any { Regex("^- \\d{4}-\\d{2}: ").containsMatchIn(it) && it.contains("ОЖ медиана") })
+        assertTrue(text, lines.any { it.startsWith("Изменение") && it.contains("ОЖ, медиана") })
+        assertTrue(text, lines.any { it.startsWith("Поездки: период: 180 дн.") })
     }
 
     /** Признаки JSON в тексте для модели на телефоне: скобки объектов/массивов, кавычки ключей, ключи вида snake_case. */

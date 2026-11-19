@@ -17,6 +17,7 @@ import io.github.iampopovich.eculense.core.database.DtcDao
 import io.github.iampopovich.eculense.core.database.FindingDao
 import io.github.iampopovich.eculense.core.database.FindingEntity
 import io.github.iampopovich.eculense.core.database.SensorAggregateRow
+import io.github.iampopovich.eculense.core.database.SessionStartRow
 import io.github.iampopovich.eculense.core.database.SessionSummaryRow
 import io.github.iampopovich.eculense.core.model.DtcKind
 import io.github.iampopovich.eculense.core.model.SensorReading
@@ -85,6 +86,11 @@ interface AnalyticsRepository {
     suspend fun sessionReport(carId: Long, sessionId: Long): SessionReport?
     suspend fun sensorSummary(carId: Long, sensorId: String, fromMs: Long, toMs: Long, warmOnly: Boolean): SensorSummary?
     suspend fun dtcEvents(carId: Long): List<DtcEvent>
+    /**
+     * Дайджесты сессий машины, начавшихся в [fromMs]..[toMs] (тренды): из кэша процесса или потоково —
+     * по одной сессии за раз, без загрузки всех значений в память.
+     */
+    suspend fun sessionDigests(carId: Long, fromMs: Long, toMs: Long): List<SessionDigest> = emptyList()
 }
 
 internal class RoomAnalyticsRepository(
@@ -122,15 +128,7 @@ internal class RoomAnalyticsRepository(
             var points = 0L
             var cached = 0
             val digests = sessions.mapIndexed { i, s ->
-                val digest = digestCache[s.id]?.also { cached++ } ?: run {
-                    val rows = dao.points(s.id, SensorIds.FOR_RULES)
-                    points += rows.size
-                    withContext(compute) {
-                        val acc = SessionDigester.Accumulator()
-                        rows.forEach { acc.accept(it.sensorId, it.value, it.timestampMs) }
-                        acc.build(s.id, s.startedAtMs)
-                    }.also { if (s.endedAtMs != null) digestCache[s.id] = it }
-                }
+                val digest = digestCache[s.id]?.also { cached++ } ?: digestOf(s).also { points += it.second }.first
                 _state.value = AnalysisState.Running(i + 1, sessions.size)
                 digest
             }
@@ -149,6 +147,28 @@ internal class RoomAnalyticsRepository(
             _state.value = AnalysisState.Failed(e.message ?: e::class.simpleName.orEmpty())
             throw e
         }
+    }
+
+    /** Одна сессия: её значения грузятся из БД, сворачиваются в дайджест и отпускаются; законченная — в кэш. */
+    private suspend fun digestOf(s: SessionStartRow): Pair<SessionDigest, Int> {
+        val rows = dao.points(s.id, SensorIds.FOR_RULES)
+        val digest = withContext(compute) {
+            val acc = SessionDigester.Accumulator()
+            rows.forEach { acc.accept(it.sensorId, it.value, it.timestampMs) }
+            acc.build(s.id, s.startedAtMs)
+        }
+        if (s.endedAtMs != null) digestCache[s.id] = digest
+        return digest to rows.size
+    }
+
+    override suspend fun sessionDigests(carId: Long, fromMs: Long, toMs: Long): List<SessionDigest> = withContext(compute) {
+        val started = System.nanoTime()
+        var computed = 0
+        val list = dao.sessionStarts(carId).filter { it.startedAtMs in fromMs..toMs }.map { s ->
+            digestCache[s.id] ?: digestOf(s).first.also { computed++ }
+        }
+        log("digests car=$carId sessions=${list.size} computed=$computed ms=${(System.nanoTime() - started) / 1_000_000}")
+        list
     }
 
     override suspend fun sessions(carId: Long, fromMs: Long, toMs: Long, limit: Int): List<SessionSummary> =

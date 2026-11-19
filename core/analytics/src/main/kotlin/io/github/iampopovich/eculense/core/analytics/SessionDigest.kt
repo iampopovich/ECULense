@@ -48,6 +48,12 @@ data class SessionDigest(
     val coldStartC: Double? = null,
     /** От первого замера ОЖ до 80 °C — только для холодного пуска (≤ 30 °C). */
     val warmupMs: Long? = null,
+    /** Распределения для медиан между сессиями (тренды): ОЖ, коррекции на прогретом, обороты прогретого ХХ. */
+    val coolantHist: Histogram = Histogram.EMPTY,
+    val warmTrimHist: Map<String, Histogram> = emptyMap(),
+    /** Обороты прогретого холостого хода: скорость 0, обороты 400–1100. */
+    val warmIdleRpm: Agg = Agg.EMPTY,
+    val warmIdleRpmHist: Histogram = Histogram.EMPTY,
 )
 
 object SessionDigester {
@@ -76,6 +82,10 @@ object SessionDigester {
 
         private val voltage = mapOf(MODULE_VOLTAGE to VoltageAcc(), ELM_VOLTAGE to VoltageAcc())
         private val trims = HashMap<String, MutableAgg>()
+        private val trimBins = HashMap<String, Bins>()
+        private val coolantBins = Bins()
+        private val idleRpm = MutableAgg()
+        private val idleRpmBins = Bins()
         private val idleMaf = MutableAgg()
         private val mil = MutableAgg()
 
@@ -89,11 +99,16 @@ object SessionDigester {
         fun accept(sensorId: String, v: Double, t: Long) {
             if (v.isNaN() || v.isInfinite()) return
             when (sensorId) {
-                RPM -> { rpm = v; rpmAt = t }
+                RPM -> {
+                    rpm = v; rpmAt = t
+                    val idle = fresh(speedAt, t, STATE_MAX_AGE_MS) && speed == 0.0 && v > RUNNING_RPM && v <= IDLE_MAX_RPM
+                    if (idle && warm(t)) { idleRpm.add(v); idleRpmBins.add(v) }
+                }
                 SPEED -> { speed = v; speedAt = t }
                 COOLANT -> {
                     coolantNow = v; coolantAt = t
                     coolant.add(v)
+                    coolantBins.add(v)
                     overheatWarn.update(t, v >= OVERHEAT_WARN_C)
                     overheatCrit.update(t, v >= OVERHEAT_CRIT_C)
                     if (firstCoolant == null) { firstCoolant = v; firstCoolantAt = t }
@@ -106,7 +121,10 @@ object SessionDigester {
                     if (idle && warm(t)) idleMaf.add(v)
                 }
                 MIL_DISTANCE -> mil.add(v)
-                in SensorIds.TRIMS -> if (warm(t)) trims.getOrPut(sensorId) { MutableAgg() }.add(v)
+                in SensorIds.TRIMS -> if (warm(t)) {
+                    trims.getOrPut(sensorId) { MutableAgg() }.add(v)
+                    trimBins.getOrPut(sensorId) { Bins() }.add(v)
+                }
             }
         }
 
@@ -129,8 +147,22 @@ object SessionDigester {
                 milDistanceKm = mil.toAgg(),
                 coldStartC = firstCoolant,
                 warmupMs = warmupMs,
+                coolantHist = coolantBins.toHistogram(),
+                warmTrimHist = trimBins.mapValues { it.value.toHistogram() },
+                warmIdleRpm = idleRpm.toAgg(),
+                warmIdleRpmHist = idleRpmBins.toHistogram(),
             )
         }
+    }
+
+    /** Изменяемая гистограмма с шагом 0,1 (как [Histogram]) — без копии карты на каждом значении. */
+    private class Bins {
+        private val bins = HashMap<Int, Int>()
+        fun add(v: Double) {
+            val bin = (v * 10).roundToInt()
+            bins[bin] = (bins[bin] ?: 0) + 1
+        }
+        fun toHistogram() = if (bins.isEmpty()) Histogram.EMPTY else Histogram(bins.toMap())
     }
 
     private class MutableAgg {
