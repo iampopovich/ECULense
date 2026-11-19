@@ -16,7 +16,7 @@ val aiChatModule = module {
     viewModel { (prefill: String?) -> ChatViewModel(get(), get(), prefill) }
     navigation<AiChatDestination> { route -> ChatRoute(route.prefill) }
     single(named("aichat-hub")) {
-        HubEntry(Hub.PITSTOP, AiChatDestination(), "ИИ-помощник", "Спросить о машине и ошибках", R.drawable.ic_ai, order = 30)
+        HubEntry(Hub.PITSTOP, AiChatDestination(), R.string.aichat_hub_title, R.string.aichat_hub_subtitle, R.drawable.ic_ai, order = 30)
     }
     // Tells the errors screen and the hub: "chat exists, links may be shown".
     single(named("aichat-route")) { RouteHandler(AiChatDestination::class) }

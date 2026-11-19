@@ -16,15 +16,31 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import io.github.iampopovich.eculense.feature.aichat.R as AiChatR
+import io.github.iampopovich.eculense.feature.aisettings.R as AiSettingsR
+import io.github.iampopovich.eculense.feature.connect.R as ConnectR
+import io.github.iampopovich.eculense.feature.dashboard.R as DashR
+import io.github.iampopovich.eculense.feature.dtc.R as DtcR
+import io.github.iampopovich.eculense.feature.pitstop.R as PitstopR
+import io.github.iampopovich.eculense.feature.sessions.R as SessionsR
+import io.github.iampopovich.eculense.feature.settings.R as SettingsR
+import io.github.iampopovich.eculense.feature.stats.R as StatsR
 
-/** Four tabs: «Панель» (start), «Статистика», «Пит-стоп», «Настройки». The adapter screen is an item in the settings hub. */
+/**
+ * Four tabs: Dashboard (start), Statistics, Pit stop, Settings. The adapter screen is an item in the settings hub.
+ * Texts come from the feature resources, so the test passes in any app/device language.
+ */
 @RunWith(AndroidJUnit4::class)
 class AppShellTest {
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
+    private fun string(id: Int): String = InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
+
+    private fun text(id: Int): SemanticsNodeInteraction = rule.onNodeWithText(string(id))
+
     /** Bottom navigation item (the hub title with the same text is not selectable). */
-    private fun tab(label: String): SemanticsNodeInteraction = rule.onNode(hasText(label) and isSelectable())
+    private fun tab(label: Int): SemanticsNodeInteraction = rule.onNode(hasText(string(label)) and isSelectable())
 
     /** The adapter screen requests permissions: grant them up front, otherwise the system dialog tears down the Compose hierarchy. */
     @Before
@@ -37,57 +53,58 @@ class AppShellTest {
 
     @Test
     fun startsOnDashboard() {
-        tab("Панель").assertIsSelected()
-        tab("Статистика").assertIsDisplayed()
-        tab("Пит-стоп").assertIsDisplayed()
-        tab("Настройки").assertIsDisplayed()
-        rule.onNodeWithText("Нет подключения к адаптеру").assertIsDisplayed()
+        tab(DashR.string.dash_tab).assertIsSelected()
+        tab(StatsR.string.stats_tab).assertIsDisplayed()
+        tab(PitstopR.string.pitstop_tab).assertIsDisplayed()
+        tab(SettingsR.string.settings_tab).assertIsDisplayed()
+        text(DashR.string.dash_not_connected).assertIsDisplayed()
     }
 
     @Test
     fun settingsTabListsAdapterEntry() {
-        tab("Настройки").performClick()
-        rule.onNodeWithText("Адаптер").assertIsDisplayed()
-        rule.onNodeWithText("Выбор и подключение ELM327").assertIsDisplayed()
+        tab(SettingsR.string.settings_tab).performClick()
+        text(ConnectR.string.connect_hub_title).assertIsDisplayed()
+        text(ConnectR.string.connect_hub_subtitle).assertIsDisplayed()
         // AI module is wired in: AI settings item in the hub.
-        rule.onNodeWithText("ИИ-помощник").assertIsDisplayed()
-        rule.onNodeWithText("Провайдер, адрес, ключ, модель").assertIsDisplayed()
+        text(AiSettingsR.string.aisettings_hub_title).assertIsDisplayed()
+        text(AiSettingsR.string.aisettings_hub_subtitle).assertIsDisplayed()
     }
 
     @Test
     fun pitstopTabShowsHub() {
-        tab("Пит-стоп").performClick()
-        rule.onNodeWithText("Ошибки (DTC)").assertIsDisplayed()
-        rule.onNodeWithText("Поездки").assertIsDisplayed()
+        tab(PitstopR.string.pitstop_tab).performClick()
+        text(DtcR.string.dtc_hub_title).assertIsDisplayed()
+        text(SessionsR.string.sessions_hub_title).assertIsDisplayed()
         // Exactly one AI card (onNodeWithText fails on duplicates), no placeholder.
-        rule.onNodeWithText("ИИ-помощник").assertIsDisplayed()
-        rule.onNodeWithText("ИИ-помощник появится позже").assertDoesNotExist()
+        text(AiChatR.string.aichat_hub_title).assertIsDisplayed()
+        text(PitstopR.string.pitstop_assistant_later_title).assertDoesNotExist()
     }
 
     @Test
     fun dtcScreenOpensFromPitstopAndKeepsTabSelected() {
-        tab("Пит-стоп").performClick()
-        rule.onNodeWithText("Ошибки (DTC)").performClick()
+        tab(PitstopR.string.pitstop_tab).performClick()
+        text(DtcR.string.dtc_hub_title).performClick()
+        // :feature:dtc screen texts are not in resources yet (until B3).
         rule.onNodeWithText("Прочитать ошибки").assertIsDisplayed()
-        tab("Пит-стоп").assertIsSelected()
+        tab(PitstopR.string.pitstop_tab).assertIsSelected()
     }
 
     @Test
     fun adapterScreenOpensFromSettingsAndKeepsTabSelected() {
-        tab("Настройки").performClick()
-        rule.onNodeWithText("Адаптер").performClick()
-        rule.onNodeWithText("Обновить список").assertIsDisplayed()
-        tab("Настройки").assertIsSelected()
+        tab(SettingsR.string.settings_tab).performClick()
+        text(ConnectR.string.connect_hub_title).performClick()
+        text(ConnectR.string.connect_refresh).assertIsDisplayed()
+        tab(SettingsR.string.settings_tab).assertIsSelected()
         rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-        rule.onNodeWithText("Выбор и подключение ELM327").assertIsDisplayed()
+        text(ConnectR.string.connect_hub_subtitle).assertIsDisplayed()
     }
 
     @Test
     fun adapterScreenOpensFromDashboardButton() {
-        rule.onNodeWithText("Подключить").performClick()
-        rule.onNodeWithText("Обновить список").assertIsDisplayed()
-        tab("Панель").assertIsSelected()
+        text(DashR.string.dash_connect).performClick()
+        text(ConnectR.string.connect_refresh).assertIsDisplayed()
+        tab(DashR.string.dash_tab).assertIsSelected()
         rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-        rule.onNodeWithText("Нет подключения к адаптеру").assertIsDisplayed()
+        text(DashR.string.dash_not_connected).assertIsDisplayed()
     }
 }

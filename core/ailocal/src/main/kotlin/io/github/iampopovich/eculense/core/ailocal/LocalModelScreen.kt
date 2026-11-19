@@ -498,8 +498,8 @@ private fun RunLine(run: BackendRun) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = if (run.ok) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error)
 }
 
-private fun sec(v: Double) = "%.1f".format(v).replace('.', ',')
-private fun num(v: Double) = "%.1f".format(v).replace('.', ',')
+private fun sec(v: Double) = String.format(java.util.Locale.getDefault(), "%.1f", v)
+private fun num(v: Double) = String.format(java.util.Locale.getDefault(), "%.1f", v)
 
 @Composable
 private fun CustomModelCard(state: LocalModelUiState, actions: LocalModelActions) {

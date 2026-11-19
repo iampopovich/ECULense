@@ -168,5 +168,5 @@ internal fun statusText(pack: PackState): String {
 
 internal fun formatSize(bytes: Long): String {
     val mb = bytes / 1024.0 / 1024.0
-    return if (mb >= 1) String.format(Locale.forLanguageTag("ru"), "%.1f МБ", mb) else String.format(Locale.forLanguageTag("ru"), "%d КБ", (bytes / 1024).coerceAtLeast(1))
+    return if (mb >= 1) String.format(Locale.getDefault(), "%.1f МБ", mb) else String.format(Locale.getDefault(), "%d КБ", (bytes / 1024).coerceAtLeast(1))
 }

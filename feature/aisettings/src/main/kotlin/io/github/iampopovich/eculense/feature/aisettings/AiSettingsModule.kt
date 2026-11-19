@@ -26,6 +26,6 @@ val aiSettingsModule = module {
     }
     navigation<AiSettingsDestination> { AiSettingsRoute() }
     single(named("aisettings-hub")) {
-        HubEntry(Hub.SETTINGS, AiSettingsDestination, "ИИ-помощник", "Провайдер, адрес, ключ, модель", R.drawable.ic_ai_settings, order = 20)
+        HubEntry(Hub.SETTINGS, AiSettingsDestination, R.string.aisettings_hub_title, R.string.aisettings_hub_subtitle, R.drawable.ic_ai_settings, order = 20)
     }
 }

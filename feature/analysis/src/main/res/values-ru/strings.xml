@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="analysis_hub_title">Анализ</string>
+    <string name="analysis_hub_subtitle">Находки по записям и кодам ошибок</string>
+</resources>

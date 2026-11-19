@@ -13,5 +13,5 @@ import org.koin.dsl.navigation3.navigation
 val statsModule = module {
     viewModel { StatsViewModel(get(), get(), get()) }
     navigation<StatsDestination> { StatsRoute() }
-    single(named("stats")) { TopLevelEntry(StatsDestination, "Статистика", R.drawable.ic_stats, order = 5) }
+    single(named("stats")) { TopLevelEntry(StatsDestination, R.string.stats_tab, R.drawable.ic_stats, order = 5) }
 }

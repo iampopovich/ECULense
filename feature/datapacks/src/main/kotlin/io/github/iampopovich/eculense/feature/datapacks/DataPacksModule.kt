@@ -22,9 +22,9 @@ val dataPacksFeatureModule = module {
     navigation<AboutDestination> { AboutRoute() }
     navigation<SignalsetDestination> { SignalsetRoute() }
     single(named("datapacks-hub")) {
-        HubEntry(Hub.SETTINGS, DataPacksDestination, "Данные и справочники", "Справочник моделей, базы кодов ошибок", R.drawable.ic_datapacks, order = 30)
+        HubEntry(Hub.SETTINGS, DataPacksDestination, R.string.datapacks_hub_title, R.string.datapacks_hub_subtitle, R.drawable.ic_datapacks, order = 30)
     }
     single(named("about-hub")) {
-        HubEntry(Hub.SETTINGS, AboutDestination, "О приложении", "Версия, лицензии и источники данных", R.drawable.ic_about, order = 90)
+        HubEntry(Hub.SETTINGS, AboutDestination, R.string.datapacks_about_hub_title, R.string.datapacks_about_hub_subtitle, R.drawable.ic_about, order = 90)
     }
 }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="datapacks_hub_title">Data and references</string>
+    <string name="datapacks_hub_subtitle">Vehicle database, trouble code databases</string>
+    <string name="datapacks_about_hub_title">About</string>
+    <string name="datapacks_about_hub_subtitle">Version, licenses and data sources</string>
+</resources>

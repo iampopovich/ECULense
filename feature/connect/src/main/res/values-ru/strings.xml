@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="connect_hub_title">Адаптер</string>
+    <string name="connect_hub_subtitle">Выбор и подключение ELM327</string>
+    <string name="connect_status_disconnected">Не подключено</string>
+    <string name="connect_status_connecting">Подключение к %1$s…</string>
+    <string name="connect_status_connected">Подключено: %1$s</string>
+    <string name="connect_status_failed">Ошибка: %1$s</string>
+    <string name="connect_adapter_info">Адаптер: %1$s, протокол %2$s, PID: %3$d</string>
+    <string name="connect_disconnect">Отключиться</string>
+    <string name="connect_refresh">Обновить список</string>
+    <string name="connect_empty">Нет адаптеров. Спарьте ELM327 в настройках Bluetooth (PIN 1234 или 0000) или подключите USB-адаптер через OTG и нажмите «Обновить».</string>
+</resources>

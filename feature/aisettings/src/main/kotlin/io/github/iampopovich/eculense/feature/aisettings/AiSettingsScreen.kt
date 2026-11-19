@@ -378,7 +378,7 @@ private fun ModelRow(model: ModelInfo, selected: Boolean, onClick: () -> Unit) {
 
 private fun contextLabel(tokens: Long): String = when {
     tokens >= 1_000_000 && tokens % 1_000_000 < 50_000 -> "${tokens / 1_000_000}M"
-    tokens >= 1_000_000 -> String.format(java.util.Locale.ROOT, "%.1fM", tokens / 1_000_000.0)
+    tokens >= 1_000_000 -> String.format(java.util.Locale.getDefault(), "%.1fM", tokens / 1_000_000.0)
     tokens >= 1_000 -> "${tokens / 1_000}K"
     else -> tokens.toString()
 }

@@ -13,13 +13,13 @@ import kotlin.math.roundToLong
 
 /** Texts for the «Обслуживание» screen: numbers with a non-breaking space as the thousands separator, all in Russian. */
 internal object MaintenanceFormat {
-    private val ru = Locale.forLanguageTag("ru")
-    private val dateInput = DateTimeFormatter.ofPattern("dd.MM.yyyy", ru)
+    // Numeric input pattern: independent of the app language.
+    private val dateInput = DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale.ROOT)
 
-    fun km(v: Number): String = String.format(ru, "%,d", v.toDouble().roundToLong()).replace('\u202F', '\u00A0').replace(' ', '\u00A0') + "\u00A0км"
+    fun km(v: Number): String = String.format(Locale.getDefault(), "%,d", v.toDouble().roundToLong()).replace('\u202F', '\u00A0').replace(' ', '\u00A0') + "\u00A0км"
 
     /** A small mileage increment is shown with tenths («0,2 км»), otherwise a short trip looks like «плюс 0 км». */
-    fun addedKm(v: Double): String = if (v < 10.0) String.format(ru, "%.1f", v) + "\u00A0км" else km(v)
+    fun addedKm(v: Double): String = if (v < 10.0) String.format(Locale.getDefault(), "%.1f", v) + "\u00A0км" else km(v)
 
     fun status(s: MaintenanceStatus): String = when (s) {
         MaintenanceStatus.OVERDUE -> "Просрочено"

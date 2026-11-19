@@ -106,7 +106,7 @@ private fun StatusRow(state: AnalysisUiState, onRecompute: () -> Unit) {
     }
 }
 
-private fun seconds(ms: Long) = String.format(Locale.forLanguageTag("ru"), "%.1f с", ms / 1000.0)
+private fun seconds(ms: Long) = String.format(Locale.getDefault(), "%.1f с", ms / 1000.0)
 
 @Composable
 private fun FindingCard(f: StoredFinding, onOpen: (StoredFinding) -> Unit) {

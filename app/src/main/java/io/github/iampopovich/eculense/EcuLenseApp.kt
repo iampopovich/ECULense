@@ -11,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
@@ -50,8 +51,8 @@ fun EcuLenseApp(deepLink: String? = null, onDeepLinkHandled: () -> Unit = {}) {
         navigationSuiteItems = {
             entries.forEach { entry ->
                 item(
-                    icon = { Icon(painterResource(entry.icon), contentDescription = entry.label) },
-                    label = { Text(entry.label) },
+                    icon = { Icon(painterResource(entry.icon), contentDescription = stringResource(entry.labelRes)) },
+                    label = { Text(stringResource(entry.labelRes)) },
                     // Tab = stack root: a sub-screen (e.g. «Адаптер» from settings) does not reset the highlight.
                     selected = backStack.firstOrNull() == entry.destination,
                     onClick = {

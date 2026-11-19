@@ -46,7 +46,7 @@ class LocalLlmRuntime(
         val verdict = reports[active.packId]?.verdict
         val detail = listOfNotNull(
             active.backend.label,
-            run?.let { "%.1f ток/с".format(it.decodeTokensPerSecond).replace('.', ',') },
+            run?.let { String.format(java.util.Locale.getDefault(), "%.1f ток/с", it.decodeTokensPerSecond) },
             verdict?.label,
         ).joinToString(" · ")
         OnDeviceSummary(model.title, detail)

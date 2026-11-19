@@ -19,6 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
+import java.util.Locale
 
 private class FakePacks(var metered: Boolean = false) : DataPackService {
     val states = MutableStateFlow(PackCatalog.all.map { PackState(it) })
@@ -33,8 +34,18 @@ private class FakePacks(var metered: Boolean = false) : DataPackService {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DataPacksViewModelTest {
-    @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
-    @After fun tearDown() = Dispatchers.resetMain()
+    // Sizes are formatted with the app locale; these texts are Russian until the module is migrated (B3).
+    private val savedLocale = Locale.getDefault()
+
+    @Before fun setUp() {
+        Locale.setDefault(Locale.forLanguageTag("ru"))
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+    }
+
+    @After fun tearDown() {
+        Dispatchers.resetMain()
+        Locale.setDefault(savedLocale)
+    }
 
     private val vehicles get() = PackState(PackCatalog.vehicles)
 

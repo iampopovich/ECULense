@@ -12,6 +12,7 @@ import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.MaintenanceItem
 import io.github.iampopovich.eculense.core.model.OdometerEntry
 import kotlinx.coroutines.Dispatchers
+import java.util.Locale
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -138,6 +139,13 @@ class MaintenanceViewModelTest {
 
 class MaintenanceFormatTest {
     private val zone = ZoneOffset.UTC
+
+    // Numbers follow the app locale; the texts are Russian until the module is migrated (B2).
+    private val savedLocale = Locale.getDefault()
+
+    @Before fun russianLocale() = Locale.setDefault(Locale.forLanguageTag("ru"))
+
+    @After fun restoreLocale() = Locale.setDefault(savedLocale)
     private fun ms(d: String) = LocalDate.parse(d).atStartOfDay(zone).toInstant().toEpochMilli()
 
     @Test

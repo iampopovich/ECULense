@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sessions_hub_title">Trips</string>
+    <string name="sessions_hub_subtitle">Recordings, charts and CSV export</string>
+    <string name="sessions_import">Import from Car Scanner</string>
+    <string name="sessions_empty">No recordings yet. Tap Record on the dashboard.</string>
+    <string name="sessions_source_live">recorded from the adapter</string>
+    <string name="sessions_source_carscanner">imported from Car Scanner</string>
+    <string name="sessions_loading">Loading recording…</string>
+    <string name="sessions_too_few_points">Not enough points for a chart</string>
+    <string name="sessions_export_chooser">Export CSV</string>
+    <string name="sessions_share_csv">Share CSV</string>
+</resources>

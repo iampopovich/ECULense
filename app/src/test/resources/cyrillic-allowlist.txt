@@ -1,0 +1,36 @@
+# Path prefixes (relative to the repo root) whose main Kotlin sources may contain Cyrillic outside comments.
+# Checked by app/src/test/.../NoCyrillicLiteralsTest.kt. Every entry must still match an offending file.
+
+# Permanent: router keywords match the user's Russian input.
+core/ai/src/main/kotlin/io/github/iampopovich/eculense/core/ai/ChatRouter.kt
+# Permanent: Car Scanner backup field and column names.
+core/carscanner/
+
+# Temporary: modules not migrated to string resources yet. Each batch removes its own lines.
+core/model/            # temporary until B2
+core/analytics/        # temporary until B2
+feature/car/           # temporary until B2
+feature/maintenance/   # temporary until B2
+core/ailocal/          # temporary until B3
+core/background/       # temporary until B3
+core/service/          # temporary until B3
+feature/aichat/        # temporary until B3
+feature/aisettings/    # temporary until B3
+feature/analysis/      # temporary until B3
+feature/backup/        # temporary until B3
+feature/datapacks/     # temporary until B3
+feature/dtc/           # temporary until B3
+feature/stats/         # temporary until B3
+core/backup/           # temporary until B4
+core/bluetooth/        # temporary until B4
+core/data/             # temporary until B4
+core/database/         # temporary until B4
+core/datapacks/        # temporary until B4
+core/demo/             # temporary until B4
+core/dtcdb/            # temporary until B4
+core/obd/              # temporary until B4
+core/obdb/             # temporary until B4
+core/usb/              # temporary until B4
+core/vehicledb/        # temporary until B4
+core/ai/               # temporary until B5
+core/aitools/          # temporary until B5

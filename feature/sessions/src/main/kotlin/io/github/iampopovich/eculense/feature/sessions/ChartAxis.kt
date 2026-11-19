@@ -12,6 +12,6 @@ internal fun niceXStepSeconds(durationSec: Double): Double {
     return niceSteps.firstOrNull { it >= target } ?: niceSteps.last()
 }
 
-/** Defaults to RPM if it was recorded (as in the plan: «график оборотов»), otherwise the first sensor. */
+/** Defaults to RPM if it was recorded (as in the plan: "RPM chart"), otherwise the first sensor. */
 internal fun defaultSensor(sensorIds: List<String>): String? =
     sensorIds.firstOrNull { it == "01.0C" } ?: sensorIds.firstOrNull()

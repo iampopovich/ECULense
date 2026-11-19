@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="datapacks_hub_title">Данные и справочники</string>
+    <string name="datapacks_hub_subtitle">Справочник моделей, базы кодов ошибок</string>
+    <string name="datapacks_about_hub_title">О приложении</string>
+    <string name="datapacks_about_hub_subtitle">Версия, лицензии и источники данных</string>
+</resources>

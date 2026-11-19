@@ -21,6 +21,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
@@ -75,17 +76,18 @@ internal fun SessionDetailRoute(sessionId: Long, viewModel: SessionDetailViewMod
                 modifier = Modifier.fillMaxWidth().height(260.dp),
             )
         } else if (loading) {
-            Text("Загрузка записи…")
+            Text(stringResource(R.string.sessions_loading))
         } else {
-            Text("Мало точек для графика")
+            Text(stringResource(R.string.sessions_too_few_points))
         }
+        val chooserTitle = stringResource(R.string.sessions_export_chooser)
         Button(onClick = {
             scope.launch {
                 val uri = viewModel.exportCsv()
                 val send = Intent(Intent.ACTION_SEND).setType("text/csv").putExtra(Intent.EXTRA_STREAM, uri)
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                context.startActivity(Intent.createChooser(send, "Экспорт CSV"))
+                context.startActivity(Intent.createChooser(send, chooserTitle))
             }
-        }) { Text("Поделиться CSV") }
+        }) { Text(stringResource(R.string.sessions_share_csv)) }
     }
 }

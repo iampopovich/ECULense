@@ -8,6 +8,7 @@ import io.github.iampopovich.eculense.core.obd.ConnectionController
 import io.github.iampopovich.eculense.core.obd.ConnectionState
 import io.github.iampopovich.eculense.core.obd.Pid
 import io.github.iampopovich.eculense.core.obd.StandardPids
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +19,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 internal data class LiveValue(val pid: Pid, val value: Double?, val unit: String = pid.unit)
 
@@ -27,13 +27,18 @@ internal data class DashboardUiState(
     val values: List<LiveValue> = emptyList(),
     val recording: Boolean = false,
     /** Short "adapter · protocol · voltage" line, only while connected. */
-    val status: String? = null,
+    val status: UiText? = null,
 )
 
-internal fun ConnectionState.statusLine(): String? {
+/** The voltage is passed as a number: the resource formats it with the app locale (12.6 V in English, 12,6 V in Russian). */
+internal fun ConnectionState.statusLine(): UiText? {
     if (this !is ConnectionState.Connected) return null
-    val voltage = info.batteryVoltage?.let { " · " + String.format(Locale.ROOT, "%.1f", it) + " В" }.orEmpty()
-    return "${endpoint.label} · протокол ${info.protocolNumber}$voltage"
+    val voltage = info.batteryVoltage
+    return if (voltage != null) {
+        UiText.Res(R.string.dash_status_voltage, listOf(endpoint.label, info.protocolNumber, voltage))
+    } else {
+        UiText.Res(R.string.dash_status, listOf(endpoint.label, info.protocolNumber))
+    }
 }
 
 internal class DashboardViewModel(
@@ -71,9 +76,10 @@ internal class DashboardViewModel(
         viewModelScope.launch { controller.readings.collect { r -> latest.update { it + (r.sensorId to r.value) } } }
     }
 
-    fun toggleRecording() {
+    /** [name] turns the "dd.MM HH:mm" stamp into the session name (the UI passes the localized template). */
+    fun toggleRecording(name: (stamp: String) -> String = { it }) {
         if (recorder.activeSessionId.value == null) {
-            recorder.start("Запись " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM HH:mm")))
+            recorder.start(name(LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM HH:mm"))))
         } else {
             recorder.stop()
         }

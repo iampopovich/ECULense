@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pitstop_tab">Пит-стоп</string>
+    <string name="pitstop_empty">Здесь появятся помощники: расшифровка ошибок, история поездок и анализ данных.</string>
+    <string name="pitstop_assistant_title">ИИ-помощник</string>
+    <string name="pitstop_assistant_subtitle">Спросить о машине и ошибках</string>
+    <string name="pitstop_assistant_later_title">ИИ-помощник появится позже</string>
+    <string name="pitstop_assistant_later_subtitle">Модуль ИИ пока не подключён</string>
+</resources>

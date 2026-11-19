@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dtc_hub_title">Ошибки (DTC)</string>
+    <string name="dtc_hub_subtitle">Чтение и сброс кодов с расшифровкой</string>
+</resources>

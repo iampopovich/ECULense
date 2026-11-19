@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.obd.AdapterEndpoint
@@ -55,12 +56,12 @@ internal fun ConnectScreen(
     Column(modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(statusText(state), style = MaterialTheme.typography.titleMedium)
         if (state is ConnectionState.Connected) {
-            Text("Адаптер: ${state.info.version}, протокол ${state.info.protocolNumber}, PID: ${state.supportedPids.size}")
-            Button(onClick = onDisconnect) { Text("Отключиться") }
+            Text(stringResource(R.string.connect_adapter_info, state.info.version, state.info.protocolNumber, state.supportedPids.size))
+            Button(onClick = onDisconnect) { Text(stringResource(R.string.connect_disconnect)) }
         }
-        OutlinedButton(onClick = onRefresh) { Text("Обновить список") }
+        OutlinedButton(onClick = onRefresh) { Text(stringResource(R.string.connect_refresh)) }
         if (endpoints.isEmpty()) {
-            Text("Нет адаптеров. Спарьте ELM327 в настройках Bluetooth (PIN 1234 или 0000) или подключите USB-адаптер через OTG и нажмите «Обновить».")
+            Text(stringResource(R.string.connect_empty))
         }
         LazyColumn {
             items(endpoints, key = { it.kind + it.address }) { endpoint ->
@@ -74,9 +75,11 @@ internal fun ConnectScreen(
     }
 }
 
-private fun statusText(state: ConnectionState) = when (state) {
-    ConnectionState.Disconnected -> "Не подключено"
-    is ConnectionState.Connecting -> "Подключение к ${state.endpoint.label}…"
-    is ConnectionState.Connected -> "Подключено: ${state.endpoint.label}"
-    is ConnectionState.Failed -> "Ошибка: ${state.reason}"
+/** Adapter labels and failure reasons come from the transport layer and are shown as is. */
+@Composable
+private fun statusText(state: ConnectionState): String = when (state) {
+    ConnectionState.Disconnected -> stringResource(R.string.connect_status_disconnected)
+    is ConnectionState.Connecting -> stringResource(R.string.connect_status_connecting, state.endpoint.label)
+    is ConnectionState.Connected -> stringResource(R.string.connect_status_connected, state.endpoint.label)
+    is ConnectionState.Failed -> stringResource(R.string.connect_status_failed, state.reason)
 }

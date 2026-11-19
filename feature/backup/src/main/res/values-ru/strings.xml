@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="backup_hub_title">Импорт и резервные копии</string>
+    <string name="backup_hub_subtitle">Бэкапы Car Scanner, копия данных ECULense</string>
+</resources>

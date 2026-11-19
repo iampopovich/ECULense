@@ -51,6 +51,14 @@ android {
         compose = true
         buildConfig = true
     }
+    // Per-app language: AGP generates the locale config from the values-* folders
+    // (the default locale comes from src/main/res/resources.properties) and links it in the manifest.
+    androidResources {
+        generateLocaleConfig = true
+    }
+    lint {
+        error += setOf("MissingTranslation", "MissingQuantity", "ExtraTranslation")
+    }
     // 3.10 item 11: two builds of one app (same applicationId, different APKs). cloud — cloud providers only
     // (≈ 10 MB), local — plus the on-device model (:core:ailocal, LiteRT-LM, ≈ 35 MB). The only difference is the flavor
     // source set (OnDeviceModules.kt) and the localImplementation dependency; shared code never sees :core:ailocal types.
@@ -64,6 +72,16 @@ android {
             versionNameSuffix = "-local"
         }
     }
+}
+
+// NoCyrillicLiteralsTest scans every module's main Kotlin sources: declare them as inputs so the test reruns on changes.
+tasks.withType<Test>().configureEach {
+    inputs.files(
+        fileTree(rootDir) {
+            include("*/*/src/main/**/*.kt", "app/src/main/**/*.kt")
+            exclude("**/build/**")
+        },
+    ).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("mainKotlinSources")
 }
 
 androidComponents {
@@ -122,6 +140,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pitstop_tab">Pit stop</string>
+    <string name="pitstop_empty">Helpers will appear here: trouble code lookup, trip history and data analysis.</string>
+    <string name="pitstop_assistant_title">AI assistant</string>
+    <string name="pitstop_assistant_subtitle">Ask about your car and trouble codes</string>
+    <string name="pitstop_assistant_later_title">AI assistant coming later</string>
+    <string name="pitstop_assistant_later_subtitle">The AI module is not included yet</string>
+</resources>

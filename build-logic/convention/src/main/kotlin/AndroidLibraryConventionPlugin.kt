@@ -21,6 +21,10 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                     sourceCompatibility = JavaVersion.VERSION_17
                     targetCompatibility = JavaVersion.VERSION_17
                 }
+                // Every values-ru string needs an English default and vice versa (plurals included).
+                lint {
+                    error += setOf("MissingTranslation", "MissingQuantity", "ExtraTranslation")
+                }
             }
             dependencies {
                 add("implementation", lib("kotlinx-coroutines-core"))

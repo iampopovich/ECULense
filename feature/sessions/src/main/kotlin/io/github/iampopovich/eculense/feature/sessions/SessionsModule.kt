@@ -12,7 +12,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
-/** Trips are an item in the «Пит-стоп» hub; trip details open on top of the list. */
+/** Trips are an item in the Pit stop hub; trip details open on top of the list. */
 @OptIn(KoinExperimentalAPI::class)
 val sessionsModule = module {
     viewModelOf(::SessionsViewModel)
@@ -20,6 +20,6 @@ val sessionsModule = module {
     navigation<SessionsDestination> { SessionsRoute() }
     navigation<SessionDetailDestination> { route -> SessionDetailRoute(route.sessionId) }
     single(named("sessions-hub")) {
-        HubEntry(Hub.PITSTOP, SessionsDestination, "Поездки", "Записи, графики и экспорт CSV", R.drawable.ic_sessions, order = 20)
+        HubEntry(Hub.PITSTOP, SessionsDestination, R.string.sessions_hub_title, R.string.sessions_hub_subtitle, R.drawable.ic_sessions, order = 20)
     }
 }

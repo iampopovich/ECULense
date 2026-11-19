@@ -17,17 +17,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.navigation.ConnectDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import org.koin.compose.viewmodel.koinViewModel
+import java.util.Locale
 
 @Composable
 internal fun DashboardRoute(viewModel: DashboardViewModel = koinViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val navigator = LocalNavigator.current
-    DashboardScreen(state, onToggleRecording = viewModel::toggleRecording, onConnect = { navigator.navigate(ConnectDestination) })
+    // The session name is stored in the database, so it is built in the language active when recording starts.
+    val sessionName = stringResource(R.string.dash_session_name)
+    DashboardScreen(
+        state,
+        onToggleRecording = { viewModel.toggleRecording { stamp -> sessionName.format(stamp) } },
+        onConnect = { navigator.navigate(ConnectDestination) },
+    )
 }
 
 @Composable
@@ -40,18 +48,18 @@ internal fun DashboardScreen(
     if (!state.connected) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Нет подключения к адаптеру")
-                Button(onClick = onConnect) { Text("Подключить") }
+                Text(stringResource(R.string.dash_not_connected))
+                Button(onClick = onConnect) { Text(stringResource(R.string.dash_connect)) }
             }
         }
         return
     }
     Column(modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         state.status?.let {
-            Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(it.asString(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         FilledTonalButton(onClick = onToggleRecording) {
-            Text(if (state.recording) "■ Остановить запись" else "● Записывать")
+            Text(stringResource(if (state.recording) R.string.dash_stop_recording else R.string.dash_record))
         }
         LazyVerticalGrid(columns = GridCells.Adaptive(160.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(state.values, key = { it.pid.sensorId }) { item ->
@@ -59,7 +67,7 @@ internal fun DashboardScreen(
                     Column(Modifier.padding(12.dp)) {
                         Text(item.pid.name, style = MaterialTheme.typography.labelMedium)
                         Text(
-                            item.value?.let { "%.1f".format(it) } ?: "—",
+                            item.value?.let { String.format(Locale.getDefault(), "%.1f", it) } ?: "—",
                             style = MaterialTheme.typography.headlineMedium,
                         )
                         Text(item.unit, style = MaterialTheme.typography.labelSmall)

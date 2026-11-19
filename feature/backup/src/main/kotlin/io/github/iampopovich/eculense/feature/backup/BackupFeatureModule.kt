@@ -18,7 +18,7 @@ val backupFeatureModule = module {
     viewModel { BackupViewModel(get(), get(), get(), get(), get()) }
     navigation<BackupDestination> { BackupRoute() }
     single(named("backup-hub")) {
-        HubEntry(Hub.SETTINGS, BackupDestination, "Импорт и резервные копии", "Бэкапы Car Scanner, копия данных ECULense", R.drawable.ic_backup, order = 25)
+        HubEntry(Hub.SETTINGS, BackupDestination, R.string.backup_hub_title, R.string.backup_hub_subtitle, R.drawable.ic_backup, order = 25)
     }
     single(named("backup-route")) { RouteHandler(BackupDestination::class) }
 }

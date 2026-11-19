@@ -26,6 +26,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object LocalModelDestination : NavKey
 /** 1.27: «Импорт и резервные копии» (:feature:backup); «Записи»/«Статистика» link here if there is a RouteHandler. */
 @Serializable data object BackupDestination : NavKey
+/** App language picker (:feature:settings). */
+@Serializable data object LanguageDestination : NavKey
 
 /**
  * Links from notifications: MainActivity receives the [EXTRA_SCREEN] extra and opens the screen on top of «Пит-стоп»

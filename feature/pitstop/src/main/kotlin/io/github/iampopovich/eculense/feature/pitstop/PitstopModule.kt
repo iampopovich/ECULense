@@ -4,6 +4,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import io.github.iampopovich.eculense.core.navigation.AiChatDestination
 import io.github.iampopovich.eculense.core.navigation.Hub
 import io.github.iampopovich.eculense.core.navigation.HubEntry
@@ -22,13 +23,13 @@ import org.koin.dsl.module
 import org.koin.dsl.navigation3.navigation
 
 /**
- * The «Пит-стоп» tab: a hub of helpers (codes, trip history, analysis…). Features register items themselves
+ * The Pit stop tab: a hub of helpers (codes, trip history, analysis…). Features register items themselves
  * via HubEntry(Hub.PITSTOP, …); the AI assistant is shown only if some feature declared RouteHandler(AiChatDestination).
  */
 @OptIn(KoinExperimentalAPI::class)
 val pitstopModule = module {
     navigation<PitstopDestination> { PitstopRoute() }
-    single(named("pitstop")) { TopLevelEntry(PitstopDestination, "Пит-стоп", R.drawable.ic_pitstop, order = 10) }
+    single(named("pitstop")) { TopLevelEntry(PitstopDestination, R.string.pitstop_tab, R.drawable.ic_pitstop, order = 10) }
 }
 
 @Composable
@@ -39,24 +40,33 @@ internal fun PitstopRoute() {
     // The chat registers its own HubEntry — then a separate placeholder card isn't needed (one AI card).
     val assistantListed = entries.any { it.destination is AiChatDestination }
     val navigator = LocalNavigator.current
-    HubScaffold(title = "Пит-стоп") {
+    HubScaffold(title = stringResource(R.string.pitstop_tab)) {
         if (entries.isEmpty()) {
-            item { HubEmptyText("Здесь появятся помощники: расшифровка ошибок, история поездок и анализ данных.") }
+            item { HubEmptyText(stringResource(R.string.pitstop_empty)) }
         }
-        items(entries, key = { it.title }) { entry ->
-            HubCard(entry.title, entry.subtitle, painterResource(entry.icon), onClick = { navigator.navigate(entry.destination) })
+        items(entries, key = { it.titleRes }) { entry ->
+            HubCard(
+                stringResource(entry.titleRes),
+                stringResource(entry.subtitleRes),
+                painterResource(entry.icon),
+                onClick = { navigator.navigate(entry.destination) },
+            )
         }
         if (!assistantListed) {
             item {
                 if (hasAssistant) {
                     HubCard(
-                        "ИИ-помощник",
-                        "Спросить о машине и ошибках",
+                        stringResource(R.string.pitstop_assistant_title),
+                        stringResource(R.string.pitstop_assistant_subtitle),
                         painterResource(R.drawable.ic_assistant),
                         onClick = { navigator.navigate(AiChatDestination()) },
                     )
                 } else {
-                    HubCard("ИИ-помощник появится позже", "Модуль ИИ пока не подключён", painterResource(R.drawable.ic_assistant))
+                    HubCard(
+                        stringResource(R.string.pitstop_assistant_later_title),
+                        stringResource(R.string.pitstop_assistant_later_subtitle),
+                        painterResource(R.drawable.ic_assistant),
+                    )
                 }
             }
         }

@@ -23,6 +23,6 @@ val carModule = module {
         CarEditRoute(route.carId, onClose = { back?.onBackPressedDispatcher?.onBackPressed() })
     }
     single(named("car-hub")) {
-        HubEntry(Hub.SETTINGS, CarDestination, "Автомобиль", "Профиль машины, выбор активной, единицы", R.drawable.ic_car, order = 5)
+        HubEntry(Hub.SETTINGS, CarDestination, R.string.car_hub_title, R.string.car_hub_subtitle, R.drawable.ic_car, order = 5)
     }
 }

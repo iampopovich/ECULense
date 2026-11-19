@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Recordings list. Car Scanner import moved to «Настройки → Импорт и резервные копии» (1.27, :feature:backup). */
+/** Recordings list. Car Scanner import moved to Settings → Import and backups (1.27, :feature:backup). */
 internal class SessionsViewModel(
     private val repository: SessionRepository,
 ) : ViewModel() {

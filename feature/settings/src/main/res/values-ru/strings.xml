@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_tab">Настройки</string>
+    <string name="settings_empty">Нет доступных настроек.</string>
+    <string name="settings_language_title">Язык</string>
+    <string name="settings_language_subtitle">Язык приложения</string>
+    <string name="settings_language_system">Как в системе</string>
+</resources>

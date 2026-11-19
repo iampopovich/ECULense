@@ -5,6 +5,7 @@ import io.github.iampopovich.eculense.core.data.UnitsRepository
 import io.github.iampopovich.eculense.core.model.UnitsSettings
 import io.github.iampopovich.eculense.core.model.SensorReading
 import io.github.iampopovich.eculense.core.obd.FakeConnectionController
+import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +22,8 @@ import org.junit.Test
 
 private class FakeRecorder : SessionRecorder {
     override val activeSessionId = MutableStateFlow<Long?>(null)
-    override fun start(name: String) { activeSessionId.value = 7L }
+    val names = mutableListOf<String>()
+    override fun start(name: String) { names += name; activeSessionId.value = 7L }
     override fun stop() { activeSessionId.value = null }
 }
 
@@ -46,8 +48,9 @@ class DashboardViewModelTest {
         val recorder = FakeRecorder()
         val vm = DashboardViewModel(FakeConnectionController(initial = FakeConnectionController.connected(setOf(0x0C))), recorder, FakeUnits())
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
-        vm.toggleRecording()
+        vm.toggleRecording { "Trip $it" }
         assertTrue(vm.uiState.value.recording)
+        assertTrue(recorder.names.single(), recorder.names.single().matches(Regex("Trip \\d{2}\\.\\d{2} \\d{2}:\\d{2}")))
     }
 
     @Test
@@ -55,7 +58,7 @@ class DashboardViewModelTest {
         val controller = FakeConnectionController(initial = FakeConnectionController.connected(setOf(0x0C)))
         val vm = DashboardViewModel(controller, FakeRecorder(), FakeUnits())
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
-        assertEquals("Fake ELM · протокол 6 · 12.6 В", vm.uiState.value.status)
+        assertEquals(UiText.Res(R.string.dash_status_voltage, listOf("Fake ELM", '6', 12.6)), vm.uiState.value.status)
         controller.disconnect()
         assertEquals(null, vm.uiState.value.status)
     }

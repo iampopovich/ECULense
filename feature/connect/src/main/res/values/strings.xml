@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="connect_hub_title">Adapter</string>
+    <string name="connect_hub_subtitle">Choose and connect an ELM327</string>
+    <string name="connect_status_disconnected">Not connected</string>
+    <string name="connect_status_connecting">Connecting to %1$s…</string>
+    <string name="connect_status_connected">Connected: %1$s</string>
+    <string name="connect_status_failed">Error: %1$s</string>
+    <string name="connect_adapter_info">Adapter: %1$s, protocol %2$s, PIDs: %3$d</string>
+    <string name="connect_disconnect">Disconnect</string>
+    <string name="connect_refresh">Refresh list</string>
+    <string name="connect_empty">No adapters. Pair an ELM327 in Bluetooth settings (PIN 1234 or 0000) or connect a USB adapter via OTG, then tap Refresh list.</string>
+</resources>

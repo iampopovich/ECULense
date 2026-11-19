@@ -27,6 +27,6 @@ val analysisModule = module {
     navigation<AnalysisDestination> { AnalysisRoute() }
     navigation<FindingDestination> { route -> FindingRoute(route.findingId) }
     single(named("analysis-hub")) {
-        HubEntry(Hub.PITSTOP, AnalysisDestination, "Анализ", "Находки по записям и кодам ошибок", R.drawable.ic_analysis, order = 15)
+        HubEntry(Hub.PITSTOP, AnalysisDestination, R.string.analysis_hub_title, R.string.analysis_hub_subtitle, R.drawable.ic_analysis, order = 15)
     }
 }

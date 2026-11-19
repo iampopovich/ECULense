@@ -15,6 +15,6 @@ val maintenanceModule = module {
     viewModel { MaintenanceViewModel(get(), get()) }
     navigation<MaintenanceDestination> { MaintenanceRoute() }
     single(named("maintenance-hub")) {
-        HubEntry(Hub.PITSTOP, MaintenanceDestination, "Обслуживание", "ТО, пробег и напоминания", R.drawable.ic_maintenance, order = 17)
+        HubEntry(Hub.PITSTOP, MaintenanceDestination, R.string.maint_hub_title, R.string.maint_hub_subtitle, R.drawable.ic_maintenance, order = 17)
     }
 }

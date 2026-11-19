@@ -5,10 +5,8 @@ import io.github.iampopovich.eculense.core.model.UnitsSettings
 import java.util.Locale
 
 internal object StatsFormat {
-    private val ru = Locale.forLanguageTag("ru")
-
     /** Thousands separator is always a non-breaking space (ICU yields either U+00A0 or the narrow U+202F). */
-    fun number(v: Double, decimals: Int = 1): String = String.format(ru, "%,.${decimals}f", v).replace('\u202F', '\u00A0')
+    fun number(v: Double, decimals: Int = 1): String = String.format(Locale.getDefault(), "%,.${decimals}f", v).replace('\u202F', '\u00A0')
 
     fun distance(km: Double, units: UnitsSettings): String = units.distance(km).let { (v, u) -> "${number(v)} $u" }
 

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_tab">Settings</string>
+    <string name="settings_empty">No settings available.</string>
+    <string name="settings_language_title">Language</string>
+    <string name="settings_language_subtitle">App language</string>
+    <string name="settings_language_system">System default</string>
+    <!-- Language names are shown in the language itself and are never translated. -->
+    <string name="settings_language_english" translatable="false">English</string>
+    <string name="settings_language_russian" translatable="false">Русский</string>
+</resources>

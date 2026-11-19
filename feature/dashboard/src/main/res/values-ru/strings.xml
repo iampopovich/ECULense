@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dash_tab">Панель</string>
+    <string name="dash_not_connected">Нет подключения к адаптеру</string>
+    <string name="dash_connect">Подключить</string>
+    <string name="dash_record">● Записывать</string>
+    <string name="dash_stop_recording">■ Остановить запись</string>
+    <string name="dash_session_name">Запись %1$s</string>
+    <string name="dash_status">%1$s · протокол %2$s</string>
+    <string name="dash_status_voltage">%1$s · протокол %2$s · %3$.1f В</string>
+</resources>

@@ -32,6 +32,6 @@ val dtcModule = module {
     viewModel { DtcViewModel(get(), get(), get(), routeHandlers = getAll(), historySource = get()) }
     navigation<DtcDestination> { DtcRoute() }
     single(named("dtc-hub")) {
-        HubEntry(Hub.PITSTOP, DtcDestination, "Ошибки (DTC)", "Чтение и сброс кодов с расшифровкой", R.drawable.ic_dtc, order = 10)
+        HubEntry(Hub.PITSTOP, DtcDestination, R.string.dtc_hub_title, R.string.dtc_hub_subtitle, R.drawable.ic_dtc, order = 10)
     }
 }

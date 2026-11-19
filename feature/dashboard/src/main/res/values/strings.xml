@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dash_tab">Dashboard</string>
+    <string name="dash_not_connected">No adapter connected</string>
+    <string name="dash_connect">Connect</string>
+    <string name="dash_record">● Record</string>
+    <string name="dash_stop_recording">■ Stop recording</string>
+    <string name="dash_session_name">Recording %1$s</string>
+    <string name="dash_status">%1$s · protocol %2$s</string>
+    <string name="dash_status_voltage">%1$s · protocol %2$s · %3$.1f V</string>
+</resources>
