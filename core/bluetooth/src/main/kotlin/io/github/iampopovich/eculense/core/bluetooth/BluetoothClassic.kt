@@ -6,6 +6,8 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import io.github.iampopovich.eculense.core.obd.AdapterEndpoint
+import io.github.iampopovich.eculense.core.obd.ObdError
+import io.github.iampopovich.eculense.core.obd.ObdException
 import io.github.iampopovich.eculense.core.obd.ObdTransport
 import io.github.iampopovich.eculense.core.obd.StreamTransport
 import io.github.iampopovich.eculense.core.obd.TransportFactory
@@ -60,7 +62,7 @@ internal class BluetoothClassicFactory(context: Context) : TransportFactory {
     }
 
     override fun create(endpoint: AdapterEndpoint): ObdTransport =
-        BluetoothClassicTransport(requireNotNull(adapter) { "На устройстве нет Bluetooth" }, endpoint.address)
+        BluetoothClassicTransport(adapter ?: throw ObdException(ObdError.NoBluetooth), endpoint.address)
 
     companion object {
         const val KIND = "bt"

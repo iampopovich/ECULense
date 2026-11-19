@@ -29,7 +29,7 @@ class TcpTransport(
 class WifiTransportFactory(includeEmulator: Boolean = false) : TransportFactory {
     private val endpoints = buildList {
         add(AdapterEndpoint(KIND, "192.168.0.10:35000", "Wi-Fi ELM327 (192.168.0.10)"))
-        if (includeEmulator) add(AdapterEndpoint(KIND, "10.0.2.2:35000", "Эмулятор ELM327 на ПК (10.0.2.2)"))
+        if (includeEmulator) add(AdapterEndpoint(KIND, "10.0.2.2:35000", "ELM327 emulator on PC (10.0.2.2)", EndpointLabel.PC_EMULATOR))
     }
 
     override val kind = KIND

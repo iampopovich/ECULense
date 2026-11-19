@@ -10,6 +10,7 @@ import io.github.iampopovich.eculense.core.model.DtcKind
 import io.github.iampopovich.eculense.core.navigation.AiChatDestination
 import io.github.iampopovich.eculense.core.navigation.RouteHandler
 import io.github.iampopovich.eculense.core.obd.ConnectionController
+import io.github.iampopovich.eculense.core.obdtext.ObdText
 import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -105,7 +106,7 @@ internal class DtcViewModel(
             try {
                 block()
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message?.let { m -> UiText.Raw(m) }) }
+                _uiState.update { it.copy(error = ObdText.error(e)) }
             } finally {
                 _uiState.update { it.copy(loading = false) }
             }

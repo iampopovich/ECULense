@@ -25,6 +25,13 @@ class Elm327SessionTest {
     }
 
     @Test
+    fun `silent ECU is a typed error`() = runTest {
+        val silentEcu = ScriptedTransport(FakeCar.replies + ("0100" to "NO DATA"))
+        val e = runCatching { Elm327Session(ElmLink(silentEcu)).initialize() }.exceptionOrNull()
+        assertEquals(ObdError.EcuSilent, (e as ObdException).error)
+    }
+
+    @Test
     fun `supported pids follow the 0x20 continuation bit`() = runTest {
         session.initialize()
         val pids = session.supportedPids()

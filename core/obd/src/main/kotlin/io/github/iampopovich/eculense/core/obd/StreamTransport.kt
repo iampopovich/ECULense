@@ -37,7 +37,7 @@ abstract class StreamTransport : ObdTransport {
                     if (n < 0) break
                     if (n > 0) chunks.send(buffer.copyOf(n))
                 }
-                chunks.close(IOException("Адаптер закрыл соединение"))
+                chunks.close(ObdIoException(ObdError.AdapterClosed))
             } catch (e: IOException) {
                 chunks.close(e)
             }
@@ -46,7 +46,7 @@ abstract class StreamTransport : ObdTransport {
 
     override suspend fun write(data: ByteArray) {
         withContext(Dispatchers.IO) {
-            val out = output ?: throw IOException("Транспорт не открыт")
+            val out = output ?: throw ObdIoException(ObdError.NotOpen)
             out.write(data)
             out.flush()
         }

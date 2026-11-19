@@ -22,7 +22,7 @@ sealed interface ConnectionState {
     data object Disconnected : ConnectionState
     data class Connecting(val endpoint: AdapterEndpoint) : ConnectionState
     data class Connected(val endpoint: AdapterEndpoint, val info: AdapterInfo, val supportedPids: Set<Int>) : ConnectionState
-    data class Failed(val endpoint: AdapterEndpoint, val reason: String) : ConnectionState
+    data class Failed(val endpoint: AdapterEndpoint, val error: ObdError) : ConnectionState
 }
 
 interface ConnectionController {
@@ -82,7 +82,7 @@ class ObdConnectionManager internal constructor(
             _state.value = ConnectionState.Connecting(endpoint)
             try {
                 val factory = factories.firstOrNull { it.kind == endpoint.kind }
-                    ?: throw ObdException("Нет транспорта '${endpoint.kind}'")
+                    ?: throw ObdException(ObdError.NoTransport(endpoint.kind))
                 val transport = factory.create(endpoint)
                 transport.open()
                 val session = sessionFactory(transport)
@@ -94,7 +94,7 @@ class ObdConnectionManager internal constructor(
                 throw e
             } catch (e: Exception) {
                 closeActive()
-                _state.value = ConnectionState.Failed(endpoint, e.message ?: e::class.simpleName.orEmpty())
+                _state.value = ConnectionState.Failed(endpoint, ObdError.of(e))
             }
         }
     }
@@ -120,7 +120,7 @@ class ObdConnectionManager internal constructor(
     private fun onLinkLost(endpoint: AdapterEndpoint, cause: Throwable) {
         scope.launch {
             closeActive()
-            _state.value = ConnectionState.Failed(endpoint, "Связь с адаптером потеряна: ${cause.message}")
+            _state.value = ConnectionState.Failed(endpoint, ObdError.LinkLost(ObdError.of(cause)))
         }
     }
 

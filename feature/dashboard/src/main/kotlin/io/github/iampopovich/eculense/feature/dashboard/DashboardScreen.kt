@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import io.github.iampopovich.eculense.core.obdtext.ObdText
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.navigation.ConnectDestination
@@ -65,7 +66,7 @@ internal fun DashboardScreen(
             items(state.values, key = { it.pid.sensorId }) { item ->
                 Card {
                     Column(Modifier.padding(12.dp)) {
-                        Text(item.pid.name, style = MaterialTheme.typography.labelMedium)
+                        Text(ObdText.pidNameRes(item.pid.code)?.let { stringResource(it) } ?: item.pid.sensorId, style = MaterialTheme.typography.labelMedium)
                         Text(
                             item.value?.let { String.format(Locale.getDefault(), "%.1f", it) } ?: "—",
                             style = MaterialTheme.typography.headlineMedium,

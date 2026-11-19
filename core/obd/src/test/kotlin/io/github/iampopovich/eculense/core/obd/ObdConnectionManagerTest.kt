@@ -31,20 +31,43 @@ class ObdConnectionManagerTest {
         val manager = ObdConnectionManager(listOf(factory { ScriptedTransport(replies) }), backgroundScope)
         manager.connect(endpoint)
         val state = manager.state.first { it is ConnectionState.Failed } as ConnectionState.Failed
-        assertTrue(state.reason, state.reason.contains("UNABLE TO CONNECT"))
+        assertEquals(ObdError.NoProtocol("UNABLE TO CONNECT"), state.error)
     }
 
     @Test
     fun `transport that cannot open ends in Failed`() = runTest {
         val broken = object : ObdTransport {
-            override suspend fun open() = throw IOException("нет сокета")
+            override suspend fun open() = throw IOException("no socket")
             override suspend fun write(data: ByteArray) = Unit
             override suspend fun read() = ByteArray(0)
             override suspend fun close() = Unit
         }
         val manager = ObdConnectionManager(listOf(factory { broken }), backgroundScope)
         manager.connect(endpoint)
-        assertTrue(manager.state.first { it is ConnectionState.Failed } is ConnectionState.Failed)
+        val state = manager.state.first { it is ConnectionState.Failed } as ConnectionState.Failed
+        assertEquals(ObdError.Other("no socket"), state.error)
+    }
+
+    @Test
+    fun `typed transport errors keep their type`() = runTest {
+        val broken = object : ObdTransport {
+            override suspend fun open() = throw ObdIoException(ObdError.NoBaudRate(listOf(38_400)))
+            override suspend fun write(data: ByteArray) = Unit
+            override suspend fun read() = ByteArray(0)
+            override suspend fun close() = Unit
+        }
+        val manager = ObdConnectionManager(listOf(factory { broken }), backgroundScope)
+        manager.connect(endpoint)
+        val state = manager.state.first { it is ConnectionState.Failed } as ConnectionState.Failed
+        assertEquals(ObdError.NoBaudRate(listOf(38_400)), state.error)
+    }
+
+    @Test
+    fun `unknown endpoint kind is NoTransport`() = runTest {
+        val manager = ObdConnectionManager(emptyList(), backgroundScope)
+        manager.connect(endpoint)
+        val state = manager.state.first { it is ConnectionState.Failed } as ConnectionState.Failed
+        assertEquals(ObdError.NoTransport(endpoint.kind), state.error)
     }
 
     @Test

@@ -40,7 +40,7 @@ class SerialTransport(
             port.open()
             baudRate = baudCandidates.firstOrNull { probe(it) } ?: run {
                 port.close()
-                throw IOException("ELM327 не отвечает ни на одной скорости: $baudCandidates")
+                throw ObdIoException(ObdError.NoBaudRate(baudCandidates))
             }
         }
         scope.launch {

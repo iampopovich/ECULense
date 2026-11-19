@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.obd.AdapterEndpoint
 import io.github.iampopovich.eculense.core.obd.ConnectionState
+import io.github.iampopovich.eculense.core.obdtext.ObdText
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -56,7 +57,7 @@ internal fun ConnectScreen(
     Column(modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(statusText(state), style = MaterialTheme.typography.titleMedium)
         if (state is ConnectionState.Connected) {
-            Text(stringResource(R.string.connect_adapter_info, state.info.version, state.info.protocolNumber, state.supportedPids.size))
+            Text(stringResource(R.string.connect_adapter_info, ObdText.adapterVersion(state.info.version).asString(), state.info.protocolNumber, state.supportedPids.size))
             Button(onClick = onDisconnect) { Text(stringResource(R.string.connect_disconnect)) }
         }
         OutlinedButton(onClick = onRefresh) { Text(stringResource(R.string.connect_refresh)) }
@@ -66,8 +67,8 @@ internal fun ConnectScreen(
         LazyColumn {
             items(endpoints, key = { it.kind + it.address }) { endpoint ->
                 ListItem(
-                    headlineContent = { Text(endpoint.label) },
-                    supportingContent = { Text(endpoint.address) },
+                    headlineContent = { Text(ObdText.endpointLabel(endpoint).asString()) },
+                    supportingContent = { Text(ObdText.endpointDetail(endpoint).asString()) },
                     modifier = Modifier.clickable(enabled = state !is ConnectionState.Connecting) { onConnect(endpoint) },
                 )
             }
@@ -75,11 +76,11 @@ internal fun ConnectScreen(
     }
 }
 
-/** Adapter labels and failure reasons come from the transport layer and are shown as is. */
+/** Device names are shown as is; built-in endpoints and typed failures are localized by :core:obdtext. */
 @Composable
 private fun statusText(state: ConnectionState): String = when (state) {
     ConnectionState.Disconnected -> stringResource(R.string.connect_status_disconnected)
-    is ConnectionState.Connecting -> stringResource(R.string.connect_status_connecting, state.endpoint.label)
-    is ConnectionState.Connected -> stringResource(R.string.connect_status_connected, state.endpoint.label)
-    is ConnectionState.Failed -> stringResource(R.string.connect_status_failed, state.reason)
+    is ConnectionState.Connecting -> stringResource(R.string.connect_status_connecting, ObdText.endpointLabel(state.endpoint).asString())
+    is ConnectionState.Connected -> stringResource(R.string.connect_status_connected, ObdText.endpointLabel(state.endpoint).asString())
+    is ConnectionState.Failed -> stringResource(R.string.connect_status_failed, ObdText.error(state.error).asString())
 }

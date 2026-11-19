@@ -23,11 +23,11 @@ internal class Elm327Session(
 
     override suspend fun initialize(): AdapterInfo {
         val version = link.send("ATZ", timeoutMs = 5_000).lines().map { it.trim() }
-            .lastOrNull { it.startsWith("ELM") } ?: "неизвестно"
+            .lastOrNull { it.startsWith("ELM") } ?: ""
         for (command in listOf("ATE0", "ATL0", "ATS0", "ATH0", "ATSP0")) link.send(command)
         when (val probe = ElmResponseParser.parse(link.send("0100", timeoutMs = 15_000))) {
-            is ElmResult.Error -> throw ObdException("Адаптер не нашёл протокол: ${probe.message}")
-            ElmResult.NoData -> throw ObdException("ЭБУ молчит. Зажигание включено?")
+            is ElmResult.Error -> throw ObdException(ObdError.NoProtocol(probe.message))
+            ElmResult.NoData -> throw ObdException(ObdError.EcuSilent)
             is ElmResult.Data -> Unit
         }
         val protocol = link.send("ATDPN").trim().removePrefix("A").firstOrNull() ?: '0'
@@ -84,6 +84,6 @@ internal class Elm327Session(
         when (val result = ElmResponseParser.parse(link.send(command, timeoutMs))) {
             is ElmResult.Data -> elmMessages(result.lines)
             ElmResult.NoData -> null
-            is ElmResult.Error -> throw ObdException("$command → ${result.message}")
+            is ElmResult.Error -> throw ObdException(ObdError.CommandFailed(command, result.message))
         }
 }

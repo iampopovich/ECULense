@@ -1,6 +1,9 @@
 package io.github.iampopovich.eculense.core.obd
 
-/** Service 01 PID. decode receives only the data bytes (without 41 and the PID number). */
+/**
+ * Service 01 PID. decode receives only the data bytes (without 41 and the PID number).
+ * [name] is the English SAE-style name for logs; the UI shows the localized name from :core:obdtext.
+ */
 class Pid(
     val code: Int,
     val name: String,
@@ -26,26 +29,26 @@ object StandardPids {
     private fun word(d: IntArray) = d[0] * 256 + d[1]
 
     val all: List<Pid> = listOf(
-        Pid(0x04, "Нагрузка двигателя", "%", 1) { pct(it[0]) },
-        Pid(0x05, "Температура ОЖ", "°C", 1) { it[0] - 40.0 },
-        Pid(0x06, "Краткосрочная коррекция топлива, банк 1", "%", 1) { trim(it[0]) },
-        Pid(0x07, "Долгосрочная коррекция топлива, банк 1", "%", 1) { trim(it[0]) },
-        Pid(0x0B, "Давление во впускном коллекторе", "kPa", 1) { it[0].toDouble() },
-        Pid(0x0C, "Обороты двигателя", "rpm", 2) { word(it) / 4.0 },
-        Pid(0x0D, "Скорость", "km/h", 1) { it[0].toDouble() },
-        Pid(0x0E, "Угол опережения зажигания", "°", 1) { it[0] / 2.0 - 64 },
-        Pid(0x0F, "Температура воздуха на впуске", "°C", 1) { it[0] - 40.0 },
-        Pid(0x10, "Массовый расход воздуха", "g/s", 2) { word(it) / 100.0 },
-        Pid(0x11, "Положение дроссельной заслонки", "%", 1) { pct(it[0]) },
-        Pid(0x1F, "Время с запуска двигателя", "s", 2) { word(it).toDouble() },
-        Pid(0x21, "Пробег с горящим Check Engine", "km", 2) { word(it).toDouble() },
-        Pid(0x2F, "Уровень топлива", "%", 1) { pct(it[0]) },
-        Pid(0x31, "Пробег после сброса ошибок", "km", 2) { word(it).toDouble() },
-        Pid(0x33, "Атмосферное давление", "kPa", 1) { it[0].toDouble() },
-        Pid(0x42, "Напряжение бортсети (ЭБУ)", "V", 2) { word(it) / 1000.0 },
-        Pid(0x46, "Температура окружающего воздуха", "°C", 1) { it[0] - 40.0 },
-        Pid(0x5C, "Температура масла", "°C", 1) { it[0] - 40.0 },
-        Pid(0x5E, "Расход топлива", "L/h", 2) { word(it) / 20.0 },
+        Pid(0x04, "Engine load", "%", 1) { pct(it[0]) },
+        Pid(0x05, "Coolant temperature", "°C", 1) { it[0] - 40.0 },
+        Pid(0x06, "Short-term fuel trim, bank 1", "%", 1) { trim(it[0]) },
+        Pid(0x07, "Long-term fuel trim, bank 1", "%", 1) { trim(it[0]) },
+        Pid(0x0B, "Intake manifold pressure", "kPa", 1) { it[0].toDouble() },
+        Pid(0x0C, "Engine speed", "rpm", 2) { word(it) / 4.0 },
+        Pid(0x0D, "Vehicle speed", "km/h", 1) { it[0].toDouble() },
+        Pid(0x0E, "Ignition timing advance", "°", 1) { it[0] / 2.0 - 64 },
+        Pid(0x0F, "Intake air temperature", "°C", 1) { it[0] - 40.0 },
+        Pid(0x10, "Mass air flow", "g/s", 2) { word(it) / 100.0 },
+        Pid(0x11, "Throttle position", "%", 1) { pct(it[0]) },
+        Pid(0x1F, "Time since engine start", "s", 2) { word(it).toDouble() },
+        Pid(0x21, "Distance with Check Engine on", "km", 2) { word(it).toDouble() },
+        Pid(0x2F, "Fuel level", "%", 1) { pct(it[0]) },
+        Pid(0x31, "Distance since codes cleared", "km", 2) { word(it).toDouble() },
+        Pid(0x33, "Barometric pressure", "kPa", 1) { it[0].toDouble() },
+        Pid(0x42, "Control module voltage", "V", 2) { word(it) / 1000.0 },
+        Pid(0x46, "Ambient air temperature", "°C", 1) { it[0] - 40.0 },
+        Pid(0x5C, "Engine oil temperature", "°C", 1) { it[0] - 40.0 },
+        Pid(0x5E, "Fuel rate", "L/h", 2) { word(it) / 20.0 },
     )
 
     /** What the dashboard shows by default, in order of importance (if the ECU supports it). */

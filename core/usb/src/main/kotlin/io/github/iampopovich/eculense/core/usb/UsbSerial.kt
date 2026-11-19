@@ -13,6 +13,8 @@ import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
 import io.github.iampopovich.eculense.core.obd.AdapterEndpoint
+import io.github.iampopovich.eculense.core.obd.ObdError
+import io.github.iampopovich.eculense.core.obd.ObdIoException
 import io.github.iampopovich.eculense.core.obd.ObdTransport
 import io.github.iampopovich.eculense.core.obd.SerialPortIo
 import io.github.iampopovich.eculense.core.obd.SerialTransport
@@ -22,7 +24,6 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.core.qualifier.named
 import org.koin.dsl.bind
 import org.koin.dsl.module
-import java.io.IOException
 import kotlin.coroutines.resume
 
 /** Adapter from a usb-serial-for-android port to the platform-independent SerialPortIo. */
@@ -33,7 +34,7 @@ internal class AndroidUsbSerialPort(
     private var port: UsbSerialPort? = null
 
     override fun open() {
-        val connection = usbManager.openDevice(driver.device) ?: throw IOException("Нет доступа к USB-устройству")
+        val connection = usbManager.openDevice(driver.device) ?: throw ObdIoException(ObdError.UsbNoAccess)
         port = driver.ports.first().also { it.open(connection) }
     }
 
@@ -49,10 +50,10 @@ internal class AndroidUsbSerialPort(
         port = null
     }
 
-    private fun requirePort() = port ?: throw IOException("USB-порт не открыт")
+    private fun requirePort() = port ?: throw ObdIoException(ObdError.UsbNotOpen)
 }
 
-/** System dialog «Разрешить ECULense доступ к устройству?» — before opening the port. */
+/** System dialog «Allow ECULense to access the device?» — before opening the port. */
 internal class UsbPermissions(private val context: Context, private val usbManager: UsbManager) {
     suspend fun ensure(device: UsbDevice) {
         if (usbManager.hasPermission(device)) return
@@ -69,7 +70,7 @@ internal class UsbPermissions(private val context: Context, private val usbManag
             val flags = if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
             usbManager.requestPermission(device, PendingIntent.getBroadcast(context, 0, intent, flags))
         }
-        if (!granted) throw IOException("Доступ к USB-адаптеру не разрешён")
+        if (!granted) throw ObdIoException(ObdError.UsbPermissionDenied)
     }
 
     private companion object {
@@ -103,7 +104,7 @@ internal class UsbSerialFactory(private val context: Context) : TransportFactory
 
     override fun create(endpoint: AdapterEndpoint): ObdTransport {
         val driver = drivers().firstOrNull { it.device.deviceName == endpoint.address }
-            ?: throw IOException("USB-адаптер отключён")
+            ?: throw ObdIoException(ObdError.UsbDetached)
         return PermissionGatedTransport(
             ensurePermission = { permissions.ensure(driver.device) },
             delegate = SerialTransport(AndroidUsbSerialPort(usbManager, driver)),

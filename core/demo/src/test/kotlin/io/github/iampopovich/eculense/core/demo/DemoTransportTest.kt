@@ -2,6 +2,7 @@ package io.github.iampopovich.eculense.core.demo
 
 import io.github.iampopovich.eculense.core.model.DtcKind
 import io.github.iampopovich.eculense.core.obd.ConnectionState
+import io.github.iampopovich.eculense.core.obd.EndpointLabel
 import io.github.iampopovich.eculense.core.obd.ObdConnectionManager
 import io.github.iampopovich.eculense.core.obd.StandardPids
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -31,7 +32,7 @@ class DemoTransportTest {
         val endpoints = DemoTransportFactory().discover()
         assertEquals(1, endpoints.size)
         assertEquals(DemoTransportFactory.KIND, endpoints.single().kind)
-        assertEquals("Демо-режим (симуляция)", endpoints.single().label)
+        assertEquals(EndpointLabel.DEMO, endpoints.single().labelKey)
     }
 
     @Test

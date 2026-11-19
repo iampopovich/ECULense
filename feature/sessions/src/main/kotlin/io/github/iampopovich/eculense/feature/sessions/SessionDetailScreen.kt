@@ -31,7 +31,7 @@ import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProdu
 import com.patrykandpatrick.vico.compose.cartesian.data.lineModel
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
-import io.github.iampopovich.eculense.core.obd.StandardPids
+import io.github.iampopovich.eculense.core.obdtext.ObdText
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -60,7 +60,7 @@ internal fun SessionDetailRoute(sessionId: Long, viewModel: SessionDetailViewMod
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             // Default sensor goes first, otherwise the selected chip may end up off-screen.
             bySensor.keys.sortedBy { it != defaultSensor(bySensor.keys.toList()) }.forEach { id ->
-                val label = id.removePrefix("01.").toIntOrNull(16)?.let { StandardPids.byCode(it)?.name } ?: id
+                val label = ObdText.sensorName(id).asString()
                 FilterChip(selected = id == sensor, onClick = { selected = id }, label = { Text(label) })
             }
         }

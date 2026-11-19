@@ -1,6 +1,7 @@
 package io.github.iampopovich.eculense.feature.connect
 
 import io.github.iampopovich.eculense.core.obd.AdapterEndpoint
+import io.github.iampopovich.eculense.core.obd.EndpointLabel
 import io.github.iampopovich.eculense.core.obd.FakeConnectionController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,7 +30,7 @@ class ConnectViewModelTest {
 
     @Test
     fun `paired bluetooth first, demo adapter last`() = runTest {
-        val demo = AdapterEndpoint("demo", "demo", "Демо-режим (симуляция)")
+        val demo = AdapterEndpoint("demo", "demo", "Demo mode (simulation)", EndpointLabel.DEMO)
         val wifi = AdapterEndpoint("wifi", "192.168.0.10:35000", "Wi-Fi ELM327")
         val vm = ConnectViewModel(FakeConnectionController(endpoints = listOf(demo, wifi, obd)))
         vm.refresh()

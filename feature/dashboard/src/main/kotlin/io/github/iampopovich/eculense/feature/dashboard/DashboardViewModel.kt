@@ -8,6 +8,7 @@ import io.github.iampopovich.eculense.core.obd.ConnectionController
 import io.github.iampopovich.eculense.core.obd.ConnectionState
 import io.github.iampopovich.eculense.core.obd.Pid
 import io.github.iampopovich.eculense.core.obd.StandardPids
+import io.github.iampopovich.eculense.core.obdtext.ObdText
 import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -35,9 +36,9 @@ internal fun ConnectionState.statusLine(): UiText? {
     if (this !is ConnectionState.Connected) return null
     val voltage = info.batteryVoltage
     return if (voltage != null) {
-        UiText.Res(R.string.dash_status_voltage, listOf(endpoint.label, info.protocolNumber, voltage))
+        UiText.Res(R.string.dash_status_voltage, listOf(ObdText.endpointLabel(endpoint), info.protocolNumber, voltage))
     } else {
-        UiText.Res(R.string.dash_status, listOf(endpoint.label, info.protocolNumber))
+        UiText.Res(R.string.dash_status, listOf(ObdText.endpointLabel(endpoint), info.protocolNumber))
     }
 }
 

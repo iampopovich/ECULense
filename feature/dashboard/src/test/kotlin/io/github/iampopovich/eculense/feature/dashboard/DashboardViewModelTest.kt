@@ -58,7 +58,7 @@ class DashboardViewModelTest {
         val controller = FakeConnectionController(initial = FakeConnectionController.connected(setOf(0x0C)))
         val vm = DashboardViewModel(controller, FakeRecorder(), FakeUnits())
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
-        assertEquals(UiText.Res(R.string.dash_status_voltage, listOf("Fake ELM", '6', 12.6)), vm.uiState.value.status)
+        assertEquals(UiText.Res(R.string.dash_status_voltage, listOf(UiText.Raw("Fake ELM"), '6', 12.6)), vm.uiState.value.status)
         controller.disconnect()
         assertEquals(null, vm.uiState.value.status)
     }

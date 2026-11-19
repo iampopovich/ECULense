@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="obd_error_timeout">The adapter did not answer \'%1$s\'</string>
+    <string name="obd_error_no_transport">No transport for \'%1$s\'</string>
+    <string name="obd_error_no_protocol">The adapter found no vehicle protocol: %1$s</string>
+    <string name="obd_error_ecu_silent">The ECU does not respond. Is the ignition on?</string>
+    <string name="obd_error_command_failed" translatable="false">%1$s → %2$s</string>
+    <string name="obd_error_adapter_closed">The adapter closed the connection</string>
+    <string name="obd_error_not_open">The connection is not open</string>
+    <string name="obd_error_no_baud_rate">ELM327 does not respond at any baud rate: %1$s</string>
+    <string name="obd_error_demo_disconnected">Demo adapter disconnected</string>
+    <string name="obd_error_no_bluetooth">This device has no Bluetooth</string>
+    <string name="obd_error_usb_no_access">No access to the USB device</string>
+    <string name="obd_error_usb_permission_denied">Access to the USB adapter was not granted</string>
+    <string name="obd_error_usb_not_open">USB port is not open</string>
+    <string name="obd_error_usb_detached">USB adapter disconnected</string>
+    <string name="obd_error_link_lost">Connection to the adapter lost: %1$s</string>
+    <string name="obd_endpoint_demo">Demo mode (simulation)</string>
+    <string name="obd_endpoint_demo_detail">Virtual ELM327 · CAN 11/500 · no car</string>
+    <string name="obd_endpoint_pc_emulator">ELM327 emulator on PC (10.0.2.2)</string>
+    <string name="obd_adapter_version_unknown">unknown</string>
+    <string name="obd_pid_04">Engine load</string>
+    <string name="obd_pid_05">Coolant temperature</string>
+    <string name="obd_pid_06">Short-term fuel trim, bank 1</string>
+    <string name="obd_pid_07">Long-term fuel trim, bank 1</string>
+    <string name="obd_pid_0b">Intake manifold pressure</string>
+    <string name="obd_pid_0c">Engine speed</string>
+    <string name="obd_pid_0d">Vehicle speed</string>
+    <string name="obd_pid_0e">Ignition timing advance</string>
+    <string name="obd_pid_0f">Intake air temperature</string>
+    <string name="obd_pid_10">Mass air flow</string>
+    <string name="obd_pid_11">Throttle position</string>
+    <string name="obd_pid_1f">Time since engine start</string>
+    <string name="obd_pid_21">Distance with Check Engine on</string>
+    <string name="obd_pid_2f">Fuel level</string>
+    <string name="obd_pid_31">Distance since codes cleared</string>
+    <string name="obd_pid_33">Barometric pressure</string>
+    <string name="obd_pid_42">Control module voltage</string>
+    <string name="obd_pid_46">Ambient air temperature</string>
+    <string name="obd_pid_5c">Engine oil temperature</string>
+    <string name="obd_pid_5e">Fuel rate</string>
+</resources>

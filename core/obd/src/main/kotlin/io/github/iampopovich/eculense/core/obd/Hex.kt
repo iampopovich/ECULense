@@ -1,7 +1,7 @@
 package io.github.iampopovich.eculense.core.obd
 
 internal fun String.hexToBytes(): ByteArray {
-    require(length % 2 == 0) { "Нечётная длина hex: $this" }
+    require(length % 2 == 0) { "odd hex length: $this" }
     return ByteArray(length / 2) { i -> substring(i * 2, i * 2 + 2).toInt(16).toByte() }
 }
 

@@ -9,8 +9,14 @@ interface ObdTransport {
     suspend fun close()
 }
 
-/** An adapter that can be connected to. kind: which factory creates the transport. */
-data class AdapterEndpoint(val kind: String, val address: String, val label: String)
+/**
+ * An adapter that can be connected to. kind: which factory creates the transport. label/address: device name and
+ * address shown as is, or English fallbacks when [labelKey] marks a built-in endpoint the UI names itself.
+ */
+data class AdapterEndpoint(val kind: String, val address: String, val label: String, val labelKey: EndpointLabel? = null)
+
+/** Built-in endpoints whose label and description are app text (localized in :core:obdtext). */
+enum class EndpointLabel { DEMO, PC_EMULATOR }
 
 /** Each link type (BT, Wi-Fi, BLE) is a separate factory, registered in Koin via bind TransportFactory::class. */
 interface TransportFactory {

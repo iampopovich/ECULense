@@ -1,13 +1,15 @@
 package io.github.iampopovich.eculense.core.demo
 
 import io.github.iampopovich.eculense.core.obd.AdapterEndpoint
+import io.github.iampopovich.eculense.core.obd.EndpointLabel
+import io.github.iampopovich.eculense.core.obd.ObdError
+import io.github.iampopovich.eculense.core.obd.ObdIoException
 import io.github.iampopovich.eculense.core.obd.ObdTransport
 import io.github.iampopovich.eculense.core.obd.StandardPids
 import io.github.iampopovich.eculense.core.obd.TransportFactory
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.delay
-import java.io.IOException
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.random.Random
@@ -49,7 +51,7 @@ class DemoTransport internal constructor(
     }
 
     override suspend fun write(data: ByteArray) {
-        if (closed) throw IOException("Демо-адаптер отключён")
+        if (closed) throw ObdIoException(ObdError.DemoDisconnected)
         inbox.append(data.decodeToString())
         while (true) {
             val end = inbox.indexOf("\r")
@@ -63,7 +65,7 @@ class DemoTransport internal constructor(
     override suspend fun read(): ByteArray = try {
         incoming.receive()
     } catch (e: ClosedReceiveChannelException) {
-        throw IOException("Демо-адаптер отключён", e)
+        throw ObdIoException(ObdError.DemoDisconnected, e)
     }
 
     override suspend fun close() {
@@ -239,6 +241,6 @@ class DemoTransportFactory(
 
     companion object {
         const val KIND = "demo"
-        val ENDPOINT = AdapterEndpoint(KIND, "Виртуальный ELM327 · CAN 11/500 · без машины", "Демо-режим (симуляция)")
+        val ENDPOINT = AdapterEndpoint(KIND, "Virtual ELM327 · CAN 11/500 · no car", "Demo mode (simulation)", EndpointLabel.DEMO)
     }
 }

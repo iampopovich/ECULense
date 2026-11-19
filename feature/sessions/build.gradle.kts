@@ -4,6 +4,6 @@ plugins {
 
 dependencies {
     implementation(project(":core:data"))
-    implementation(project(":core:obd")) // PID names for labels
+    implementation(project(":core:obdtext")) // PID names for labels
     implementation(libs.vico.compose.m3)
 }

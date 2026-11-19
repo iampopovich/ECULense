@@ -15,7 +15,7 @@ class FakeSession(
     override suspend fun initialize() = AdapterInfo("fake", '6', true, 12.5)
     override suspend fun supportedPids() = values.keys
     override suspend fun read(pid: Pid): SensorReading? {
-        if (pid.code in failing) throw ObdException("сбой ${pid.command}")
+        if (pid.code in failing) throw ObdException(ObdError.Other("failure ${pid.command}"))
         return values[pid.code]?.let { SensorReading(pid.sensorId, it, pid.unit, 0L) }
     }
     override suspend fun readDtcs(kind: DtcKind) = dtcs.filter { it.kind == kind }
