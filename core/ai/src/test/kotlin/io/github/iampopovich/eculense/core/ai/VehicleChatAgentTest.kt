@@ -89,6 +89,9 @@ class VehicleChatAgentTest {
     }
 
     private val toolRound = listOf(StreamFrame.ToolCallComplete("call_1", "dtcHistory", """{"limit":5}"""), StreamFrame.End("tool_calls"))
+
+    /** Тесты агента — с одним экспертом (Диагност): без диспетчера по тексту вопроса «?». */
+    private val oneExpert: (String) -> ChatRoute = { ChatRoute(ChatIntent.DIAGNOSE, listOf(ExpertRoles.DIAGNOSTICIAN), null) }
     private fun textRound(vararg chunks: String) =
         chunks.map { StreamFrame.TextDelta(it) } + StreamFrame.TextComplete(chunks.joinToString("")) + StreamFrame.End("stop")
 
@@ -101,7 +104,13 @@ class VehicleChatAgentTest {
         val events = gateway.chat("c1", "Объясни мои ошибки", useCarData = true).toList()
 
         assertEquals(
-            listOf(ChatEvent.ToolCall("dtcHistory", "ИИ смотрит ошибки…"), ChatEvent.Text("Код "), ChatEvent.Text("P0171 — бедная смесь")),
+            listOf(
+                ChatEvent.Status("Диагност смотрит коды ошибок…"),
+                ChatEvent.ToolCall("dtcHistory", "Диагност смотрит ошибки…"),
+                ChatEvent.Text("Код "),
+                ChatEvent.Text("P0171 — бедная смесь"),
+                ChatEvent.Experts(listOf("Диагност"), emptyList()),
+            ),
             events,
         )
         assertEquals(listOf(5), toolbox.calls)
@@ -116,7 +125,7 @@ class VehicleChatAgentTest {
     @Test
     fun `chat memory keeps only texts of the same conversation`() = runBlocking {
         val exec = ScriptedExecutor(listOf(toolRound, textRound("Первый ответ"), textRound("Второй ответ")))
-        val gateway = KoogLlmGateway(store(), toolbox = Toolbox()) { _, _ -> exec }
+        val gateway = KoogLlmGateway(store(), toolbox = Toolbox(), executorFactory = { _, _ -> exec }, router = oneExpert)
 
         gateway.chat("c1", "Вопрос 1", useCarData = true).toList()
         gateway.chat("c1", "Вопрос 2", useCarData = true).toList()
@@ -151,9 +160,9 @@ class VehicleChatAgentTest {
     @Test
     fun `endless tool calls stop after the limit with a last round without tools`() = runBlocking {
         val exec = ScriptedExecutor(List(VehicleChatStrategy.MAX_TOOL_ROUNDS) { toolRound } + listOf(textRound("Итог")))
-        val gateway = KoogLlmGateway(store(), toolbox = Toolbox()) { _, _ -> exec }
+        val gateway = KoogLlmGateway(store(), toolbox = Toolbox(), executorFactory = { _, _ -> exec }, router = oneExpert)
         val events = gateway.chat("c1", "?", useCarData = true).toList()
-        assertEquals(ChatEvent.Text("Итог"), events.last())
+        assertEquals(ChatEvent.Text("Итог"), events.filterIsInstance<ChatEvent.Text>().last())
         assertEquals(emptyList<String>(), exec.toolNames.last())
     }
 
@@ -225,6 +234,7 @@ class VehicleChatAgentTest {
                 ChatEvent.ToolCall("dtcHistory", "ИИ смотрит ошибки…"),
                 ChatEvent.Status(VehicleChatStrategy.THINKING),
                 ChatEvent.Text("P0171 — бедная смесь"),
+                ChatEvent.Experts(listOf("Диагност"), emptyList()),
             ),
             events,
         )
@@ -327,7 +337,7 @@ class VehicleChatAgentTest {
         // DeepSeekLLMClient 1.3.0 требует system_fingerprint в кадрах; без него ошибка разбора маскируется Ktor как «Content-Length mismatch».
         val events = gateway.chat("c1", "Объясни мои ошибки", useCarData = true).toList()
 
-        assertEquals(ChatEvent.ToolCall("dtcHistory", "ИИ смотрит ошибки…"), events.first())
+        assertEquals(ChatEvent.ToolCall("dtcHistory", "Диагност смотрит ошибки…"), events.filterIsInstance<ChatEvent.ToolCall>().first())
         assertEquals("P0171 дважды", events.filterIsInstance<ChatEvent.Text>().joinToString("") { it.delta })
         assertEquals(listOf(3), toolbox.calls)
         assertTrue(bodies[0], bodies[0].contains("\"tools\"") && bodies[0].contains("dtcHistory"))

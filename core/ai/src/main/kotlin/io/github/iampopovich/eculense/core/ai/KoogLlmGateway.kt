@@ -31,6 +31,10 @@ import ai.koog.prompt.streaming.StreamFrame
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.channelFlow
@@ -232,6 +236,11 @@ internal class KoogLlmGateway(
     private val historyProvider: ChatHistoryStore = InMemoryChatHistory(),
     /** Модель на телефоне (:core:ailocal); если выбрана — чат идёт через неё, облачные настройки не трогаются. */
     private val onDevice: OnDeviceLlm? = null,
+    /** Диспетчер: вопрос → тип, эксперты, период (детерминированно, без модели). */
+    private val router: (String) -> ChatRoute = { ChatRouter.route(it) },
+    /** Сколько ждать одного эксперта в облаке; не успел — редактор получает «эксперт недоступен». */
+    private val expertTimeoutMs: Long = 120_000,
+    private val expertLog: (String) -> Unit = { msg -> runCatching { android.util.Log.w("EcuExperts", msg) } },
     private val executorFactory: (LlmSettings, String?) -> PromptExecutor = { s, key -> KoogClients.executor(s, key) },
 ) : LlmGateway {
     override val hasVehicleTools: Boolean get() = toolbox != null
@@ -245,6 +254,7 @@ internal class KoogLlmGateway(
             ?: store.settings.first()?.takeIf { it.model.isNotBlank() }?.let { ProviderInfo(it.provider.name, it.provider.title, it.model) }
 
     override fun chat(conversationId: String, userText: String, useCarData: Boolean): Flow<ChatEvent> = channelFlow {
+        val route = router(userText)
         val local = try {
             onDevice?.session()
         } catch (e: CancellationException) {
@@ -253,22 +263,7 @@ internal class KoogLlmGateway(
             throw LlmException("Модель на телефоне не загрузилась: ${e.message ?: e::class.simpleName}", cause = e)
         }
         if (local != null) {
-            val tools = toolbox?.takeIf { useCarData && local.supportsTools }
-            // Модель без инструментов (на телефоне): данные машины — сводкой в системном промпте, числа считает приложение.
-            val digest = if (useCarData && toolbox != null && !local.supportsTools) {
-                send(ChatEvent.Status("Приложение собирает данные машины…"))
-                toolbox.digest()
-            } else {
-                null
-            }
-            val system = digest?.let { SystemPrompts.chatWithDigest(it) } ?: SystemPrompts.chat(withTools = tools != null)
-            try {
-                runAgent(local.executor, local.model, tools, conversationId, userText, streaming = local.streaming, system = system)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                throw LlmException("Модель на телефоне не ответила: ${e.message ?: e::class.simpleName}", cause = e)
-            }
+            chatOnDevice(local, route, conversationId, userText, useCarData)
             // исполнитель принадлежит :core:ailocal (движок держится между вопросами) — не закрываем
             return@channelFlow
         }
@@ -280,8 +275,29 @@ internal class KoogLlmGateway(
         } catch (e: Exception) {
             throw LlmErrors.describe(e, apiKey)
         }
+        val model = KoogClients.model(settings)
         try {
-            runAgent(executor, KoogClients.model(settings), tools, conversationId, userText, streaming = true)
+            when {
+                // без данных машины или вопрос не о машине («привет») — без экспертов, форма по вопросу
+                tools == null || route.roles.isEmpty() ->
+                    runAgent(executor, model, null, conversationId, userText, streaming = true, system = SystemPrompts.general(route.intent))
+                // одна роль — отвечает сама, стримом, без редактора
+                route.roles.size == 1 -> {
+                    val role = route.roles.single()
+                    send(ChatEvent.Status(role.statusText(route.periodDays)))
+                    runAgent(
+                        executor, model, tools, conversationId, userText, streaming = true,
+                        system = SystemPrompts.direct(role, route), registry = tools.registry(role.tools), label = roleLabel(role, tools),
+                    )
+                    send(ChatEvent.Experts(listOf(role.title), emptyList()))
+                }
+                else -> {
+                    val notes = experts(executor, model, tools, route, conversationId, userText)
+                    send(ChatEvent.Experts(route.roles.map { it.title }, notes))
+                    send(ChatEvent.Status(EDITOR_STATUS))
+                    runAgent(executor, model, null, conversationId, userText, streaming = true, system = SystemPrompts.editor(route, notes))
+                }
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -289,6 +305,104 @@ internal class KoogLlmGateway(
         } finally {
             executor.close()
         }
+    }
+
+    /**
+     * Модель на телефоне (≈ 90 с на вызов): один вызов «сразу в ролях» выбранных экспертов; данные — сводкой только из
+     * нужных вопросу разделов (тренды за период для «как машина вела себя»), а не всё подряд.
+     */
+    private suspend fun kotlinx.coroutines.channels.ProducerScope<ChatEvent>.chatOnDevice(
+        local: OnDeviceSession,
+        route: ChatRoute,
+        conversationId: String,
+        userText: String,
+        useCarData: Boolean,
+    ) {
+        val tools = toolbox?.takeIf { useCarData && local.supportsTools && route.roles.isNotEmpty() }
+        // Модель без инструментов: данные машины — сводкой в системном промпте, числа считает приложение.
+        val digest = if (useCarData && toolbox != null && !local.supportsTools && route.roles.isNotEmpty()) {
+            send(ChatEvent.Status("Приложение собирает данные машины…"))
+            toolbox.digest(route.digestSections, route.periodDays)
+        } else {
+            null
+        }
+        val system = when {
+            !useCarData || toolbox == null || route.roles.isEmpty() -> SystemPrompts.general(route.intent)
+            tools != null -> SystemPrompts.onDevice(route, null) + "\n" + SystemPrompts.VEHICLE_DATA
+            else -> SystemPrompts.onDevice(route, digest)
+        }
+        val registry = tools?.registry(route.roles.flatMap { it.tools }.toSet())
+        try {
+            runAgent(local.executor, local.model, tools, conversationId, userText, streaming = local.streaming, system = system, registry = registry)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw LlmException("Модель на телефоне не ответила: ${e.message ?: e::class.simpleName}", cause = e)
+        }
+        if (useCarData && toolbox != null && route.roles.isNotEmpty()) send(ChatEvent.Experts(route.roles.map { it.title }, emptyList()))
+    }
+
+    /**
+     * Эксперты параллельно: у каждого свой системный промпт роли и только свои инструменты, ≤ [EXPERT_TOOL_ROUNDS] кругов,
+     * без ChatMemory (контекст — две последние реплики диалога). Текст экспертов пользователю не стримится — он уходит
+     * редактору и в «Заметки экспертов». Ошибка или таймаут одного эксперта не валит ответ.
+     */
+    private suspend fun kotlinx.coroutines.channels.ProducerScope<ChatEvent>.experts(
+        executor: PromptExecutor,
+        model: LLModel,
+        tools: VehicleToolbox,
+        route: ChatRoute,
+        conversationId: String,
+        userText: String,
+    ): List<ExpertNote> {
+        val context = runCatching { historyProvider.transcript(conversationId).takeLast(2) }.getOrDefault(emptyList())
+        val input = buildString {
+            if (context.isNotEmpty()) {
+                appendLine("Контекст диалога (последние реплики):")
+                context.forEach { m ->
+                    append(if (m.role == ChatMessage.Role.USER) "Пользователь: " else "Помощник: ").appendLine(m.text.take(CONTEXT_CHARS))
+                }
+                appendLine()
+            }
+            append("Вопрос пользователя: ").append(userText)
+        }
+        return coroutineScope {
+            route.roles.map { role ->
+                async {
+                    send(ChatEvent.Status(role.statusText(route.periodDays)))
+                    val text = try {
+                        withTimeoutOrNull(expertTimeoutMs) {
+                            AIAgent(
+                                promptExecutor = executor,
+                                llmModel = model,
+                                strategy = VehicleChatStrategy.create(
+                                    system = SystemPrompts.expert(role, route),
+                                    // пользователю — только какие данные смотрит роль; текст заметки — редактору
+                                    emit = { e -> if (e is ChatEvent.ToolCall) send(e) },
+                                    label = roleLabel(role, tools),
+                                    streaming = true,
+                                    maxToolRounds = EXPERT_TOOL_ROUNDS,
+                                ),
+                                toolRegistry = tools.registry(role.tools),
+                                systemPrompt = SystemPrompts.expert(role, route),
+                            ).run(input, null)
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        null.also { expertLog("expert ${role.id} failed: ${e::class.simpleName}") }
+                    }
+                    if (text.isNullOrBlank()) ExpertNote(role.id, role.title, "Эксперт «${role.title}» недоступен — его данных в ответе нет.", failed = true)
+                    else ExpertNote(role.id, role.title, text.trim())
+                }
+            }.awaitAll()
+        }
+    }
+
+    /** «ИИ смотрит ошибки…» → «Диагност смотрит ошибки…». */
+    private fun roleLabel(role: ExpertRole, tools: VehicleToolbox): (String) -> String = { name ->
+        val label = tools.progressLabel(name)
+        if (label.startsWith("ИИ ")) role.title + label.removePrefix("ИИ") else "${role.title}: $label"
     }
 
     private suspend fun kotlinx.coroutines.channels.ProducerScope<ChatEvent>.runAgent(
@@ -299,6 +413,8 @@ internal class KoogLlmGateway(
         userText: String,
         streaming: Boolean,
         system: String = SystemPrompts.chat(withTools = tools != null),
+        registry: ToolRegistry? = null,
+        label: (String) -> String = { name -> tools?.progressLabel(name) ?: name },
     ) {
         val agent = AIAgent(
             promptExecutor = executor,
@@ -306,10 +422,10 @@ internal class KoogLlmGateway(
             strategy = VehicleChatStrategy.create(
                 system = system,
                 emit = { send(it) },
-                label = { name -> tools?.progressLabel(name) ?: name },
+                label = label,
                 streaming = streaming,
             ),
-            toolRegistry = tools?.registry() ?: ToolRegistry.EMPTY,
+            toolRegistry = registry ?: tools?.registry() ?: ToolRegistry.EMPTY,
             systemPrompt = system,
         ) {
             install(ChatMemory) {
@@ -352,5 +468,8 @@ internal class KoogLlmGateway(
 
     private companion object {
         const val NOT_CONFIGURED = "ИИ не настроен: откройте Настройки → ИИ-помощник"
+        const val EDITOR_STATUS = "Редактор собирает ответ из заметок экспертов…"
+        const val EXPERT_TOOL_ROUNDS = 3
+        const val CONTEXT_CHARS = 400
     }
 }

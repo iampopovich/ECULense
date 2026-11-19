@@ -40,7 +40,7 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
      * Сводка только из разделов [sections] (имена инструментов, в этом порядке); [days] — период трендов и поездок.
      * Раздел, который не удалось собрать, пропускается.
      */
-    internal suspend fun digest(sections: List<String>, days: Int): String? {
+    override suspend fun digest(sections: List<String>, days: Int): String? {
         val parts = sections.distinct().mapNotNull { name ->
             runCatching {
                 when (name) {

@@ -29,6 +29,7 @@ internal object VehicleChatStrategy {
         label: (String) -> String,
         streaming: Boolean = true,
         thinkingLabel: String = THINKING,
+        maxToolRounds: Int = MAX_TOOL_ROUNDS,
     ): AIAgentFunctionalStrategy<String, String> = functionalStrategy("ecu-chat") { input ->
         llm.writeSession {
             // ChatMemory подставляет сохранённую историю без системного сообщения — задаём актуальное заново
@@ -39,9 +40,9 @@ internal object VehicleChatStrategy {
             appendPrompt { user(input) }
         }
         val answer = StringBuilder()
-        for (round in 0..MAX_TOOL_ROUNDS) {
+        for (round in 0..maxToolRounds) {
             val response = llm.writeSession {
-                if (round == MAX_TOOL_ROUNDS) tools = emptyList()
+                if (round == maxToolRounds) tools = emptyList()
                 if (streaming) {
                     val frames = mutableListOf<StreamFrame>()
                     requestLLMStreaming().collect { frame ->

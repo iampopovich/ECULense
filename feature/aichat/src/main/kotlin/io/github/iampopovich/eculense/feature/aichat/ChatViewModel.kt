@@ -175,6 +175,7 @@ internal class ChatViewModel(
                         when (event) {
                             is ChatEvent.ToolCall -> s.copy(toolStatus = event.label)
                             is ChatEvent.Status -> s.copy(toolStatus = event.label)
+                            is ChatEvent.Experts -> s
                             is ChatEvent.Text -> {
                                 val last = s.messages.last()
                                 s.copy(messages = s.messages.dropLast(1) + last.copy(text = last.text + event.delta), toolStatus = null)

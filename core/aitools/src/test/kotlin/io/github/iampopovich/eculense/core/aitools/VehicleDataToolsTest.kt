@@ -1,5 +1,7 @@
 package io.github.iampopovich.eculense.core.aitools
 
+import io.github.iampopovich.eculense.core.ai.ChatRouter
+import io.github.iampopovich.eculense.core.ai.ExpertRoles
 import io.github.iampopovich.eculense.core.analytics.Agg
 import io.github.iampopovich.eculense.core.analytics.DtcEvent
 import io.github.iampopovich.eculense.core.analytics.Evidence
@@ -322,6 +324,32 @@ class VehicleDataToolsTest {
         assertTrue(text, lines.any { Regex("^- \\d{4}-\\d{2}: ").containsMatchIn(it) && it.contains("ОЖ медиана") })
         assertTrue(text, lines.any { it.startsWith("Изменение") && it.contains("ОЖ, медиана") })
         assertTrue(text, lines.any { it.startsWith("Поездки: период: 180 дн.") })
+    }
+
+    @Test
+    fun `every expert role uses only tools that exist and digest sections that exist`() {
+        val names = VehicleDataToolbox(ctx).registry().tools.map { it.name }.toSet()
+        ExpertRoles.ALL.forEach { r ->
+            assertTrue("${r.id}: ${r.tools - names}", names.containsAll(r.tools))
+            assertTrue("${r.id}: ${r.digestSections}", DigestText.SECTIONS.keys.containsAll(r.digestSections))
+            assertEquals(r.id, r.tools, VehicleDataToolbox(ctx).registry(r.tools).tools.map { it.name }.toSet())
+        }
+    }
+
+    @Test
+    fun `phone digest for a trend question has trends and does not start with the codes`() = runBlocking {
+        val route = ChatRouter.route("how did my car behave over the last 6 months")
+        val text = VehicleDataToolbox(described).digest(route.digestSections, route.periodDays)!!
+        assertNoJson(text)
+        val lines = text.lines()
+        assertTrue(text, lines.first().startsWith("Машина: "))
+        assertTrue(text, lines[1].startsWith("Тренды за 180 дн."))
+        assertTrue(text, lines.indexOfFirst { it.startsWith("Тренды") } < lines.indexOfFirst { it.startsWith("Коды ошибок") })
+        // вопрос про ошибки — без трендов и поездок
+        val dtc = ChatRouter.route("объясни мои ошибки")
+        val dtcText = VehicleDataToolbox(described).digest(dtc.digestSections, dtc.periodDays)!!
+        assertFalse(dtcText, dtcText.contains("Тренды") || dtcText.contains("Поездки:"))
+        assertTrue(dtcText, dtcText.contains("Коды ошибок"))
     }
 
     /** Признаки JSON в тексте для модели на телефоне: скобки объектов/массивов, кавычки ключей, ключи вида snake_case. */

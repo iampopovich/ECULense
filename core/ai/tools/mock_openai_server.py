@@ -56,6 +56,44 @@ def chunks(text, size=12):
         yield text[i:i + size]
 
 
+# Роли экспертов приложения узнаются по системному промпту («Ты — Диагност.»): так на телефоне видно статусы ролей,
+# «Над ответом работали» и «Заметки экспертов». Числа — нарочно синтетические, это мок.
+ROLES = ["Диагност", "Моторист", "Специалист по охлаждению", "Электрик", "Аналитик эксплуатации", "Экономист", "Мастер ТО",
+         "Знаток модели"]
+
+EDITOR_ANSWER = """**Коротко:** за полгода машина ездит ровно, тревожных изменений нет (ответ мок-сервера).
+
+### Что изменилось за период
+- Поездок стало больше: 8 → 12 в месяц (синтетика мока).
+- Температура ОЖ стабильна: медиана 90 °C.
+
+### На что обратить внимание
+- Напряжение на ходу 13,9 В — в норме.
+"""
+
+
+def note_for(role):
+    return (f"- {role}: показатель из инструмента 42 → в норме (заметка мок-сервера)\n"
+            f"- Уверенность: низкая — это мок, данных нет\n"
+            f"- Чего не хватает в данных: настоящей модели")
+
+
+def answer_for(request):
+    """Ответ по системному промпту: редактор, заметка эксперта, прямой ответ роли или общий ответ."""
+    messages = request.get("messages", [])
+    system = next((m.get("content") or "" for m in messages if m.get("role") == "system"), "")
+    if isinstance(system, list):  # content parts
+        system = " ".join(p.get("text", "") for p in system if isinstance(p, dict))
+    if "Ты — Редактор." in system:
+        return "editor", EDITOR_ANSWER
+    role = next((r for r in ROLES if f"Ты — {r}." in system), None)
+    if role and "заметку для редактора" in system:
+        return f"note:{role}", note_for(role)
+    if role:
+        return f"direct:{role}", f"## {role}\n\n" + note_for(role).replace("заметка", "ответ")
+    return "general", ANSWER
+
+
 class Handler(BaseHTTPRequestHandler):
     key = None
 
@@ -116,11 +154,13 @@ class Handler(BaseHTTPRequestHandler):
         if not self._authorized():
             return self._json(401, {"error": {"message": "Invalid API key (mock)"}})
         model = request.get("model", "ecu-mock-mini")
-        print(f"chat model={model} messages={len(request.get('messages', []))} stream={request.get('stream')}", flush=True)
+        kind, answer = answer_for(request)
+        print(f"chat model={model} messages={len(request.get('messages', []))} stream={request.get('stream')} as={kind}", flush=True)
         if not request.get("stream"):
             return self._json(200, {
                 "id": "mock-1", "object": "chat.completion", "created": int(time.time()), "model": model,
-                "choices": [{"index": 0, "message": {"role": "assistant", "content": ANSWER}, "finish_reason": "stop"}],
+                "system_fingerprint": "fp_mock",
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": answer}, "finish_reason": "stop"}],
             })
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
@@ -130,12 +170,13 @@ class Handler(BaseHTTPRequestHandler):
         def send(delta, finish=None):
             event = {
                 "id": "mock-1", "object": "chat.completion.chunk", "created": int(time.time()), "model": model,
+                "system_fingerprint": "fp_mock",
                 "choices": [{"index": 0, "delta": delta, "finish_reason": finish}],
             }
             self.wfile.write(f"data: {json.dumps(event, ensure_ascii=False)}\n\n".encode())
             self.wfile.flush()
 
-        for piece in chunks(ANSWER):
+        for piece in chunks(answer):
             send({"role": "assistant", "content": piece})
             time.sleep(0.05)
         send({}, "stop")
