@@ -32,9 +32,5 @@ gradlePlugin {
             id = "ecu.android.room"
             implementationClass = "AndroidRoomConventionPlugin"
         }
-        register("androidScreenshots") {
-            id = "ecu.android.screenshots"
-            implementationClass = "AndroidScreenshotConventionPlugin"
-        }
     }
 }

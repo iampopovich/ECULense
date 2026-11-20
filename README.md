@@ -108,8 +108,7 @@
 Нужны JDK 17+ (CI использует 21) и Android SDK.
 
 ```bash
-./gradlew build                          # всё: оба флейвора, unit-тесты, скриншот-тесты, lint
-./gradlew :feature:dashboard:recordRoborazziDebug   # перезаписать эталонные скриншоты модуля
+./gradlew build                          # всё: оба флейвора, unit-тесты, lint
 ./gradlew :app:installLocalDebug         # поставить на подключённый телефон
 ./gradlew :core:obd:test                 # тесты протокола, без телефона и эмулятора
 ./gradlew :app:assembleCloudRelease :app:assembleLocalRelease
@@ -147,7 +146,6 @@ core/
   background              фоновый анализ и уведомления
   demo                    эмулятор адаптера для работы без машины
   navigation, ui, model   общие ключи навигации, тема, модели
-  screenshots             только для тестов: матрица скриншотов Roborazzi
 feature/                  экраны: dashboard, connect, obdlog, cardata, dtc, health,
                           sessions, stats, fuel, analysis, maintenance, car, pitstop,
                           settings, datapacks, backup, widget, aisettings, aichat
@@ -160,8 +158,7 @@ build-logic/              convention-плагины (ecu.android.feature и др
 2. Объявите ключ экрана в `:core:navigation`: `@Serializable data object …Destination : NavKey`.
 3. В Koin-модуле фичи зарегистрируйте `navigation<…Destination> { … }` и `HubEntry` или `TopLevelEntry`.
 4. Подключите модуль в `settings.gradle.kts` и в `app`.
-5. Для экранов с вёрсткой добавьте плагин `ecu.android.screenshots` и тест через `snapshotMatrix(...)`: эталоны лежат в `src/test/snapshots` и проверяются в `./gradlew build` (только синтетические данные).
-6. Тексты интерфейса — в `res/values/strings.xml` модуля (английский) и `res/values-ru/strings.xml` (русский); ViewModel держит `UiText`, чистые JVM-модули возвращают типы, а не текст. `NoCyrillicLiteralsTest` и lint (`MissingTranslation`) валят сборку на строке в коде или без перевода.
+5. Тексты интерфейса — в `res/values/strings.xml` модуля (английский) и `res/values-ru/strings.xml` (русский); ViewModel держит `UiText`, чистые JVM-модули возвращают типы, а не текст. `NoCyrillicLiteralsTest` и lint (`MissingTranslation`) валят сборку на строке в коде или без перевода.
 
 Импортировать классы других фич не нужно. Если без этого не обойтись, в `core` не хватает ключа или интерфейса.
 

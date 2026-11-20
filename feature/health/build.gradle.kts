@@ -1,6 +1,5 @@
 plugins {
     id("ecu.android.feature")
-    id("ecu.android.screenshots")
 }
 
 // B6 quick health check on Pit-stop: one tap, traffic light per item, history, HTML report (share / print to PDF).

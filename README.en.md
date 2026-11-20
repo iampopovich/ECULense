@@ -108,8 +108,7 @@ Requires Android 8.0 or newer and an ELM327 v1.5+ adapter. Cheap clones labelled
 You need JDK 17+ (CI uses 21) and the Android SDK.
 
 ```bash
-./gradlew build                          # everything: both flavors, unit tests, screenshot tests, lint
-./gradlew :feature:dashboard:recordRoborazziDebug   # re-record a module's golden screenshots
+./gradlew build                          # everything: both flavors, unit tests, lint
 ./gradlew :app:installLocalDebug         # install on a connected phone
 ./gradlew :core:obd:test                 # protocol tests, no phone or emulator needed
 ./gradlew :app:assembleCloudRelease :app:assembleLocalRelease
@@ -147,7 +146,6 @@ core/
   background              background analysis and notifications
   demo                    adapter emulator for working without a car
   navigation, ui, model   shared navigation keys, theme, models
-  screenshots             test only: Roborazzi screenshot matrix
 feature/                  screens: dashboard, connect, obdlog, cardata, dtc, health,
                           sessions, stats, fuel, analysis, maintenance, car, pitstop,
                           settings, datapacks, backup, widget, aisettings, aichat
@@ -160,8 +158,7 @@ build-logic/              convention plugins (ecu.android.feature and others)
 2. Declare the screen key in `:core:navigation`: `@Serializable data object …Destination : NavKey`.
 3. In the feature's Koin module, register `navigation<…Destination> { … }` and a `HubEntry` or `TopLevelEntry`.
 4. Include the module in `settings.gradle.kts` and in `app`.
-5. For screens with layout, add the `ecu.android.screenshots` plugin and a `snapshotMatrix(...)` test: goldens live in `src/test/snapshots` and are verified by `./gradlew build` (synthetic data only).
-6. Put UI text in the module's `res/values/strings.xml` (English) and `res/values-ru/strings.xml` (Russian); ViewModels hold `UiText`, pure-JVM modules return types, not text. `NoCyrillicLiteralsTest` and lint (`MissingTranslation`) fail the build on a hardcoded or untranslated string.
+5. Put UI text in the module's `res/values/strings.xml` (English) and `res/values-ru/strings.xml` (Russian); ViewModels hold `UiText`, pure-JVM modules return types, not text. `NoCyrillicLiteralsTest` and lint (`MissingTranslation`) fail the build on a hardcoded or untranslated string.
 
 You shouldn't need to import other features' classes. If you do, `core` is missing a key or an interface.
 
