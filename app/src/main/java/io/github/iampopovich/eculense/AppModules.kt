@@ -33,10 +33,14 @@ import io.github.iampopovich.eculense.feature.sessions.sessionsModule
 import io.github.iampopovich.eculense.feature.settings.settingsModule
 import io.github.iampopovich.eculense.feature.stats.statsModule
 import io.github.iampopovich.eculense.feature.widget.widgetModule
+import io.github.iampopovich.eculense.core.model.AppBuild
 import org.koin.core.module.Module
+import org.koin.dsl.module
 
 /** Add/remove a feature = add/remove a line here and in settings.gradle.kts. */
 val appModules: List<Module> = listOf(
+    // Version and flavor for «About» and problem reports (C11).
+    module { single { AppBuild(BuildConfig.VERSION_NAME, BuildConfig.FLAVOR) } },
     // Current app language (BCP-47) for AI prompts: the answer language follows the in-app language.
     appLanguageModule,
     obdModule(includeEmulator = BuildConfig.DEBUG),

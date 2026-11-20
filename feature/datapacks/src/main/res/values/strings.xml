@@ -55,4 +55,12 @@
     <string name="datapacks_pinned_version">%1$s. Pinned version: %2$s.</string>
     <string name="datapacks_obdb_note">Signalset data: OBDb (obdb.community), CC BY-SA 4.0. Downloaded by make and model, unmodified.</string>
     <string name="datapacks_builtin_title">Built-in generic code database</string>
+    <string name="datapacks_feedback">Feedback</string>
+    <string name="datapacks_report_problem">Report a problem</string>
+    <string name="datapacks_report_idea">Suggest an improvement</string>
+    <string name="datapacks_report_preview_title">This text will open on GitHub</string>
+    <string name="datapacks_report_preview_intro">Nothing is sent automatically: the browser opens a new issue form with this text, and you submit it yourself. No VIN, car name, location or traffic log.</string>
+    <string name="datapacks_report_log_note">To attach the traffic log: Settings → Adapter traffic log → Share, save the file, then drag it into the issue.</string>
+    <string name="datapacks_report_open">Open GitHub</string>
+    <string name="datapacks_report_cancel">Cancel</string>
 </resources>

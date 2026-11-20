@@ -55,4 +55,12 @@
     <string name="datapacks_pinned_version">%1$s. Зафиксированная версия: %2$s.</string>
     <string name="datapacks_obdb_note">Signalset data: OBDb (obdb.community), CC BY-SA 4.0. Скачивается по марке и модели без изменений.</string>
     <string name="datapacks_builtin_title">Встроенная база общих кодов</string>
+    <string name="datapacks_feedback">Обратная связь</string>
+    <string name="datapacks_report_problem">Сообщить о проблеме</string>
+    <string name="datapacks_report_idea">Предложить улучшение</string>
+    <string name="datapacks_report_preview_title">Этот текст откроется на GitHub</string>
+    <string name="datapacks_report_preview_intro">Ничего не отправляется автоматически: браузер откроет форму новой задачи с этим текстом, отправите её вы сами. Без VIN, названия машины, местоположения и журнала обмена.</string>
+    <string name="datapacks_report_log_note">Чтобы приложить журнал обмена: Настройки → Журнал обмена с адаптером → Поделиться, сохраните файл и перетащите его в задачу.</string>
+    <string name="datapacks_report_open">Открыть GitHub</string>
+    <string name="datapacks_report_cancel">Отмена</string>
 </resources>

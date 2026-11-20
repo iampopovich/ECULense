@@ -7,4 +7,5 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:datapacks"))
     implementation(project(":core:obdb"))
+    implementation(project(":core:obd")) // C11: adapter version and protocol for the problem report
 }
