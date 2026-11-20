@@ -16,12 +16,14 @@ import kotlinx.coroutines.flow.update
 /**
  * C5 «Automation» group of the adapter screen. Everything is off by default except remembering the last adapter.
  * [askCar] = C8: ask «which car?» when a recording starts and there is more than one car.
+ * [recordAccel] = E5-lite: log the phone accelerometer during recordings for the threshold calibration (off by default).
  */
 data class AutomationSettings(
     val rememberLast: Boolean = true,
     val autoConnect: Boolean = false,
     val autoRecord: Boolean = false,
     val askCar: Boolean = true,
+    val recordAccel: Boolean = false,
 )
 
 interface AutomationPrefs {
@@ -52,6 +54,7 @@ internal class DataStoreAutomationPrefs(private val store: DataStore<Preferences
             autoConnect = p[AUTO_CONNECT] ?: d.autoConnect,
             autoRecord = p[AUTO_RECORD] ?: d.autoRecord,
             askCar = p[ASK_CAR] ?: d.askCar,
+            recordAccel = p[RECORD_ACCEL] ?: d.recordAccel,
         )
     }
 
@@ -62,6 +65,7 @@ internal class DataStoreAutomationPrefs(private val store: DataStore<Preferences
             p[AUTO_CONNECT] = next.autoConnect
             p[AUTO_RECORD] = next.autoRecord
             p[ASK_CAR] = next.askCar
+            p[RECORD_ACCEL] = next.recordAccel
             if (!next.rememberLast) p.remove(LAST)
         }
     }
@@ -77,6 +81,7 @@ internal class DataStoreAutomationPrefs(private val store: DataStore<Preferences
         private val AUTO_CONNECT = booleanPreferencesKey("auto_connect")
         private val AUTO_RECORD = booleanPreferencesKey("auto_record")
         private val ASK_CAR = booleanPreferencesKey("ask_car")
+        private val RECORD_ACCEL = booleanPreferencesKey("record_accel")
         private val LAST = stringPreferencesKey("last_adapter")
         private const val SEP = '\u001F'
 

@@ -51,4 +51,8 @@
     <string name="automation_record_hint">Запись начинается после 5 с быстрее 10 км/ч и заканчивается через 3 мин после выключения двигателя. В демо-режиме не работает</string>
     <string name="automation_ask_car">Спрашивать машину при начале записи</string>
     <string name="automation_ask_car_hint">Только если машин больше одной; автозапись идёт на активную машину</string>
+    <string name="automation_accel">Записывать акселерометр телефона (для калибровки)</string>
+    <string name="automation_accel_hint">Только во время записи поездки. Телефон должен стоять в жёстком держателе. Около 2 МБ в час. Результат — на странице поездки, «Калибровка порогов»</string>
+    <string name="automation_accel_no_gravity">Недоступно: у телефона нет датчика гравитации</string>
+    <string name="automation_accel_no_sensor">Недоступно: у телефона нет акселерометра</string>
 </resources>

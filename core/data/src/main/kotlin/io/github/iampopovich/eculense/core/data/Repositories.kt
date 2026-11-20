@@ -68,6 +68,8 @@ internal class RoomSessionRepository(
     private val dao: SessionDao,
     private val clock: () -> Long = System::currentTimeMillis,
     private val activeCarId: suspend () -> Long? = { null },
+    /** Files that belong to a recording (E5-lite accelerometer log) go with it. */
+    private val onDeleted: (sessionId: Long) -> Unit = {},
 ) : SessionRepository {
     override fun observeSessions(): Flow<List<Session>> = dao.observeSessions().map { list -> list.map { it.toModel() } }
 
@@ -88,7 +90,10 @@ internal class RoomSessionRepository(
         dao.readings(sessionId).map { SensorReading(it.sensorId, it.value, it.unit, it.timestampMs) }
 
     /** Deleting a recording also deletes the trip derived from it; the stats follow the trips table. */
-    override suspend fun delete(sessionId: Long) = dao.deleteWithDerivedTrips(sessionId)
+    override suspend fun delete(sessionId: Long) {
+        dao.deleteWithDerivedTrips(sessionId)
+        runCatching { onDeleted(sessionId) }
+    }
 
     override suspend fun hasExternal(externalId: String): Boolean = dao.countByExternalId(externalId) > 0
 

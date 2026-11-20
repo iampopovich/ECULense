@@ -50,9 +50,25 @@ val dataModule = module {
         val analyticsDao = get<AnalyticsDao>()
         RecordingTrips(candidates = { tripDao.sessionsWithoutTrip() }, points = { id, sensors -> analyticsDao.points(id, sensors) }, get(), get())
     }
+    single { AccelFiles(java.io.File(androidContext().filesDir, "accel")) }
     single<SessionRepository> {
         val cars = get<CarRepository>()
-        RoomSessionRepository(get(), activeCarId = { cars.activeCarId() })
+        val accel = get<AccelFiles>()
+        RoomSessionRepository(get(), activeCarId = { cars.activeCarId() }, onDeleted = { accel.delete(it) })
+    }
+    single<StylePrefs> { DataStoreStylePrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("style") }) }
+    single {
+        val analyticsDao = get<AnalyticsDao>()
+        val trips = get<TripRepository>()
+        AccelCalibrations(
+            get(),
+            speed = { id, from, to ->
+                analyticsDao.points(id, listOf(io.github.iampopovich.eculense.core.analytics.SensorIds.SPEED))
+                    .filter { it.timestampMs in from..to }
+                    .map { io.github.iampopovich.eculense.core.analytics.SpeedSample(it.timestampMs, it.value) }
+            },
+            carSessions = { carId -> trips.trips(carId).sortedByDescending { it.startedAtMs }.mapNotNull { runCatching { trips.sessionOf(it) }.getOrNull() }.distinct() },
+        )
     }
     single<DtcRepository> {
         val cars = get<CarRepository>()

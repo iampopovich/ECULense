@@ -1,0 +1,4 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Normal permission (already merged from WorkManager): keeps the CPU awake while a recording logs the accelerometer. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+</manifest>

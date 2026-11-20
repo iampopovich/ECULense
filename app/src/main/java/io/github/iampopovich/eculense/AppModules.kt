@@ -14,6 +14,7 @@ import io.github.iampopovich.eculense.core.database.databaseModule
 import io.github.iampopovich.eculense.core.demo.demoModule
 import io.github.iampopovich.eculense.core.obd.obdModule
 import io.github.iampopovich.eculense.core.service.serviceModule
+import io.github.iampopovich.eculense.core.sensors.sensorsModule
 import io.github.iampopovich.eculense.core.usb.usbModule
 import io.github.iampopovich.eculense.feature.aichat.aiChatModule
 import io.github.iampopovich.eculense.feature.aisettings.aiSettingsModule
@@ -49,6 +50,8 @@ val appModules: List<Module> = listOf(
     serviceModule,
     databaseModule,
     dataModule,
+    // E5-lite phone accelerometer logging during recordings (threshold calibration); without it the setting is hidden.
+    sensorsModule,
     // Background post-trip analysis and maintenance reminders (WorkManager + notifications); without it the data layer computes findings.
     backgroundModule,
     // On-demand data packs (reference catalogs, code databases) — before the modules that read them.

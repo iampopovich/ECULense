@@ -2,6 +2,7 @@ package io.github.iampopovich.eculense.feature.connect
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.iampopovich.eculense.core.data.AccelSupport
 import io.github.iampopovich.eculense.core.data.AutomationPrefs
 import io.github.iampopovich.eculense.core.data.AutomationSettings
 import io.github.iampopovich.eculense.core.obd.AdaptiveTiming
@@ -39,6 +40,8 @@ internal class AdapterSettingsViewModel(
     controller: ConnectionController,
     /** C5 «Automation» group; null when the data layer is not wired (the group is hidden). */
     private val automationPrefs: AutomationPrefs? = null,
+    /** E5-lite: phone accelerometer support; null = the sensors module is not in the build (switch hidden). */
+    val accelSupport: AccelSupport? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(AdapterSettingsUiState())
     val state: StateFlow<AdapterSettingsUiState> = _state.asStateFlow()

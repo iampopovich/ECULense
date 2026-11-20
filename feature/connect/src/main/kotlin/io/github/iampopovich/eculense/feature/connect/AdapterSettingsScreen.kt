@@ -5,6 +5,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Switch
 import androidx.compose.ui.semantics.Role
+import io.github.iampopovich.eculense.core.data.AccelSupport
 import io.github.iampopovich.eculense.core.data.AutomationSettings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -50,13 +51,17 @@ internal fun AdapterSettingsRoute(viewModel: AdapterSettingsViewModel = koinView
     val automation by viewModel.automation.collectAsStateWithLifecycle()
     AdapterSettingsScreen(
         state, detected, viewModel::setProtocol, viewModel::setTiming, viewModel::setExtraInit, viewModel::save,
-        automation = automation, onAutomation = viewModel::setAutomation,
+        automation = automation, onAutomation = viewModel::setAutomation, accelSupport = viewModel.accelSupport,
     )
 }
 
 /** C5: switches apply at once; auto-connect needs the remembered adapter. */
 @Composable
-private fun AutomationGroup(settings: AutomationSettings, onChange: ((AutomationSettings) -> AutomationSettings) -> Unit) {
+private fun AutomationGroup(
+    settings: AutomationSettings,
+    accelSupport: AccelSupport?,
+    onChange: ((AutomationSettings) -> AutomationSettings) -> Unit,
+) {
     Text(stringResource(R.string.automation_title), style = MaterialTheme.typography.titleMedium)
     SwitchRow(R.string.automation_remember, R.string.automation_remember_hint, settings.rememberLast) { on ->
         onChange { it.copy(rememberLast = on, autoConnect = it.autoConnect && on) }
@@ -66,6 +71,17 @@ private fun AutomationGroup(settings: AutomationSettings, onChange: ((Automation
     }
     SwitchRow(R.string.automation_record, R.string.automation_record_hint, settings.autoRecord) { on -> onChange { it.copy(autoRecord = on) } }
     SwitchRow(R.string.automation_ask_car, R.string.automation_ask_car_hint, settings.askCar) { on -> onChange { it.copy(askCar = on) } }
+    if (accelSupport != null) {
+        // E5-lite: off by default; a phone without the sensors shows why the switch is disabled.
+        val hint = when (accelSupport) {
+            AccelSupport.LINEAR_ACCELERATION, AccelSupport.ACCELEROMETER_MINUS_GRAVITY -> R.string.automation_accel_hint
+            AccelSupport.NO_GRAVITY -> R.string.automation_accel_no_gravity
+            AccelSupport.NO_ACCELEROMETER -> R.string.automation_accel_no_sensor
+        }
+        SwitchRow(R.string.automation_accel, hint, settings.recordAccel && accelSupport.supported, enabled = accelSupport.supported) { on ->
+            onChange { it.copy(recordAccel = on) }
+        }
+    }
     HorizontalDivider()
 }
 
@@ -91,6 +107,7 @@ internal fun AdapterSettingsScreen(
     modifier: Modifier = Modifier,
     automation: AutomationSettings? = null,
     onAutomation: ((AutomationSettings) -> AutomationSettings) -> Unit = {},
+    accelSupport: AccelSupport? = null,
 ) {
     var picking by remember { mutableStateOf(false) }
     Column(
@@ -98,7 +115,7 @@ internal fun AdapterSettingsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(R.string.adapter_settings_title), style = MaterialTheme.typography.titleLarge)
-        automation?.let { AutomationGroup(it, onAutomation) }
+        automation?.let { AutomationGroup(it, accelSupport, onAutomation) }
         ListItem(
             headlineContent = { Text(stringResource(R.string.adapter_settings_protocol)) },
             supportingContent = { Text(ObdText.protocolName(state.protocol).asString()) },

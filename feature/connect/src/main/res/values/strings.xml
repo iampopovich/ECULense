@@ -51,4 +51,8 @@
     <string name="automation_record_hint">Starts after 5 s above 10 km/h, stops 3 min after the engine is off. Not in demo mode</string>
     <string name="automation_ask_car">Ask which car when recording starts</string>
     <string name="automation_ask_car_hint">Only with more than one car; automatic recordings use the active car</string>
+    <string name="automation_accel">Record the phone accelerometer (for calibration)</string>
+    <string name="automation_accel_hint">Only during a trip recording. The phone must sit in a rigid holder. About 2 MB per hour. The result is on the trip page, «Threshold calibration»</string>
+    <string name="automation_accel_no_gravity">Unavailable: this phone has no gravity sensor</string>
+    <string name="automation_accel_no_sensor">Unavailable: this phone has no accelerometer</string>
 </resources>

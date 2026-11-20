@@ -1,6 +1,7 @@
 package io.github.iampopovich.eculense.feature.connect
 
 import io.github.iampopovich.eculense.core.data.AutomationPrefs
+import io.github.iampopovich.eculense.core.data.PhoneSensors
 import io.github.iampopovich.eculense.core.navigation.AdapterSettingsDestination
 import io.github.iampopovich.eculense.core.navigation.ConnectDestination
 import io.github.iampopovich.eculense.core.navigation.Hub
@@ -18,7 +19,7 @@ import org.koin.dsl.navigation3.navigation
 @OptIn(KoinExperimentalAPI::class)
 val connectModule = module {
     viewModel { ConnectViewModel(get(), getOrNull<ReplayLogHolder>()) }
-    viewModel { AdapterSettingsViewModel(getOrNull<AdapterPrefs>() ?: InMemoryAdapterPrefs(), get(), getOrNull<AutomationPrefs>()) }
+    viewModel { AdapterSettingsViewModel(getOrNull<AdapterPrefs>() ?: InMemoryAdapterPrefs(), get(), getOrNull<AutomationPrefs>(), getOrNull<PhoneSensors>()?.accelSupport) }
     navigation<ConnectDestination> { ConnectRoute() }
     navigation<AdapterSettingsDestination> { AdapterSettingsRoute() }
     single(named("connect-hub")) {
