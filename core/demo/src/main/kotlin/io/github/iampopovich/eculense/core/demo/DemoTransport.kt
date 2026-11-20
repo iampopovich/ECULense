@@ -32,13 +32,16 @@ class DemoTransport internal constructor(
     private val engine: DemoEngine,
     private val flaky: Boolean = false,
     lateScope: CoroutineScope? = null,
+    /** Elapsed-time window (ms after open) in which the engine is off: the ECU is silent, ATRV shows 12.3 V. */
+    private val engineOff: LongRange? = null,
 ) : ObdTransport {
 
     constructor(
         clock: () -> Long = System::currentTimeMillis,
         latencyMs: (String) -> Long = ::defaultLatency,
         flaky: Boolean = false,
-    ) : this(clock, latencyMs, DemoEngine(), flaky)
+        engineOff: LongRange? = null,
+    ) : this(clock, latencyMs, DemoEngine(), flaky, engineOff = engineOff)
 
     private val incoming = Channel<ByteArray>(Channel.UNLIMITED)
     private val inbox = StringBuilder()
@@ -109,18 +112,27 @@ class DemoTransport internal constructor(
             append(body.replace("\r", eol)).append(eol).append(eol).append('>')
         }
         val bytes = text.encodeToByteArray()
+        val live = isLivePid(command)
+        if (live) liveRequests++
         when {
             flaky && command == "ATZ" -> incoming.send(GARBAGE + bytes)
-            flaky && isLivePid(command) && ++liveRequests % LATE_EVERY == 0 -> lateReply = scope?.launch {
+            flaky && live && liveRequests % LATE_EVERY == 0 -> lateReply = scope?.launch {
                 delay(LATE_DELAY_MS)
                 incoming.send(bytes)
             }
+            flaky && live && liveRequests % ERROR_EVERY == 0 -> incoming.send("CAN ERROR$eol$eol>".encodeToByteArray())
             else -> incoming.send(bytes)
         }
     }
 
-    private fun isLivePid(command: String): Boolean =
-        command.length == 4 && command.startsWith("01") && command.substring(2).toIntOrNull(16)?.let { it % 0x20 != 0 } == true
+    /** Service 01 data request (with or without a response-count suffix, single or multi-PID), not a mask. */
+    private fun isLivePid(command: String): Boolean {
+        if (!command.startsWith("01") || command.length < 4) return false
+        val pids = command.substring(2).let { if (it.length % 2 == 1) it.dropLast(1) else it }.chunked(2)
+        return pids.isNotEmpty() && pids.all { p -> p.length == 2 && p.toIntOrNull(16)?.let { it % 0x20 != 0 } == true }
+    }
+
+    private fun engineIsOff(): Boolean = engineOff?.contains(elapsed()) == true
 
     private fun handle(command: String): String =
         if (command.startsWith("AT")) handleAt(command.substring(2)) else handleObd(command)
@@ -143,16 +155,21 @@ class DemoTransport internal constructor(
         at.matches(Regex("(SP|TP)A?[0-9A-C]")) -> { protocolFound = false; "OK" }
         at == "DPN" -> if (flaky) "0" else if (protocolFound) "A6" else "A0"
         at == "DP" -> if (protocolFound) "AUTO, ISO 15765-4 (CAN 11/500)" else "AUTO"
-        at == "RV" -> String.format(Locale.US, "%.1fV", engine.voltage(elapsed()))
+        at == "RV" -> String.format(Locale.US, "%.1fV", if (engineIsOff()) ENGINE_OFF_VOLTAGE else engine.voltage(elapsed()))
         at.matches(Regex("ST[0-9A-F]{2}|AT[0-2]|M[01]|CAF[01]|AL|NL|R[01]|PC")) -> "OK"
         else -> "?"
     }
 
-    private fun handleObd(command: String): String {
-        if (command.length < 2 || command.length % 2 != 0 || !command.all { it in HEX }) return "?"
+    private fun handleObd(raw: String): String {
+        if (raw.length < 2 || !raw.all { it in HEX }) return "?"
+        // A trailing single digit is the response-count suffix ("010C1"): answer as for "010C".
+        val command = if (raw.length % 2 == 1 && raw.length >= 3) raw.dropLast(1) else raw
+        if (command.length % 2 != 0) return "?"
         protocolFound = true
+        if (engineIsOff()) return NO_DATA
         val mode = command.substring(0, 2).toInt(16)
         val pid = command.drop(2).take(2).takeIf { it.length == 2 }?.toInt(16)
+        if (mode == 0x01 && command.length > 4) return multiPid(command.substring(2).chunked(2).map { it.toInt(16) })
         return when (mode) {
             0x01 -> pid?.let { mode01(it) }?.let(::singleFrame) ?: NO_DATA
             0x03 -> singleFrame(dtcReply(0x43, stored))
@@ -171,6 +188,15 @@ class DemoTransport internal constructor(
             }
             else -> NO_DATA
         }
+    }
+
+    /** Up to 6 PIDs in one service 01 request: one combined "41 pid data pid data..." message (ISO-TP when long). */
+    private fun multiPid(pids: List<Int>): String {
+        if (pids.size > 6) return "?"
+        val parts = pids.mapNotNull { mode01(it)?.drop(2) }
+        if (parts.isEmpty()) return NO_DATA
+        val hex = "41" + parts.joinToString("")
+        return if (hex.length / 2 <= 7) singleFrame(hex) else multiFrame(hex)
     }
 
     private fun mode01(pid: Int): String? = when {
@@ -233,6 +259,10 @@ class DemoTransport internal constructor(
         private val GARBAGE = byteArrayOf(0xFC.toByte(), 0x00)
         internal const val LATE_EVERY = 25
         internal const val LATE_DELAY_MS = 2_300L
+
+        // Flaky clone: every Nth live request answers CAN ERROR once (the session recovers with ATPC + ATSP).
+        internal const val ERROR_EVERY = 40
+        private const val ENGINE_OFF_VOLTAGE = 12.3
         private const val HEX = "0123456789ABCDEF"
         private val VIN_HEX = DemoEngine.VIN.encodeToByteArray().joinToString("") { "%02X".format(it) }
 
@@ -279,6 +309,25 @@ class DemoTransportFactory(
     companion object {
         const val KIND = "demo"
         val ENDPOINT = AdapterEndpoint(KIND, "Virtual ELM327 · CAN 11/500 · no car", "Demo mode (simulation)", EndpointLabel.DEMO)
+    }
+}
+
+/**
+ * The demo car whose engine is switched off 30 s after connecting and started again 30 s later, so the
+ * «engine off» state (A4) can be watched without a car.
+ */
+class EngineStopDemoTransportFactory(
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val latencyMs: (String) -> Long = DemoTransport.Companion::defaultLatency,
+    private val offWindow: LongRange = 30_000L..60_000L,
+) : TransportFactory {
+    override val kind = KIND
+    override suspend fun discover() = listOf(ENDPOINT)
+    override fun create(endpoint: AdapterEndpoint): ObdTransport = DemoTransport(clock, latencyMs, engineOff = offWindow)
+
+    companion object {
+        const val KIND = "demo-engine-off"
+        val ENDPOINT = AdapterEndpoint(KIND, "Virtual ELM327 · engine stops after 30 s", "Demo: engine stops", EndpointLabel.DEMO_ENGINE_OFF)
     }
 }
 

@@ -3,9 +3,12 @@ package io.github.iampopovich.eculense.core.data
 import io.github.iampopovich.eculense.core.model.SensorReading
 import io.github.iampopovich.eculense.core.model.SessionSource
 import io.github.iampopovich.eculense.core.obd.ConnectionController
+import io.github.iampopovich.eculense.core.obd.ConnectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,12 +40,20 @@ internal class LiveSessionRecorder(
             _active.value = id
             val batch = mutableListOf<SensorReading>()
             try {
-                controller.readings.collect { reading ->
-                    batch += reading
-                    if (batch.size >= BATCH_SIZE) {
-                        repository.append(id, batch.toList())
-                        batch.clear()
+                // The recording survives reconnects (readings resume in the same session); a stopped engine (A4)
+                // ends it cleanly instead.
+                coroutineScope {
+                    val collector = launch {
+                        controller.readings.collect { reading ->
+                            batch += reading
+                            if (batch.size >= BATCH_SIZE) {
+                                repository.append(id, batch.toList())
+                                batch.clear()
+                            }
+                        }
                     }
+                    controller.state.first { it is ConnectionState.EngineOff }
+                    collector.cancel()
                 }
             } finally {
                 withContext(NonCancellable) {

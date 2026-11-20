@@ -8,12 +8,14 @@ import io.github.iampopovich.eculense.core.obd.ConnectionController
 import io.github.iampopovich.eculense.core.obd.ConnectionState
 import io.github.iampopovich.eculense.core.obd.Pid
 import io.github.iampopovich.eculense.core.obd.StandardPids
+import io.github.iampopovich.eculense.core.obd.isSessionAlive
 import io.github.iampopovich.eculense.core.obdtext.ObdText
 import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -27,6 +29,8 @@ internal data class DashboardUiState(
     val connected: Boolean = false,
     val values: List<LiveValue> = emptyList(),
     val recording: Boolean = false,
+    /** Reconnecting / engine off: one line above the values (the last values stay on screen). */
+    val banner: UiText? = null,
     /** Short "adapter · protocol · voltage" line, only while connected. */
     val status: UiText? = null,
 )
@@ -49,7 +53,8 @@ internal class DashboardViewModel(
 ) : ViewModel() {
     private val latest = MutableStateFlow<Map<String, Double>>(emptyMap())
 
-    private val selected: StateFlow<List<Pid>> = controller.state.map { state ->
+    // Reconnecting / engine off / connecting keep the current selection, so polling resumes with the same PIDs.
+    private val selected: StateFlow<List<Pid>> = controller.state.filter { it is ConnectionState.Connected || it is ConnectionState.Disconnected || it is ConnectionState.Failed }.map { state ->
         if (state is ConnectionState.Connected) {
             StandardPids.dashboardDefaults.filter { it in state.supportedPids }.mapNotNull { StandardPids.byCode(it) }
         } else {
@@ -61,7 +66,8 @@ internal class DashboardViewModel(
     val uiState: StateFlow<DashboardUiState> =
         combine(controller.state, selected, latest, recorder.activeSessionId, units.units) { state, pids, values, sessionId, u ->
             DashboardUiState(
-                connected = state is ConnectionState.Connected,
+                connected = state.isSessionAlive,
+                banner = ObdText.sessionState(state),
                 values = pids.map { pid ->
                     val raw = values[pid.sensorId]
                     val (shown, unit) = raw?.let { u.display(it, pid.unit) } ?: (null to u.display(0.0, pid.unit).second)

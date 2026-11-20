@@ -14,8 +14,8 @@ class Elm327SessionTest {
     @Test
     fun `initialize configures adapter and detects CAN`() = runTest {
         val info = session.initialize()
-        assertEquals(AdapterInfo("ELM327 v1.5", '6', isCan = true, batteryVoltage = 12.6), info)
-        assertEquals(listOf("ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "ATSP0", "0100", "ATDPN", "ATRV"), transport.sent)
+        assertEquals(AdapterInfo("ELM327 v1.5", '6', isCan = true, batteryVoltage = 13.9), info)
+        assertEquals(listOf("ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "AT@1", "STI", "VTI", "ATSP0", "0100", "ATDPN", "ATAT1", "ATRV"), transport.sent)
     }
 
     @Test(expected = ObdException::class)

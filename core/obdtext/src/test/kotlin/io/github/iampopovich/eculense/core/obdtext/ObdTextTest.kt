@@ -39,8 +39,21 @@ class ObdTextTest {
             ObdError.CommandFailed("x", "y"), ObdError.AdapterClosed, ObdError.NotOpen, ObdError.NoBaudRate(listOf(1)),
             ObdError.DemoDisconnected, ObdError.NoBluetooth, ObdError.UsbNoAccess, ObdError.UsbPermissionDenied,
             ObdError.UsbNotOpen, ObdError.UsbDetached, ObdError.LinkLost(ObdError.NotOpen), ObdError.BusInitFailed,
+            ObdError.AdapterNotResponding, ObdError.AdapterNoPower(4.0), ObdError.IgnitionOff(12.1),
         )
         typed.forEach { assertTrue(it.toString(), ObdText.error(it) is UiText.Res) }
+    }
+
+    @Test
+    fun `connection hints name the concrete thing to check`() {
+        assertEquals(UiText.Res(R.string.obd_hint_bt), ObdText.hint(ObdError.AdapterNotResponding, "bt"))
+        assertEquals(UiText.Res(R.string.obd_hint_wifi), ObdText.hint(ObdError.Other("connect timed out"), "wifi"))
+        assertEquals(UiText.Res(R.string.obd_hint_ignition), ObdText.hint(ObdError.IgnitionOff(12.2), "bt"))
+        assertEquals(UiText.Res(R.string.obd_hint_ignition), ObdText.hint(ObdError.LinkLost(ObdError.EcuSilent), "wifi"))
+        assertEquals(UiText.Res(R.string.obd_hint_no_power), ObdText.hint(ObdError.AdapterNoPower(3.9), "bt"))
+        assertEquals(null, ObdText.hint(ObdError.DemoDisconnected, "demo"))
+        assertEquals(UiText.Res(R.string.obd_protocol_5), ObdText.protocolName('5'))
+        assertEquals(UiText.Res(R.string.obd_protocol_auto), ObdText.protocolName(null))
     }
 
     @Test

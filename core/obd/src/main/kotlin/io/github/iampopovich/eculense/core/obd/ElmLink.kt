@@ -35,9 +35,19 @@ internal class ElmLink(
         val bytes = "$command\r".encodeToByteArray()
         traffic?.record(TrafficDirection.TX, bytes)
         val started = clock()
-        transport.write(bytes)
-        awaitReply(command, timeoutMs, idle, started)
+        lastActivityMs = started
+        try {
+            transport.write(bytes)
+            awaitReply(command, timeoutMs, idle, started)
+        } finally {
+            lastActivityMs = clock()
+        }
     }
+
+    /** When the last command was sent or finished (for the K-Line keepalive). */
+    @Volatile
+    var lastActivityMs: Long = clock()
+        private set
 
     /** Reads one more '>'-terminated reply without writing (the own reply after a foreign one); null on timeout. */
     suspend fun awaitNextReply(command: String, timeoutMs: Long = 2_000): String? = mutex.withLock {

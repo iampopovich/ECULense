@@ -9,4 +9,5 @@ import org.koin.dsl.module
 val demoModule = module {
     single(named(DemoTransportFactory.KIND)) { DemoTransportFactory() } bind TransportFactory::class
     single(named(FlakyDemoTransportFactory.KIND)) { FlakyDemoTransportFactory() } bind TransportFactory::class
+    single(named(EngineStopDemoTransportFactory.KIND)) { EngineStopDemoTransportFactory() } bind TransportFactory::class
 }

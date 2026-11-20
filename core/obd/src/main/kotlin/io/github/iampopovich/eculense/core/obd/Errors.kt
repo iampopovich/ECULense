@@ -19,6 +19,15 @@ sealed interface ObdError {
     /** The ECU does not answer (ignition off?). */
     data object EcuSilent : ObdError
 
+    /** The adapter does not answer at all: wrong device, wrong PIN/port, or the adapter is not powered. */
+    data object AdapterNotResponding : ObdError
+
+    /** The adapter reports [voltage] V on its OBD pin: below what a car battery gives (not plugged in / no power). */
+    data class AdapterNoPower(val voltage: Double) : ObdError
+
+    /** The adapter answers but the ECU stays silent and the battery shows [voltage] V: the ignition is probably off. */
+    data class IgnitionOff(val voltage: Double) : ObdError
+
     /** K-Line bus initialization failed ("BUS INIT: ...ERROR"): ignition off or the ECU did not wake up. */
     data object BusInitFailed : ObdError
 
@@ -65,6 +74,9 @@ sealed interface ObdError {
             is NoProtocol -> "adapter found no protocol: $detail"
             EcuSilent -> "ECU does not respond"
             BusInitFailed -> "bus init failed (BUS INIT: ERROR)"
+            AdapterNotResponding -> "adapter does not respond"
+            is AdapterNoPower -> "adapter has no power ($voltage V)"
+            is IgnitionOff -> "ECU silent at $voltage V: ignition off?"
             is CommandFailed -> "$command → $detail"
             AdapterClosed -> "adapter closed the connection"
             NotOpen -> "transport is not open"

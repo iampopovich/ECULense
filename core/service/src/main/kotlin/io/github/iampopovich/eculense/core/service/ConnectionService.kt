@@ -7,14 +7,17 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import io.github.iampopovich.eculense.core.obd.AppScope
 import io.github.iampopovich.eculense.core.obd.ConnectionController
-import io.github.iampopovich.eculense.core.obd.ConnectionState
+import io.github.iampopovich.eculense.core.obd.isSessionAlive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.android.ext.koin.androidContext
@@ -46,13 +49,19 @@ class ConnectionService : Service() {
     }
 }
 
-/** Connected → start the service, disconnected → stop it. */
+/** Session alive (connected, reconnecting, engine off) → keep the service; disconnected/failed → stop it. */
 internal class ConnectionServiceStarter(context: Context, controller: ConnectionController, scope: CoroutineScope) {
     init {
         scope.launch {
-            controller.state.map { it is ConnectionState.Connected }.distinctUntilChanged().collect { connected ->
+            controller.state.map { it.isSessionAlive }.distinctUntilChanged().collect { alive ->
                 val intent = Intent(context, ConnectionService::class.java)
-                if (connected) ContextCompat.startForegroundService(context, intent) else context.stopService(intent)
+                if (alive) ContextCompat.startForegroundService(context, intent) else context.stopService(intent)
+            }
+        }
+        // Polling speed in logcat (A7): one line every 20 cycles, for checks without a UI.
+        scope.launch {
+            controller.pollStats.filterNotNull().filter { it.cycles % 20 == 0 }.collect { s ->
+                Log.i("EcuObd", "poll cycles=${s.cycles} cycle_p50_ms=${s.cycleMsP50} pid_p50_ms=${s.pidMsP50}")
             }
         }
     }

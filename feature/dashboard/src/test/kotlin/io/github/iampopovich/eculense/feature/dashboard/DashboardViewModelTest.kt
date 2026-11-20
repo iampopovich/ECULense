@@ -4,7 +4,10 @@ import io.github.iampopovich.eculense.core.data.SessionRecorder
 import io.github.iampopovich.eculense.core.data.UnitsRepository
 import io.github.iampopovich.eculense.core.model.UnitsSettings
 import io.github.iampopovich.eculense.core.model.SensorReading
+import io.github.iampopovich.eculense.core.obd.ConnectionState
 import io.github.iampopovich.eculense.core.obd.FakeConnectionController
+import io.github.iampopovich.eculense.core.obd.ObdError
+import io.github.iampopovich.eculense.core.obdtext.R as ObdTextR
 import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -51,6 +54,24 @@ class DashboardViewModelTest {
         vm.toggleRecording { "Trip $it" }
         assertTrue(vm.uiState.value.recording)
         assertTrue(recorder.names.single(), recorder.names.single().matches(Regex("Trip \\d{2}\\.\\d{2} \\d{2}:\\d{2}")))
+    }
+
+    @Test
+    fun `reconnecting keeps the values on screen with a banner and the same polled pids`() = runTest {
+        val connected = FakeConnectionController.connected(setOf(0x0C, 0x0D))
+        val controller = FakeConnectionController(initial = connected)
+        val vm = DashboardViewModel(controller, FakeRecorder(), FakeUnits())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
+        controller.readingsFlow.emit(SensorReading("01.0C", 800.0, "rpm", 0))
+        controller.stateFlow.value = ConnectionState.Reconnecting(connected.endpoint, 2, 2_000, ObdError.AdapterClosed)
+        assertTrue(vm.uiState.value.connected)
+        assertEquals(UiText.Res(ObdTextR.string.obd_state_reconnecting, listOf(2, 2)), vm.uiState.value.banner)
+        assertEquals(800.0, vm.uiState.value.values.first { it.pid.code == 0x0C }.value)
+        assertEquals(listOf(0x0C, 0x0D), controller.polled.value.map { it.code })
+        controller.stateFlow.value = ConnectionState.EngineOff(connected.endpoint, 12.3)
+        assertEquals(UiText.Res(ObdTextR.string.obd_state_engine_off_voltage, listOf(12.3)), vm.uiState.value.banner)
+        controller.stateFlow.value = connected
+        assertEquals(null, vm.uiState.value.banner)
     }
 
     @Test

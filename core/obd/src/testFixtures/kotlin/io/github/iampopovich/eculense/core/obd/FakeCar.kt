@@ -7,7 +7,7 @@ object FakeCar {
         "0100" to "SEARCHING...\r4100BE3FA813",
         "0120" to "412080000000",
         "ATDPN" to "A6",
-        "ATRV" to "12.6V",
+        "ATRV" to "13.9V",
         "010C" to "410C1AF8",
         "010D" to "410D20",
         "03" to "430201330300",

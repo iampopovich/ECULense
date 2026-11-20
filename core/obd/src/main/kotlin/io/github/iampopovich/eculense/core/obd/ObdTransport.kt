@@ -29,7 +29,7 @@ interface ObdTransport {
 data class AdapterEndpoint(val kind: String, val address: String, val label: String, val labelKey: EndpointLabel? = null)
 
 /** Built-in endpoints whose label and description are app text (localized in :core:obdtext). */
-enum class EndpointLabel { DEMO, DEMO_FLAKY, PC_EMULATOR }
+enum class EndpointLabel { DEMO, DEMO_FLAKY, DEMO_ENGINE_OFF, PC_EMULATOR, REPLAY }
 
 /** Each link type (BT, Wi-Fi, BLE) is a separate factory, registered in Koin via bind TransportFactory::class. */
 interface TransportFactory {

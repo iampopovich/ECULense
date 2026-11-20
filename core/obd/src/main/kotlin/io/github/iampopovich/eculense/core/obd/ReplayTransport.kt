@@ -74,15 +74,29 @@ class ReplayTransport(exported: String) : ObdTransport {
     }
 }
 
-/** Offers one exported log as a selectable adapter (kind "replay"). */
-class ReplayTransportFactory(private val label: String, private val exported: () -> String?) : TransportFactory {
+/**
+ * Offers one exported log as a selectable adapter (kind "replay"). [listedWithoutLog] = the endpoint is always
+ * listed (the app picks a log file when it is tapped) instead of only when a log is loaded.
+ */
+class ReplayTransportFactory(
+    private val label: String,
+    private val listedWithoutLog: Boolean = false,
+    private val exported: () -> String?,
+) : TransportFactory {
     override val kind = KIND
     override suspend fun discover(): List<AdapterEndpoint> =
-        if (exported().isNullOrBlank()) emptyList() else listOf(AdapterEndpoint(KIND, "traffic log", label))
+        if (!listedWithoutLog && exported().isNullOrBlank()) emptyList() else listOf(ENDPOINT.copy(label = label))
 
     override fun create(endpoint: AdapterEndpoint): ObdTransport = ReplayTransport(exported().orEmpty())
 
     companion object {
         const val KIND = "replay"
+        val ENDPOINT = AdapterEndpoint(KIND, "traffic log", "Replay a traffic log", EndpointLabel.REPLAY)
     }
+}
+
+/** The traffic log picked by the user for the replay adapter (in memory only, until the next pick). */
+class ReplayLogHolder {
+    @Volatile
+    var text: String? = null
 }

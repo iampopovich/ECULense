@@ -68,7 +68,7 @@ class CloneScenariosTest {
         val transport = FlakyCloneTransport(backgroundScope)
             .on("ATZ", CloneReply.Parts(listOf(0L to "ELM327 v1.5\r\r>", 400L to "\rELM327 v1.5\r\r>")))
         val info = session(transport).initialize()
-        assertEquals(AdapterInfo("ELM327 v1.5", '6', isCan = true, batteryVoltage = 12.6), info)
+        assertEquals(AdapterInfo("ELM327 v1.5", '6', isCan = true, batteryVoltage = 13.9), info)
     }
 
     @Test

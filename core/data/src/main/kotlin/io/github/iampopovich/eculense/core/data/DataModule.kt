@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
 import io.github.iampopovich.eculense.core.database.AnalyticsDao
 import io.github.iampopovich.eculense.core.database.TripDao
+import io.github.iampopovich.eculense.core.obd.AdapterPrefs
 import io.github.iampopovich.eculense.core.obd.AppScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -25,6 +26,10 @@ val dataModule = module {
     single { DataStoreVehiclePrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("vehicle") }) } binds
         arrayOf(VehiclePrefs::class, UnitsRepository::class, MaintenancePrefs::class)
     single<CarRepository> { RoomCarRepository(get(), get(), get()) }
+    single<AdapterPrefs> {
+        val cars = get<CarRepository>()
+        DataStoreAdapterPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("adapter") }) { cars.activeCarId() }
+    }
     single<TripRepository> { RoomTripRepository(get()) }
     single<MaintenanceRepository> { RoomMaintenanceRepository(get(), get(), get(), get()) }
     single {

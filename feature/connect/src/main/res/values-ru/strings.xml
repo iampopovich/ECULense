@@ -10,4 +10,27 @@
     <string name="connect_disconnect">Отключиться</string>
     <string name="connect_refresh">Обновить список</string>
     <string name="connect_empty">Нет адаптеров. Спарьте ELM327 в настройках Bluetooth (PIN 1234 или 0000) или подключите USB-адаптер через OTG и нажмите «Обновить».</string>
+    <string name="connect_settings">Настройки адаптера</string>
+    <string name="connect_row_adapter">Адаптер: %1$s · %2$s</string>
+    <string name="connect_row_chip">Чип: %1$s</string>
+    <string name="connect_row_protocol">Протокол: %1$s</string>
+    <string name="connect_row_voltage">АКБ: %1$s В</string>
+    <string name="connect_row_pids">Поддерживаемых PID: %1$d</string>
+    <string name="connect_row_unsupported">Адаптер не поддерживает: %1$s</string>
+    <string name="adapter_settings_title">Настройки адаптера</string>
+    <string name="adapter_settings_protocol">Протокол</string>
+    <string name="adapter_settings_detected">Найден сейчас: %1$s</string>
+    <string name="adapter_settings_detected_none">Найденный протокол: нет подключения</string>
+    <string name="adapter_settings_timing">Адаптивные тайминги</string>
+    <string name="adapter_timing_auto">Авто</string>
+    <string name="adapter_timing_off">Выкл</string>
+    <string name="adapter_timing_1">Обычные</string>
+    <string name="adapter_timing_2">Быстрые</string>
+    <string name="adapter_settings_extra_init">Дополнительные команды инициализации</string>
+    <string name="adapter_settings_extra_init_hint">Одна команда AT или ST в строке, отправляются после стандартной инициализации. Пример: ATST32</string>
+    <string name="adapter_settings_not_at">«%1$s»: это не команда AT/ST</string>
+    <string name="adapter_settings_forbidden">«%1$s»: нельзя (сбрасывает адаптер или ломает связь)</string>
+    <string name="adapter_settings_too_many">Не больше 10 команд</string>
+    <string name="adapter_settings_save">Сохранить</string>
+    <string name="adapter_settings_saved">Сохранено. Применится при следующем подключении.</string>
 </resources>

@@ -4,6 +4,8 @@ import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
 @Serializable data object ConnectDestination : NavKey
+/** Adapter settings (A11): manual protocol, extra init commands, adaptive timing; opened from the connect screen. */
+@Serializable data object AdapterSettingsDestination : NavKey
 /** Adapter traffic log (:feature:obdlog), an item of the Settings hub. */
 @Serializable data object ObdLogDestination : NavKey
 @Serializable data object DashboardDestination : NavKey
