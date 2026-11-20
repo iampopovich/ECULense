@@ -196,4 +196,30 @@ class AnalyticsRepositoryTest {
         val unknown = old.copy(evidenceJson = """{"v":2,"title":{"k":"NO_SUCH_KEY"},"message":[],"sessions":[]}""").toModel().finding
         assertTrue(unknown.isLegacyText)
     }
+
+    @Test
+    fun `legacy rows are regenerated in typed form once and none is lost`() = runTest {
+        dao.add(1, 1, 100, *(0..4).map { Triple("01.05", 112.0, it * 10_000L) }.toTypedArray())
+        fun legacy(rule: String) = FindingEntity(
+            carId = 1, ruleId = rule, severity = "WARNING", title = "Старый текст", message = "Старое сообщение",
+            evidenceJson = """{"evidence":[],"sessions":[1]}""", periodFromMs = null, periodToMs = null, createdAtMs = 5,
+        )
+        findings.insertAll(listOf(legacy("coolant-overheat"), legacy("rule-of-an-older-version")))
+        val oldId = findings.all.value.first { it.ruleId == "coolant-overheat" }.id
+        val repo = repo(StandardTestDispatcher(testScheduler))
+
+        // opened by its old id (e.g. from a notification): the regenerated finding of the same rule comes back
+        val opened = repo.finding(oldId)!!
+        assertEquals("coolant-overheat", opened.finding.ruleId)
+        assertFalse(opened.finding.isLegacyText)
+        assertEquals(Severity.CRITICAL, opened.finding.severity)
+
+        val stored = repo.findings(1)
+        assertTrue(stored.filter { it.finding.ruleId != "rule-of-an-older-version" }.none { it.finding.isLegacyText })
+        // a rule that produced nothing new keeps its stored text instead of disappearing
+        assertEquals("Старый текст", FindingEnglish.title(stored.single { it.finding.ruleId == "rule-of-an-older-version" }.finding))
+        // only one recompute: the kept legacy row does not trigger another one
+        repo.findings(1)
+        assertEquals(1, logs.count { it.startsWith("recompute") })
+    }
 }

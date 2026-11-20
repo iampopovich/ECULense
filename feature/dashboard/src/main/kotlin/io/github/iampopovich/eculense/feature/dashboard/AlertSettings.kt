@@ -9,7 +9,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -29,6 +28,9 @@ import io.github.iampopovich.eculense.core.analytics.AlertThreshold
 import io.github.iampopovich.eculense.core.analytics.LiveAlertConfig
 import io.github.iampopovich.eculense.core.analytics.LiveAlertKind
 import io.github.iampopovich.eculense.core.data.AlertPrefs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,10 +46,9 @@ internal data class AlertSettingsUiState(
     val loaded: Boolean = false,
     val rows: List<AlertRow> = emptyList(),
     val newDtc: Boolean = true,
+    /** true after the latest edit reached the store and every number is valid. */
     val saved: Boolean = false,
-) {
-    val canSave: Boolean get() = loaded && rows.all { it.valid }
-}
+)
 
 /** Parses «110», «12.0» or «12,0»; null when it is not a number inside [LiveAlertConfig.validRange]. */
 internal fun parseThreshold(kind: LiveAlertKind, text: String): Double? =
@@ -56,10 +57,21 @@ internal fun parseThreshold(kind: LiveAlertKind, text: String): Double? =
 internal fun formatThreshold(kind: LiveAlertKind, v: Double): String =
     if (kind == LiveAlertKind.OVERHEAT) String.format(Locale.ROOT, "%.0f", v) else String.format(Locale.ROOT, "%.1f", v)
 
-/** C4 thresholds: switch each alert off or change its number; numbers are typed here, never on the dashboard. */
-internal class AlertSettingsViewModel(private val prefs: AlertPrefs) : ViewModel() {
+/**
+ * C4 thresholds: switch each alert off or change its number; numbers are typed here, never on the dashboard.
+ * Every change is stored on its own (no Save button): switches at once, typed numbers after [debounceMs] of quiet. A row
+ * whose text is not a valid number keeps its last stored value until the text is fixed. Saves run in [saveScope] (the app
+ * scope in production) so an edit made right before leaving the screen is not lost.
+ */
+internal class AlertSettingsViewModel(
+    private val prefs: AlertPrefs,
+    saveScope: CoroutineScope? = null,
+    private val debounceMs: Long = DEBOUNCE_MS,
+) : ViewModel() {
+    private val scope = saveScope ?: viewModelScope
     private val _state = MutableStateFlow(AlertSettingsUiState())
     val state: StateFlow<AlertSettingsUiState> = _state.asStateFlow()
+    private var pending: Job? = null
 
     init {
         viewModelScope.launch {
@@ -72,11 +84,20 @@ internal class AlertSettingsViewModel(private val prefs: AlertPrefs) : ViewModel
         }
     }
 
-    fun setEnabled(kind: LiveAlertKind, on: Boolean) = edit(kind) { it.copy(enabled = on) }
+    fun setEnabled(kind: LiveAlertKind, on: Boolean) {
+        edit(kind) { it.copy(enabled = on) }
+        persist(0)
+    }
 
-    fun setText(kind: LiveAlertKind, text: String) = edit(kind) { it.copy(text = text, valid = parseThreshold(kind, text) != null) }
+    fun setText(kind: LiveAlertKind, text: String) {
+        edit(kind) { it.copy(text = text, valid = parseThreshold(kind, text) != null) }
+        persist(debounceMs)
+    }
 
-    fun setNewDtc(on: Boolean) = _state.update { it.copy(newDtc = on, saved = false) }
+    fun setNewDtc(on: Boolean) {
+        _state.update { it.copy(newDtc = on, saved = false) }
+        persist(0)
+    }
 
     /** Restores the shipped defaults (the batch acceptance pass lowers a threshold and puts it back with this). */
     fun resetDefaults() {
@@ -84,21 +105,32 @@ internal class AlertSettingsViewModel(private val prefs: AlertPrefs) : ViewModel
         _state.update { s ->
             s.copy(rows = LiveAlertKind.entries.map { AlertRow(it, d.of(it).enabled, formatThreshold(it, d.of(it).value)) }, newDtc = d.newDtc, saved = false)
         }
+        persist(0)
     }
 
-    fun save() {
-        val s = _state.value
-        if (!s.canSave) return
-        viewModelScope.launch {
+    private fun persist(delayMs: Long) {
+        if (!_state.value.loaded) return
+        pending?.cancel()
+        pending = scope.launch {
+            if (delayMs > 0) delay(delayMs)
+            val s = _state.value
             prefs.update { c ->
-                s.rows.fold(c.copy(newDtc = s.newDtc)) { acc, r -> acc.with(r.kind, AlertThreshold(r.enabled, parseThreshold(r.kind, r.text)!!)) }
+                s.rows.fold(c.copy(newDtc = s.newDtc)) { acc, r ->
+                    // An invalid number keeps the stored value; its switch is stored anyway.
+                    val value = parseThreshold(r.kind, r.text) ?: acc.of(r.kind).value
+                    acc.with(r.kind, AlertThreshold(r.enabled, value))
+                }
             }
-            _state.update { it.copy(saved = true) }
+            if (_state.value == s) _state.update { it.copy(saved = s.rows.all { r -> r.valid }) }
         }
     }
 
     private fun edit(kind: LiveAlertKind, f: (AlertRow) -> AlertRow) =
         _state.update { s -> s.copy(rows = s.rows.map { if (it.kind == kind) f(it) else it }, saved = false) }
+
+    companion object {
+        const val DEBOUNCE_MS = 600L
+    }
 }
 
 @Composable
@@ -138,7 +170,6 @@ internal fun AlertSettingsRoute(viewModel: AlertSettingsViewModel = koinViewMode
             trailingContent = { Switch(checked = state.newDtc, onCheckedChange = null) },
             modifier = Modifier.toggleable(state.newDtc, role = Role.Switch) { viewModel.setNewDtc(it) },
         )
-        Button(onClick = viewModel::save, enabled = state.canSave, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.alerts_save)) }
         androidx.compose.material3.TextButton(onClick = viewModel::resetDefaults, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.alerts_defaults))
         }

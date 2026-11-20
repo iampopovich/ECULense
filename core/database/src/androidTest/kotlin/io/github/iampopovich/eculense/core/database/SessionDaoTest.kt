@@ -27,4 +27,20 @@ class SessionDaoTest {
         dao.delete(id)
         assertEquals(0, dao.readings(id).size)
     }
+
+    @Test
+    fun deletingRecordingDeletesOnlyItsDerivedTrip() = runTest {
+        val car = db.carDao().insert(CarEntity(name = "Test car"))
+        val id = dao.insertSession(SessionEntity(name = "t", startedAtMs = 1_000, endedAtMs = 9_000, source = "IMPORT_CARSCANNER", vin = null, carId = car))
+        val other = dao.insertSession(SessionEntity(name = "u", startedAtMs = 20_000, endedAtMs = 29_000, source = "LIVE", vin = null, carId = car))
+        fun trip(ext: String, source: String, from: Long) =
+            TripEntity(carId = car, startedAtMs = from, endedAtMs = from + 8_000, distanceMm = 1_000_000, fuelUl = 0, fuelPricePerL = null,
+                drivingMs = 8_000, standingMs = 0, source = source, externalId = ext)
+        db.tripDao().insertAll(
+            listOf(trip("session:$id", "LIVE", 1_000), trip("carscanner:7", "IMPORT_CARSCANNER", 1_000), trip("session:$other", "LIVE", 20_000)),
+        )
+        dao.deleteWithDerivedTrips(id)
+        assertEquals(listOf("carscanner:7", "session:$other"), db.tripDao().forCar(car).mapNotNull { it.externalId }.sorted())
+        assertEquals(listOf(other), dao.observeSessions().first().map { it.id })
+    }
 }

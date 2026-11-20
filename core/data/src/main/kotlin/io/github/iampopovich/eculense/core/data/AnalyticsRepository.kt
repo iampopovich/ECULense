@@ -125,11 +125,38 @@ internal class RoomAnalyticsRepository(
      */
     private val digestCache = java.util.concurrent.ConcurrentHashMap<Long, SessionDigest>()
 
-    override fun observeFindings(carId: Long): Flow<List<StoredFinding>> = findingDao.observeForCar(carId).map { list -> list.map { it.toModel() } }
+    override fun observeFindings(carId: Long): Flow<List<StoredFinding>> =
+        findingDao.observeForCar(carId).map { list -> withoutLegacy(carId, list.map { it.toModel() }) }
 
-    override suspend fun findings(carId: Long): List<StoredFinding> = findingDao.forCar(carId).map { it.toModel() }
+    override suspend fun findings(carId: Long): List<StoredFinding> = withoutLegacy(carId, findingDao.forCar(carId).map { it.toModel() })
 
-    override suspend fun finding(id: Long): StoredFinding? = findingDao.byId(id)?.toModel()
+    /** A finding opened by id (notification, link) whose row holds pre-localization text: regenerated, found again by rule. */
+    override suspend fun finding(id: Long): StoredFinding? {
+        val f = findingDao.byId(id)?.toModel() ?: return null
+        if (!f.finding.isLegacyText) return f
+        return withoutLegacy(f.carId, listOf(f)).firstOrNull { it.finding.ruleId == f.finding.ruleId } ?: f
+    }
+
+    /** Cars whose legacy rows were already regenerated in this process: a row kept on purpose never loops a recompute. */
+    private val regenerated = java.util.concurrent.ConcurrentHashMap.newKeySet<Long>()
+
+    /**
+     * Rows written before localization (or with a key unknown to this version) carry only stored text: they have a stable
+     * rule id but no typed parameters, so they can't be re-rendered. The analysis is re-run once to regenerate them in
+     * typed form (the alert ledger keys on car + rule + severity, so seen/notified state survives); a legacy row whose
+     * rule produced nothing new is kept as it is ([recomputeLocked]), so no finding is lost.
+     */
+    private suspend fun withoutLegacy(carId: Long, list: List<StoredFinding>): List<StoredFinding> {
+        if (list.none { it.finding.isLegacyText } || !regenerated.add(carId)) return list
+        try {
+            recompute(carId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return list
+        }
+        return findingDao.forCar(carId).map { it.toModel() }
+    }
 
     override suspend fun recompute(carId: Long): List<Finding> = withContext(compute) { mutex.withLock { recomputeLocked(carId) } }
 
@@ -148,7 +175,11 @@ internal class RoomAnalyticsRepository(
             val input = AnalysisInput(cars.cars().firstOrNull { it.id == carId }, digests, dtcEvents(carId), clock(), zone(), runCatching { tripEvents(carId) }.getOrDefault(emptyList()))
             val findings = withContext(compute) { AnalyticsEngine.evaluate(input) }
             val now = clock()
-            findingDao.replaceForCar(carId, findings.map { it.toEntity(carId, now) })
+            val fresh = findings.map { it.toEntity(carId, now) }
+            // Legacy rows of rules that produced nothing this time are kept (with their stored text) rather than lost.
+            val rules = fresh.map { it.ruleId }.toSet()
+            val keep = findingDao.forCar(carId).filter { it.toModel().finding.isLegacyText && it.ruleId !in rules }.map { it.copy(id = 0) }
+            findingDao.replaceForCar(carId, fresh + keep)
             val ms = (System.nanoTime() - started) / 1_000_000
             log("recompute car=$carId sessions=${sessions.size} cached=$cached points=$points findings=${findings.count { it.severity.rank >= Severity.INFO.rank }} ms=$ms")
             _state.value = AnalysisState.Done(now, ms, sessions.size)

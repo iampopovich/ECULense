@@ -148,6 +148,20 @@ interface SessionDao {
     @Query("DELETE FROM sessions WHERE id = :id")
     suspend fun delete(id: Long)
 
+    /**
+     * Trips computed from this recording ("session:<id>", own or imported without a Car Scanner trip). Car Scanner
+     * trips that merely overlap the recording have their own externalId and are never touched.
+     */
+    @Query("DELETE FROM trips WHERE externalId = 'session:' || :sessionId")
+    suspend fun deleteDerivedTrips(sessionId: Long): Int
+
+    /** The recording, its readings and events (cascade) and the trip derived from it, in one transaction. */
+    @androidx.room.Transaction
+    suspend fun deleteWithDerivedTrips(id: Long) {
+        deleteDerivedTrips(id)
+        delete(id)
+    }
+
     @Query("SELECT COUNT(*) FROM sessions WHERE externalId = :externalId")
     suspend fun countByExternalId(externalId: String): Int
 

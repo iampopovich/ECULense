@@ -26,7 +26,7 @@ val dashboardModule = module {
             alerts = getOrNull<LiveAlerts>(), marker = getOrNull<EventMarker>(), cars = getOrNull<CarRepository>(), automation = getOrNull<AutomationPrefs>(),
         )
     }
-    viewModel { AlertSettingsViewModel(getOrNull<AlertPrefs>() ?: InMemoryAlertPrefs()) }
+    viewModel { AlertSettingsViewModel(getOrNull<AlertPrefs>() ?: InMemoryAlertPrefs(), saveScope = getOrNull<kotlinx.coroutines.CoroutineScope>(io.github.iampopovich.eculense.core.obd.AppScope)) }
     navigation<DashboardDestination> { DashboardRoute() }
     navigation<DrivingModeDestination> { DrivingModeRoute() }
     navigation<AlertSettingsDestination> { AlertSettingsRoute() }

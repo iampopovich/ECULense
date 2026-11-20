@@ -87,7 +87,8 @@ internal class RoomSessionRepository(
     override suspend fun readings(sessionId: Long): List<SensorReading> =
         dao.readings(sessionId).map { SensorReading(it.sensorId, it.value, it.unit, it.timestampMs) }
 
-    override suspend fun delete(sessionId: Long) = dao.delete(sessionId)
+    /** Deleting a recording also deletes the trip derived from it; the stats follow the trips table. */
+    override suspend fun delete(sessionId: Long) = dao.deleteWithDerivedTrips(sessionId)
 
     override suspend fun hasExternal(externalId: String): Boolean = dao.countByExternalId(externalId) > 0
 

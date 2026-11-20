@@ -45,7 +45,6 @@
     <string name="alerts_range">От %1$s до %2$s</string>
     <string name="alerts_new_dtc">Новый код неисправности в поездке</string>
     <string name="alerts_new_dtc_hint">Раз в минуту читает сохранённые и ожидающие коды; коды, которые были при подключении, не сообщаются</string>
-    <string name="alerts_save">Сохранить</string>
     <string name="alerts_defaults">Вернуть по умолчанию</string>
     <string name="alerts_saved">Сохранено</string>
     <string name="dash_value_celsius">%1$.0f °C</string>

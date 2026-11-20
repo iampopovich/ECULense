@@ -45,7 +45,6 @@
     <string name="alerts_range">From %1$s to %2$s</string>
     <string name="alerts_new_dtc">New trouble code during the trip</string>
     <string name="alerts_new_dtc_hint">Reads stored and pending codes once a minute; codes present at connect are not reported</string>
-    <string name="alerts_save">Save</string>
     <string name="alerts_defaults">Restore defaults</string>
     <string name="alerts_saved">Saved</string>
     <string name="dash_value_celsius">%1$.0f °C</string>
