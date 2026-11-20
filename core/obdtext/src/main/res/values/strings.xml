@@ -42,11 +42,6 @@
     <string name="obd_protocol_a">SAE J1939 CAN (29 bit, 250 kbaud, trucks)</string>
     <string name="obd_protocol_b">User CAN 1 (11 bit, 125 kbaud)</string>
     <string name="obd_protocol_c">User CAN 2 (11 bit, 50 kbaud)</string>
-    <string name="obd_adapter_kind_genuine">genuine ELM327 (by version)</string>
-    <string name="obd_adapter_kind_clone">ELM327 clone (likely)</string>
-    <string name="obd_adapter_kind_stn">OBDLink / STN chip</string>
-    <string name="obd_adapter_kind_vlinker">vLinker</string>
-    <string name="obd_adapter_kind_unknown">unknown type</string>
     <string name="obd_state_reconnecting">Connection lost. Reconnecting, attempt %1$d in %2$d s…</string>
     <string name="obd_state_engine_off">Engine off. Waiting for the ECU…</string>
     <string name="obd_state_engine_off_voltage">Engine off (battery %1$.1f V). Waiting for the ECU…</string>
@@ -75,4 +70,24 @@
     <string name="obd_pid_46">Ambient air temperature</string>
     <string name="obd_pid_5c">Engine oil temperature</string>
     <string name="obd_pid_5e">Fuel rate</string>
+    <string name="obd_pid_03">Fuel system status</string>
+    <string name="obd_pid_08">Short-term fuel trim, bank 2</string>
+    <string name="obd_pid_09">Long-term fuel trim, bank 2</string>
+    <string name="obd_pid_14">O2 sensor, bank 1 sensor 1</string>
+    <string name="obd_pid_15">O2 sensor, bank 1 sensor 2</string>
+    <string name="obd_pid_30">Warm-ups since codes cleared</string>
+    <string name="obd_pid_3c">Catalyst temperature, bank 1</string>
+    <string name="obd_pid_43">Absolute load</string>
+    <string name="obd_pid_44">Commanded lambda</string>
+    <string name="obd_pid_45">Relative throttle position</string>
+    <string name="obd_system_engine">Engine</string>
+    <string name="obd_system_fuel">Fuel</string>
+    <string name="obd_system_air">Air intake</string>
+    <string name="obd_system_exhaust">Exhaust and O2 sensors</string>
+    <string name="obd_system_electrical">Electrical</string>
+    <string name="obd_system_other">Other</string>
+    <string name="obd_fuel_closed_loop">closed loop</string>
+    <string name="obd_fuel_open_loop">open loop</string>
+    <string name="obd_adapter_note_clone_version">%1$s — the version most clones report</string>
+    <string name="obd_adapter_note_elm_version">%1$s — a version of the original ELM327 firmware</string>
 </resources>

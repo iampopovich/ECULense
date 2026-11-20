@@ -1,13 +1,18 @@
 package io.github.iampopovich.eculense.core.data
 
+import io.github.iampopovich.eculense.core.analytics.SensorIds
 import io.github.iampopovich.eculense.core.model.SensorReading
 import io.github.iampopovich.eculense.core.model.SessionSource
 import io.github.iampopovich.eculense.core.obd.ConnectionController
 import io.github.iampopovich.eculense.core.obd.ConnectionState
+import io.github.iampopovich.eculense.core.obd.Pid
+import io.github.iampopovich.eculense.core.obd.StandardPids
+import io.github.iampopovich.eculense.core.obd.isSessionAlive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,8 +45,8 @@ internal class LiveSessionRecorder(
             _active.value = id
             val batch = mutableListOf<SensorReading>()
             try {
-                // The recording survives reconnects (readings resume in the same session); a stopped engine (A4)
-                // ends it cleanly instead.
+                // The recording survives reconnects (readings resume in the same session); a stopped engine (A4),
+                // a reconnect that gave up (Failed) and a user disconnect end it cleanly instead.
                 coroutineScope {
                     val collector = launch {
                         controller.readings.collect { reading ->
@@ -52,11 +57,19 @@ internal class LiveSessionRecorder(
                             }
                         }
                     }
-                    controller.state.first { it is ConnectionState.EngineOff }
+                    // Analytics needs coolant, trims, voltage... even if the dashboard does not show them (C1).
+                    val demand = launch {
+                        controller.state.collect { s ->
+                            if (s is ConnectionState.Connected) controller.setPolledPids(OWNER, requiredPids(s.supportedPids))
+                        }
+                    }
+                    controller.state.dropWhile { !it.isSessionAlive }.first { it.endsRecording() }
                     collector.cancel()
+                    demand.cancel()
                 }
             } finally {
                 withContext(NonCancellable) {
+                    controller.setPolledPids(OWNER, emptyList())
                     if (batch.isNotEmpty()) repository.append(id, batch.toList())
                     repository.finish(id)
                     _active.value = null
@@ -74,5 +87,20 @@ internal class LiveSessionRecorder(
 
     private companion object {
         const val BATCH_SIZE = 25
+        const val OWNER = "recorder"
     }
 }
+
+/** Reconnecting keeps the recording open; these states close it. */
+internal fun ConnectionState.endsRecording(): Boolean =
+    this is ConnectionState.EngineOff || this is ConnectionState.Failed || this is ConnectionState.Disconnected
+
+/**
+ * PIDs a recording always polls (C1/C2): what the analytics rules and the trip calculator read, so a dashboard
+ * without coolant or trims still yields complete recordings. They are read in their own (mostly slow) tier.
+ */
+internal fun requiredPids(supported: Set<Int>): List<Pid> =
+    (SensorIds.FOR_RULES + SensorIds.FUEL_RATE)
+        .mapNotNull { id -> StandardPids.all.firstOrNull { it.sensorId == id } }
+        .filter { it.code in supported }
+        .sortedBy { it.code }

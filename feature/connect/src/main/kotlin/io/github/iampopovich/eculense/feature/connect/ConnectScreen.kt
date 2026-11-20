@@ -145,9 +145,11 @@ private fun AdapterRows(state: ConnectionState.Connected) {
     val caps = state.capabilities
     val version = ObdText.adapterVersion(state.info.version).asString()
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row(stringResource(R.string.connect_row_adapter, version, ObdText.adapterKind(caps.kind).asString()))
-        caps.stnId?.let { Row(stringResource(R.string.connect_row_chip, listOfNotNull(it, caps.deviceId).joinToString(" · "))) }
-        caps.vlinkerId?.let { Row(stringResource(R.string.connect_row_chip, it)) }
+        Row(stringResource(R.string.connect_row_adapter_version, version))
+        ObdText.adapterNote(caps)?.let {
+            Text(it.asString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        ObdText.adapterChip(caps)?.let { Row(stringResource(R.string.connect_row_chip, it)) }
         Row(stringResource(R.string.connect_row_protocol, ObdText.protocolName(state.info.protocolNumber).asString()))
         state.info.batteryVoltage?.let { Row(stringResource(R.string.connect_row_voltage, volts(it))) }
         Row(stringResource(R.string.connect_row_pids, state.supportedPids.size))

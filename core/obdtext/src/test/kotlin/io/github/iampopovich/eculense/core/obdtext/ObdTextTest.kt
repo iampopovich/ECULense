@@ -19,6 +19,16 @@ class ObdTextTest {
     }
 
     @Test
+    fun `adapter note states the version fact, never a clone verdict`() {
+        val clone = io.github.iampopovich.eculense.core.obd.AdapterCapabilities(version = "ELM327 v1.5", kind = io.github.iampopovich.eculense.core.obd.AdapterKind.CLONE)
+        assertEquals(UiText.Res(R.string.obd_adapter_note_clone_version, listOf("ELM327 v1.5")), ObdText.adapterNote(clone))
+        val stn = io.github.iampopovich.eculense.core.obd.AdapterCapabilities(version = "ELM327 v1.4b", stnId = "STN1110 v4.0", kind = io.github.iampopovich.eculense.core.obd.AdapterKind.STN)
+        assertEquals(null, ObdText.adapterNote(stn))
+        assertEquals("STN1110 v4.0", ObdText.adapterChip(stn))
+        assertEquals(null, ObdText.adapterChip(clone))
+    }
+
+    @Test
     fun `sensor names fall back to the id`() {
         assertEquals(UiText.Res(R.string.obd_pid_0c), ObdText.sensorName("01.0C"))
         assertEquals(UiText.Raw("01.99"), ObdText.sensorName("01.99"))

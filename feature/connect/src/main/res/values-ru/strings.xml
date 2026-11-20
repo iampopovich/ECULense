@@ -11,7 +11,6 @@
     <string name="connect_refresh">Обновить список</string>
     <string name="connect_empty">Нет адаптеров. Спарьте ELM327 в настройках Bluetooth (PIN 1234 или 0000) или подключите USB-адаптер через OTG и нажмите «Обновить».</string>
     <string name="connect_settings">Настройки адаптера</string>
-    <string name="connect_row_adapter">Адаптер: %1$s · %2$s</string>
     <string name="connect_row_chip">Чип: %1$s</string>
     <string name="connect_row_protocol">Протокол: %1$s</string>
     <string name="connect_row_voltage">АКБ: %1$s В</string>
@@ -33,4 +32,5 @@
     <string name="adapter_settings_too_many">Не больше 10 команд</string>
     <string name="adapter_settings_save">Сохранить</string>
     <string name="adapter_settings_saved">Сохранено. Применится при следующем подключении.</string>
+    <string name="connect_row_adapter_version">Адаптер: %1$s</string>
 </resources>

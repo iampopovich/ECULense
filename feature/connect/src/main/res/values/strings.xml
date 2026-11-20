@@ -11,7 +11,6 @@
     <string name="connect_refresh">Refresh list</string>
     <string name="connect_empty">No adapters. Pair an ELM327 in Bluetooth settings (PIN 1234 or 0000) or connect a USB adapter via OTG, then tap Refresh list.</string>
     <string name="connect_settings">Adapter settings</string>
-    <string name="connect_row_adapter">Adapter: %1$s · %2$s</string>
     <string name="connect_row_chip">Chip: %1$s</string>
     <string name="connect_row_protocol">Protocol: %1$s</string>
     <string name="connect_row_voltage">Battery: %1$s V</string>
@@ -33,4 +32,5 @@
     <string name="adapter_settings_too_many">At most 10 commands</string>
     <string name="adapter_settings_save">Save</string>
     <string name="adapter_settings_saved">Saved. Applies on the next connection.</string>
+    <string name="connect_row_adapter_version">Adapter: %1$s</string>
 </resources>

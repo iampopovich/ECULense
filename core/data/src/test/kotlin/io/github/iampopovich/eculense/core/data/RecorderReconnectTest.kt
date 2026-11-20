@@ -66,7 +66,8 @@ class RecorderReconnectTest {
         recorder.start("Test car")
         delay(1_000)
         val t = transports[0]
-        listOf("010C1", "010C", "0100").forEach { t.replies[it] = "NO DATA" }
+        // The recorder also polls what analytics needs (speed answers on FakeCar): the whole ECU goes silent.
+        listOf("010C1", "010C", "010D1", "010D", "0100").forEach { t.replies[it] = "NO DATA" }
         t.replies["ATRV"] = "12.2V"
         manager.state.first { it is ConnectionState.EngineOff }
         runCurrent()

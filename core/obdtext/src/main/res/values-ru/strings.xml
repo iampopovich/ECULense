@@ -41,11 +41,6 @@
     <string name="obd_protocol_a">SAE J1939 CAN (29 бит, 250 кбод, грузовики)</string>
     <string name="obd_protocol_b">Пользовательский CAN 1 (11 бит, 125 кбод)</string>
     <string name="obd_protocol_c">Пользовательский CAN 2 (11 бит, 50 кбод)</string>
-    <string name="obd_adapter_kind_genuine">оригинальный ELM327 (по версии)</string>
-    <string name="obd_adapter_kind_clone">клон ELM327 (вероятно)</string>
-    <string name="obd_adapter_kind_stn">OBDLink / чип STN</string>
-    <string name="obd_adapter_kind_vlinker">vLinker</string>
-    <string name="obd_adapter_kind_unknown">тип неизвестен</string>
     <string name="obd_state_reconnecting">Связь потеряна. Переподключение, попытка %1$d через %2$d с…</string>
     <string name="obd_state_engine_off">Двигатель заглушён. Ждём ЭБУ…</string>
     <string name="obd_state_engine_off_voltage">Двигатель заглушён (АКБ %1$.1f В). Ждём ЭБУ…</string>
@@ -74,4 +69,24 @@
     <string name="obd_pid_46">Температура окружающего воздуха</string>
     <string name="obd_pid_5c">Температура масла</string>
     <string name="obd_pid_5e">Расход топлива</string>
+    <string name="obd_pid_03">Состояние топливной системы</string>
+    <string name="obd_pid_08">Краткосрочная коррекция топлива, банк 2</string>
+    <string name="obd_pid_09">Долгосрочная коррекция топлива, банк 2</string>
+    <string name="obd_pid_14">Датчик кислорода, банк 1 датчик 1</string>
+    <string name="obd_pid_15">Датчик кислорода, банк 1 датчик 2</string>
+    <string name="obd_pid_30">Прогревов после сброса ошибок</string>
+    <string name="obd_pid_3c">Температура катализатора, банк 1</string>
+    <string name="obd_pid_43">Абсолютная нагрузка</string>
+    <string name="obd_pid_44">Заданная лямбда</string>
+    <string name="obd_pid_45">Относительное положение дросселя</string>
+    <string name="obd_system_engine">Двигатель</string>
+    <string name="obd_system_fuel">Топливо</string>
+    <string name="obd_system_air">Впуск воздуха</string>
+    <string name="obd_system_exhaust">Выхлоп и лямбда-зонды</string>
+    <string name="obd_system_electrical">Электрика</string>
+    <string name="obd_system_other">Прочее</string>
+    <string name="obd_fuel_closed_loop">замкнутый контур</string>
+    <string name="obd_fuel_open_loop">разомкнутый контур</string>
+    <string name="obd_adapter_note_clone_version">%1$s — такую версию чаще всего показывают клоны</string>
+    <string name="obd_adapter_note_elm_version">%1$s — версия оригинальной прошивки ELM327</string>
 </resources>

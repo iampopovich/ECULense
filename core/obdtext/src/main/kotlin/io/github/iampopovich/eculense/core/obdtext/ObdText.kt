@@ -1,11 +1,14 @@
 package io.github.iampopovich.eculense.core.obdtext
 
 import androidx.annotation.StringRes
+import io.github.iampopovich.eculense.core.obd.AdapterCapabilities
 import io.github.iampopovich.eculense.core.obd.AdapterEndpoint
 import io.github.iampopovich.eculense.core.obd.AdapterKind
 import io.github.iampopovich.eculense.core.obd.ConnectionState
 import io.github.iampopovich.eculense.core.obd.EndpointLabel
 import io.github.iampopovich.eculense.core.obd.ObdError
+import io.github.iampopovich.eculense.core.obd.PidSystem
+import io.github.iampopovich.eculense.core.obd.StandardPids
 import io.github.iampopovich.eculense.core.ui.UiText
 
 /** UI text for :core:obd types in the app language. Adapter replies and device names stay raw. */
@@ -58,14 +61,40 @@ object ObdText {
     fun protocolName(protocol: Char?): UiText = PROTOCOL_NAMES[protocol]?.let { UiText.Res(it) }
         ?: if (protocol == null) UiText.Res(R.string.obd_protocol_auto) else UiText.Raw(protocol.toString())
 
-    fun adapterKind(kind: AdapterKind): UiText = UiText.Res(
-        when (kind) {
-            AdapterKind.GENUINE_ELM -> R.string.obd_adapter_kind_genuine
-            AdapterKind.CLONE -> R.string.obd_adapter_kind_clone
-            AdapterKind.STN -> R.string.obd_adapter_kind_stn
-            AdapterKind.VLINKER -> R.string.obd_adapter_kind_vlinker
-            AdapterKind.UNKNOWN -> R.string.obd_adapter_kind_unknown
+    /**
+     * A6: a factual secondary line about the adapter version (never a "clone" verdict): clones mostly report
+     * v1.5/v2.1, so the line says that much. STN/vLinker adapters show their chip name instead (null here).
+     */
+    fun adapterNote(capabilities: AdapterCapabilities): UiText? {
+        val version = capabilities.version.trim().takeIf { it.isNotEmpty() } ?: return null
+        return when (capabilities.kind) {
+            AdapterKind.CLONE -> UiText.Res(R.string.obd_adapter_note_clone_version, listOf(version))
+            AdapterKind.GENUINE_ELM -> UiText.Res(R.string.obd_adapter_note_elm_version, listOf(version))
+            AdapterKind.STN, AdapterKind.VLINKER, AdapterKind.UNKNOWN -> null
+        }
+    }
+
+    /** Chip name for STN (OBDLink) and vLinker adapters, as the adapter reported it. */
+    fun adapterChip(capabilities: AdapterCapabilities): String? = when {
+        capabilities.stnId != null -> listOfNotNull(capabilities.stnId, capabilities.deviceId).joinToString(" · ")
+        capabilities.vlinkerId != null -> capabilities.vlinkerId
+        else -> null
+    }
+
+    fun systemName(system: PidSystem): UiText = UiText.Res(
+        when (system) {
+            PidSystem.ENGINE -> R.string.obd_system_engine
+            PidSystem.FUEL -> R.string.obd_system_fuel
+            PidSystem.AIR -> R.string.obd_system_air
+            PidSystem.EXHAUST -> R.string.obd_system_exhaust
+            PidSystem.ELECTRICAL -> R.string.obd_system_electrical
+            PidSystem.OTHER -> R.string.obd_system_other
         },
+    )
+
+    /** PID 03 value in words: closed / open loop. */
+    fun fuelSystemStatus(value: Double): UiText = UiText.Res(
+        if (StandardPids.isClosedLoop(value)) R.string.obd_fuel_closed_loop else R.string.obd_fuel_open_loop,
     )
 
     /** One status line for connection states beyond connected/failed (reconnecting, engine off). */
@@ -152,5 +181,15 @@ object ObdText {
         0x46 to R.string.obd_pid_46,
         0x5C to R.string.obd_pid_5c,
         0x5E to R.string.obd_pid_5e,
+        0x03 to R.string.obd_pid_03,
+        0x08 to R.string.obd_pid_08,
+        0x09 to R.string.obd_pid_09,
+        0x14 to R.string.obd_pid_14,
+        0x15 to R.string.obd_pid_15,
+        0x30 to R.string.obd_pid_30,
+        0x3C to R.string.obd_pid_3c,
+        0x43 to R.string.obd_pid_43,
+        0x44 to R.string.obd_pid_44,
+        0x45 to R.string.obd_pid_45,
     )
 }
