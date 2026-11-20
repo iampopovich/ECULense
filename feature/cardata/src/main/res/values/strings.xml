@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cardata_hub_title">Car data</string>
+    <string name="cardata_hub_subtitle">Everything the car reports, by system · choose the dashboard values</string>
+    <string name="cardata_not_connected">Connect an adapter to see what the car reports.</string>
+    <string name="cardata_connect">Connect</string>
+    <string name="cardata_edit_panel">Edit dashboard</string>
+    <string name="cardata_done">Done</string>
+    <string name="cardata_keep_screen_on">Keep the screen on while connected</string>
+    <string name="cardata_on_panel">On the dashboard</string>
+    <string name="cardata_add_to_panel">Add to the dashboard</string>
+    <string name="cardata_remove_from_panel">Remove from the dashboard</string>
+    <string name="cardata_move_up">Move up</string>
+    <string name="cardata_move_down">Move down</string>
+    <string name="cardata_unsupported">Not supported by this car: %1$d</string>
+    <string name="cardata_na">N/A</string>
+    <string name="cardata_not_answering">not answering</string>
+    <string name="cardata_estimated">estimated from MAF</string>
+    <string name="cardata_panel_empty">The dashboard is empty. Mark values with the star.</string>
+    <string name="cardata_panel_title">Dashboard order</string>
+</resources>

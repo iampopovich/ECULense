@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cardata_hub_title">Данные машины</string>
+    <string name="cardata_hub_subtitle">Всё, что отдаёт машина, по системам · выбор значений для панели</string>
+    <string name="cardata_not_connected">Подключите адаптер, чтобы увидеть, что отдаёт машина.</string>
+    <string name="cardata_connect">Подключить</string>
+    <string name="cardata_edit_panel">Изменить панель</string>
+    <string name="cardata_done">Готово</string>
+    <string name="cardata_keep_screen_on">Не гасить экран при подключении</string>
+    <string name="cardata_on_panel">На панели</string>
+    <string name="cardata_add_to_panel">Добавить на панель</string>
+    <string name="cardata_remove_from_panel">Убрать с панели</string>
+    <string name="cardata_move_up">Выше</string>
+    <string name="cardata_move_down">Ниже</string>
+    <string name="cardata_unsupported">Машина не поддерживает: %1$d</string>
+    <string name="cardata_na">н/д</string>
+    <string name="cardata_not_answering">не отвечает</string>
+    <string name="cardata_estimated">оценка по MAF</string>
+    <string name="cardata_panel_empty">Панель пуста. Отметьте значения звёздочкой.</string>
+    <string name="cardata_panel_title">Порядок на панели</string>
+</resources>

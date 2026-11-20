@@ -36,6 +36,9 @@ import io.github.iampopovich.eculense.core.navigation.CarDataDestination
 import io.github.iampopovich.eculense.core.navigation.ConnectDestination
 import io.github.iampopovich.eculense.core.navigation.DrivingModeDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
+import io.github.iampopovich.eculense.core.navigation.RouteHandler
+import androidx.compose.runtime.remember
+import org.koin.compose.getKoin
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -45,11 +48,14 @@ internal fun DashboardRoute(viewModel: DashboardViewModel = koinViewModel()) {
     // The session name is stored in the database, so it is built in the language active when recording starts.
     val sessionName = stringResource(R.string.dash_session_name)
     KeepScreenOn(state.connected && state.keepScreenOn)
+    // The car data screen is an optional module: the button shows only if it is wired in.
+    val koin = getKoin()
+    val hasCarData = remember { koin.getAll<RouteHandler>().any { it.routeClass == CarDataDestination::class } }
     DashboardScreen(
         state,
         onToggleRecording = { viewModel.toggleRecording { stamp -> sessionName.format(stamp) } },
         onConnect = { navigator.navigate(ConnectDestination) },
-        onCarData = { navigator.navigate(CarDataDestination) },
+        onCarData = if (hasCarData) ({ navigator.navigate(CarDataDestination) }) else null,
         onDriving = { navigator.navigate(DrivingModeDestination) },
     )
 }
@@ -69,7 +75,7 @@ internal fun DashboardScreen(
     state: DashboardUiState,
     onToggleRecording: () -> Unit,
     onConnect: () -> Unit,
-    onCarData: () -> Unit,
+    onCarData: (() -> Unit)?,
     onDriving: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -102,8 +108,10 @@ internal fun DashboardScreen(
                 Text(stringResource(if (state.recording) R.string.dash_stop_recording else R.string.dash_record))
             }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = onCarData) {
-                Icon(painterResource(R.drawable.ic_list), contentDescription = stringResource(R.string.dash_open_car_data))
+            if (onCarData != null) {
+                IconButton(onClick = onCarData) {
+                    Icon(painterResource(R.drawable.ic_list), contentDescription = stringResource(R.string.dash_open_car_data))
+                }
             }
             Spacer(Modifier.width(4.dp))
             IconButton(onClick = onDriving) {

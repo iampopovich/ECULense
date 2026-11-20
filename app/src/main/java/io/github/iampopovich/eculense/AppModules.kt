@@ -21,6 +21,7 @@ import io.github.iampopovich.eculense.feature.analysis.analysisModule
 import io.github.iampopovich.eculense.feature.car.carModule
 import io.github.iampopovich.eculense.feature.connect.connectModule
 import io.github.iampopovich.eculense.feature.obdlog.obdLogModule
+import io.github.iampopovich.eculense.feature.cardata.carDataModule
 import io.github.iampopovich.eculense.feature.dashboard.dashboardModule
 import io.github.iampopovich.eculense.feature.datapacks.dataPacksFeatureModule
 import io.github.iampopovich.eculense.feature.dtc.dtcModule
@@ -51,6 +52,8 @@ val appModules: List<Module> = listOf(
     // Adapter traffic log screen (Settings hub); without it the log still records in memory, unseen.
     obdLogModule,
     dashboardModule,
+    // Car data screen (C1, Pit-stop hub + dashboard button); without it the dashboard keeps its default PID set.
+    carDataModule,
     pitstopModule,
     settingsModule,
     dtcModule,
