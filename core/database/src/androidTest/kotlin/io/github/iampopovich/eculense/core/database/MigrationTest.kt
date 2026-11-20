@@ -313,4 +313,42 @@ class MigrationTest {
             room.close()
         }
     }
+
+    @Test
+    fun v8GetsEventsAndHealthChecksKeepingDataAndMovesSessions() = runTest {
+        helper.createDatabase(dbName, 8).use { db ->
+            db.execSQL("INSERT INTO cars (id, name) VALUES (1, 'Тестовая')")
+            db.execSQL("INSERT INTO cars (id, name) VALUES (2, 'Test car 2')")
+            db.execSQL("INSERT INTO sessions (id, name, startedAtMs, endedAtMs, source, vin, externalId, carId) VALUES (1, 'live', 30, 40, 'LIVE', NULL, NULL, 1)")
+            db.execSQL("INSERT INTO readings (sessionId, sensorId, value, unit, timestampMs) VALUES (1, '01.0C', 800.0, 'rpm', 31)")
+            db.execSQL(
+                "INSERT INTO trips (carId, startedAtMs, endedAtMs, distanceMm, fuelUl, fuelPricePerL, drivingMs, standingMs, source, externalId) " +
+                    "VALUES (1, 30, 40, 1000, 10, NULL, 10, 0, 'LIVE', 'session:1')",
+            )
+            db.execSQL("INSERT INTO readiness_snapshots (carId, takenAtMs, reason) VALUES (1, 50, 'BEFORE_CLEAR')")
+        }
+        helper.runMigrationsAndValidate(dbName, 9, true, MIGRATION_8_9).use { db ->
+            fun count(sql: String) = db.query(sql).use { c -> c.moveToFirst(); c.getInt(0) }
+            assertEquals(1, count("SELECT COUNT(*) FROM readings"))
+            assertEquals(1, count("SELECT COUNT(*) FROM trips"))
+            assertEquals(1, count("SELECT COUNT(*) FROM readiness_snapshots"))
+            assertEquals(0, count("SELECT COUNT(*) FROM trip_events"))
+            assertEquals(0, count("SELECT COUNT(*) FROM health_checks"))
+        }
+        val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
+            .addMigrations(*EcuDatabase.MIGRATIONS).build()
+        try {
+            room.eventDao().insert(TripEventEntity(sessionId = 1, carId = 1, atMs = 35, type = "STALL"))
+            room.healthDao().insert(HealthCheckEntity(carId = 1, takenAtMs = 60, verdict = "OK", items = "", dtcs = null, readiness = null, counters = null, odometerKm = null))
+            assertEquals(1, room.healthDao().observeForCar(1).first().size)
+            room.sessionMoveDao().move(1, 2)
+            assertEquals(2L, room.sessionMoveDao().carOf(1))
+            assertEquals(1, room.tripDao().forCar(2).size)
+            assertEquals(2L, room.eventDao().forSession(1).single().carId)
+            room.sessionDao().delete(1)
+            assertTrue("events go with their recording", room.eventDao().forSession(1).isEmpty())
+        } finally {
+            room.close()
+        }
+    }
 }

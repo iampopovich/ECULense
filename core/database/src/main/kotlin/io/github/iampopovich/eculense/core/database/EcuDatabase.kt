@@ -481,7 +481,7 @@ interface ImportDao {
     entities = [
         SessionEntity::class, ReadingEntity::class, DtcSnapshotEntity::class, CarEntity::class, TripEntity::class, FindingEntity::class,
         MaintenanceItemEntity::class, OdometerEntity::class, ImportHistoryEntity::class, ImportedFileEntity::class, ImportSnapshotEntity::class,
-        ReadinessSnapshotEntity::class,
+        ReadinessSnapshotEntity::class, TripEventEntity::class, HealthCheckEntity::class,
     ],
     version = EcuDatabase.VERSION,
 )
@@ -495,12 +495,15 @@ abstract class EcuDatabase : RoomDatabase() {
     abstract fun maintenanceDao(): MaintenanceDao
     abstract fun odometerDao(): OdometerDao
     abstract fun importDao(): ImportDao
+    abstract fun eventDao(): EventDao
+    abstract fun healthDao(): HealthDao
+    abstract fun sessionMoveDao(): SessionMoveDao
 
     companion object {
         /** Schema version; an ECULense backup with a newer version is not restored. */
-        const val VERSION = 8
+        const val VERSION = 9
         const val FILE_NAME = "ecu.db"
-        val MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+        val MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
 
         const val DEFAULT_CAR_ID = 1L
         /** Blank: the UI shows the localized default name (older DBs keep their Russian literal, see LegacyValues). */
@@ -709,4 +712,7 @@ val databaseModule = module {
     single { get<EcuDatabase>().maintenanceDao() }
     single { get<EcuDatabase>().odometerDao() }
     single { get<EcuDatabase>().importDao() }
+    single { get<EcuDatabase>().eventDao() }
+    single { get<EcuDatabase>().healthDao() }
+    single { get<EcuDatabase>().sessionMoveDao() }
 }

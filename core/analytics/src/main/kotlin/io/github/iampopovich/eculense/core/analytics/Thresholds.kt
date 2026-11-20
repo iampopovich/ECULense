@@ -62,4 +62,28 @@ object Thresholds {
     const val WARMUP_TREND_RATIO = 1.3
     /** Cold starts needed in each half of the history to talk about a trend. */
     const val WARMUP_MIN_STARTS_PER_HALF = 3
+
+    // --- Live alerts during a connection (C4); defaults the user can change ---
+    /** Below 12.0 V with the engine running the alternator does not charge at all (battery alone ~12.2–12.7 V). */
+    const val LIVE_NOT_CHARGING_V = 12.0
+    /** Above 15.2 V the regulator has failed: lamps and the battery suffer within minutes. */
+    const val LIVE_OVERCHARGE_V = 15.2
+    /** «Engine running» for the charging check: above cranking/idle-drop territory. */
+    const val LIVE_CHARGING_RPM = 500.0
+    /** A condition must hold this long before an alert (one bad sample is not an alert). */
+    const val LIVE_CONFIRM_MS = 5_000L
+    /** Hysteresis: the alert clears only this far back on the safe side of the threshold. */
+    const val LIVE_COOLANT_HYSTERESIS_C = 3.0
+    const val LIVE_VOLTAGE_HYSTERESIS_V = 0.3
+    /** One heads-up notification per kind at most this often. */
+    const val LIVE_NOTIFY_COOLDOWN_MS = 10 * 60_000L
+
+    // --- Engine stall (B10) ---
+    /** The engine was running (rpm above [RUNNING_RPM] or speed above 0) at most this long before rpm hit 0. */
+    const val STALL_LOOKBACK_MS = 10_000L
+    /** Voltage at the OBD port that still means «ignition on» (a dead port reads ~0). */
+    const val STALL_IGNITION_MIN_V = 11.0
+    /** Two stalls in the analysed period make a finding (one could be the driver); critical from this many. */
+    const val STALL_FINDING_MIN = 2
+    const val STALL_FINDING_CRITICAL = 4
 }
