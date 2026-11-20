@@ -50,6 +50,20 @@ class ObdTrafficLogTest {
     }
 
     @Test
+    fun `duration counts from the command, including a slow write`() = runTest {
+        val log = RingTrafficLog(clock = { testScheduler.currentTime })
+        val inner = ScriptedTransport(FakeCar.replies)
+        val slowWrite = object : ObdTransport by inner {
+            override suspend fun write(data: ByteArray) {
+                kotlinx.coroutines.delay(120) // adapters like the demo answer inside write()
+                inner.write(data)
+            }
+        }
+        ElmLink(slowWrite, log, clock = { testScheduler.currentTime }).send("010D")
+        assertEquals(120L, log.snapshot().last().durationMs)
+    }
+
+    @Test
     fun `timeout and dropped late reply are visible in the log`() = runTest {
         val log = RingTrafficLog(clock = { testScheduler.currentTime })
         val link = ElmLink(CloneScenarios.lateReplyAfterTimeout(backgroundScope), log)

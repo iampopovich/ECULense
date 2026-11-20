@@ -34,14 +34,15 @@ internal class ElmLink(
         dropPending()
         val bytes = "$command\r".encodeToByteArray()
         traffic?.record(TrafficDirection.TX, bytes)
+        val started = clock()
         transport.write(bytes)
-        awaitReply(command, timeoutMs, idle)
+        awaitReply(command, timeoutMs, idle, started)
     }
 
     /** Reads one more '>'-terminated reply without writing (the own reply after a foreign one); null on timeout. */
     suspend fun awaitNextReply(command: String, timeoutMs: Long = 2_000): String? = mutex.withLock {
         try {
-            awaitReply(command, timeoutMs, idle = true)
+            awaitReply(command, timeoutMs, idle = true, started = clock())
         } catch (e: ElmTimeoutException) {
             null
         }
@@ -57,8 +58,7 @@ internal class ElmLink(
 
     private class Hung : Exception()
 
-    private suspend fun awaitReply(command: String, timeoutMs: Long, idle: Boolean): String {
-        val started = clock()
+    private suspend fun awaitReply(command: String, timeoutMs: Long, idle: Boolean, started: Long): String {
         val received = ByteArrayOutputStream()
         var hung = false
         val reply = try {
