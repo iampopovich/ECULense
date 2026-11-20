@@ -23,14 +23,16 @@ class DemoCycleTimeTest {
         manager.connect(DemoTransportFactory.ENDPOINT)
         manager.state.first { it is ConnectionState.Connected }
         manager.setPolledPids(pids)
-        val cycles = 10
-        val started = testScheduler.currentTime
-        val readings = manager.readings.take(pids.size * cycles).toList()
-        val perCycle = (testScheduler.currentTime - started) / cycles
-        println("DEMO_CYCLE_MS=$perCycle for ${pids.size} PIDs; stats=${manager.pollStats.value}")
-        // 8 single requests would take 8 × 45 = 360 ms; two multi-PID requests take 90 ms.
-        assertEquals(90L, perCycle)
-        assertEquals(90L, manager.pollStats.value!!.cycleMsP50)
+        val readings = mutableListOf<io.github.iampopovich.eculense.core.model.SensorReading>()
+        val job = launch { manager.readings.collect { readings += it } }
+        kotlinx.coroutines.delay(3_000)
+        job.cancel()
+        val rpm = readings.count { it.sensorId == "01.0C" }
+        println("DEMO rpm readings in 3 s: $rpm; stats=${manager.pollStats.value}")
+        // C2 + A8: the four fast PIDs plus whatever slower PID is due fit into one multi-PID request (45 ms); round
+        // robin over 8 single requests took 360 ms per rpm value.
+        assertEquals(45L, manager.pollStats.value!!.cycleMsP50)
+        assertTrue("rpm=$rpm", rpm >= 3_000 / 60)
         assertEquals(pids.map { it.sensorId }.toSet(), readings.map { it.sensorId }.toSet())
     }
 

@@ -99,7 +99,7 @@ class DemoTransportTest {
         transport.open()
         transport.ask("ATE0")
         transport.ask("0100")
-        assertEquals("NO DATA", transport.ask("0103"))
+        assertEquals("NO DATA", transport.ask("0150"))
         assertEquals("?", transport.ask("HELLO"))
         assertEquals("?", transport.ask("ATXYZ"))
     }

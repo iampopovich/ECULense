@@ -26,8 +26,18 @@ class FakeConnectionController(
     override fun disconnect() {
         stateFlow.value = ConnectionState.Disconnected
     }
-    override fun setPolledPids(pids: List<Pid>) {
-        polled.value = pids
+    val polledBy = MutableStateFlow<Map<String, List<Pid>>>(emptyMap())
+    val background = MutableStateFlow(false)
+    override val disabledPids = MutableStateFlow<Set<Int>>(emptySet())
+    override val pollStats = MutableStateFlow<PollStats?>(null)
+
+    override fun setPolledPids(pids: List<Pid>) = setPolledPids(DEFAULT_OWNER, pids)
+    override fun setPolledPids(owner: String, pids: List<Pid>) {
+        polledBy.value = if (pids.isEmpty()) polledBy.value - owner else LinkedHashMap(polledBy.value).apply { put(owner, pids) }
+        polled.value = mergePolled(polledBy.value)
+    }
+    override fun setBackground(background: Boolean) {
+        this.background.value = background
     }
     override suspend fun <T> withSession(block: suspend (ObdSession) -> T): T? = session?.let { block(it) }
 

@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -66,9 +67,27 @@ interface ConnectionController {
     fun disconnect()
     fun setPolledPids(pids: List<Pid>)
 
+    /**
+     * Several consumers ask for PIDs at once (dashboard, car data screen, recorder): the poller reads the union, in
+     * the order the owners first appeared. An empty list removes the owner. [setPolledPids] without an owner is the
+     * [DEFAULT_OWNER] (the dashboard).
+     */
+    fun setPolledPids(owner: String, pids: List<Pid>) {
+        if (owner == DEFAULT_OWNER) setPolledPids(pids)
+    }
+
+    /** C2: the app is in background / the screen is off; slower tiers are read half as often. */
+    fun setBackground(background: Boolean) {}
+
     /** One-off operations (DTCs, VIN). null — if not connected. */
     suspend fun <T> withSession(block: suspend (ObdSession) -> T): T?
 }
+
+const val DEFAULT_OWNER = "default"
+
+/** Union of the PIDs requested by all owners, without duplicates, in owner order. */
+fun mergePolled(byOwner: Map<String, List<Pid>>): List<Pid> =
+    byOwner.values.flatten().distinctBy { it.code }
 
 private val NO_PIDS: StateFlow<Set<Int>> = MutableStateFlow(emptySet())
 private val NO_STATS: StateFlow<PollStats?> = MutableStateFlow(null)
@@ -112,7 +131,9 @@ class ObdConnectionManager internal constructor(
 
     private val _state = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     override val state: StateFlow<ConnectionState> = _state.asStateFlow()
+    private val polledByOwner = MutableStateFlow<Map<String, List<Pid>>>(emptyMap())
     private val polledPids = MutableStateFlow<List<Pid>>(emptyList())
+    private val background = MutableStateFlow(false)
     private val pollEpoch = MutableStateFlow(0)
     private val disabled = MutableStateFlow<Set<Int>>(emptySet())
     override val disabledPids: StateFlow<Set<Int>> = disabled.asStateFlow()
@@ -129,7 +150,7 @@ class ObdConnectionManager internal constructor(
             .flatMapLatest { (s, pids) ->
                 val current = active
                 if (s is ConnectionState.Connected && current != null && pids.isNotEmpty()) {
-                    LivePoller(current.session, clock, disabled, stats).poll(pids)
+                    LivePoller(current.session, clock, disabled, stats, background = background).poll(pids)
                         .catch { e -> onPollingFailure(s, current, e) }
                 } else {
                     emptyFlow()
@@ -167,8 +188,19 @@ class ObdConnectionManager internal constructor(
         }
     }
 
-    override fun setPolledPids(pids: List<Pid>) {
-        polledPids.value = pids
+    override fun setPolledPids(pids: List<Pid>) = setPolledPids(DEFAULT_OWNER, pids)
+
+    override fun setPolledPids(owner: String, pids: List<Pid>) {
+        val updated = polledByOwner.updateAndGet { current ->
+            if (pids.isEmpty()) current - owner else LinkedHashMap(current).apply { put(owner, pids) }
+        }
+        // Restart the poller only when the union really changed.
+        val merged = mergePolled(updated)
+        if (merged != polledPids.value) polledPids.value = merged
+    }
+
+    override fun setBackground(background: Boolean) {
+        this.background.value = background
     }
 
     override suspend fun <T> withSession(block: suspend (ObdSession) -> T): T? {

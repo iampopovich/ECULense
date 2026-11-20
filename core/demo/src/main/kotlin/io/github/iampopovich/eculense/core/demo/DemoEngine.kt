@@ -77,6 +77,17 @@ internal class DemoEngine(
             0x46 to ambientC,
             0x5C to oil,
             0x5E to fuelRate,
+            // Open loop (1) while cold, closed loop (2) once warm; open loop (4) under fuel cut.
+            0x03 to when { coolant < 40 -> 1.0; fuelCut -> 4.0; else -> 2.0 },
+            0x08 to stft + 0.8 * noise(t, 10),
+            0x09 to 4.7,
+            0x14 to 0.45 + 0.4 * sin(t * 2.3),
+            0x15 to 0.68 + 0.02 * noise(t, 11),
+            0x30 to 12.0,
+            0x3C to ambientC + 420 * (1 - exp(-t / 200)),
+            0x43 to load * 0.9,
+            0x44 to if (fuelCut) 1.99 else 1.0 + 0.01 * noise(t, 12),
+            0x45 to max(0.0, throttle - 11),
         )
     }
 

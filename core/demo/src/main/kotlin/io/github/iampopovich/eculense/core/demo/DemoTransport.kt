@@ -277,10 +277,15 @@ class DemoTransport internal constructor(
         internal fun encodePid(pid: Int, values: Map<Int, Double>): String? {
             val v = values[pid] ?: return null
             val data = when (pid) {
-                0x04, 0x11, 0x2F -> byte(v * 255 / 100)
+                0x04, 0x11, 0x2F, 0x45 -> byte(v * 255 / 100)
                 0x05, 0x0F, 0x46, 0x5C -> byte(v + 40)
-                0x06, 0x07 -> byte((v + 100) * 128 / 100)
-                0x0B, 0x0D, 0x33 -> byte(v)
+                0x06, 0x07, 0x08, 0x09 -> byte((v + 100) * 128 / 100)
+                0x0B, 0x0D, 0x33, 0x30 -> byte(v)
+                0x03 -> byte(v) + "00"
+                0x14, 0x15 -> byte(v * 200) + "FF"
+                0x3C -> word((v + 40) * 10)
+                0x43 -> word(v * 255 / 100)
+                0x44 -> word(v * 65_536 / 2)
                 0x0C -> word(v * 4)
                 0x0E -> byte((v + 64) * 2)
                 0x10 -> word(v * 100)
