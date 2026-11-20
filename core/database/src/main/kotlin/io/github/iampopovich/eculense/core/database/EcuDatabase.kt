@@ -342,6 +342,16 @@ interface TripDao {
             "ORDER BY s.startedAtMs",
     )
     suspend fun sessionsWithoutTrip(): List<TripCandidateRow>
+
+    @Query("SELECT * FROM trips WHERE id = :id")
+    suspend fun byId(id: Long): TripEntity?
+
+    /** D4: the recording behind a trip that has no «session:<id>» link (a Car Scanner trip): the first overlapping one. */
+    @Query(
+        "SELECT id FROM sessions WHERE carId = :carId AND startedAtMs <= :endMs AND (endedAtMs IS NULL OR endedAtMs >= :startMs) " +
+            "ORDER BY startedAtMs LIMIT 1",
+    )
+    suspend fun sessionOverlapping(carId: Long, startMs: Long, endMs: Long): Long?
 }
 
 data class TripCandidateRow(val id: Long, val startedAtMs: Long, val endedAtMs: Long, val source: String, val carId: Long)

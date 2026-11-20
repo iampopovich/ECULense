@@ -1,7 +1,10 @@
 package io.github.iampopovich.eculense.feature.stats
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,8 +45,11 @@ import io.github.iampopovich.eculense.core.model.TripSource
 import io.github.iampopovich.eculense.core.model.TripStats
 import io.github.iampopovich.eculense.core.model.UnitsSettings
 import io.github.iampopovich.eculense.core.navigation.BackupDestination
+import io.github.iampopovich.eculense.core.navigation.ExpensesDestination
+import io.github.iampopovich.eculense.core.navigation.FuelLogDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import io.github.iampopovich.eculense.core.navigation.RouteHandler
+import io.github.iampopovich.eculense.core.navigation.TripDetailDestination
 import io.github.iampopovich.eculense.core.ui.CarNames
 import io.github.iampopovich.eculense.core.ui.EcuDates
 import io.github.iampopovich.eculense.feature.stats.StatsFormat.labelRes
@@ -55,15 +61,29 @@ internal fun StatsRoute(viewModel: StatsViewModel = koinViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val navigator = LocalNavigator.current
     val koin = getKoin()
-    // Car Scanner statistics import lives in :feature:backup; no feature, no link
-    val hasBackup = remember { koin.getAll<RouteHandler>().any { it.routeClass == BackupDestination::class } }
-    StatsScreen(state, onPeriod = viewModel::selectPeriod, onImport = if (hasBackup) ({ navigator.navigate(BackupDestination) }) else null)
+    // Car Scanner statistics import lives in :feature:backup, the fuel log and expenses in :feature:fuel; no feature, no link
+    val routes = remember { koin.getAll<RouteHandler>().map { it.routeClass }.toSet() }
+    val actions = HeaderActions(
+        onImport = if (BackupDestination::class in routes) ({ navigator.navigate(BackupDestination) }) else null,
+        onFuel = if (FuelLogDestination::class in routes) ({ navigator.navigate(FuelLogDestination) }) else null,
+        onExpenses = if (ExpensesDestination::class in routes) ({ navigator.navigate(ExpensesDestination) }) else null,
+    )
+    StatsScreen(state, onPeriod = viewModel::selectPeriod, actions = actions, onTrip = { navigator.navigate(TripDetailDestination(it.id)) })
 }
 
+internal data class HeaderActions(val onImport: (() -> Unit)? = null, val onFuel: (() -> Unit)? = null, val onExpenses: (() -> Unit)? = null)
+
 @Composable
-internal fun StatsScreen(state: StatsUiState, onPeriod: (StatsPeriod) -> Unit, modifier: Modifier = Modifier, onImport: (() -> Unit)? = null) {
+internal fun StatsScreen(
+    state: StatsUiState,
+    onPeriod: (StatsPeriod) -> Unit,
+    modifier: Modifier = Modifier,
+    onImport: (() -> Unit)? = null,
+    actions: HeaderActions = HeaderActions(onImport = onImport),
+    onTrip: ((Trip) -> Unit)? = null,
+) {
     Column(modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Header(state.car?.let { CarNames.display(it) }, onImport)
+        Header(state.car?.let { CarNames.display(it) }, actions)
         if (state.loading) return@Column
         PeriodSelector(state.period, onPeriod)
         if (state.trips.isEmpty()) {
@@ -71,31 +91,40 @@ internal fun StatsScreen(state: StatsUiState, onPeriod: (StatsPeriod) -> Unit, m
             return@Column
         }
         LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item { Summary(state.stats, state.units, state.car?.currency) }
+            item { Summary(state) }
             item { Text(stringResource(R.string.stats_trips), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
-            items(state.trips, key = { it.id.takeIf { id -> id != 0L } ?: it.startedAtMs }) { TripRow(it, state.units) }
+            items(state.trips, key = { it.id.takeIf { id -> id != 0L } ?: it.startedAtMs }) { TripRow(it, state.units, onTrip) }
             item { Text(" ", Modifier.padding(bottom = 8.dp)) }
         }
     }
 }
 
 /**
- * Header: title + ONE import button for the whole screen; backup import does not depend on the selected period
- * (repeating the link in every branch read as "import for the week/month"). No :feature:backup, no button.
+ * Header: title + ONE row of screen-wide actions (import, fill-ups, expenses); none of them depends on the selected period
+ * (repeating the import link in every branch read as "import for the week/month"). A missing feature = no button.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Header(carName: String?, onImport: (() -> Unit)?) {
-    // The button goes on its own row: on the same row as the title, with a large font «Статистика» wrapped letter by letter.
+private fun Header(carName: String?, actions: HeaderActions) {
+    // The buttons go on their own row: on the same row as the title, with a large font «Статистика» wrapped letter by letter.
     Column(Modifier.fillMaxWidth().padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Column {
             Text(stringResource(R.string.stats_tab), style = MaterialTheme.typography.headlineSmall, maxLines = 1)
             carName?.let { Secondary(it) }
         }
-        onImport?.let {
-            FilledTonalButton(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) {
-                Icon(painterResource(R.drawable.ic_import), contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.stats_import), maxLines = 1)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            actions.onFuel?.let {
+                FilledTonalButton(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.stats_fuel_log), maxLines = 1) }
+            }
+            actions.onExpenses?.let {
+                FilledTonalButton(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.stats_expenses), maxLines = 1) }
+            }
+            actions.onImport?.let {
+                FilledTonalButton(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Icon(painterResource(R.drawable.ic_import), contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.stats_import), maxLines = 1)
+                }
             }
         }
     }
@@ -148,15 +177,36 @@ private fun PeriodSelector(selected: StatsPeriod, onPeriod: (StatsPeriod) -> Uni
 }
 
 @Composable
-private fun Summary(s: TripStats, u: UnitsSettings, currency: String?) {
+private fun Summary(state: StatsUiState) {
+    val s = state.stats
+    val u = state.units
     Card {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             StatRow(stringResource(R.string.stats_trip_count), s.trips.toString(), stringResource(R.string.stats_distance), StatsFormat.distance(s.distanceKm, u))
-            StatRow(stringResource(R.string.stats_fuel), StatsFormat.volume(s.fuelL, u), stringResource(R.string.stats_avg_consumption), StatsFormat.consumption(s.avgLPer100Km, u))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Stat(stringResource(R.string.stats_fuel), StatsFormat.volume(s.fuelL, u), Modifier.weight(1f))
+                Stat(
+                    stringResource(R.string.stats_avg_consumption), StatsFormat.consumption(state.consumption, u), Modifier.weight(1f),
+                    note = stringResource(sourceRes(state.consumptionSource)),
+                )
+            }
             StatRow(stringResource(R.string.stats_driving), StatsFormat.duration(s.drivingMs), stringResource(R.string.stats_standing), StatsFormat.duration(s.standingMs))
-            if (s.fuelCost > 0) StatRow(stringResource(R.string.stats_fuel_cost), StatsFormat.money(s.fuelCost, currency), null, null)
+            if (state.fuelCost > 0) {
+                Row(Modifier.fillMaxWidth()) {
+                    Stat(
+                        stringResource(R.string.stats_fuel_cost), StatsFormat.money(state.fuelCost, state.car?.currency), Modifier.weight(1f),
+                        note = stringResource(sourceRes(state.costSource)),
+                    )
+                }
+            }
         }
     }
+}
+
+private fun sourceRes(s: FuelSource): Int = when (s) {
+    FuelSource.FILL_UPS -> R.string.stats_source_fill_ups
+    FuelSource.TRIPS -> R.string.stats_source_trips
+    FuelSource.TRIPS_CORRECTED -> R.string.stats_source_trips_corrected
 }
 
 @Composable
@@ -168,15 +218,16 @@ private fun StatRow(label1: String, value1: String, label2: String?, value2: Str
 }
 
 @Composable
-private fun Stat(label: String, value: String, modifier: Modifier) {
+private fun Stat(label: String, value: String, modifier: Modifier, note: String? = null) {
     Column(modifier) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.titleLarge)
+        note?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
 @Composable
-private fun TripRow(t: Trip, u: UnitsSettings) {
+private fun TripRow(t: Trip, u: UnitsSettings, onTrip: ((Trip) -> Unit)?) {
     val stats = TripStats.of(listOf(t))
     val approx = if (t.fuelMethod == FuelMethod.MAF_ESTIMATE) "≈ " else ""
     val fuel = if (!t.fuelKnown) stringResource(R.string.stats_fuel_unknown)
@@ -187,6 +238,7 @@ private fun TripRow(t: Trip, u: UnitsSettings) {
             headlineContent = { Text(EcuDates.dateTime(t.startedAtMs)) },
             supportingContent = { Text("${StatsFormat.distance(t.distanceKm, u)} · $fuel") },
             trailingContent = { Text(StatsFormat.duration(t.drivingMs + t.standingMs), style = MaterialTheme.typography.labelMedium) },
+            modifier = if (onTrip != null && t.id != 0L) Modifier.clickable { onTrip(t) } else Modifier,
         )
         HorizontalDivider()
     }

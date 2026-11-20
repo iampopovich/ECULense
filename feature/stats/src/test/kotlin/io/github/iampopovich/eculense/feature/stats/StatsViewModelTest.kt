@@ -1,9 +1,13 @@
 package io.github.iampopovich.eculense.feature.stats
 
 import io.github.iampopovich.eculense.core.data.CarRepository
+import io.github.iampopovich.eculense.core.data.FuelImportResult
+import io.github.iampopovich.eculense.core.data.FuelPrefs
+import io.github.iampopovich.eculense.core.data.FuelRepository
 import io.github.iampopovich.eculense.core.data.TripRepository
 import io.github.iampopovich.eculense.core.data.UnitsRepository
 import io.github.iampopovich.eculense.core.model.CarProfile
+import io.github.iampopovich.eculense.core.model.FuelFillUp
 import io.github.iampopovich.eculense.core.model.StatsPeriod
 import io.github.iampopovich.eculense.core.model.Trip
 import io.github.iampopovich.eculense.core.model.TripSource
@@ -92,5 +96,39 @@ class StatsViewModelTest {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
         assertEquals(0, vm.uiState.value.totalTrips)
         assertEquals(false, vm.uiState.value.loading)
+    }
+
+    private class Fuel(list: List<FuelFillUp>) : FuelRepository {
+        val all = MutableStateFlow(list)
+        override fun observeFillUps(carId: Long) = all.map { l -> l.filter { it.carId == carId } }
+        override suspend fun fillUps(carId: Long) = all.value.filter { it.carId == carId }
+        override suspend fun save(fillUp: FuelFillUp) = 0L
+        override suspend fun delete(id: Long) = Unit
+        override suspend fun import(rows: List<FuelFillUp>) = FuelImportResult(0, 0)
+    }
+
+    private class Prefs : FuelPrefs {
+        val on = MutableStateFlow(false)
+        override fun mafCorrection(carId: Long) = on
+        override suspend fun setMafCorrection(carId: Long, on: Boolean) { this.on.value = on }
+    }
+
+    @Test
+    fun `consumption and spend come from fill-ups when the period has them and say so`() = runTest {
+        val trips = Trips(listOf(trip(1, 3 * day, 10.0, 1.0), trip(1, 20 * day, 30.0, 3.0)))
+        fun fill(ago: Long, km: Long, l: Double) = FuelFillUp(carId = 1, atMs = now - ago, odometerKm = km, litres = l, pricePerL = 50.0, total = l * 50)
+        val fuel = Fuel(listOf(fill(25 * day, 10_000, 40.0), fill(10 * day, 10_500, 45.0)))
+        val vm = StatsViewModel(Cars(), trips, Units(), clock = { now }, fuel = fuel, fuelPrefs = Prefs())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
+
+        vm.selectPeriod(StatsPeriod.MONTH)
+        assertEquals(FuelSource.FILL_UPS, vm.uiState.value.consumptionSource)
+        assertEquals(9.0, vm.uiState.value.consumption!!, 1e-9)
+        assertEquals((40.0 + 45.0) * 50, vm.uiState.value.fuelCost, 1e-9)
+        // the last week has no fill-up and no closed interval: the trips' estimate, labelled as such
+        vm.selectPeriod(StatsPeriod.WEEK)
+        assertEquals(FuelSource.TRIPS, vm.uiState.value.consumptionSource)
+        assertEquals(FuelSource.TRIPS, vm.uiState.value.costSource)
+        assertEquals(10.0, vm.uiState.value.consumption!!, 1e-9)
     }
 }

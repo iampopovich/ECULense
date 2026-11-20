@@ -107,6 +107,7 @@ dependencies {
     implementation(project(":feature:stats"))
     implementation(project(":feature:analysis"))
     implementation(project(":feature:maintenance"))
+    implementation(project(":feature:fuel"))
     // 1.27 background import of Car Scanner backups and ECULense backup
     implementation(project(":core:backup"))
     implementation(project(":feature:backup"))

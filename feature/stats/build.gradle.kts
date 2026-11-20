@@ -4,4 +4,5 @@ plugins {
 
 dependencies {
     implementation(project(":core:data"))
+    implementation(libs.vico.compose.m3)
 }

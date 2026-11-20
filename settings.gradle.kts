@@ -68,4 +68,5 @@ include(":feature:datapacks")
 include(":feature:maintenance")
 include(":feature:backup")
 include(":feature:health")
+include(":feature:fuel")
 

@@ -27,6 +27,7 @@ import io.github.iampopovich.eculense.feature.datapacks.dataPacksFeatureModule
 import io.github.iampopovich.eculense.feature.dtc.dtcModule
 import io.github.iampopovich.eculense.feature.health.healthModule
 import io.github.iampopovich.eculense.feature.maintenance.maintenanceModule
+import io.github.iampopovich.eculense.feature.fuel.fuelModule
 import io.github.iampopovich.eculense.feature.pitstop.pitstopModule
 import io.github.iampopovich.eculense.feature.sessions.sessionsModule
 import io.github.iampopovich.eculense.feature.settings.settingsModule
@@ -63,6 +64,7 @@ val appModules: List<Module> = listOf(
     statsModule,
     analysisModule,
     maintenanceModule,
+    fuelModule,
     dataPacksFeatureModule,
     // Car Scanner backup import (WorkManager) and ECULense backup; without them «Поездки»/«Статистика» have no import link.
     backupModule,

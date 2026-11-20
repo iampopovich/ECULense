@@ -70,3 +70,15 @@ object DeepLinks {
 
 /** C4: live alert thresholds (Settings hub of :feature:dashboard). */
 @Serializable data object AlertSettingsDestination : NavKey
+
+/** D1: fuel log (:feature:fuel); Stats shows a header action when a RouteHandler for it exists. */
+@Serializable data object FuelLogDestination : NavKey
+
+/** D2: expenses and cost of ownership (:feature:fuel). */
+@Serializable data object ExpensesDestination : NavKey
+
+/** D4: one trip from the trips table (:feature:stats). */
+@Serializable data class TripDetailDestination(val tripId: Long) : NavKey
+
+/** D5: fuel trims against rpm and load for a recording (:feature:sessions); [compareWith] = a second recording. */
+@Serializable data class EngineMapDestination(val sessionId: Long, val compareWith: Long? = null) : NavKey

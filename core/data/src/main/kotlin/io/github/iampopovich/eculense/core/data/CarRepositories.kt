@@ -55,6 +55,11 @@ interface TripRepository {
         val added = addAll(trips)
         return TripMerge(added = added, updated = 0, unchanged = trips.size - added)
     }
+
+    suspend fun trip(id: Long): Trip? = null
+
+    /** D4: the recording a trip was computed from («session:<id>»), else the first recording overlapping it; null = none. */
+    suspend fun sessionOf(trip: Trip): Long? = trip.externalId?.takeIf { it.startsWith("session:") }?.removePrefix("session:")?.toLongOrNull()
 }
 
 data class TripMerge(val added: Int, val updated: Int, val unchanged: Int)
@@ -206,6 +211,14 @@ internal class RoomTripRepository(private val dao: TripDao) : TripRepository {
     override fun observeTrips(carId: Long): Flow<List<Trip>> = dao.observeForCar(carId).map { list -> list.map { it.toModel() } }
 
     override suspend fun trips(carId: Long): List<Trip> = dao.forCar(carId).map { it.toModel() }
+
+    override suspend fun trip(id: Long): Trip? = dao.byId(id)?.toModel()
+
+    override suspend fun sessionOf(trip: Trip): Long? {
+        val ext = trip.externalId
+        if (ext != null && ext.startsWith("session:")) return ext.removePrefix("session:").toLongOrNull()
+        return dao.sessionOverlapping(trip.carId, trip.startedAtMs, trip.endedAtMs)
+    }
 
     override suspend fun addAll(trips: List<Trip>): Int = dao.insertAll(trips.map { it.toEntity() }).count { it > 0 }
 
