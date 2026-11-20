@@ -32,12 +32,45 @@ class DrivingStyleAndEngineMapTest {
         assertTrue(s.score < 80)
     }
 
+    /** Constant deceleration [g] from [fromKmh] to 0, sampled every [stepMs], with cruise before and standing after. */
+    private fun braking(g: Double, stepMs: Long, fromKmh: Double = 80.0): List<Double> {
+        val dvPerStep = g * 9.80665 * 3.6 * stepMs / 1000.0
+        val ramp = generateSequence(fromKmh) { (it - dvPerStep).takeIf { v -> v > 0 } }.toList() + 0.0
+        return cruise(1500 * 1000 / stepMs.toInt(), fromKmh) + ramp + List(5) { 0.0 }
+    }
+
     @Test
-    fun `the threshold is scaled down for 2 s samples`() {
-        // +20 km/h per 2 s = 2.78 m/s²: under 3.0 at 1 s, over 3.0 × 0.85 = 2.55 at 2 s
-        val speeds = listOf(20.0, 40.0, 60.0) + cruise(200)
-        val s = DrivingStyleRules.evaluate(drive(2000, speeds)) as DrivingStyle.Scored
-        assertEquals(1, s.accelEvents)
+    fun `thresholds are the sourced 0_3 g Geotab GPS rules with a severe level as data`() {
+        assertEquals(0.3 * 9.80665, StyleThresholds.HARSH_ACCEL_MS2, 1e-9)
+        assertEquals(StyleThresholds.HARSH_ACCEL_MS2, StyleThresholds.HARSH_BRAKE_MS2, 1e-9)
+        assertEquals(0.43 * 9.80665, StyleThresholds.SEVERE_ACCEL_MS2, 1e-9)
+        assertEquals(0.61 * 9.80665, StyleThresholds.SEVERE_BRAKE_MS2, 1e-9)
+    }
+
+    @Test
+    fun `a 0_35 g braking sampled every 1_7 s on K-Line is detected`() {
+        val s = DrivingStyleRules.evaluate(drive(1700, braking(0.35, 1700))) as DrivingStyle.Scored
+        assertEquals(1, s.brakeEvents)
+        assertEquals(0, s.accelEvents)
+        assertEquals(1700L, s.medianIntervalMs)
+    }
+
+    @Test
+    fun `a single 1 km_h step at 0_25 s spacing is speed resolution noise, not an event`() {
+        // One step over 0.25 s would read as 1.1 m/s² per sample; ±1 km/h jitter at 4 Hz must not count either.
+        val jitter = List(400) { i -> if (i % 2 == 0) 60.0 else 61.0 } + List(600) { 61.0 } + List(4000) { 60.0 }
+        val s = DrivingStyleRules.evaluate(drive(250, jitter)) as DrivingStyle.Scored
+        assertEquals(0, s.accelEvents)
+        assertEquals(0, s.brakeEvents)
+        assertEquals(1000L, s.medianIntervalMs)
+    }
+
+    @Test
+    fun `a 0_2 g braking is not harsh`() {
+        listOf(250L, 1000L, 1700L).forEach { step ->
+            val s = DrivingStyleRules.evaluate(drive(step, braking(0.2, step))) as DrivingStyle.Scored
+            assertEquals("step $step", 0, s.brakeEvents)
+        }
     }
 
     @Test
