@@ -122,6 +122,7 @@ val backupModule = module {
             schemaVersion = EcuDatabase.VERSION,
             appVersion = version,
             closeDatabases = { runCatching { koin.get<EcuDatabase>().close() } },
+            accelDir = File(context.filesDir, "accel"),
         )
     }
     single<BackupService> { AndroidBackupService(androidContext(), get()) }

@@ -22,6 +22,10 @@ data class BackupManifest(
     val datastore: List<String>,
     /** How many secret values (API keys, tokens) were excluded — just the count, no names or values. */
     val secretsExcluded: Int,
+    /** E5-lite accelerometer files (`<sessionId>.bin`) in the archive. */
+    val accelFiles: List<String> = emptyList(),
+    /** Bytes of accelerometer files left out because they exceeded [EcuBackup.ACCEL_CAP_BYTES]; 0 = none skipped. */
+    val accelSkippedBytes: Long = 0,
 )
 
 /** Database for the backup: snapshotTo writes a consistent copy (WAL checkpoint + VACUUM INTO) and returns user_version. */
@@ -66,6 +70,9 @@ class EcuBackup(
     /** Close open databases before replacing files. */
     private val closeDatabases: () -> Unit,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** files/accel (E5-lite); null = not backed up. */
+    private val accelDir: File? = null,
+    private val accelCapBytes: Long = ACCEL_CAP_BYTES,
 ) {
     fun export(out: OutputStream, includeAiChat: Boolean): BackupManifest {
         val staging = File(workDir, "backup-export").apply { deleteRecursively(); mkdirs() }
@@ -93,14 +100,20 @@ class EcuBackup(
                     secrets += split.secretCount
                     prefs += f.name to split.public
                 }
+            // Accelerometer logs go in only while they are small; above the cap all are skipped (noted in the manifest).
+            val accel = accelDir?.listFiles().orEmpty().filter { it.isFile && ACCEL_NAME.matches(it.name) }.sortedBy { it.name }
+            val accelBytes = accel.sumOf { it.length() }
+            val accelIn = if (accelBytes <= accelCapBytes) accel else emptyList()
             val manifest = BackupManifest(
                 format = FORMAT, app = APP, appVersion = appVersion, schemaVersion = version, createdAtMs = clock(),
                 databases = dbFiles.map { it.name }, datastore = prefs.map { it.first }, secretsExcluded = secrets,
+                accelFiles = accelIn.map { it.name }, accelSkippedBytes = if (accelIn.isEmpty()) accelBytes else 0,
             )
             ZipOutputStream(out.buffered()).use { zip ->
                 zip.putNextEntry(ZipEntry(MANIFEST)); zip.write(json.encodeToString(BackupManifest.serializer(), manifest).toByteArray()); zip.closeEntry()
                 dbFiles.forEach { f -> zip.putNextEntry(ZipEntry("$DB_DIR/${f.name}")); f.inputStream().use { it.copyTo(zip) }; zip.closeEntry() }
                 prefs.forEach { (name, bytes) -> zip.putNextEntry(ZipEntry("$PREFS_DIR/$name")); zip.write(bytes); zip.closeEntry() }
+                accelIn.forEach { f -> zip.putNextEntry(ZipEntry("$ACCEL_DIR/${f.name}")); f.inputStream().use { it.copyTo(zip) }; zip.closeEntry() }
             }
             return manifest
         } finally {
@@ -129,6 +142,14 @@ class EcuBackup(
                 val restored = File(dir, "$PREFS_DIR/$name").readBytes()
                 current.writeBytes(restored + keepSecrets)
             }
+            // Session ids belong to the restored database: the current phone's files would attach to other trips.
+            accelDir?.let { target ->
+                target.listFiles().orEmpty().filter { it.isFile && ACCEL_NAME.matches(it.name) }.forEach { it.delete() }
+                for (name in manifest.accelFiles) {
+                    val f = File(dir, "$ACCEL_DIR/$name")
+                    if (ACCEL_NAME.matches(name) && f.isFile) f.copyTo(File(target.apply { mkdirs() }, name), overwrite = true)
+                }
+            }
             return RestoreResult(manifest, manifest.schemaVersion.takeIf { it < schemaVersion })
         } finally {
             dir.deleteRecursively()
@@ -146,7 +167,8 @@ class EcuBackup(
                     val name = e.name
                     val allowed = name == MANIFEST ||
                         (name.startsWith("$DB_DIR/") && name.substringAfter('/') in KNOWN_DATABASES) ||
-                        (name.startsWith("$PREFS_DIR/") && SAFE_NAME.matches(name.substringAfter('/')) && name.endsWith(PREFS_SUFFIX))
+                        (name.startsWith("$PREFS_DIR/") && SAFE_NAME.matches(name.substringAfter('/')) && name.endsWith(PREFS_SUFFIX)) ||
+                        (name.startsWith("$ACCEL_DIR/") && ACCEL_NAME.matches(name.substringAfter('/')))
                     if (!allowed) continue // skip foreign and unsafe paths (../)
                     if (name == MANIFEST) manifestBytes = zip.readBytes()
                     else File(dir, name).apply { parentFile?.mkdirs() }.outputStream().use { zip.copyTo(it) }
@@ -187,6 +209,11 @@ class EcuBackup(
         private val KNOWN_DATABASES = setOf(MAIN_DB, AI_CHAT_DB)
         private val SAFE_NAME = Regex("[A-Za-z0-9_.-]+")
         private val SQLITE_SIDE_FILES = listOf("-wal", "-shm", "-journal")
+        private const val ACCEL_DIR = "accel"
+        private val ACCEL_NAME = Regex("[0-9]{1,19}\\.bin")
+
+        /** Accelerometer logs are ≈ 2 MB per hour of recording: 50 MB ≈ 25 h, more is left on the phone. */
+        const val ACCEL_CAP_BYTES = 50L * 1024 * 1024
 
         /**
          * Stores that don't go into the backup: ailocal — the downloaded model choice and this phone's benchmarks (models

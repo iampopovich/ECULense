@@ -100,7 +100,14 @@ internal class BackupViewModel(
 
     fun export(uri: Uri) = copyJob {
         val manifest = backup.export(uri, state.value.includeAiChat)
-        UiText.Res(if ("ai_chat.db" in manifest.databases) R.string.backup_saved_with_chat else R.string.backup_saved)
+        val saved = UiText.Res(if ("ai_chat.db" in manifest.databases) R.string.backup_saved_with_chat else R.string.backup_saved)
+        when {
+            manifest.accelSkippedBytes > 0 -> UiText.Joined(
+                listOf(saved, UiText.Res(R.string.backup_accel_skipped, listOf(((manifest.accelSkippedBytes + 524_288) / 1_048_576).toInt()))), " ",
+            )
+            manifest.accelFiles.isNotEmpty() -> UiText.Joined(listOf(saved, UiText.Res(R.string.backup_accel_included, listOf(manifest.accelFiles.size))), " ")
+            else -> saved
+        }
     }
 
     fun pickRestore(uri: Uri) = copyJob {

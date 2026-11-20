@@ -89,7 +89,7 @@ class EcuBackupTest {
         return Triple(db, chat, store)
     }
 
-    private fun backup(root: File, db: File, chat: File, store: File, schema: Int = 6) = EcuBackup(
+    private fun backup(root: File, db: File, chat: File, store: File, schema: Int = 6, accel: File? = null, cap: Long = EcuBackup.ACCEL_CAP_BYTES) = EcuBackup(
         databases = listOf(JdbcDb(db), JdbcDb(chat)),
         databaseTargets = mapOf("ecu.db" to db, "ai_chat.db" to chat),
         dataStoreDir = store,
@@ -98,7 +98,48 @@ class EcuBackupTest {
         appVersion = "0.1.0-test",
         closeDatabases = {},
         clock = { 1_767_000_000_000L },
+        accelDir = accel,
+        accelCapBytes = cap,
     )
+
+    @Test
+    fun `accelerometer logs are backed up under the cap and replace the target's on restore`() {
+        val (db, chat, store) = deviceA()
+        val accel = File(db.parentFile.parentFile, "files/accel").apply { mkdirs() }
+        File(accel, "1.bin").writeBytes(ByteArray(300) { 1 })
+        File(accel, "2.bin").writeBytes(ByteArray(200) { 2 })
+        File(accel, "notes.txt").writeText("not a log")
+        val out = ByteArrayOutputStream()
+        val manifest = backup(db.parentFile.parentFile, db, chat, store, accel = accel).export(out, includeAiChat = false)
+        assertEquals(listOf("1.bin", "2.bin"), manifest.accelFiles)
+        assertEquals(0L, manifest.accelSkippedBytes)
+        assertTrue("accel/1.bin" in entries(out.toByteArray()).keys)
+
+        val b = tmp.newFolder("b2")
+        val bAccel = File(b, "files/accel").apply { mkdirs() }
+        File(bAccel, "1.bin").writeBytes(ByteArray(10) { 9 }) // belongs to another database: must go
+        File(bAccel, "7.bin").writeBytes(ByteArray(10) { 9 })
+        backup(b, File(b, "databases/ecu.db"), File(b, "databases/ai_chat.db"), File(b, "datastore"), accel = bAccel)
+            .restore(ByteArrayInputStream(out.toByteArray()))
+        assertEquals(setOf("1.bin", "2.bin"), bAccel.list()!!.toSet())
+        assertEquals(300L, File(bAccel, "1.bin").length())
+        assertEquals(2, count(File(b, "databases/ecu.db"), "sessions"))
+    }
+
+    @Test
+    fun `accelerometer logs over the cap are skipped with a note`() {
+        val (db, chat, store) = deviceA()
+        val accel = File(db.parentFile.parentFile, "files/accel").apply { mkdirs() }
+        File(accel, "1.bin").writeBytes(ByteArray(300))
+        File(accel, "2.bin").writeBytes(ByteArray(300))
+        val out = ByteArrayOutputStream()
+        val manifest = backup(db.parentFile.parentFile, db, chat, store, accel = accel, cap = 500).export(out, includeAiChat = false)
+        assertTrue(manifest.accelFiles.isEmpty())
+        assertEquals(600L, manifest.accelSkippedBytes)
+        assertFalse(entries(out.toByteArray()).keys.any { it.startsWith("accel/") })
+        // An old backup without the field still reads (default values).
+        assertEquals(0L, BackupManifest(1, "a", "v", 1, 0, emptyList(), emptyList(), 0).accelSkippedBytes)
+    }
 
     private fun entries(zip: ByteArray): Map<String, ByteArray> = buildMap {
         ZipInputStream(ByteArrayInputStream(zip)).use { z -> while (true) { val e = z.nextEntry ?: break; put(e.name, z.readBytes()) } }

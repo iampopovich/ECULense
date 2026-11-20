@@ -54,4 +54,6 @@
     <string name="backup_file_create_failed">Couldn\'t create the file</string>
     <string name="backup_file_unavailable">Couldn\'t open the file</string>
     <string name="backup_cancelled_progress">Cancelled: %1$d of %2$d recordings processed</string>
+    <string name="backup_accel_included">Phone accelerometer logs: %1$d.</string>
+    <string name="backup_accel_skipped">Phone accelerometer logs (%1$d MB) are over 50 MB and were not included; they stay on this phone.</string>
 </resources>

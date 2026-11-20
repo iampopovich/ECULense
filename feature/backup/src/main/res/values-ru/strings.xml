@@ -54,4 +54,6 @@
     <string name="backup_file_create_failed">Не удалось создать файл</string>
     <string name="backup_file_unavailable">Не удалось открыть файл</string>
     <string name="backup_cancelled_progress">Отменено: обработано записей %1$d из %2$d</string>
+    <string name="backup_accel_included">Записи акселерометра телефона: %1$d.</string>
+    <string name="backup_accel_skipped">Записи акселерометра телефона (%1$d МБ) больше 50 МБ и в копию не вошли, они остались на этом телефоне.</string>
 </resources>
