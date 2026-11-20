@@ -155,14 +155,15 @@ class HealthCheckRunner internal constructor(
                     samples = samples,
                 ),
             )
-            val car = activeCarId()
+            // A simulated link is shown, not kept, and never tied to the real active car (no name, mileage or findings).
+            val store = gate.allowed()
+            val car = if (store) activeCarId() else null
             val record = HealthCheckRecord(
                 id = 0, carId = car, takenAtMs = clock(), result = result,
                 dtcs = listOfNotNull(snapshot.stored, snapshot.pending, snapshot.permanent).flatten().distinct(),
                 freezeFrame = snapshot.frame, readiness = snapshot.readiness, counters = snapshot.counters,
                 odometerKm = car?.let { runCatching { odometerKm(it) }.getOrNull() },
             )
-            val store = gate.allowed()
             val saved = if (store) record.copy(id = repository.save(record)) else record
             HealthProgress.Done(saved, store).also { _progress.value = it }
         } catch (e: CancellationException) {

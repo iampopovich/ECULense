@@ -59,6 +59,8 @@ class HealthCheckRunnerTest {
         val done = runner(demo, repo).first.run() as HealthProgress.Done
         assertFalse(done.stored)
         assertEquals(0L, done.record.id)
+        assertEquals(null, done.record.carId)
+        assertEquals(null, done.record.odometerKm)
         assertTrue(repo.saved.isEmpty())
     }
 

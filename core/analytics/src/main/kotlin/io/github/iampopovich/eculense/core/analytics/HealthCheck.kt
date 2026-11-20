@@ -121,7 +121,6 @@ object HealthCheck {
         !running && max >= Thresholds.OVERHEAT_WARN_C -> HealthItem(HealthItemId.COOLANT, HealthStatus.OK, max, HealthNote.RESIDUAL_HEAT)
         max >= Thresholds.OVERHEAT_CRIT_C -> HealthItem(HealthItemId.COOLANT, HealthStatus.FAULT, max)
         max >= Thresholds.OVERHEAT_WARN_C -> HealthItem(HealthItemId.COOLANT, HealthStatus.ATTENTION, max)
-        running && max < Thresholds.WARM_COOLANT_C -> HealthItem(HealthItemId.COOLANT, HealthStatus.OK, max, HealthNote.COLD_ENGINE)
         else -> HealthItem(HealthItemId.COOLANT, HealthStatus.OK, max)
     }
 

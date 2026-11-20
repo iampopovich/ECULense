@@ -59,14 +59,14 @@
     <string name="health_mil_on">горит</string>
     <string name="health_mil_off">не горит</string>
     <string name="health_note_residual_heat">двигатель заглушен: остаточный нагрев после поездки, не неисправность</string>
-    <string name="health_note_cold">двигатель холодный (ниже 80 °C): пока не оценивается</string>
+    <string name="health_note_cold">двигатель холодный (ниже 80 °C)</string>
     <string name="health_note_engine_off">двигатель не работает</string>
     <string name="health_note_resting">двигатель заглушен: напряжение АКБ в покое</string>
     <string name="health_note_charging">двигатель работает: напряжение зарядки</string>
     <string name="health_note_can_only">их сообщают только машины с CAN</string>
     <string name="health_note_unstable_idle">обороты плавают</string>
     <string name="health_note_o2_lazy">сигнал почти не меняется</string>
-    <string name="health_note_moving">машина едет: холостой ход не оценивается</string>
+    <string name="health_note_moving">машина едет</string>
     <string name="health_note_cleared">счётчики после сброса малы: коды недавно стирали</string>
     <string name="health_monitor_complete">готов</string>
     <string name="health_monitor_incomplete">не готов</string>

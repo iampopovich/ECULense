@@ -59,14 +59,14 @@
     <string name="health_mil_on">on</string>
     <string name="health_mil_off">off</string>
     <string name="health_note_residual_heat">engine off: heat soak after driving, not a fault</string>
-    <string name="health_note_cold">engine cold (below 80 °C): not judged yet</string>
+    <string name="health_note_cold">engine cold (below 80 °C)</string>
     <string name="health_note_engine_off">engine not running</string>
     <string name="health_note_resting">engine off: resting battery voltage</string>
     <string name="health_note_charging">engine running: charging voltage</string>
     <string name="health_note_can_only">only CAN cars report them</string>
     <string name="health_note_unstable_idle">idle speed hunts</string>
     <string name="health_note_o2_lazy">signal barely moves</string>
-    <string name="health_note_moving">car moving: idle not judged</string>
+    <string name="health_note_moving">car moving</string>
     <string name="health_note_cleared">counters since clear are low: codes were cleared recently</string>
     <string name="health_monitor_complete">complete</string>
     <string name="health_monitor_incomplete">incomplete</string>
