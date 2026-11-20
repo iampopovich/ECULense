@@ -28,7 +28,7 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
 </p>
 <p align="center"><sub>Screenshots taken in demo mode with test data.</sub></p>
 
-> **Status:** early version (0.1.0, release candidate). The protocol layer is covered by tests and emulation; field testing with a real adapter in a car is still ahead.
+> **Status:** early version (0.1.0 plus the changes in the [CHANGELOG](CHANGELOG.md)). The protocol, connection recovery, diagnostics and the fuel log are covered by tests, the demo adapter and emulated misbehaving clones; field testing with a real adapter in a car is still ahead.
 >
 > **Language:** English and Russian. The app follows the system language; you can also pick one in Settings → Language (or in the system "App language" settings on Android 13+). The AI assistant answers in the app's language.
 
@@ -37,13 +37,27 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
 **Diagnostics**
 - Live standard PIDs: RPM, speed, coolant temperature, MAF, fuel trims, O2 sensors, voltage and more.
 - Read and clear trouble codes with descriptions. A manufacturer-specific code is only described for your car's make: the same code means something else on another brand.
-- Bluetooth, Wi-Fi and USB OTG adapters, plus a demo mode with no adapter at all.
-- CAN and K-Line (ISO 9141 / KWP2000), so early-2000s cars work too, not just modern CAN ones.
+- Bluetooth, Wi-Fi and USB OTG adapters, plus a demo mode with no adapter at all (including a "flaky clone" and an "engine stops" mode).
+- CAN and K-Line (ISO 9141 / KWP2000), so early-2000s cars work too, not just modern CAN ones. The car profile tells you when the car may predate mandatory OBD-II.
+- Robust with cheap ELM327 clones: reconnect after a dropout, "engine off" instead of an error, priority polling (RPM and speed more often, slow sensors less often), a shareable adapter traffic log.
+- Readiness monitors, a used-car "codes cleared recently?" check, freeze frame on the code card, safe clear with a before/after comparison, mode 06.
+- A one-minute health check with traffic lights and an HTML/PDF report.
+
+**Dashboard**
+- Your own PID set per car, clear value states ("—", "~", "○", age), sparklines, a driving mode with big tiles and HUD.
+- Trip warnings: overheating, not charging, a new trouble code, engine stall; a "Mark event" button.
+- Auto-connect to the last adapter and automatic trip recording.
+- A home-screen widget: live values, or the last battery voltage, code check and trip.
 
 **Recordings and statistics**
 - Record sessions, view charts, export to CSV.
 - Trips are derived automatically: distance, fuel used, driving and idle time.
 - A per-car summary: kilometres, litres, average consumption, fuel spend.
+- A trip page with charts and a driving-style score; "engine maps": fuel trims by RPM and load, before/after comparison.
+
+**Fuel and costs**
+- A fuel log with full-to-full consumption, MAF estimate calibration, CSV import from Fuelio.
+- All car expenses and cost of ownership per day, month and kilometre.
 
 **Analysis and maintenance**
 - Rules that find problems in recorded data: fuel trims and bank imbalance, overheating, battery undercharge, MAF at idle, repeated and related codes, distance driven with the check-engine light on.
@@ -71,6 +85,8 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
 - Only what you send to the AI assistant goes to the cloud, and only after explicit consent. VIN and GPS are never included in model requests.
 - API keys are encrypted with Android Keystore and never end up in backups.
 - Without the AI assistant the app works fully offline (the network is only used to download reference data).
+- The demo adapter and log replay never write into your car's history. The VIN is hidden by default.
+- "Report a problem" opens a GitHub form only after showing the exact text; it has no VIN, car name, location or traffic log, and nothing is sent automatically.
 
 ## Installation
 
@@ -92,7 +108,8 @@ Requires Android 8.0 or newer and an ELM327 v1.5+ adapter. Cheap clones labelled
 You need JDK 17+ (CI uses 21) and the Android SDK.
 
 ```bash
-./gradlew build                          # everything: both flavors, unit tests, lint
+./gradlew build                          # everything: both flavors, unit tests, screenshot tests, lint
+./gradlew :feature:dashboard:recordRoborazziDebug   # re-record a module's golden screenshots
 ./gradlew :app:installLocalDebug         # install on a connected phone
 ./gradlew :core:obd:test                 # protocol tests, no phone or emulator needed
 ./gradlew :app:assembleCloudRelease :app:assembleLocalRelease
@@ -130,9 +147,10 @@ core/
   background              background analysis and notifications
   demo                    adapter emulator for working without a car
   navigation, ui, model   shared navigation keys, theme, models
-feature/                  screens: dashboard, connect, dtc, sessions, stats, analysis,
-                          maintenance, car, pitstop, settings, datapacks, backup,
-                          aisettings, aichat
+  screenshots             test only: Roborazzi screenshot matrix
+feature/                  screens: dashboard, connect, obdlog, cardata, dtc, health,
+                          sessions, stats, fuel, analysis, maintenance, car, pitstop,
+                          settings, datapacks, backup, widget, aisettings, aichat
 build-logic/              convention plugins (ecu.android.feature and others)
 ```
 
@@ -142,7 +160,8 @@ build-logic/              convention plugins (ecu.android.feature and others)
 2. Declare the screen key in `:core:navigation`: `@Serializable data object …Destination : NavKey`.
 3. In the feature's Koin module, register `navigation<…Destination> { … }` and a `HubEntry` or `TopLevelEntry`.
 4. Include the module in `settings.gradle.kts` and in `app`.
-5. Put UI text in the module's `res/values/strings.xml` (English) and `res/values-ru/strings.xml` (Russian); ViewModels hold `UiText`, pure-JVM modules return types, not text. `NoCyrillicLiteralsTest` and lint (`MissingTranslation`) fail the build on a hardcoded or untranslated string.
+5. For screens with layout, add the `ecu.android.screenshots` plugin and a `snapshotMatrix(...)` test: goldens live in `src/test/snapshots` and are verified by `./gradlew build` (synthetic data only).
+6. Put UI text in the module's `res/values/strings.xml` (English) and `res/values-ru/strings.xml` (Russian); ViewModels hold `UiText`, pure-JVM modules return types, not text. `NoCyrillicLiteralsTest` and lint (`MissingTranslation`) fail the build on a hardcoded or untranslated string.
 
 You shouldn't need to import other features' classes. If you do, `core` is missing a key or an interface.
 
