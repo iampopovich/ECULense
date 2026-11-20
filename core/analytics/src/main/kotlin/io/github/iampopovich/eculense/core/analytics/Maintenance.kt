@@ -23,7 +23,7 @@ data class OdometerEstimate(val km: Double, val baseKm: Long, val baseAtMs: Long
 
 object OdometerEstimator {
     fun estimate(entries: List<OdometerEntry>, trips: List<Trip>): OdometerEstimate? {
-        val base = entries.filter { it.source == OdometerSource.MANUAL }.maxByOrNull { it.atMs } ?: return null
+        val base = entries.filter { it.source.measured }.maxByOrNull { it.atMs } ?: return null
         val added = trips.filter { it.startedAtMs >= base.atMs }.sumOf { it.distanceKm }
         return OdometerEstimate(base.km + added, base.km, base.atMs, added)
     }

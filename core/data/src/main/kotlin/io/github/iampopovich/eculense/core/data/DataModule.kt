@@ -26,7 +26,9 @@ interface DataEvents {
 val dataModule = module {
     single<LiveWriteGate> { LiveWriteGate.of(get()) }
     single { DataStoreVehiclePrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("vehicle") }) } binds
-        arrayOf(VehiclePrefs::class, UnitsRepository::class, MaintenancePrefs::class)
+        arrayOf(VehiclePrefs::class, UnitsRepository::class, MaintenancePrefs::class, FuelPrefs::class)
+    single<FuelRepository> { RoomFuelRepository(get(), get(), get()) }
+    single<ExpenseRepository> { RoomExpenseRepository(get(), get()) }
     single<CarRepository> { RoomCarRepository(get(), get(), get()) }
     single<AdapterPrefs> {
         val cars = get<CarRepository>()

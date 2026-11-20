@@ -99,7 +99,12 @@ data class Trip(
 }
 
 /** Mileage: MANUAL = entered by the user (or carried over from the profile/Car Scanner); ESTIMATED = estimated from trips. */
-enum class OdometerSource { MANUAL, ESTIMATED }
+/** FILL_UP: read off the dashboard at a fill-up (D1), a measured value like MANUAL. */
+enum class OdometerSource { MANUAL, ESTIMATED, FILL_UP;
+
+    /** A real reading of the odometer (not computed): the base of the estimate. */
+    val measured: Boolean get() = this != ESTIMATED
+}
 
 data class OdometerEntry(
     val id: Long = 0,

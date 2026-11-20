@@ -351,4 +351,49 @@ class MigrationTest {
             room.close()
         }
     }
+
+    @Test
+    fun v9GetsFuelLogAndExpensesKeepingData() = runTest {
+        helper.createDatabase(dbName, 9).use { db ->
+            db.execSQL("INSERT INTO cars (id, name, tankVolumeL) VALUES (1, 'Test car', 60.0)")
+            db.execSQL("INSERT INTO sessions (id, name, startedAtMs, endedAtMs, source, vin, externalId, carId) VALUES (1, 'live', 30, 40, 'LIVE', NULL, NULL, 1)")
+            db.execSQL("INSERT INTO readings (sessionId, sensorId, value, unit, timestampMs) VALUES (1, '01.0C', 800.0, 'rpm', 31)")
+            db.execSQL(
+                "INSERT INTO trips (carId, startedAtMs, endedAtMs, distanceMm, fuelUl, fuelPricePerL, drivingMs, standingMs, source, externalId) " +
+                    "VALUES (1, 30, 40, 1000, 10, NULL, 10, 0, 'LIVE', 'session:1')",
+            )
+            db.execSQL("INSERT INTO maintenance_items (id, carId, title, intervalKm, intervalMonths) VALUES (1, 1, '', 10000, 12)")
+            db.execSQL("INSERT INTO odometer_log (carId, km, atMs, source) VALUES (1, 1000, 20, 'MANUAL')")
+            db.execSQL("INSERT INTO trip_events (sessionId, carId, atMs, type) VALUES (1, 1, 35, 'STALL')")
+        }
+        helper.runMigrationsAndValidate(dbName, 10, true, MIGRATION_9_10).use { db ->
+            fun count(sql: String) = db.query(sql).use { c -> c.moveToFirst(); c.getInt(0) }
+            assertEquals(1, count("SELECT COUNT(*) FROM sessions"))
+            assertEquals(1, count("SELECT COUNT(*) FROM readings"))
+            assertEquals(1, count("SELECT COUNT(*) FROM trips"))
+            assertEquals(1, count("SELECT COUNT(*) FROM maintenance_items"))
+            assertEquals(1, count("SELECT COUNT(*) FROM odometer_log"))
+            assertEquals(1, count("SELECT COUNT(*) FROM trip_events"))
+            assertEquals(0, count("SELECT COUNT(*) FROM fuel_fillups"))
+            assertEquals(0, count("SELECT COUNT(*) FROM expenses"))
+            assertEquals(60, count("SELECT tankVolumeL FROM cars WHERE id = 1"))
+        }
+        val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
+            .addMigrations(*EcuDatabase.MIGRATIONS).build()
+        try {
+            val id = room.fuelDao().insert(
+                FuelFillUpEntity(carId = 1, atMs = 50, odometerKm = 1500, litres = 40.0, pricePerL = 50.0, total = 2000.0, fullTank = true,
+                    missedPrevious = false, station = null, note = null),
+            )
+            fun csv(ext: String) = FuelFillUpEntity(carId = 1, atMs = 60, odometerKm = null, litres = 1.0, pricePerL = null, total = null,
+                fullTank = false, missedPrevious = false, station = null, note = null, externalId = ext)
+            assertEquals(1, room.fuelDao().insertAll(listOf(csv("csv:a"))).count { it > 0 })
+            assertEquals(0, room.fuelDao().insertAll(listOf(csv("csv:a"))).count { it > 0 })
+            room.expenseDao().insert(ExpenseEntity(carId = 1, atMs = 70, category = "SERVICE", amount = 3000.0, odometerKm = 1600, note = null, maintenanceItemId = 1))
+            assertEquals(1500L, room.fuelDao().byId(id)!!.odometerKm)
+            assertEquals(1, room.expenseDao().forCar(1).size)
+        } finally {
+            room.close()
+        }
+    }
 }

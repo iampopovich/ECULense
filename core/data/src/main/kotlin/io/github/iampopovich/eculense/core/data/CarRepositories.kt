@@ -81,7 +81,13 @@ interface VehiclePrefs {
     suspend fun setActiveCarId(id: Long)
 }
 
-internal class DataStoreVehiclePrefs(private val store: DataStore<Preferences>) : VehiclePrefs, UnitsRepository, MaintenancePrefs {
+internal class DataStoreVehiclePrefs(private val store: DataStore<Preferences>) : VehiclePrefs, UnitsRepository, MaintenancePrefs, FuelPrefs {
+    override fun mafCorrection(carId: Long): Flow<Boolean> = store.data.map { it[booleanPreferencesKey("maf_correction_$carId")] == true }
+
+    override suspend fun setMafCorrection(carId: Long, on: Boolean) {
+        store.edit { it[booleanPreferencesKey("maf_correction_$carId")] = on }
+    }
+
     override val activeCarId: Flow<Long?> = store.data.map { it[ACTIVE_CAR] }
 
     override suspend fun setActiveCarId(id: Long) {
