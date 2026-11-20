@@ -137,6 +137,27 @@ class VehicleDataToolsTest {
     }
 
     @Test
+    fun `session stats and the session list carry the recording's events in English`() = runBlocking {
+        val events = object : io.github.iampopovich.eculense.core.data.TripEventRepository {
+            val list = listOf(
+                io.github.iampopovich.eculense.core.data.TripEvent(1, 1, NOW - 3 * DAY + 192_000, io.github.iampopovich.eculense.core.analytics.TripEventType.STALL),
+                io.github.iampopovich.eculense.core.data.TripEvent(2, 1, NOW - 3 * DAY + 300_000, io.github.iampopovich.eculense.core.analytics.TripEventType.USER_MARK),
+            )
+            override fun observe(sessionId: Long) = kotlinx.coroutines.flow.flowOf(list.filter { it.sessionId == sessionId })
+            override suspend fun forSession(sessionId: Long) = list.filter { it.sessionId == sessionId }
+            override suspend fun forCar(carId: Long, fromMs: Long, toMs: Long) = list
+        }
+        val withEvents = ToolContext(analytics, Cars(car), Trips(trips), clock = { NOW }, zone = { ZoneOffset.UTC }, log = { _, _, _ -> }, events = events)
+        val stats = SessionStatsTool(withEvents).execute(SessionArgs(1))
+        assertTrue(stats, stats.contains("\"events\""))
+        assertTrue(stats, stats.contains("engine_stall") && stats.contains("user_mark"))
+        val list = ListSessionsTool(withEvents).execute(ListSessionsArgs(limit = 5))
+        assertTrue(list, list.contains("\"events\":2"))
+        // Without the events store nothing changes.
+        assertFalse(SessionStatsTool(ctx).execute(SessionArgs(1)).contains("\"events\""))
+    }
+
+    @Test
     fun `every answer fits the 2 KB budget and is logged with its size`() {
         val answers = all()
         answers.forEach { assertTrue("${it.toByteArray().size}: $it", it.toByteArray().size <= Compact.MAX_BYTES) }

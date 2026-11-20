@@ -10,4 +10,15 @@
     <string name="sessions_too_few_points">Not enough points for a chart</string>
     <string name="sessions_export_chooser">Export CSV</string>
     <string name="sessions_share_csv">Share CSV</string>
+    <string name="sessions_events_title">Events</string>
+    <string name="sessions_event_stall">Engine stalled</string>
+    <string name="sessions_event_mark">Your mark</string>
+    <string name="sessions_event_time">%1$s · %2$s into the recording</string>
+    <string name="sessions_event_show_window">±2 min</string>
+    <string name="sessions_event_show_all">All</string>
+    <string name="sessions_event_window">Chart: 2 min before and after the event</string>
+    <string name="sessions_reassign">Reassign car</string>
+    <string name="sessions_reassign_title">Move this recording to</string>
+    <string name="sessions_car_now">Car: %1$s</string>
+    <string name="sessions_reassigned">Moved to %1$s; the trip, statistics and analysis follow</string>
 </resources>

@@ -10,4 +10,15 @@
     <string name="sessions_too_few_points">Мало точек для графика</string>
     <string name="sessions_export_chooser">Экспорт CSV</string>
     <string name="sessions_share_csv">Поделиться CSV</string>
+    <string name="sessions_events_title">События</string>
+    <string name="sessions_event_stall">Двигатель заглох</string>
+    <string name="sessions_event_mark">Ваша отметка</string>
+    <string name="sessions_event_time">%1$s · %2$s от начала записи</string>
+    <string name="sessions_event_show_window">±2 мин</string>
+    <string name="sessions_event_show_all">Всё</string>
+    <string name="sessions_event_window">График: 2 мин до и после события</string>
+    <string name="sessions_reassign">Переназначить машину</string>
+    <string name="sessions_reassign_title">Перенести запись на</string>
+    <string name="sessions_car_now">Машина: %1$s</string>
+    <string name="sessions_reassigned">Перенесено на «%1$s»; поездка, статистика и анализ пересчитываются</string>
 </resources>

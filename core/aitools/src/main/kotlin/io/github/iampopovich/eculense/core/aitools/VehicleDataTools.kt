@@ -12,6 +12,7 @@ import io.github.iampopovich.eculense.core.data.CarRepository
 import io.github.iampopovich.eculense.core.data.MaintenanceRepository
 import io.github.iampopovich.eculense.core.analytics.FindingEnglish
 import io.github.iampopovich.eculense.core.data.StoredFinding
+import io.github.iampopovich.eculense.core.data.TripEventRepository
 import io.github.iampopovich.eculense.core.data.TripRepository
 import io.github.iampopovich.eculense.core.dtcdb.DtcInfo
 import io.github.iampopovich.eculense.core.dtcdb.DtcSource
@@ -49,7 +50,27 @@ internal class ToolContext(
     val describeDtc: suspend (codes: Collection<String>, make: String?) -> Map<String, DtcInfo> = { _, _ -> emptyMap() },
     /** Maintenance and mileage (3.9); null means the maintenance module is not wired in. */
     val maintenance: MaintenanceRepository? = null,
+    /** B10: stalls and user marks inside recordings; null means the events store is not wired in. */
+    val events: TripEventRepository? = null,
 )
+
+/** B10: events of one recording for the model (English, no location): type, local time, seconds from the start. */
+internal suspend fun ToolContext.eventsJson(sessionId: Long, startedAtMs: Long): JsonArray? {
+    val list = events?.forSession(sessionId).orEmpty()
+    if (list.isEmpty()) return null
+    val zone = zone()
+    return JsonArray(
+        list.take(MAX_EVENTS).map { e ->
+            buildJsonObject {
+                put("type", if (e.type == io.github.iampopovich.eculense.core.analytics.TripEventType.STALL) "engine_stall" else "user_mark")
+                put("at", Dates.dateTime(e.atMs, zone))
+                put("offset_s", ((e.atMs - startedAtMs) / 1000).coerceAtLeast(0))
+            }
+        },
+    )
+}
+
+private const val MAX_EVENTS = 10
 
 private fun logcat(tool: String, bytes: Int, json: String) {
     runCatching {
@@ -275,7 +296,7 @@ internal class TripStatsTool(ctx: ToolContext) : VehicleTool<PeriodArgs>(
 
 internal class ListSessionsTool(ctx: ToolContext) : VehicleTool<ListSessionsArgs>(
     typeToken<ListSessionsArgs>(), "listSessions",
-    "Recorded OBD sessions (live recordings and Car Scanner imports), newest first: id, local start time, duration in minutes, source, number of readings. Use the id with sessionStats.",
+    "Recorded OBD sessions (live recordings and Car Scanner imports), newest first: id, local start time, duration in minutes, source, number of readings, events (engine stalls and driver marks, when any). Use the id with sessionStats.",
     ctx,
 ) {
     override suspend fun answer(args: ListSessionsArgs, carId: Long): JsonObject {
@@ -287,6 +308,7 @@ internal class ListSessionsTool(ctx: ToolContext) : VehicleTool<ListSessionsArgs
             args.limit.coerceIn(1, 20),
         )
         if (list.isEmpty()) return Compact.noData("no sessions in this range")
+        val eventCounts = list.associate { it.id to (ctx.events?.forSession(it.id)?.size ?: 0) }
         return Compact.fit(
             list,
             { s ->
@@ -296,6 +318,7 @@ internal class ListSessionsTool(ctx: ToolContext) : VehicleTool<ListSessionsArgs
                     s.endedAtMs?.let { put("min", (it - s.startedAtMs) / 60_000) }
                     put("source", if (s.source.name == "LIVE") "live" else "carscanner")
                     put("readings", s.readings)
+                    eventCounts[s.id]?.takeIf { it > 0 }?.let { put("events", it) }
                 }
             },
         ) { items, truncated ->
@@ -309,13 +332,14 @@ internal class ListSessionsTool(ctx: ToolContext) : VehicleTool<ListSessionsArgs
 
 internal class SessionStatsTool(ctx: ToolContext) : VehicleTool<SessionArgs>(
     typeToken<SessionArgs>(), "sessionStats",
-    "Statistics of one session per sensor (n, min, avg, max, p95; values in the given unit) plus rule findings for that session.",
+    "Statistics of one session per sensor (n, min, avg, max, p95; values in the given unit) plus rule findings for that session and its events (engine_stall = rpm dropped to 0 while the ECU kept answering; user_mark = the driver tapped 'mark event'; look at the data +-2 min around them).",
     ctx,
 ) {
     override suspend fun answer(args: SessionArgs, carId: Long): JsonObject {
         val report = ctx.analytics.sessionReport(carId, args.sessionId) ?: return Compact.noData("no such session")
         val zone = ctx.zone()
         val findings = report.findings.map { f -> findingJson(f.ruleId, f.severity, FindingEnglish.title(f), FindingEnglish.evidence(f)) }
+        val events = ctx.eventsJson(report.session.id, report.session.startedAtMs)
         return Compact.fit(
             report.sensors.sortedByDescending { it.sensorId in SENSOR_NAMES },
             { s ->
@@ -338,6 +362,7 @@ internal class SessionStatsTool(ctx: ToolContext) : VehicleTool<SessionArgs>(
                 put("sensors", items)
                 if (truncated) put("truncated", true)
                 put("findings", JsonArray(findings))
+                events?.let { put("events", it) }
             }
         }
     }

@@ -1,6 +1,9 @@
 package io.github.iampopovich.eculense.feature.sessions
 
 import io.github.iampopovich.eculense.core.navigation.Hub
+import io.github.iampopovich.eculense.core.data.CarRepository
+import io.github.iampopovich.eculense.core.data.SessionMover
+import io.github.iampopovich.eculense.core.data.TripEventRepository
 import io.github.iampopovich.eculense.core.navigation.HubEntry
 import io.github.iampopovich.eculense.core.navigation.SessionDetailDestination
 import io.github.iampopovich.eculense.core.navigation.SessionsDestination
@@ -16,7 +19,9 @@ import org.koin.dsl.navigation3.navigation
 @OptIn(KoinExperimentalAPI::class)
 val sessionsModule = module {
     viewModelOf(::SessionsViewModel)
-    viewModel { (sessionId: Long) -> SessionDetailViewModel(sessionId, get(), androidContext(), get()) }
+    viewModel { (sessionId: Long) ->
+        SessionDetailViewModel(sessionId, get(), androidContext(), get(), getOrNull<TripEventRepository>(), getOrNull<SessionMover>(), getOrNull<CarRepository>())
+    }
     navigation<SessionsDestination> { SessionsRoute() }
     navigation<SessionDetailDestination> { route -> SessionDetailRoute(route.sessionId) }
     single(named("sessions-hub")) {

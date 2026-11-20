@@ -5,6 +5,7 @@ import io.github.iampopovich.eculense.core.ai.VehicleToolbox
 import io.github.iampopovich.eculense.core.data.AnalyticsRepository
 import io.github.iampopovich.eculense.core.data.CarRepository
 import io.github.iampopovich.eculense.core.data.MaintenanceRepository
+import io.github.iampopovich.eculense.core.data.TripEventRepository
 import io.github.iampopovich.eculense.core.data.TripRepository
 import io.github.iampopovich.eculense.core.dtcdb.DtcDescriptions
 import org.koin.dsl.module
@@ -17,7 +18,8 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
         trips: TripRepository,
         dtc: DtcDescriptions?,
         maintenance: MaintenanceRepository? = null,
-    ) : this(ToolContext(analytics, cars, trips, describeDtc = { codes, make -> dtc?.describeAll(codes, make).orEmpty() }, maintenance = maintenance))
+        events: TripEventRepository? = null,
+    ) : this(ToolContext(analytics, cars, trips, describeDtc = { codes, make -> dtc?.describeAll(codes, make).orEmpty() }, maintenance = maintenance, events = events))
 
     override fun registry(): ToolRegistry = ToolRegistry {
         tool(CarProfileTool(ctx))
@@ -65,5 +67,5 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
 
 /** Wiring: one line in AppModules. Without this module the chat works, but without vehicle data. */
 val aiToolsModule = module {
-    single<VehicleToolbox> { VehicleDataToolbox(get(), get(), get(), getOrNull(), getOrNull()) }
+    single<VehicleToolbox> { VehicleDataToolbox(get(), get(), get(), getOrNull(), getOrNull(), getOrNull()) }
 }
