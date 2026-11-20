@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.mutableStateOf
+import io.github.iampopovich.eculense.core.data.AutoConnect
 import io.github.iampopovich.eculense.core.navigation.DeepLinks
 import io.github.iampopovich.eculense.core.obd.ConnectionController
 import io.github.iampopovich.eculense.core.ui.theme.ECULenseTheme
@@ -16,6 +17,7 @@ class MainActivity : AppCompatActivity() {
     /** Screen from a notification (DeepLinks); reset after navigation. */
     private val deepLink = mutableStateOf<String?>(null)
     private val connection: ConnectionController by inject()
+    private val autoConnect: AutoConnect by inject()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,6 +38,8 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         connection.setBackground(false)
+        // C5: once per process, the visible activity may start the foreground connection service.
+        autoConnect.onAppStart()
     }
 
     override fun onStop() {

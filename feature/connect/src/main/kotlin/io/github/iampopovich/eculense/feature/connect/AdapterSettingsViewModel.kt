@@ -2,6 +2,8 @@ package io.github.iampopovich.eculense.feature.connect
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.iampopovich.eculense.core.data.AutomationPrefs
+import io.github.iampopovich.eculense.core.data.AutomationSettings
 import io.github.iampopovich.eculense.core.obd.AdaptiveTiming
 import io.github.iampopovich.eculense.core.obd.AdapterPrefs
 import io.github.iampopovich.eculense.core.obd.AdapterSettings
@@ -14,6 +16,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -34,9 +37,19 @@ internal data class AdapterSettingsUiState(
 internal class AdapterSettingsViewModel(
     private val prefs: AdapterPrefs,
     controller: ConnectionController,
+    /** C5 «Automation» group; null when the data layer is not wired (the group is hidden). */
+    private val automationPrefs: AutomationPrefs? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(AdapterSettingsUiState())
     val state: StateFlow<AdapterSettingsUiState> = _state.asStateFlow()
+
+    val automation: StateFlow<AutomationSettings?> = (automationPrefs?.settings ?: flowOf(null))
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    fun setAutomation(transform: (AutomationSettings) -> AutomationSettings) {
+        val p = automationPrefs ?: return
+        viewModelScope.launch { p.update(transform) }
+    }
 
     /** The protocol of the current connection, null when not connected. */
     val detectedProtocol: StateFlow<Char?> = controller.state

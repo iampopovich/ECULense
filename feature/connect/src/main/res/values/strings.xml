@@ -42,4 +42,13 @@
     <string name="adapter_settings_save">Save</string>
     <string name="adapter_settings_saved">Saved. Applies on the next connection.</string>
     <string name="connect_row_adapter_version">Adapter: %1$s</string>
+    <string name="automation_title">Automation</string>
+    <string name="automation_remember">Remember the last adapter</string>
+    <string name="automation_remember_hint">The last real adapter that connected; demo mode is never remembered</string>
+    <string name="automation_connect">Connect automatically</string>
+    <string name="automation_connect_hint">When the app opens, connect to the last adapter</string>
+    <string name="automation_record">Record trips by itself</string>
+    <string name="automation_record_hint">Starts after 5 s above 10 km/h, stops 3 min after the engine is off. Not in demo mode</string>
+    <string name="automation_ask_car">Ask which car when recording starts</string>
+    <string name="automation_ask_car_hint">Only with more than one car; automatic recordings use the active car</string>
 </resources>

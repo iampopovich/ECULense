@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation(project(":core:obd"))
+    implementation(project(":core:data"))
     implementation(project(":core:obdtext"))
     testImplementation(testFixtures(project(":core:obd")))
 }

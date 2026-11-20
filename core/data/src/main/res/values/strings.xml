@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- C5: name of a recording started by the auto recorder; stored in the database in the language active at start. -->
+    <string name="data_auto_session_name">Auto recording %1$s</string>
+</resources>

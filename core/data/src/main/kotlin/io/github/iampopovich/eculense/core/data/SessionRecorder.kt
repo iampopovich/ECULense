@@ -11,6 +11,7 @@ import io.github.iampopovich.eculense.core.obd.isSessionAlive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
@@ -23,9 +24,21 @@ import kotlinx.coroutines.withContext
 /** Writes to the DB whatever is currently being polled (like Car Scanner: "what is on screen gets recorded"). */
 interface SessionRecorder {
     val activeSessionId: StateFlow<Long?>
-    fun start(name: String)
+
+    /** Whether the running recording was started by [AutoRecorder] (not by the user). */
+    val activeIsAuto: StateFlow<Boolean> get() = NOT_AUTO
+
+    fun start(name: String) = start(name, carId = null, auto = false)
+
+    /**
+     * [carId] = null → the active car (C8). [auto] = started by [AutoRecorder]: engine off and disconnect do not end
+     * it (the auto recorder stops it after its hold time, so a short stop continues the same recording).
+     */
+    fun start(name: String, carId: Long?, auto: Boolean)
     fun stop()
 }
+
+private val NOT_AUTO: StateFlow<Boolean> = MutableStateFlow(false)
 
 internal class LiveSessionRecorder(
     private val controller: ConnectionController,
@@ -36,12 +49,15 @@ internal class LiveSessionRecorder(
 ) : SessionRecorder {
     private val _active = MutableStateFlow<Long?>(null)
     override val activeSessionId: StateFlow<Long?> = _active.asStateFlow()
+    private val _auto = MutableStateFlow(false)
+    override val activeIsAuto: StateFlow<Boolean> = _auto.asStateFlow()
     private var job: Job? = null
 
-    override fun start(name: String) {
+    override fun start(name: String, carId: Long?, auto: Boolean) {
         if (job?.isActive == true) return
+        _auto.value = auto
         job = scope.launch {
-            val id = repository.start(name, SessionSource.LIVE, vin = null)
+            val id = repository.start(name, SessionSource.LIVE, vin = null, carId = carId)
             _active.value = id
             val batch = mutableListOf<SensorReading>()
             try {
@@ -63,6 +79,7 @@ internal class LiveSessionRecorder(
                             if (s is ConnectionState.Connected) controller.setPolledPids(OWNER, requiredPids(s.supportedPids))
                         }
                     }
+                    if (auto) awaitCancellation()
                     controller.state.dropWhile { !it.isSessionAlive }.first { it.endsRecording() }
                     collector.cancel()
                     demand.cancel()
@@ -73,6 +90,7 @@ internal class LiveSessionRecorder(
                     if (batch.isNotEmpty()) repository.append(id, batch.toList())
                     repository.finish(id)
                     _active.value = null
+                    _auto.value = false
                     runCatching { onFinished(id) }
                 }
                 _active.value = null

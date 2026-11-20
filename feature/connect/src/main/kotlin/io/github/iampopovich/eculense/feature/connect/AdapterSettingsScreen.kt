@@ -1,6 +1,11 @@
 package io.github.iampopovich.eculense.feature.connect
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Switch
+import androidx.compose.ui.semantics.Role
+import io.github.iampopovich.eculense.core.data.AutomationSettings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,7 +47,36 @@ import org.koin.compose.viewmodel.koinViewModel
 internal fun AdapterSettingsRoute(viewModel: AdapterSettingsViewModel = koinViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val detected by viewModel.detectedProtocol.collectAsStateWithLifecycle()
-    AdapterSettingsScreen(state, detected, viewModel::setProtocol, viewModel::setTiming, viewModel::setExtraInit, viewModel::save)
+    val automation by viewModel.automation.collectAsStateWithLifecycle()
+    AdapterSettingsScreen(
+        state, detected, viewModel::setProtocol, viewModel::setTiming, viewModel::setExtraInit, viewModel::save,
+        automation = automation, onAutomation = viewModel::setAutomation,
+    )
+}
+
+/** C5: switches apply at once; auto-connect needs the remembered adapter. */
+@Composable
+private fun AutomationGroup(settings: AutomationSettings, onChange: ((AutomationSettings) -> AutomationSettings) -> Unit) {
+    Text(stringResource(R.string.automation_title), style = MaterialTheme.typography.titleMedium)
+    SwitchRow(R.string.automation_remember, R.string.automation_remember_hint, settings.rememberLast) { on ->
+        onChange { it.copy(rememberLast = on, autoConnect = it.autoConnect && on) }
+    }
+    SwitchRow(R.string.automation_connect, R.string.automation_connect_hint, settings.autoConnect, enabled = settings.rememberLast) { on ->
+        onChange { it.copy(autoConnect = on) }
+    }
+    SwitchRow(R.string.automation_record, R.string.automation_record_hint, settings.autoRecord) { on -> onChange { it.copy(autoRecord = on) } }
+    SwitchRow(R.string.automation_ask_car, R.string.automation_ask_car_hint, settings.askCar) { on -> onChange { it.copy(askCar = on) } }
+    HorizontalDivider()
+}
+
+@Composable
+private fun SwitchRow(title: Int, hint: Int, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    ListItem(
+        headlineContent = { Text(stringResource(title)) },
+        supportingContent = { Text(stringResource(hint)) },
+        trailingContent = { Switch(checked = checked, onCheckedChange = null, enabled = enabled) },
+        modifier = Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange),
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,6 +89,8 @@ internal fun AdapterSettingsScreen(
     onExtraInit: (String) -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
+    automation: AutomationSettings? = null,
+    onAutomation: ((AutomationSettings) -> AutomationSettings) -> Unit = {},
 ) {
     var picking by remember { mutableStateOf(false) }
     Column(
@@ -62,6 +98,7 @@ internal fun AdapterSettingsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(R.string.adapter_settings_title), style = MaterialTheme.typography.titleLarge)
+        automation?.let { AutomationGroup(it, onAutomation) }
         ListItem(
             headlineContent = { Text(stringResource(R.string.adapter_settings_protocol)) },
             supportingContent = { Text(ObdText.protocolName(state.protocol).asString()) },

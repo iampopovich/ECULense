@@ -30,7 +30,8 @@ import org.junit.Test
 private class FakeRecorder : SessionRecorder {
     override val activeSessionId = MutableStateFlow<Long?>(null)
     val names = mutableListOf<String>()
-    override fun start(name: String) { names += name; activeSessionId.value = 7L }
+    val cars = mutableListOf<Long?>()
+    override fun start(name: String, carId: Long?, auto: Boolean) { names += name; cars += carId; activeSessionId.value = 7L }
     override fun stop() { activeSessionId.value = null }
 }
 

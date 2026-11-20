@@ -68,6 +68,13 @@ val dataModule = module {
         }
     }
     single<AnalyticsRepository> { RoomAnalyticsRepository(get(), get(), get(), get()) }
+    single<AutomationPrefs> { DataStoreAutomationPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("automation") }) }
+    single(createdAtStart = true) {
+        val context = androidContext()
+        AutoRecorder(get(), get(), get(), get(AppScope), sessionName = { stamp -> context.getString(R.string.data_auto_session_name, stamp) })
+            .also { it.start() }
+    }
+    single(createdAtStart = true) { AutoConnect(get(), get(), get(AppScope)).also { it.start() } }
     single { RoomImportLedger(get()) } binds arrayOf(ImportLedger::class, ImportHistoryRepository::class)
     single {
         val scope = get<CoroutineScope>(AppScope)
