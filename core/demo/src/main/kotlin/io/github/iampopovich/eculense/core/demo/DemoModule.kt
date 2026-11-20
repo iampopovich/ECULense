@@ -8,4 +8,5 @@ import org.koin.dsl.module
 /** Demo mode: a virtual ELM327 shown in the adapter list as a regular transport. */
 val demoModule = module {
     single(named(DemoTransportFactory.KIND)) { DemoTransportFactory() } bind TransportFactory::class
+    single(named(FlakyDemoTransportFactory.KIND)) { FlakyDemoTransportFactory() } bind TransportFactory::class
 }

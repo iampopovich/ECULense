@@ -23,6 +23,7 @@ internal class ConnectViewModel(private val controller: ConnectionController) : 
     private fun kindRank(kind: String): Int = when (kind) {
         "bt" -> 0
         "demo" -> 2
+        "demo-flaky" -> 3
         else -> 1
     }
 

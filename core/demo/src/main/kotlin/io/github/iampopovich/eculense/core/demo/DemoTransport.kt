@@ -7,9 +7,15 @@ import io.github.iampopovich.eculense.core.obd.ObdIoException
 import io.github.iampopovich.eculense.core.obd.ObdTransport
 import io.github.iampopovich.eculense.core.obd.StandardPids
 import io.github.iampopovich.eculense.core.obd.TransportFactory
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.random.Random
@@ -24,17 +30,26 @@ class DemoTransport internal constructor(
     private val clock: () -> Long,
     private val latencyMs: (String) -> Long,
     private val engine: DemoEngine,
+    private val flaky: Boolean = false,
+    lateScope: CoroutineScope? = null,
 ) : ObdTransport {
 
     constructor(
         clock: () -> Long = System::currentTimeMillis,
         latencyMs: (String) -> Long = ::defaultLatency,
-    ) : this(clock, latencyMs, DemoEngine())
+        flaky: Boolean = false,
+    ) : this(clock, latencyMs, DemoEngine(), flaky)
 
     private val incoming = Channel<ByteArray>(Channel.UNLIMITED)
     private val inbox = StringBuilder()
     private var startMs = 0L
     @Volatile private var closed = false
+
+    // Flaky clone mode: replies that come after the command timeout are delivered from this scope.
+    private val ownsScope = flaky && lateScope == null
+    private val scope: CoroutineScope? = if (flaky) lateScope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default) else null
+    private var lateReply: Job? = null
+    private var liveRequests = 0
 
     private var echo = true
     private var linefeeds = false
@@ -52,6 +67,8 @@ class DemoTransport internal constructor(
 
     override suspend fun write(data: ByteArray) {
         if (closed) throw ObdIoException(ObdError.DemoDisconnected)
+        // A real adapter is busy until its late reply is out; keep the order of replies.
+        lateReply?.join()
         inbox.append(data.decodeToString())
         while (true) {
             val end = inbox.indexOf("\r")
@@ -72,6 +89,7 @@ class DemoTransport internal constructor(
 
     override suspend fun close() {
         closed = true
+        if (ownsScope) scope?.cancel()
         incoming.close()
     }
 
@@ -87,10 +105,22 @@ class DemoTransport internal constructor(
         val text = buildString {
             if (echoed) append(raw).append(eol)
             if (searching) append("SEARCHING...").append(eol)
+            if (flaky && command == "ATZ") append("+READY").append(eol)
             append(body.replace("\r", eol)).append(eol).append(eol).append('>')
         }
-        incoming.send(text.encodeToByteArray())
+        val bytes = text.encodeToByteArray()
+        when {
+            flaky && command == "ATZ" -> incoming.send(GARBAGE + bytes)
+            flaky && isLivePid(command) && ++liveRequests % LATE_EVERY == 0 -> lateReply = scope?.launch {
+                delay(LATE_DELAY_MS)
+                incoming.send(bytes)
+            }
+            else -> incoming.send(bytes)
+        }
     }
+
+    private fun isLivePid(command: String): Boolean =
+        command.length == 4 && command.startsWith("01") && command.substring(2).toIntOrNull(16)?.let { it % 0x20 != 0 } == true
 
     private fun handle(command: String): String =
         if (command.startsWith("AT")) handleAt(command.substring(2)) else handleObd(command)
@@ -111,7 +141,7 @@ class DemoTransport internal constructor(
         at == "S0" || at == "S1" -> { spaces = at == "S1"; "OK" }
         at == "H0" || at == "H1" -> { headers = at == "H1"; "OK" }
         at.matches(Regex("(SP|TP)A?[0-9A-C]")) -> { protocolFound = false; "OK" }
-        at == "DPN" -> if (protocolFound) "A6" else "A0"
+        at == "DPN" -> if (flaky) "0" else if (protocolFound) "A6" else "A0"
         at == "DP" -> if (protocolFound) "AUTO, ISO 15765-4 (CAN 11/500)" else "AUTO"
         at == "RV" -> String.format(Locale.US, "%.1fV", engine.voltage(elapsed()))
         at.matches(Regex("ST[0-9A-F]{2}|AT[0-2]|M[01]|CAF[01]|AL|NL|R[01]|PC")) -> "OK"
@@ -198,6 +228,11 @@ class DemoTransport internal constructor(
         private const val VERSION = "ELM327 v1.5"
         private const val NO_DATA = "NO DATA"
         private const val SEARCH_DELAY_MS = 400L
+
+        // Flaky clone: bytes before the reset banner, every Nth live PID answers after the 2 s command timeout.
+        private val GARBAGE = byteArrayOf(0xFC.toByte(), 0x00)
+        internal const val LATE_EVERY = 25
+        internal const val LATE_DELAY_MS = 2_300L
         private const val HEX = "0123456789ABCDEF"
         private val VIN_HEX = DemoEngine.VIN.encodeToByteArray().joinToString("") { "%02X".format(it) }
 
@@ -232,7 +267,7 @@ class DemoTransport internal constructor(
     }
 }
 
-/** The only demo-mode "adapter": creates a fresh simulation for each connection. */
+/** The demo-mode "adapter": creates a fresh simulation for each connection. */
 class DemoTransportFactory(
     private val clock: () -> Long = System::currentTimeMillis,
     private val latencyMs: (String) -> Long = DemoTransport.Companion::defaultLatency,
@@ -244,5 +279,23 @@ class DemoTransportFactory(
     companion object {
         const val KIND = "demo"
         val ENDPOINT = AdapterEndpoint(KIND, "Virtual ELM327 · CAN 11/500 · no car", "Demo mode (simulation)", EndpointLabel.DEMO)
+    }
+}
+
+/**
+ * The same simulation behind a misbehaving cheap clone (garbage on reset, ATDPN "0", occasional late replies),
+ * so the recovery path of the protocol layer can be watched on the device.
+ */
+class FlakyDemoTransportFactory(
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val latencyMs: (String) -> Long = DemoTransport.Companion::defaultLatency,
+) : TransportFactory {
+    override val kind = KIND
+    override suspend fun discover() = listOf(ENDPOINT)
+    override fun create(endpoint: AdapterEndpoint): ObdTransport = DemoTransport(clock, latencyMs, flaky = true)
+
+    companion object {
+        const val KIND = "demo-flaky"
+        val ENDPOINT = AdapterEndpoint(KIND, "Virtual ELM327 clone · late replies, garbage", "Demo: flaky clone", EndpointLabel.DEMO_FLAKY)
     }
 }

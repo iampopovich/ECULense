@@ -45,10 +45,11 @@ class ObdConnectionManager internal constructor(
     private val factories: List<TransportFactory>,
     private val scope: CoroutineScope,
     private val sessionFactory: (ObdTransport) -> ObdSession,
+    private val traffic: ObdTrafficLog? = null,
 ) : ConnectionController {
 
-    constructor(factories: List<TransportFactory>, scope: CoroutineScope) :
-        this(factories, scope, { transport -> Elm327Session(ElmLink(transport)) })
+    constructor(factories: List<TransportFactory>, scope: CoroutineScope, trafficLog: ObdTrafficLog? = null) :
+        this(factories, scope, { transport -> Elm327Session(ElmLink(transport, trafficLog)) }, trafficLog)
 
     private class Active(val transport: ObdTransport, val session: ObdSession)
 
@@ -80,6 +81,7 @@ class ObdConnectionManager internal constructor(
         connectJob = scope.launch {
             closeActive()
             _state.value = ConnectionState.Connecting(endpoint)
+            traffic?.note("connect: ${endpoint.kind}")
             try {
                 val factory = factories.firstOrNull { it.kind == endpoint.kind }
                     ?: throw ObdException(ObdError.NoTransport(endpoint.kind))
@@ -94,6 +96,7 @@ class ObdConnectionManager internal constructor(
                 throw e
             } catch (e: Exception) {
                 closeActive()
+                traffic?.note("connect failed: ${ObdError.of(e).technicalMessage}")
                 _state.value = ConnectionState.Failed(endpoint, ObdError.of(e))
             }
         }
@@ -102,6 +105,7 @@ class ObdConnectionManager internal constructor(
     override fun disconnect() {
         connectJob?.cancel()
         scope.launch {
+            if (_state.value !is ConnectionState.Disconnected) traffic?.note("disconnect")
             _state.value = ConnectionState.Disconnected
             closeActive()
         }

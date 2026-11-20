@@ -33,6 +33,7 @@ object ObdText {
 
     fun endpointLabel(endpoint: AdapterEndpoint): UiText = when (endpoint.labelKey) {
         EndpointLabel.DEMO -> UiText.Res(R.string.obd_endpoint_demo)
+        EndpointLabel.DEMO_FLAKY -> UiText.Res(R.string.obd_endpoint_demo_flaky)
         EndpointLabel.PC_EMULATOR -> UiText.Res(R.string.obd_endpoint_pc_emulator)
         null -> UiText.Raw(endpoint.label)
     }
@@ -40,6 +41,7 @@ object ObdText {
     /** Second line of an adapter row: the address, or a description for built-in endpoints. */
     fun endpointDetail(endpoint: AdapterEndpoint): UiText = when (endpoint.labelKey) {
         EndpointLabel.DEMO -> UiText.Res(R.string.obd_endpoint_demo_detail)
+        EndpointLabel.DEMO_FLAKY -> UiText.Res(R.string.obd_endpoint_demo_flaky_detail)
         EndpointLabel.PC_EMULATOR, null -> UiText.Raw(endpoint.address)
     }
 

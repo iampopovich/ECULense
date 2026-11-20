@@ -18,6 +18,8 @@
     <string name="obd_error_link_lost">Connection to the adapter lost: %1$s</string>
     <string name="obd_endpoint_demo">Demo mode (simulation)</string>
     <string name="obd_endpoint_demo_detail">Virtual ELM327 · CAN 11/500 · no car</string>
+    <string name="obd_endpoint_demo_flaky">Demo: flaky clone</string>
+    <string name="obd_endpoint_demo_flaky_detail">Simulated cheap clone · late replies and garbage · tests recovery</string>
     <string name="obd_endpoint_pc_emulator">ELM327 emulator on PC (10.0.2.2)</string>
     <string name="obd_adapter_version_unknown">unknown</string>
     <string name="obd_pid_04">Engine load</string>

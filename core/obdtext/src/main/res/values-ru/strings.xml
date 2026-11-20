@@ -17,6 +17,8 @@
     <string name="obd_error_link_lost">Связь с адаптером потеряна: %1$s</string>
     <string name="obd_endpoint_demo">Демо-режим (симуляция)</string>
     <string name="obd_endpoint_demo_detail">Виртуальный ELM327 · CAN 11/500 · без машины</string>
+    <string name="obd_endpoint_demo_flaky">Демо: капризный клон</string>
+    <string name="obd_endpoint_demo_flaky_detail">Имитация дешёвого клона · опоздания и мусор · проверка восстановления</string>
     <string name="obd_endpoint_pc_emulator">Эмулятор ELM327 на ПК (10.0.2.2)</string>
     <string name="obd_adapter_version_unknown">неизвестно</string>
     <string name="obd_pid_04">Нагрузка двигателя</string>

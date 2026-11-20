@@ -12,6 +12,7 @@ val AppScope = named("app-scope")
 
 fun obdModule(includeEmulator: Boolean) = module {
     single<CoroutineScope>(AppScope) { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
-    single<ConnectionController> { ObdConnectionManager(getAll(), get(AppScope)) }
+    single<ObdTrafficLog> { RingTrafficLog() }
+    single<ConnectionController> { ObdConnectionManager(getAll(), get(AppScope), trafficLog = get()) }
     single(named(WifiTransportFactory.KIND)) { WifiTransportFactory(includeEmulator) } bind TransportFactory::class
 }
