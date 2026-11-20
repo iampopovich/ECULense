@@ -54,6 +54,7 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
 - Trips are derived automatically: distance, fuel used, driving and idle time.
 - A per-car summary: kilometres, litres, average consumption, fuel spend.
 - A trip page with charts and a driving-style score; "engine maps": fuel trims by RPM and load, before/after comparison.
+- Calibrating the harsh acceleration/braking threshold with the phone accelerometer in a rigid holder (optional, CSV export).
 
 **Fuel and costs**
 - A fuel log with full-to-full consumption, MAF estimate calibration, CSV import from Fuelio.
@@ -144,6 +145,7 @@ core/
   ailocal                 on-device models (local build only)
   analyticstext, obdtext  localized texts for findings, OBD errors and PID names
   background              background analysis and notifications
+  sensors                 phone accelerometer during recordings (threshold calibration)
   demo                    adapter emulator for working without a car
   navigation, ui, model   shared navigation keys, theme, models
 feature/                  screens: dashboard, connect, obdlog, cardata, dtc, health,

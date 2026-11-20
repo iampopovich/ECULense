@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import io.github.iampopovich.eculense.core.analytics.AccelCalibrationThresholds
 import io.github.iampopovich.eculense.core.analytics.CalibrationGap
 import io.github.iampopovich.eculense.core.analytics.StyleThresholds
@@ -91,3 +92,6 @@ private fun gapText(gap: CalibrationGap, correlation: Double?, events: Int): Str
     CalibrationGap.TOO_FEW_EVENTS -> stringResource(R.string.calib_gap_few_events, events, AccelCalibrationThresholds.MIN_EVENTS)
     CalibrationGap.INCONSISTENT_RATIO -> stringResource(R.string.calib_gap_sign)
 }
+
+/** Own subclass: one FileProvider class per manifest entry (the merger rejects duplicates). */
+class StatsFileProvider : FileProvider()
