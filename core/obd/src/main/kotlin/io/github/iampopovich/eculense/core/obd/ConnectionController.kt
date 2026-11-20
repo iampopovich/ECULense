@@ -50,6 +50,20 @@ sealed interface ConnectionState {
 val ConnectionState.isSessionAlive: Boolean
     get() = this is ConnectionState.Connected || this is ConnectionState.Reconnecting || this is ConnectionState.EngineOff
 
+/** The endpoint of any state except Disconnected. */
+val ConnectionState.endpointOrNull: AdapterEndpoint?
+    get() = when (this) {
+        ConnectionState.Disconnected -> null
+        is ConnectionState.Connecting -> endpoint
+        is ConnectionState.Connected -> endpoint
+        is ConnectionState.Reconnecting -> endpoint
+        is ConnectionState.EngineOff -> endpoint
+        is ConnectionState.Failed -> endpoint
+    }
+
+/** The current link has no real car behind it ([AdapterEndpoint.isSimulated]). */
+val ConnectionState.isSimulated: Boolean get() = endpointOrNull?.isSimulated == true
+
 interface ConnectionController {
     val state: StateFlow<ConnectionState>
 

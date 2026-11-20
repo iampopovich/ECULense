@@ -31,6 +31,17 @@ data class AdapterEndpoint(val kind: String, val address: String, val label: Str
 /** Built-in endpoints whose label and description are app text (localized in :core:obdtext). */
 enum class EndpointLabel { DEMO, DEMO_FLAKY, DEMO_ENGINE_OFF, PC_EMULATOR, REPLAY }
 
+/**
+ * No real car behind this endpoint (demo kinds, a replayed log, the PC emulator): results are shown, but nothing is
+ * persisted to the active car (DTC/readiness history, events, health checks, auto-recordings).
+ */
+val AdapterEndpoint.isSimulated: Boolean
+    get() = kind.startsWith(SIMULATED_KIND_PREFIX) || kind == ReplayTransportFactory.KIND ||
+        labelKey in SIMULATED_LABELS
+
+private const val SIMULATED_KIND_PREFIX = "demo"
+private val SIMULATED_LABELS = setOf(EndpointLabel.DEMO, EndpointLabel.DEMO_FLAKY, EndpointLabel.DEMO_ENGINE_OFF, EndpointLabel.PC_EMULATOR, EndpointLabel.REPLAY)
+
 /** Each link type (BT, Wi-Fi, BLE) is a separate factory, registered in Koin via bind TransportFactory::class. */
 interface TransportFactory {
     val kind: String

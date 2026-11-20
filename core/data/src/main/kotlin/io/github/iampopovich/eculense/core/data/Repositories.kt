@@ -100,6 +100,8 @@ internal class RoomDtcRepository(
     private val dao: DtcDao,
     private val clock: () -> Long = System::currentTimeMillis,
     private val activeCarId: suspend () -> Long? = { null },
+    /** Live reads from a demo/replay link are not stored ([LiveWriteGate]); imports use [saveSnapshot] and are not gated. */
+    private val liveWrites: LiveWriteGate = LiveWriteGate.ALWAYS,
 ) : DtcRepository {
     override suspend fun saveSnapshot(dtcs: List<Dtc>, vin: String?, takenAtMs: Long?, carId: Long?) =
         save(dtcs, vin, takenAtMs, carId, null)
@@ -124,7 +126,7 @@ internal class RoomDtcRepository(
     override suspend fun recordRead(dtcs: List<Dtc>, vin: String?): Boolean = recordRead(dtcs, vin, null)
 
     override suspend fun recordRead(dtcs: List<Dtc>, vin: String?, freezeFrame: FreezeFrame?): Boolean {
-        if (dtcs.isEmpty()) return false
+        if (dtcs.isEmpty() || !liveWrites.allowed()) return false
         val at = clock()
         val car = activeCarId()
         val last = dao.latestForCar(car)
@@ -137,6 +139,7 @@ internal class RoomDtcRepository(
 
     override suspend fun saveReadiness(reason: ReadinessReason, readiness: Readiness?, counters: ClearedCounters?) {
         if (readiness == null && counters == null) return
+        if (!liveWrites.allowed()) return
         dao.insertReadiness(
             ReadinessSnapshotEntity(
                 carId = activeCarId(), takenAtMs = clock(), reason = reason.name, milOn = readiness?.milOn,
