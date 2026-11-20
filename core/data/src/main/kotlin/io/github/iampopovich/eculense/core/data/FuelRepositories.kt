@@ -3,6 +3,7 @@ package io.github.iampopovich.eculense.core.data
 import io.github.iampopovich.eculense.core.analytics.FuelCalibration
 import io.github.iampopovich.eculense.core.analytics.FuelLog
 import io.github.iampopovich.eculense.core.analytics.FullToFull
+import io.github.iampopovich.eculense.core.analytics.RangeEstimate
 import io.github.iampopovich.eculense.core.database.ExpenseDao
 import io.github.iampopovich.eculense.core.database.ExpenseEntity
 import io.github.iampopovich.eculense.core.database.FuelDao
@@ -18,6 +19,8 @@ import io.github.iampopovich.eculense.core.model.OdometerSource
 import io.github.iampopovich.eculense.core.model.Trip
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 /** D1 fuel log of a car. Every fill-up with an odometer is also a measured odometer reading (odometer_log, FILL_UP). */
@@ -66,6 +69,22 @@ data class FuelInsights(
 
 fun observeFuelInsights(carId: Long, fuel: FuelRepository, trips: TripRepository, prefs: FuelPrefs): Flow<FuelInsights> =
     combine(fuel.observeFillUps(carId), trips.observeTrips(carId), prefs.mafCorrection(carId)) { f, t, on -> FuelInsights.of(f, t, on) }
+
+/** D3: what the range of the active car is computed from; null when the tank capacity or a learned consumption is missing. */
+data class RangeBasis(val tankL: Double, val lPer100: Double, val source: RangeEstimate.Source) {
+    fun km(fuelLevelPercent: Double?): Double? = RangeEstimate.km(fuelLevelPercent, tankL, lPer100)
+}
+
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+fun observeRangeBasis(cars: CarRepository, fuel: FuelRepository, trips: TripRepository, prefs: FuelPrefs): Flow<RangeBasis?> =
+    cars.observeActiveCar().flatMapLatest { car ->
+        val tank = car?.tankVolumeL
+        if (car == null || tank == null || tank <= 0) flowOf(null)
+        else combine(fuel.observeFillUps(car.id), trips.observeTrips(car.id), prefs.mafCorrection(car.id)) { f, t, on ->
+            val i = FuelInsights.of(f, t, on)
+            RangeEstimate.learnedLPer100(i.intervals, i.corrected(t))?.let { (l, s) -> RangeBasis(tank, l, s) }
+        }
+    }
 
 internal class RoomFuelRepository(
     private val dao: FuelDao,

@@ -121,6 +121,12 @@ internal fun SessionDetailRoute(sessionId: Long, viewModel: SessionDetailViewMod
             Text(stringResource(R.string.sessions_too_few_points))
         }
         if (events.isNotEmpty()) EventList(events, startMs, focus) { focus = if (focus == it) null else it }
+        val navigator = io.github.iampopovich.eculense.core.navigation.LocalNavigator.current
+        if (bySensor.keys.any { it == "01.06" || it == "01.08" }) {
+            OutlinedButton(onClick = { navigator.navigate(io.github.iampopovich.eculense.core.navigation.EngineMapDestination(sessionId)) }) {
+                Text(stringResource(R.string.sessions_engine_map))
+            }
+        }
         val chooserTitle = stringResource(R.string.sessions_export_chooser)
         Button(onClick = {
             scope.launch {

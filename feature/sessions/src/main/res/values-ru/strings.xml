@@ -21,4 +21,34 @@
     <string name="sessions_reassign_title">Перенести запись на</string>
     <string name="sessions_car_now">Машина: %1$s</string>
     <string name="sessions_reassigned">Перенесено на «%1$s»; поездка, статистика и анализ пересчитываются</string>
+    <string name="sessions_engine_map">Карта двигателя (коррекции топлива)</string>
+    <string name="map_title">Карта двигателя</string>
+    <string name="map_intro">Суммарная коррекция топлива (STFT + LTFT) каждого замера на прогретом двигателе против оборотов или нагрузки. Плюс — ЭБУ добавляет топливо.</string>
+    <string name="map_no_points">В этой записи нет прогретых замеров, где STFT, LTFT и обороты есть вместе.</string>
+    <string name="map_axis_rpm">По оборотам</string>
+    <string name="map_axis_load">По нагрузке</string>
+    <string name="map_x_rpm">X: 0–%1$d об/мин</string>
+    <string name="map_x_load">X: нагрузка 0–100 %%</string>
+    <string name="map_y_hint">Y: коррекция −25…+25 %%, пунктир = 0</string>
+    <string name="map_legend_bank1">● ряд 1 (синий)</string>
+    <string name="map_legend_bank2">● ряд 2 (оранжевый)</string>
+    <string name="map_legend_second">● вторая запись</string>
+    <string name="map_table_title">Медиана коррекции по диапазонам (замеров)</string>
+    <string name="map_col_rpm">об/мин</string>
+    <string name="map_col_load">Нагрузка</string>
+    <string name="map_col_bank">Ряд %1$d</string>
+    <string name="map_col_second">Вторая</string>
+    <string name="map_medians_rpm">Холостые (до 1000 об/мин): %1$s (%2$d) · от 2500 об/мин: %3$s (%4$d)</string>
+    <string name="map_medians_load">Холостые (до 1000 об/мин): %1$s (%2$d) · нагрузка от 50 %%: %3$s (%4$d)</string>
+    <string name="map_pattern_air_leak">Коррекции растут на холостых и падают под нагрузкой — типично для подсоса воздуха после ДМРВ (гипотеза).</string>
+    <string name="map_pattern_fuel_delivery">Коррекции растут под нагрузкой при нормальных холостых — типично для слабой подачи топлива: насос, фильтр, регулятор (гипотеза).</string>
+    <string name="map_pattern_lean">Бедно на всех режимах — ДМРВ занижает, низкое давление топлива или большой подсос (гипотеза).</string>
+    <string name="map_pattern_rich">Богато на всех режимах — подтекают форсунки, высокое давление топлива или ДМРВ завышает (гипотеза).</string>
+    <string name="map_pattern_normal">Коррекции на холостых и под нагрузкой в норме, явной картины нет.</string>
+    <string name="map_pattern_no_data">Мало прогретых замеров на холостых и под нагрузкой для сравнения.</string>
+    <string name="map_hypothesis_note">Это картина, а не диагноз: проверьте дымогенератором, манометром давления топлива или заведомо исправным датчиком.</string>
+    <string name="map_compare">Сравнить с другой записью</string>
+    <string name="map_compare_change">Сравнить с другой записью</string>
+    <string name="map_compare_title">Вторая запись (до / после)</string>
+    <string name="map_compare_second">Вторая запись</string>
 </resources>

@@ -41,6 +41,8 @@ internal data class TileState(
     val decimals: Int = decimalsOf(pid),
     /** C4: a live alert is active for this sensor (error color). */
     val alert: Boolean = false,
+    /** D3: «~230 km» left, only on the fuel-level tile when the tank capacity and a learned consumption are known. */
+    val rangeKm: Double? = null,
 )
 
 internal data class Stamped(val value: Double, val atMs: Long)

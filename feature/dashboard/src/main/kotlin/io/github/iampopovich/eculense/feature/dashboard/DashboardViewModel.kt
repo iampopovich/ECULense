@@ -12,6 +12,7 @@ import io.github.iampopovich.eculense.core.data.DashboardSelection
 import io.github.iampopovich.eculense.core.data.EventMarker
 import io.github.iampopovich.eculense.core.data.LiveAlerts
 import io.github.iampopovich.eculense.core.data.MarkResult
+import io.github.iampopovich.eculense.core.data.RangeBasis
 import io.github.iampopovich.eculense.core.data.SessionRecorder
 import io.github.iampopovich.eculense.core.data.UnitsRepository
 import io.github.iampopovich.eculense.core.model.CarProfile
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
@@ -100,7 +102,10 @@ internal class DashboardViewModel(
     private val marker: EventMarker? = null,
     private val cars: CarRepository? = null,
     private val automation: AutomationPrefs? = null,
+    /** D3: tank capacity and learned consumption of the active car; the fuel-level tile then shows «~230 km left». */
+    rangeBasis: Flow<RangeBasis?> = flowOf(null),
 ) : ViewModel() {
+    private val range: StateFlow<RangeBasis?> = rangeBasis.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     private val buffer = LiveBuffer()
     private val carChoice = MutableStateFlow<List<CarProfile>?>(null)
     private val markResult = MutableStateFlow<MarkResult?>(null)
@@ -153,10 +158,16 @@ internal class DashboardViewModel(
                 )
             },
             extras,
-        ) { base, x ->
+            range,
+        ) { base, x, basis ->
             val alerting = x.alerts.flatMap { it.kind.sensorIds() }.toSet()
             base.copy(
-                tiles = base.tiles.map { if (it.pid.sensorId in alerting) it.copy(alert = true) else it },
+                tiles = base.tiles.map { tile ->
+                    val withAlert = if (tile.pid.sensorId in alerting) tile.copy(alert = true) else tile
+                    if (basis != null && tile.pid.code == FUEL_LEVEL && tile.status == ValueStatus.LIVE) {
+                        withAlert.copy(rangeKm = basis.km(buffer.latest(tile.pid.sensorId)?.value))
+                    } else withAlert
+                },
                 alerts = x.alerts,
                 newCodes = x.newCodes,
                 carChoice = x.carChoice,
@@ -241,6 +252,8 @@ internal class DashboardViewModel(
     private data class Extras(val alerts: List<ActiveAlert>, val newCodes: List<String>, val carChoice: List<CarProfile>?, val mark: MarkResult?)
 
     internal companion object {
+        /** PID 2F fuel tank level, %. */
+        const val FUEL_LEVEL = 0x2F
         const val REDRAW_MS = 250L
 
         /** What the poller needs for [shown] tiles: helpers for the open-loop marker and the fuel-rate estimate. */

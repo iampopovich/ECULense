@@ -57,6 +57,21 @@ class DashboardViewModelTest {
     private fun DashboardViewModel.tile(code: Int) = uiState.value.tiles.first { it.pid.code == code }
 
     @Test
+    fun `fuel level tile shows the range when the tank and a learned consumption are known`() = runTest {
+        val controller = FakeConnectionController(initial = FakeConnectionController.connected(setOf(0x0C, 0x2F)))
+        val prefs = InMemoryDashboardPrefs(selection = listOf(0x2F, 0x0C))
+        val basis = kotlinx.coroutines.flow.MutableStateFlow<io.github.iampopovich.eculense.core.data.RangeBasis?>(null)
+        val vm = DashboardViewModel(controller, FakeRecorder(), FakeUnits(), prefs, now = { clock }, ticks = ticks.onStart { emit(Unit) }, rangeBasis = basis)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
+        controller.readingsFlow.emit(SensorReading("01.2F", 50.0, "%", 0))
+        assertEquals(null, vm.tile(0x2F).rangeKm)
+        basis.value = io.github.iampopovich.eculense.core.data.RangeBasis(60.0, 10.0, io.github.iampopovich.eculense.core.analytics.RangeEstimate.Source.FUEL_LOG)
+        controller.readingsFlow.emit(SensorReading("01.2F", 50.0, "%", 1))
+        assertEquals(300.0, vm.tile(0x2F).rangeKm!!, 1e-9)
+        assertEquals(null, vm.tile(0x0C).rangeKm)
+    }
+
+    @Test
     fun `polls supported default pids and shows latest values`() = runTest {
         val controller = FakeConnectionController(initial = FakeConnectionController.connected(setOf(0x0C, 0x0D, 0x99)))
         val vm = vm(controller)

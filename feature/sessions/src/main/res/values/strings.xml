@@ -21,4 +21,34 @@
     <string name="sessions_reassign_title">Move this recording to</string>
     <string name="sessions_car_now">Car: %1$s</string>
     <string name="sessions_reassigned">Moved to %1$s; the trip, statistics and analysis follow</string>
+    <string name="sessions_engine_map">Engine map (fuel trims)</string>
+    <string name="map_title">Engine map</string>
+    <string name="map_intro">Total fuel trim (STFT + LTFT) of every warm sample against engine speed or load. Positive = the ECU adds fuel.</string>
+    <string name="map_no_points">No warm samples with STFT, LTFT and rpm together in this recording.</string>
+    <string name="map_axis_rpm">By rpm</string>
+    <string name="map_axis_load">By load</string>
+    <string name="map_x_rpm">X: 0–%1$d rpm</string>
+    <string name="map_x_load">X: engine load 0–100 %%</string>
+    <string name="map_y_hint">Y: trim −25…+25 %%, dashed = 0</string>
+    <string name="map_legend_bank1">● bank 1 (blue)</string>
+    <string name="map_legend_bank2">● bank 2 (orange)</string>
+    <string name="map_legend_second">● second recording</string>
+    <string name="map_table_title">Median trim per range (samples)</string>
+    <string name="map_col_rpm">rpm</string>
+    <string name="map_col_load">Load</string>
+    <string name="map_col_bank">Bank %1$d</string>
+    <string name="map_col_second">Second</string>
+    <string name="map_medians_rpm">Idle (under 1000 rpm): %1$s (%2$d) · from 2500 rpm: %3$s (%4$d)</string>
+    <string name="map_medians_load">Idle (under 1000 rpm): %1$s (%2$d) · load from 50 %%: %3$s (%4$d)</string>
+    <string name="map_pattern_air_leak">Trims rise at idle and fall under load — typical for an air leak after the MAF (hypothesis).</string>
+    <string name="map_pattern_fuel_delivery">Trims rise under load while idle is normal — typical for weak fuel delivery: pump, filter, regulator (hypothesis).</string>
+    <string name="map_pattern_lean">Lean in every mode — MAF reading low, low fuel pressure or a large leak (hypothesis).</string>
+    <string name="map_pattern_rich">Rich in every mode — leaking injectors, high fuel pressure or MAF reading high (hypothesis).</string>
+    <string name="map_pattern_normal">Trims at idle and under load are in the normal band, no clear pattern.</string>
+    <string name="map_pattern_no_data">Not enough warm samples at idle and under load to compare.</string>
+    <string name="map_hypothesis_note">This is a pattern, not a diagnosis: check with a smoke test, fuel pressure gauge or a known-good sensor.</string>
+    <string name="map_compare">Compare with another recording</string>
+    <string name="map_compare_change">Compare with a different recording</string>
+    <string name="map_compare_title">Second recording (before / after)</string>
+    <string name="map_compare_second">Second recording</string>
 </resources>

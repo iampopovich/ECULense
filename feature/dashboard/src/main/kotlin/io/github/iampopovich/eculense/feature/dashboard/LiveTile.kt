@@ -33,7 +33,11 @@ internal fun tileNote(tile: TileState): String? = when (tile.status) {
     ValueStatus.STALE -> tile.ageSec?.let { age ->
         if (age < 120) stringResource(R.string.dash_age_seconds, age.toInt()) else stringResource(R.string.dash_age_minutes, (age / 60).toInt())
     }
-    ValueStatus.LIVE, ValueStatus.NO_DATA -> if (tile.estimated) stringResource(R.string.dash_estimated_hint) else null
+    ValueStatus.LIVE, ValueStatus.NO_DATA -> when {
+        tile.rangeKm != null -> stringResource(R.string.dash_range, formatNumber(tile.rangeKm, 0))
+        tile.estimated -> stringResource(R.string.dash_estimated_hint)
+        else -> null
+    }
 }
 
 @Composable

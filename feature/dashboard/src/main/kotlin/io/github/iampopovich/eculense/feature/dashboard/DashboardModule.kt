@@ -24,6 +24,7 @@ val dashboardModule = module {
         DashboardViewModel(
             get(), get(), get(), get(),
             alerts = getOrNull<LiveAlerts>(), marker = getOrNull<EventMarker>(), cars = getOrNull<CarRepository>(), automation = getOrNull<AutomationPrefs>(),
+            rangeBasis = rangeBasisOf(this),
         )
     }
     viewModel { AlertSettingsViewModel(getOrNull<AlertPrefs>() ?: InMemoryAlertPrefs(), saveScope = getOrNull<kotlinx.coroutines.CoroutineScope>(io.github.iampopovich.eculense.core.obd.AppScope)) }
@@ -34,4 +35,14 @@ val dashboardModule = module {
         HubEntry(Hub.SETTINGS, AlertSettingsDestination, R.string.alerts_hub_title, R.string.alerts_hub_subtitle, R.drawable.ic_warning, order = 13)
     }
     single(named("dashboard")) { TopLevelEntry(DashboardDestination, R.string.dash_tab, R.drawable.ic_dashboard, order = 0) }
+}
+
+/** D3 range inputs when the fuel log is in the build (it lives in :core:data, always present; nullables for tests). */
+private fun rangeBasisOf(scope: org.koin.core.scope.Scope): kotlinx.coroutines.flow.Flow<io.github.iampopovich.eculense.core.data.RangeBasis?> {
+    val cars = scope.getOrNull<CarRepository>()
+    val fuel = scope.getOrNull<io.github.iampopovich.eculense.core.data.FuelRepository>()
+    val trips = scope.getOrNull<io.github.iampopovich.eculense.core.data.TripRepository>()
+    val prefs = scope.getOrNull<io.github.iampopovich.eculense.core.data.FuelPrefs>()
+    return if (cars == null || fuel == null || trips == null || prefs == null) kotlinx.coroutines.flow.flowOf(null)
+    else io.github.iampopovich.eculense.core.data.observeRangeBasis(cars, fuel, trips, prefs)
 }

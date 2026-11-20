@@ -4,7 +4,9 @@ import io.github.iampopovich.eculense.core.navigation.Hub
 import io.github.iampopovich.eculense.core.data.CarRepository
 import io.github.iampopovich.eculense.core.data.SessionMover
 import io.github.iampopovich.eculense.core.data.TripEventRepository
+import io.github.iampopovich.eculense.core.navigation.EngineMapDestination
 import io.github.iampopovich.eculense.core.navigation.HubEntry
+import io.github.iampopovich.eculense.core.navigation.RouteHandler
 import io.github.iampopovich.eculense.core.navigation.SessionDetailDestination
 import io.github.iampopovich.eculense.core.navigation.SessionsDestination
 import org.koin.android.ext.koin.androidContext
@@ -24,6 +26,9 @@ val sessionsModule = module {
     }
     navigation<SessionsDestination> { SessionsRoute() }
     navigation<SessionDetailDestination> { route -> SessionDetailRoute(route.sessionId) }
+    viewModel { (sessionId: Long, compareWith: Long?) -> EngineMapViewModel(sessionId, compareWith, get()) }
+    navigation<EngineMapDestination> { route -> EngineMapRoute(route.sessionId, route.compareWith) }
+    single(named("engine-map-route")) { RouteHandler(EngineMapDestination::class) }
     single(named("sessions-hub")) {
         HubEntry(Hub.PITSTOP, SessionsDestination, R.string.sessions_hub_title, R.string.sessions_hub_subtitle, R.drawable.ic_sessions, order = 20)
     }
