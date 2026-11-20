@@ -80,6 +80,12 @@ val dataModule = module {
         val analytics = get<AnalyticsRepository>()
         RoomSessionMover(get(), get(AppScope)) { analytics.recompute(it) }
     }
+    single<HealthRepository> { RoomHealthRepository(get()) }
+    single {
+        val cars = get<CarRepository>()
+        val maintenance = get<MaintenanceRepository>()
+        HealthCheckRunner(get(), get(), get(), activeCarId = { cars.activeCarId() }, odometerKm = { maintenance.estimate(it)?.km?.toLong() })
+    }
     single<AlertPrefs> { DataStoreAlertPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("alerts") }) }
     single(createdAtStart = true) {
         val koin = getKoin()

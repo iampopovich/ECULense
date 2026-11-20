@@ -92,4 +92,21 @@
     <string name="obd_fuel_open_loop">open loop</string>
     <string name="obd_adapter_note_clone_version">%1$s — the version most clones report</string>
     <string name="obd_adapter_note_elm_version">%1$s — a version of the original ELM327 firmware</string>
+    <string name="obd_monitor_misfire">Misfire</string>
+    <string name="obd_monitor_fuel_system">Fuel system</string>
+    <string name="obd_monitor_components">Components</string>
+    <string name="obd_monitor_catalyst">Catalyst</string>
+    <string name="obd_monitor_heated_catalyst">Heated catalyst</string>
+    <string name="obd_monitor_evap">Evaporative system (EVAP)</string>
+    <string name="obd_monitor_secondary_air">Secondary air</string>
+    <string name="obd_monitor_ac">A/C refrigerant</string>
+    <string name="obd_monitor_o2">Oxygen sensors</string>
+    <string name="obd_monitor_o2_heater">Oxygen sensor heaters</string>
+    <string name="obd_monitor_egr">EGR system</string>
+    <string name="obd_monitor_nmhc">NMHC catalyst</string>
+    <string name="obd_monitor_nox">NOx / SCR</string>
+    <string name="obd_monitor_boost">Boost pressure</string>
+    <string name="obd_monitor_exhaust_sensor">Exhaust gas sensor</string>
+    <string name="obd_monitor_pm_filter">Particulate filter</string>
+    <string name="obd_monitor_egr_vvt">EGR / VVT</string>
 </resources>

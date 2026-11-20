@@ -91,4 +91,21 @@
     <string name="obd_fuel_open_loop">разомкнутый контур</string>
     <string name="obd_adapter_note_clone_version">%1$s — такую версию чаще всего показывают клоны</string>
     <string name="obd_adapter_note_elm_version">%1$s — версия оригинальной прошивки ELM327</string>
+    <string name="obd_monitor_misfire">Пропуски зажигания</string>
+    <string name="obd_monitor_fuel_system">Топливная система</string>
+    <string name="obd_monitor_components">Компоненты</string>
+    <string name="obd_monitor_catalyst">Катализатор</string>
+    <string name="obd_monitor_heated_catalyst">Подогрев катализатора</string>
+    <string name="obd_monitor_evap">Улавливание паров топлива (EVAP)</string>
+    <string name="obd_monitor_secondary_air">Вторичный воздух</string>
+    <string name="obd_monitor_ac">Хладагент кондиционера</string>
+    <string name="obd_monitor_o2">Датчики кислорода</string>
+    <string name="obd_monitor_o2_heater">Подогрев датчиков кислорода</string>
+    <string name="obd_monitor_egr">Система EGR</string>
+    <string name="obd_monitor_nmhc">Катализатор NMHC</string>
+    <string name="obd_monitor_nox">NOx / SCR</string>
+    <string name="obd_monitor_boost">Давление наддува</string>
+    <string name="obd_monitor_exhaust_sensor">Датчик отработавших газов</string>
+    <string name="obd_monitor_pm_filter">Сажевый фильтр</string>
+    <string name="obd_monitor_egr_vvt">EGR / VVT</string>
 </resources>

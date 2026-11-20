@@ -25,6 +25,7 @@ import io.github.iampopovich.eculense.feature.cardata.carDataModule
 import io.github.iampopovich.eculense.feature.dashboard.dashboardModule
 import io.github.iampopovich.eculense.feature.datapacks.dataPacksFeatureModule
 import io.github.iampopovich.eculense.feature.dtc.dtcModule
+import io.github.iampopovich.eculense.feature.health.healthModule
 import io.github.iampopovich.eculense.feature.maintenance.maintenanceModule
 import io.github.iampopovich.eculense.feature.pitstop.pitstopModule
 import io.github.iampopovich.eculense.feature.sessions.sessionsModule
@@ -66,6 +67,8 @@ val appModules: List<Module> = listOf(
     // Car Scanner backup import (WorkManager) and ECULense backup; without them «Поездки»/«Статистика» have no import link.
     backupModule,
     backupFeatureModule,
+    // B6 quick health check + report (Pit-stop hub); without it nothing else changes.
+    healthModule,
     // Demo mode (virtual ELM327) — last in the transport list, in all builds.
     demoModule,
     // AI (stage 2): remove these lines + the modules in settings.gradle.kts/app → the app works without AI.

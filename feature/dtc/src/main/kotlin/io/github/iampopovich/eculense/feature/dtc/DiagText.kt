@@ -5,30 +5,14 @@ import io.github.iampopovich.eculense.core.obd.MidGroup
 import io.github.iampopovich.eculense.core.obd.Monitor
 import io.github.iampopovich.eculense.core.obd.MonitorStatus
 import io.github.iampopovich.eculense.core.obd.RecentClearVerdict
+import io.github.iampopovich.eculense.core.obdtext.ObdText
 import java.util.Locale
 
 /** Resource ids for the typed diagnostics results of :core:obd (shown only by this feature). */
 internal object DiagText {
+    /** Monitor names live in :core:obdtext (the health report shows them too). */
     @StringRes
-    fun monitor(m: Monitor): Int = when (m) {
-        Monitor.MISFIRE -> R.string.dtc_monitor_misfire
-        Monitor.FUEL_SYSTEM -> R.string.dtc_monitor_fuel_system
-        Monitor.COMPONENTS -> R.string.dtc_monitor_components
-        Monitor.CATALYST -> R.string.dtc_monitor_catalyst
-        Monitor.HEATED_CATALYST -> R.string.dtc_monitor_heated_catalyst
-        Monitor.EVAPORATIVE_SYSTEM -> R.string.dtc_monitor_evap
-        Monitor.SECONDARY_AIR -> R.string.dtc_monitor_secondary_air
-        Monitor.AC_REFRIGERANT -> R.string.dtc_monitor_ac
-        Monitor.OXYGEN_SENSOR -> R.string.dtc_monitor_o2
-        Monitor.OXYGEN_SENSOR_HEATER -> R.string.dtc_monitor_o2_heater
-        Monitor.EGR -> R.string.dtc_monitor_egr
-        Monitor.NMHC_CATALYST -> R.string.dtc_monitor_nmhc
-        Monitor.NOX_SCR -> R.string.dtc_monitor_nox
-        Monitor.BOOST_PRESSURE -> R.string.dtc_monitor_boost
-        Monitor.EXHAUST_GAS_SENSOR -> R.string.dtc_monitor_exhaust_sensor
-        Monitor.PM_FILTER -> R.string.dtc_monitor_pm_filter
-        Monitor.EGR_VVT -> R.string.dtc_monitor_egr_vvt
-    }
+    fun monitor(m: Monitor): Int = ObdText.monitorRes(m)
 
     @StringRes
     fun status(s: MonitorStatus): Int = when (s) {
@@ -56,17 +40,17 @@ internal object DiagText {
     @StringRes
     fun group(g: MidGroup): Int = when (g) {
         MidGroup.OXYGEN_SENSOR -> R.string.mode06_group_o2
-        MidGroup.CATALYST -> R.string.dtc_monitor_catalyst
-        MidGroup.EGR_VVT -> R.string.dtc_monitor_egr_vvt
-        MidGroup.EVAP -> R.string.dtc_monitor_evap
-        MidGroup.OXYGEN_HEATER -> R.string.dtc_monitor_o2_heater
-        MidGroup.HEATED_CATALYST -> R.string.dtc_monitor_heated_catalyst
-        MidGroup.SECONDARY_AIR -> R.string.dtc_monitor_secondary_air
-        MidGroup.FUEL_SYSTEM -> R.string.dtc_monitor_fuel_system
-        MidGroup.BOOST -> R.string.dtc_monitor_boost
-        MidGroup.NOX -> R.string.dtc_monitor_nox
-        MidGroup.MISFIRE -> R.string.dtc_monitor_misfire
-        MidGroup.PM_FILTER -> R.string.dtc_monitor_pm_filter
+        MidGroup.CATALYST -> io.github.iampopovich.eculense.core.obdtext.R.string.obd_monitor_catalyst
+        MidGroup.EGR_VVT -> io.github.iampopovich.eculense.core.obdtext.R.string.obd_monitor_egr_vvt
+        MidGroup.EVAP -> io.github.iampopovich.eculense.core.obdtext.R.string.obd_monitor_evap
+        MidGroup.OXYGEN_HEATER -> io.github.iampopovich.eculense.core.obdtext.R.string.obd_monitor_o2_heater
+        MidGroup.HEATED_CATALYST -> io.github.iampopovich.eculense.core.obdtext.R.string.obd_monitor_heated_catalyst
+        MidGroup.SECONDARY_AIR -> io.github.iampopovich.eculense.core.obdtext.R.string.obd_monitor_secondary_air
+        MidGroup.FUEL_SYSTEM -> io.github.iampopovich.eculense.core.obdtext.R.string.obd_monitor_fuel_system
+        MidGroup.BOOST -> io.github.iampopovich.eculense.core.obdtext.R.string.obd_monitor_boost
+        MidGroup.NOX -> io.github.iampopovich.eculense.core.obdtext.R.string.obd_monitor_nox
+        MidGroup.MISFIRE -> io.github.iampopovich.eculense.core.obdtext.R.string.obd_monitor_misfire
+        MidGroup.PM_FILTER -> io.github.iampopovich.eculense.core.obdtext.R.string.obd_monitor_pm_filter
         MidGroup.OTHER -> R.string.mode06_group_other
     }
 

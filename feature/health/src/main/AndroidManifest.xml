@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Own FileProvider subclass: one provider class per authority, no clash with other features. -->
+        <provider
+            android:name="io.github.iampopovich.eculense.feature.health.HealthReportFileProvider"
+            android:authorities="${applicationId}.health.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/health_file_paths" />
+        </provider>
+    </application>
+</manifest>

@@ -51,23 +51,6 @@
     <string name="dtc_monitor_incomplete">не завершён</string>
     <string name="dtc_monitor_not_supported">не поддерживается</string>
     <string name="dtc_monitor_this_trip">в этой поездке: %1$s</string>
-    <string name="dtc_monitor_misfire">Пропуски зажигания</string>
-    <string name="dtc_monitor_fuel_system">Топливная система</string>
-    <string name="dtc_monitor_components">Компоненты</string>
-    <string name="dtc_monitor_catalyst">Катализатор</string>
-    <string name="dtc_monitor_heated_catalyst">Подогрев катализатора</string>
-    <string name="dtc_monitor_evap">Улавливание паров топлива (EVAP)</string>
-    <string name="dtc_monitor_secondary_air">Вторичный воздух</string>
-    <string name="dtc_monitor_ac">Хладагент кондиционера</string>
-    <string name="dtc_monitor_o2">Датчики кислорода</string>
-    <string name="dtc_monitor_o2_heater">Подогрев датчиков кислорода</string>
-    <string name="dtc_monitor_egr">Система EGR</string>
-    <string name="dtc_monitor_nmhc">Катализатор NMHC</string>
-    <string name="dtc_monitor_nox">NOx / SCR</string>
-    <string name="dtc_monitor_boost">Давление наддува</string>
-    <string name="dtc_monitor_exhaust_sensor">Датчик отработавших газов</string>
-    <string name="dtc_monitor_pm_filter">Сажевый фильтр</string>
-    <string name="dtc_monitor_egr_vvt">EGR / VVT</string>
 
     <!-- B2 used-car check -->
     <string name="dtc_usedcar_title">Коды недавно стёрли?</string>

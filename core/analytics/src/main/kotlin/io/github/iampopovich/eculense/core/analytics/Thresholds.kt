@@ -86,4 +86,17 @@ object Thresholds {
     /** Two stalls in the analysed period make a finding (one could be the driver); critical from this many. */
     const val STALL_FINDING_MIN = 2
     const val STALL_FINDING_CRITICAL = 4
+
+    // --- Quick health check (B6) ---
+    /** Resting battery (engine off): below 12.2 V it is under ~60 % charged, below 11.8 V nearly flat. */
+    const val HEALTH_BATTERY_LOW_V = 12.2
+    const val HEALTH_BATTERY_FAULT_V = 11.8
+    /** A warm narrowband O2 sensor swings ~0.1–0.9 V several times a second; under 0.3 V of swing it is lazy or stuck. */
+    const val HEALTH_O2_MIN_SWING_V = 0.3
+    /** Warm idle below 500 rpm is too low (stall risk); the upper bound is [IDLE_MAX_RPM]. */
+    const val HEALTH_IDLE_MIN_RPM = 500.0
+    /** Idle hunting by more than 200 rpm within the sample. */
+    const val HEALTH_IDLE_MAX_SWING_RPM = 200.0
+    /** Length of the live part of the quick check. */
+    const val HEALTH_LIVE_MS = 15_000L
 }

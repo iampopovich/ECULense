@@ -110,6 +110,7 @@ dependencies {
     // 1.27 background import of Car Scanner backups and ECULense backup
     implementation(project(":core:backup"))
     implementation(project(":feature:backup"))
+    implementation(project(":feature:health"))
     implementation(project(":core:obd"))
     implementation(project(":core:model"))
     implementation(project(":core:bluetooth"))

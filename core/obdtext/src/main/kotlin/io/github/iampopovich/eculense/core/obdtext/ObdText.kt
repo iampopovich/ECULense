@@ -13,6 +13,26 @@ import io.github.iampopovich.eculense.core.ui.UiText
 
 /** UI text for :core:obd types in the app language. Adapter replies and device names stay raw. */
 object ObdText {
+    /** Readiness monitor names (feature:dtc and the health report). */
+    fun monitorRes(m: io.github.iampopovich.eculense.core.obd.Monitor): Int = when (m) {
+        io.github.iampopovich.eculense.core.obd.Monitor.MISFIRE -> R.string.obd_monitor_misfire
+        io.github.iampopovich.eculense.core.obd.Monitor.FUEL_SYSTEM -> R.string.obd_monitor_fuel_system
+        io.github.iampopovich.eculense.core.obd.Monitor.COMPONENTS -> R.string.obd_monitor_components
+        io.github.iampopovich.eculense.core.obd.Monitor.CATALYST -> R.string.obd_monitor_catalyst
+        io.github.iampopovich.eculense.core.obd.Monitor.HEATED_CATALYST -> R.string.obd_monitor_heated_catalyst
+        io.github.iampopovich.eculense.core.obd.Monitor.EVAPORATIVE_SYSTEM -> R.string.obd_monitor_evap
+        io.github.iampopovich.eculense.core.obd.Monitor.SECONDARY_AIR -> R.string.obd_monitor_secondary_air
+        io.github.iampopovich.eculense.core.obd.Monitor.AC_REFRIGERANT -> R.string.obd_monitor_ac
+        io.github.iampopovich.eculense.core.obd.Monitor.OXYGEN_SENSOR -> R.string.obd_monitor_o2
+        io.github.iampopovich.eculense.core.obd.Monitor.OXYGEN_SENSOR_HEATER -> R.string.obd_monitor_o2_heater
+        io.github.iampopovich.eculense.core.obd.Monitor.EGR -> R.string.obd_monitor_egr
+        io.github.iampopovich.eculense.core.obd.Monitor.NMHC_CATALYST -> R.string.obd_monitor_nmhc
+        io.github.iampopovich.eculense.core.obd.Monitor.NOX_SCR -> R.string.obd_monitor_nox
+        io.github.iampopovich.eculense.core.obd.Monitor.BOOST_PRESSURE -> R.string.obd_monitor_boost
+        io.github.iampopovich.eculense.core.obd.Monitor.EXHAUST_GAS_SENSOR -> R.string.obd_monitor_exhaust_sensor
+        io.github.iampopovich.eculense.core.obd.Monitor.PM_FILTER -> R.string.obd_monitor_pm_filter
+        io.github.iampopovich.eculense.core.obd.Monitor.EGR_VVT -> R.string.obd_monitor_egr_vvt
+    }
     fun error(e: ObdError): UiText = when (e) {
         is ObdError.Timeout -> UiText.Res(R.string.obd_error_timeout, listOf(e.command))
         is ObdError.NoTransport -> UiText.Res(R.string.obd_error_no_transport, listOf(e.kind))

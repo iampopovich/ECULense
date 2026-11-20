@@ -90,6 +90,7 @@ internal fun DashboardRoute(viewModel: DashboardViewModel = koinViewModel()) {
 @Composable
 internal fun MarkResultEffect(result: MarkResult?, onShown: () -> Unit) {
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     LaunchedEffect(result) {
         val r = result ?: return@LaunchedEffect
         val text = when (r) {
@@ -97,7 +98,7 @@ internal fun MarkResultEffect(result: MarkResult?, onShown: () -> Unit) {
             MarkResult.NOT_RECORDING -> R.string.dash_mark_not_recording
             MarkResult.SIMULATED -> R.string.dash_mark_demo
         }
-        Toast.makeText(context, context.getString(text), Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, resources.getString(text), Toast.LENGTH_SHORT).show()
         onShown()
     }
 }

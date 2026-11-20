@@ -47,23 +47,6 @@
     <string name="dtc_monitor_incomplete">not complete</string>
     <string name="dtc_monitor_not_supported">not supported</string>
     <string name="dtc_monitor_this_trip">this trip: %1$s</string>
-    <string name="dtc_monitor_misfire">Misfire</string>
-    <string name="dtc_monitor_fuel_system">Fuel system</string>
-    <string name="dtc_monitor_components">Components</string>
-    <string name="dtc_monitor_catalyst">Catalyst</string>
-    <string name="dtc_monitor_heated_catalyst">Heated catalyst</string>
-    <string name="dtc_monitor_evap">Evaporative system (EVAP)</string>
-    <string name="dtc_monitor_secondary_air">Secondary air</string>
-    <string name="dtc_monitor_ac">A/C refrigerant</string>
-    <string name="dtc_monitor_o2">Oxygen sensors</string>
-    <string name="dtc_monitor_o2_heater">Oxygen sensor heaters</string>
-    <string name="dtc_monitor_egr">EGR system</string>
-    <string name="dtc_monitor_nmhc">NMHC catalyst</string>
-    <string name="dtc_monitor_nox">NOx / SCR</string>
-    <string name="dtc_monitor_boost">Boost pressure</string>
-    <string name="dtc_monitor_exhaust_sensor">Exhaust gas sensor</string>
-    <string name="dtc_monitor_pm_filter">Particulate filter</string>
-    <string name="dtc_monitor_egr_vvt">EGR / VVT</string>
 
     <!-- B2 used-car check -->
     <string name="dtc_usedcar_title">Codes cleared recently?</string>
