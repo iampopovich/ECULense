@@ -175,6 +175,7 @@ class AccelCalibrationTest {
         assertEquals(CalibrationGap.NO_SENSOR_DATA, AccelCalibrationRules.calibrate(emptyList(), emptyList(), listOf(SpeedSample(0, 1.0))).gap)
         val s = synth(drivingWithBrakes(1), 60.0, Mount(0.0, 0.0, 0.0))
         assertEquals(CalibrationGap.NO_SPEED, AccelCalibrationRules.calibrate(s.linear, s.gravity, emptyList()).gap)
+        assertEquals(CalibrationGap.NO_GRAVITY, AccelCalibrationRules.calibrate(s.linear, emptyList(), s.speed).gap)
     }
 
     @Test

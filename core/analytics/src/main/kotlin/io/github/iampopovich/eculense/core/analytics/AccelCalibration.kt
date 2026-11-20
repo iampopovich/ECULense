@@ -122,6 +122,8 @@ data class CalibrationEvent(
 
 enum class CalibrationGap {
     NO_SENSOR_DATA,
+    /** Linear acceleration without gravity samples: the horizontal plane is unknown. */
+    NO_GRAVITY,
     NO_SPEED,
     /** Fewer than [AccelCalibrationThresholds.MIN_AXIS_WINDOWS] moving windows (phone still, car standing). */
     NO_MOVEMENT,
@@ -212,6 +214,7 @@ object AccelCalibrationRules {
     fun calibrate(linear: List<Vec3Sample>, gravity: List<Vec3Sample>, speed: List<SpeedSample>): AccelCalibration {
         fun gap(g: CalibrationGap, axis: AxisFit? = null, events: List<CalibrationEvent> = emptyList()) =
             AccelCalibration(axis, events, null, null, null, null, g)
+        if (linear.isNotEmpty() && gravity.isEmpty()) return gap(CalibrationGap.NO_GRAVITY)
         val track = horizontal(linear, gravity) ?: return gap(CalibrationGap.NO_SENSOR_DATA)
         if (speed.isEmpty()) return gap(CalibrationGap.NO_SPEED)
         val windows = SpeedWindows.derive(speed.sortedBy { it.tMs })

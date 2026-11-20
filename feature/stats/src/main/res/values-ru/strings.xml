@@ -80,4 +80,5 @@
     <string name="calib_gap_low_axis">ось машины определена ненадёжно (%1$s меньше %2$s): держатель жёсткий?</string>
     <string name="calib_gap_few_events">событий со скоростью OBD: %1$d, нужно не меньше %2$d</string>
     <string name="calib_gap_sign">датчик и OBD расходятся в направлении</string>
+    <string name="calib_gap_no_gravity">в файле нет вектора гравитации, горизонталь не найти</string>
 </resources>

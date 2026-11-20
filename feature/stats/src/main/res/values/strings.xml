@@ -80,4 +80,5 @@
     <string name="calib_gap_low_axis">the car axis is uncertain (%1$s below %2$s): is the holder rigid?</string>
     <string name="calib_gap_few_events">%1$d events with OBD speed, at least %2$d needed</string>
     <string name="calib_gap_sign">the sensor and OBD disagree on the direction</string>
+    <string name="calib_gap_no_gravity">the file has no gravity samples, the horizontal plane is unknown</string>
 </resources>

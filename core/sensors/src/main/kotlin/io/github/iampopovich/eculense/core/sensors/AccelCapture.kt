@@ -54,6 +54,9 @@ object AccelCaptureRules {
 
     /** Gravity is stored once per second. */
     const val GRAVITY_EVERY_MS = 1_000L
+
+    /** Whether a gravity event at [tMs] is stored; [lastMs] = the last stored one (null = none yet). */
+    fun storeGravity(tMs: Long, lastMs: Long?): Boolean = lastMs == null || tMs - lastMs >= GRAVITY_EVERY_MS
     /** 50 Hz: SensorManager.registerListener samplingPeriodUs. Below 200 Hz, so no HIGH_SAMPLING_RATE_SENSORS. */
     const val LINEAR_PERIOD_US = 20_000
     /** Gravity hint: 1 Hz when only stored; 5 Hz when it is also subtracted from the raw accelerometer. */
@@ -132,7 +135,7 @@ internal class AccelCapture(
         )
         private val gravity = FloatArray(3)
         private var hasGravity = false
-        private var lastGravityMs = Long.MIN_VALUE
+        private var lastGravityMs: Long? = null
         private val wakeLock = context.getSystemService(PowerManager::class.java)
             ?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "eculense:accel")
             ?.apply { setReferenceCounted(false); acquire(AccelCaptureRules.WAKE_LOCK_MAX_MS) }
@@ -155,7 +158,7 @@ internal class AccelCapture(
                     Sensor.TYPE_GRAVITY -> {
                         gravity[0] = v[0]; gravity[1] = v[1]; gravity[2] = v[2]
                         hasGravity = true
-                        if (t - lastGravityMs >= AccelCaptureRules.GRAVITY_EVERY_MS) {
+                        if (AccelCaptureRules.storeGravity(t, lastGravityMs)) {
                             writer.gravity(t, v[0], v[1], v[2])
                             lastGravityMs = t
                         }

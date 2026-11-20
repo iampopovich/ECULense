@@ -83,6 +83,7 @@ internal fun CalibrationCard(ui: CalibrationUi, actions: CalibrationActions) {
 @Composable
 private fun gapText(gap: CalibrationGap, correlation: Double?, events: Int): String = when (gap) {
     CalibrationGap.NO_SENSOR_DATA -> stringResource(R.string.calib_gap_no_sensor)
+    CalibrationGap.NO_GRAVITY -> stringResource(R.string.calib_gap_no_gravity)
     CalibrationGap.NO_SPEED -> stringResource(R.string.calib_gap_no_speed)
     CalibrationGap.NO_MOVEMENT -> stringResource(R.string.calib_gap_no_movement)
     CalibrationGap.AXIS_NOT_FOUND -> stringResource(R.string.calib_gap_axis)

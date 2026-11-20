@@ -3,6 +3,7 @@ package io.github.iampopovich.eculense.core.sensors
 import io.github.iampopovich.eculense.core.data.AccelSupport
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AccelCaptureRulesTest {
@@ -39,9 +40,17 @@ class AccelCaptureRulesTest {
     }
 
     @Test
+    fun `gravity is stored first and then once per second`() {
+        // Regression: a Long.MIN_VALUE sentinel overflowed (t - MIN_VALUE < 0) and no gravity was ever written.
+        assertTrue(AccelCaptureRules.storeGravity(1_700_000_000_000L, null))
+        assertTrue(!AccelCaptureRules.storeGravity(1_700_000_000_500L, 1_700_000_000_000L))
+        assertTrue(AccelCaptureRules.storeGravity(1_700_000_001_000L, 1_700_000_000_000L))
+    }
+
+    @Test
     fun `50 Hz without the high sampling rate permission`() {
         assertEquals(50, 1_000_000 / AccelCaptureRules.LINEAR_PERIOD_US)
         // HIGH_SAMPLING_RATE_SENSORS is required only above 200 Hz (Android 12 behaviour changes).
-        assert(1_000_000 / AccelCaptureRules.LINEAR_PERIOD_US < 200)
+        assertTrue(1_000_000 / AccelCaptureRules.LINEAR_PERIOD_US < 200)
     }
 }
