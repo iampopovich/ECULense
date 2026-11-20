@@ -225,7 +225,8 @@ private fun ExpenseDialog(
                         FilterChip(selected = f.category == c, onClick = { f = f.copy(category = c) }, label = { Text(stringResource(categoryRes(c))) })
                     }
                 }
-                Field(f.amount, R.string.expense_field_amount, ExpenseError.AMOUNT in errors, R.string.fuel_error_number, KeyboardType.Decimal, "exp-amount") { f = f.copy(amount = it) }
+                // A blank amount blocks Save but isn't shown as an error before anything was typed.
+                Field(f.amount, R.string.expense_field_amount, ExpenseError.AMOUNT in errors && f.amount.isNotBlank(), R.string.fuel_error_number, KeyboardType.Decimal, "exp-amount") { f = f.copy(amount = it) }
                 Field(f.date, R.string.fuel_field_date, ExpenseError.DATE in errors, R.string.fuel_error_date, KeyboardType.Text, "exp-date") { f = f.copy(date = it) }
                 Field(f.odometer, R.string.fuel_field_odometer, ExpenseError.ODOMETER in errors, R.string.fuel_error_odometer, KeyboardType.Number, "exp-odo",
                     hint = R.string.expense_odometer_hint) { f = f.copy(odometer = it) }

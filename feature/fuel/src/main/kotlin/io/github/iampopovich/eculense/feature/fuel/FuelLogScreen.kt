@@ -186,6 +186,7 @@ private fun Calibration(state: FuelLogUiState, onCorrection: (Boolean) -> Unit) 
                 headlineContent = { Text(stringResource(R.string.fuel_correction)) },
                 supportingContent = { Text(stringResource(R.string.fuel_correction_hint)) },
                 trailingContent = { Switch(checked = on, onCheckedChange = null, enabled = c != null) },
+                colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                 modifier = Modifier.toggleable(on, enabled = c != null, role = Role.Switch) { onCorrection(it) },
             )
         }
