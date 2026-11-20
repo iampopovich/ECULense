@@ -22,7 +22,8 @@ import kotlin.math.roundToInt
  * 1 km/h resolution, so one step over 0.5 s already reads as 0.56 m/s² of noise; a harsh event at 0.3 g lasts several
  * seconds (60→0 km/h at 0.3 g ≈ 5.7 s), so a 1–3 s window still sees it. No per-interval correction factors.
  *
- * How to calibrate on a real car (field test 1.23, not built yet; accelerometer logging would be E5):
+ * How to calibrate on a real car (field test 1.23; the phone-accelerometer logging of E5-lite does (a), see
+ * [AccelCalibrationRules], and its result can be stored as a per-car override passed to [DrivingStyleRules.evaluate]):
  * - Mount the phone rigidly and log Android TYPE_LINEAR_ACCELERATION at ≥ 50 Hz together with the OBD 01.0D stream
  *   (same clock, from the recorder). Compare the accelerometer peak over each event with the windowed speed derivative
  *   computed here at the real K-Line sample rate, fit the ratio and adjust the threshold or the window from that.
@@ -99,7 +100,11 @@ sealed interface DrivingStyle {
  * share. Single pass over (sensorId, value, timestamp) in time order.
  */
 object DrivingStyleRules {
-    fun evaluate(points: Iterable<Triple<String, Double, Long>>): DrivingStyle {
+    /**
+     * [harshMs2] = harsh level for both acceleration and braking; the default is the sourced Geotab 0.3 g, a per-car
+     * override comes from the phone-accelerometer calibration (E5-lite, [AccelCalibrationRules]).
+     */
+    fun evaluate(points: Iterable<Triple<String, Double, Long>>, harshMs2: Double = StyleThresholds.HARSH_ACCEL_MS2): DrivingStyle {
         val t = StyleThresholds
         val intervals = mutableListOf<Long>()
         val windows = mutableListOf<Long>()
@@ -145,8 +150,8 @@ object DrivingStyleRules {
                         windows += window
                         if (window <= t.MAX_WINDOW_MS) {
                             val a = (v - ref.second) / 3.6 / (window / 1000.0)
-                            val isAccel = a > t.HARSH_ACCEL_MS2
-                            val isBrake = -a > t.HARSH_BRAKE_MS2
+                            val isAccel = a > harshMs2
+                            val isBrake = -a > harshMs2
                             if (isAccel && !inAccel) accel++
                             if (isBrake && !inBrake) brake++
                             inAccel = isAccel

@@ -48,6 +48,13 @@ class DrivingStyleAndEngineMapTest {
     }
 
     @Test
+    fun `a per-car threshold override changes what counts as harsh`() {
+        val pts = drive(1000, braking(0.25, 1000))
+        assertEquals(0, (DrivingStyleRules.evaluate(pts) as DrivingStyle.Scored).brakeEvents)
+        assertEquals(1, (DrivingStyleRules.evaluate(pts, harshMs2 = 0.2 * 9.80665) as DrivingStyle.Scored).brakeEvents)
+    }
+
+    @Test
     fun `a 0_35 g braking sampled every 1_7 s on K-Line is detected`() {
         val s = DrivingStyleRules.evaluate(drive(1700, braking(0.35, 1700))) as DrivingStyle.Scored
         assertEquals(1, s.brakeEvents)
