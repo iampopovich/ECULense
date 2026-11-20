@@ -290,10 +290,14 @@ class VehicleDataToolsTest {
     }
 
     @Test
-    fun `toolbox registers nine read-only tools with argument schemas`() {
+    fun `toolbox registers thirteen read-only tools with argument schemas`() {
         val box = VehicleDataToolbox(ctx)
         val tools = box.registry().tools
-        assertEquals(setOf("carProfile", "tripStats", "listSessions", "sessionStats", "sensorSummary", "findings", "dtcHistory", "maintenanceDue", "trends"), tools.map { it.name }.toSet())
+        assertEquals(
+            setOf("carProfile", "tripStats", "listSessions", "sessionStats", "sensorSummary", "findings", "dtcHistory", "maintenanceDue", "trends",
+                "fuelLog", "expenses", "engineMap", "drivingStyle"),
+            tools.map { it.name }.toSet(),
+        )
         val session = tools.single { it.name == "sessionStats" }.descriptor
         assertEquals(listOf("sessionId"), session.requiredParameters.map { it.name })
         val sensor = tools.single { it.name == "sensorSummary" }.descriptor

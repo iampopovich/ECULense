@@ -130,7 +130,7 @@ class ChatRouterTest {
             assertTrue(r.id, SystemPrompts.expert(r, trend, "en").contains("days=180"))
         }
         assertEquals(setOf("dtcHistory", "findings", "carProfile"), ExpertRoles.DIAGNOSTICIAN.tools)
-        assertEquals(setOf("trends", "tripStats", "listSessions"), ExpertRoles.USAGE.tools)
+        assertEquals(setOf("trends", "tripStats", "listSessions", "drivingStyle"), ExpertRoles.USAGE.tools)
         assertEquals(setOf("carProfile"), ExpertRoles.MODEL_EXPERT.tools)
         // the old template lives on only in the answer format for fault questions
         assertTrue(SystemPrompts.answerForm(ChatIntent.DIAGNOSE).contains("what to check yourself"))

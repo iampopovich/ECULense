@@ -4,7 +4,11 @@ import ai.koog.agents.core.tools.ToolRegistry
 import io.github.iampopovich.eculense.core.ai.VehicleToolbox
 import io.github.iampopovich.eculense.core.data.AnalyticsRepository
 import io.github.iampopovich.eculense.core.data.CarRepository
+import io.github.iampopovich.eculense.core.data.ExpenseRepository
+import io.github.iampopovich.eculense.core.data.FuelPrefs
+import io.github.iampopovich.eculense.core.data.FuelRepository
 import io.github.iampopovich.eculense.core.data.MaintenanceRepository
+import io.github.iampopovich.eculense.core.data.SessionRepository
 import io.github.iampopovich.eculense.core.data.TripEventRepository
 import io.github.iampopovich.eculense.core.data.TripRepository
 import io.github.iampopovich.eculense.core.dtcdb.DtcDescriptions
@@ -19,7 +23,16 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
         dtc: DtcDescriptions?,
         maintenance: MaintenanceRepository? = null,
         events: TripEventRepository? = null,
-    ) : this(ToolContext(analytics, cars, trips, describeDtc = { codes, make -> dtc?.describeAll(codes, make).orEmpty() }, maintenance = maintenance, events = events))
+        fuel: FuelRepository? = null,
+        fuelPrefs: FuelPrefs? = null,
+        expenses: ExpenseRepository? = null,
+        sessions: SessionRepository? = null,
+    ) : this(
+        ToolContext(
+            analytics, cars, trips, describeDtc = { codes, make -> dtc?.describeAll(codes, make).orEmpty() }, maintenance = maintenance, events = events,
+            fuel = fuel, fuelPrefs = fuelPrefs, expenses = expenses, sessions = sessions,
+        ),
+    )
 
     override fun registry(): ToolRegistry = ToolRegistry {
         tool(CarProfileTool(ctx))
@@ -31,6 +44,10 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
         tool(DtcHistoryTool(ctx))
         tool(MaintenanceDueTool(ctx))
         tool(TrendsTool(ctx))
+        tool(FuelLogTool(ctx))
+        tool(ExpensesTool(ctx))
+        tool(EngineMapTool(ctx))
+        tool(DrivingStyleTool(ctx))
     }
 
     /** The on-device model does not call tools: the same information as plain text (no JSON — it used to just paraphrase it). */
@@ -50,6 +67,8 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
                     "dtcHistory" -> DigestText.section(name, DtcHistoryTool(ctx).json(LimitArgs(15)))
                     "findings" -> DigestText.section(name, FindingsTool(ctx).json(LimitArgs(8)))
                     "maintenanceDue" -> DigestText.section(name, MaintenanceDueTool(ctx).json(NoArgs()))
+                    FuelLogTool.NAME -> DigestText.section(name, FuelLogTool(ctx).json(DaysArgs(days)))
+                    ExpensesTool.NAME -> DigestText.section(name, ExpensesTool(ctx).json(DaysArgs(days)))
                     "listSessions" -> DigestText.section(name, ListSessionsTool(ctx).json(ListSessionsArgs(limit = 1)))
                     else -> null
                 }
@@ -67,5 +86,5 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
 
 /** Wiring: one line in AppModules. Without this module the chat works, but without vehicle data. */
 val aiToolsModule = module {
-    single<VehicleToolbox> { VehicleDataToolbox(get(), get(), get(), getOrNull(), getOrNull(), getOrNull()) }
+    single<VehicleToolbox> { VehicleDataToolbox(get(), get(), get(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull()) }
 }

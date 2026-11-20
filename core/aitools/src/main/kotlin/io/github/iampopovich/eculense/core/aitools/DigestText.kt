@@ -23,6 +23,8 @@ internal object DigestText {
         "findings" to "Analysis findings",
         "maintenanceDue" to "Maintenance",
         "listSessions" to "Latest recording",
+        "fuelLog" to "Fuel log",
+        "expenses" to "Expenses",
     )
 
     /** Leading field of a list item: written first, without a label. */

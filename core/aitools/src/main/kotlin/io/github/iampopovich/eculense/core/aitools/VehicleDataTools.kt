@@ -52,6 +52,11 @@ internal class ToolContext(
     val maintenance: MaintenanceRepository? = null,
     /** B10: stalls and user marks inside recordings; null means the events store is not wired in. */
     val events: TripEventRepository? = null,
+    /** D1/D2/D5/D6: fuel log, its correction setting, expenses and raw recordings; null = not wired in. */
+    val fuel: io.github.iampopovich.eculense.core.data.FuelRepository? = null,
+    val fuelPrefs: io.github.iampopovich.eculense.core.data.FuelPrefs? = null,
+    val expenses: io.github.iampopovich.eculense.core.data.ExpenseRepository? = null,
+    val sessions: io.github.iampopovich.eculense.core.data.SessionRepository? = null,
 )
 
 /** B10: events of one recording for the model (English, no location): type, local time, seconds from the start. */

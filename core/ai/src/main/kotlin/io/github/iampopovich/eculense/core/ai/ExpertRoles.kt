@@ -52,10 +52,11 @@ object ExpertRoles {
         focus = "mixture, fuel trims, MAF, oxygen sensors, misfires, idle",
         prompt = """
             You are the Engine specialist. You look at how the engine runs: fuel trims (LTFT/STFT per bank), mixture, MAF, oxygen sensors,
-            misfires, rpm and idle stability — from the recordings and their change over the period. You do not touch codes as such
+            misfires, rpm and idle stability — from the recordings and their change over the period; the engine map (trims by rpm and load)
+            shows whether a lean/rich pattern is at idle or under load (treat its hypothesis as something to check). You do not touch codes as such
             (see Diagnostician), cooling (see Cooling specialist) or money (see Economist).
         """.trimIndent(),
-        tools = setOf("sensorSummary", "sessionStats", "findings", "trends"),
+        tools = setOf("sensorSummary", "sessionStats", "findings", "trends", "engineMap"),
         digestSections = listOf("trends", "findings"),
         keywords = RouterKeywords.ENGINE,
     )
@@ -94,10 +95,10 @@ object ExpertRoles {
         focus = "trips, mileage, driving modes and style, idling, how the car \"behaves\" over the period",
         prompt = """
             You are the Operations analyst. You look at how the car is used and how it "behaves" over the period: number and length of trips, mileage,
-            share of time standing still (traffic jams, warming up in place), driving modes, changes by month (trends). You do not diagnose codes
+            share of time standing still (traffic jams, warming up in place), driving modes and style (harsh accelerations/brakings, high rpm), changes by month (trends). You do not diagnose codes
             (see Diagnostician) and do not count money (see Economist).
         """.trimIndent(),
-        tools = setOf("trends", "tripStats", "listSessions"),
+        tools = setOf("trends", "tripStats", "listSessions", "drivingStyle"),
         digestSections = listOf("trends", "tripStats", "listSessions"),
         keywords = RouterKeywords.USAGE,
     )
@@ -108,11 +109,12 @@ object ExpertRoles {
         focus = "fuel consumption, fuel spending, comparison of periods",
         prompt = """
             You are the Economist. You look at fuel consumption (l/100 km) and fuel spending over the period, compare months with each other and
-            link changes to the driving mode (share of standing time, trip length). Say so if consumption is estimated from MAF rather than measured.
+            link changes to the driving mode (share of standing time, trip length). Prefer the fuel log (real litres between full tanks) and
+            the expenses (cost of ownership per month and km) when they exist; say so if consumption is only estimated from MAF.
             You do not touch trouble codes (see Diagnostician).
         """.trimIndent(),
-        tools = setOf("tripStats", "trends"),
-        digestSections = listOf("tripStats", "trends"),
+        tools = setOf("tripStats", "trends", "fuelLog", "expenses"),
+        digestSections = listOf("fuelLog", "tripStats", "trends"),
         keywords = RouterKeywords.FUEL,
     )
 
