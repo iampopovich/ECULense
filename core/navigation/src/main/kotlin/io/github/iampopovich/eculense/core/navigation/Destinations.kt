@@ -9,6 +9,15 @@ import kotlinx.serialization.Serializable
 /** Adapter traffic log (:feature:obdlog), an item of the Settings hub. */
 @Serializable data object ObdLogDestination : NavKey
 @Serializable data object DashboardDestination : NavKey
+
+/** Screens that hide the bottom navigation (driving mode). */
+interface FullScreenDestination
+
+/** C6: driving mode with a few big tiles (:feature:dashboard). */
+@Serializable data object DrivingModeDestination : NavKey, FullScreenDestination
+
+/** C1: everything the car reports, grouped by system, and the dashboard PID choice (:feature:cardata). */
+@Serializable data object CarDataDestination : NavKey
 @Serializable data object PitstopDestination : NavKey
 @Serializable data object SettingsDestination : NavKey
 @Serializable data object DtcDestination : NavKey

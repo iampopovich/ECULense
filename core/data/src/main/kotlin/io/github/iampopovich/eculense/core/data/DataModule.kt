@@ -31,6 +31,10 @@ val dataModule = module {
         DataStoreAdapterPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("adapter") }) { cars.activeCarId() }
     }
     single<TripRepository> { RoomTripRepository(get()) }
+    single<DashboardPrefs> {
+        val vehicle = get<DataStoreVehiclePrefs>()
+        DataStoreDashboardPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("dashboard") }, vehicle.activeCarId)
+    }
     single<MaintenanceRepository> { RoomMaintenanceRepository(get(), get(), get(), get()) }
     single {
         val tripDao = get<TripDao>()

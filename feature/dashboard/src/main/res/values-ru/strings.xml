@@ -8,4 +8,18 @@
     <string name="dash_session_name">Запись %1$s</string>
     <string name="dash_status">%1$s · протокол %2$s</string>
     <string name="dash_status_voltage">%1$s · протокол %2$s · %3$.1f В</string>
+    <string name="dash_not_answering">не отвечает</string>
+    <string name="dash_open_loop_hint">разомкнутый контур, коррекция не работает</string>
+    <string name="dash_estimated_hint">оценка по MAF</string>
+    <string name="dash_age_seconds">%1$d с назад</string>
+    <string name="dash_age_minutes">%1$d мин назад</string>
+    <string name="dash_open_car_data">Данные машины</string>
+    <string name="dash_open_driving">Режим езды</string>
+    <string name="dash_no_pids">На панели нет PID. Выберите их в «Данных машины».</string>
+    <string name="drive_exit">Выйти из режима езды</string>
+    <string name="drive_fewer">Меньше плиток</string>
+    <string name="drive_more">Больше плиток</string>
+    <string name="drive_mirror">Зеркально для лобового стекла (HUD)</string>
+    <string name="drive_tiles_count">Плиток: %1$d</string>
+    <string name="drive_hint">Нажмите в любом месте, чтобы показать или скрыть кнопки</string>
 </resources>
