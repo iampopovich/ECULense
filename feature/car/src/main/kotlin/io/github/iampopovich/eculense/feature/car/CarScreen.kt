@@ -3,6 +3,9 @@ package io.github.iampopovich.eculense.feature.car
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.remember
+import io.github.iampopovich.eculense.core.analytics.ObdCompatibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -103,6 +106,7 @@ private fun ActiveCarCard(car: CarProfile, onEdit: () -> Unit) {
             if (car.brand == null && car.model == null && car.year == null) {
                 Secondary(stringResource(R.string.car_fill_profile_hint))
             }
+            CompatibilityNote(car)
             FilledTonalButton(onClick = onEdit, modifier = Modifier.padding(top = 8.dp)) { Text(stringResource(CoreUiR.string.common_edit)) }
         }
     }
@@ -111,6 +115,22 @@ private fun ActiveCarCard(car: CarProfile, onEdit: () -> Unit) {
 @Composable
 private fun Secondary(text: String) {
     Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/** C12: non-blocking note when the model year predates mandatory OBD-II/EOBD in the phone's country. */
+@Composable
+private fun CompatibilityNote(car: CarProfile) {
+    // The phone's region, not the in-app language: the mandate depends on where the car was sold.
+    val country = remember { android.content.res.Resources.getSystem().configuration.locales[0]?.country.orEmpty() }
+    val hint = ObdCompatibility.hint(car.year, car.fuelType, country) ?: return
+    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.small, modifier = Modifier.padding(top = 4.dp)) {
+        Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(stringResource(R.string.car_obd_compat_note), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            if (hint.lateAdoption) {
+                Text(stringResource(R.string.car_obd_compat_late), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            }
+        }
+    }
 }
 
 @Composable

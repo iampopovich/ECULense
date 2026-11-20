@@ -122,4 +122,6 @@
     <string name="car_spec_mass_value">%1$d kg</string>
     <string name="car_spec_economy">Consumption (combined)</string>
     <string name="car_spec_economy_value">%1$s L/100 km</string>
+    <string name="car_obd_compat_note">The car may predate mandatory OBD-II: some data may be unavailable.</string>
+    <string name="car_obd_compat_late">OBD-II/EOBD became mandatory later in Russia and neighbouring countries, so older cars may not support it.</string>
 </resources>

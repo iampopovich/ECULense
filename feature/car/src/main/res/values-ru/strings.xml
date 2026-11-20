@@ -122,4 +122,6 @@
     <string name="car_spec_mass_value">%1$d кг</string>
     <string name="car_spec_economy">Расход (смеш.)</string>
     <string name="car_spec_economy_value">%1$s л/100 км</string>
+    <string name="car_obd_compat_note">Машина могла выйти до обязательного OBD-II: часть данных может быть недоступна.</string>
+    <string name="car_obd_compat_late">В России OBD-II/EOBD обязателен позже, старые машины могут не поддерживать.</string>
 </resources>
