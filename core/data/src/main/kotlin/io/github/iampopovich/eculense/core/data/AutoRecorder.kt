@@ -140,4 +140,14 @@ class AutoConnect internal constructor(
             if (controller.state.value is ConnectionState.Disconnected) controller.connect(last)
         }
     }
+
+    /**
+     * C9: the widget's «Connect» (the activity is in front, so the foreground service may start). Uses the last
+     * adapter even when auto-connect is off — the user asked for it. false = no adapter remembered yet.
+     */
+    suspend fun connectLast(): Boolean {
+        val last = prefs.lastAdapter.first() ?: return false
+        if (controller.state.value is ConnectionState.Disconnected || controller.state.value is ConnectionState.Failed) controller.connect(last)
+        return true
+    }
 }

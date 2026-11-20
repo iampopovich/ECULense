@@ -103,6 +103,8 @@ internal class RoomDtcRepository(
     private val activeCarId: suspend () -> Long? = { null },
     /** Live reads from a demo/replay link are not stored ([LiveWriteGate]); imports use [saveSnapshot] and are not gated. */
     private val liveWrites: LiveWriteGate = LiveWriteGate.ALWAYS,
+    /** C9: every allowed live check (also one without codes) → the widget's «last check». */
+    private val onCheck: suspend (count: Int, atMs: Long) -> Unit = { _, _ -> },
 ) : DtcRepository {
     override suspend fun saveSnapshot(dtcs: List<Dtc>, vin: String?, takenAtMs: Long?, carId: Long?) =
         save(dtcs, vin, takenAtMs, carId, null)
@@ -127,7 +129,9 @@ internal class RoomDtcRepository(
     override suspend fun recordRead(dtcs: List<Dtc>, vin: String?): Boolean = recordRead(dtcs, vin, null)
 
     override suspend fun recordRead(dtcs: List<Dtc>, vin: String?, freezeFrame: FreezeFrame?): Boolean {
-        if (dtcs.isEmpty() || !liveWrites.allowed()) return false
+        if (!liveWrites.allowed()) return false
+        runCatching { onCheck(dtcs.map { it.code }.distinct().size, clock()) }
+        if (dtcs.isEmpty()) return false
         val at = clock()
         val car = activeCarId()
         val last = dao.latestForCar(car)

@@ -56,7 +56,17 @@ val dataModule = module {
     }
     single<DtcRepository> {
         val cars = get<CarRepository>()
-        RoomDtcRepository(get(), activeCarId = { cars.activeCarId() }, liveWrites = get())
+        val lastSeen = get<LastSeenStore>()
+        RoomDtcRepository(
+            get(), activeCarId = { cars.activeCarId() }, liveWrites = get(),
+            onCheck = { count, at -> cars.activeCarId()?.let { lastSeen.saveDtcCheck(it, count, at) } },
+        )
+    }
+    // C9: last voltage and code check per car for the home-screen widget (real links only).
+    single<LastSeenStore> { DataStoreLastSeen(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("last_seen") }) }
+    single(createdAtStart = true) {
+        val cars = get<CarRepository>()
+        LastSeenRecorder(get(), get(), activeCarId = { cars.activeCarId() }, liveWrites = get(), scope = get(AppScope)).also { it.start() }
     }
     single<SessionRecorder> {
         val trips = get<RecordingTrips>()
