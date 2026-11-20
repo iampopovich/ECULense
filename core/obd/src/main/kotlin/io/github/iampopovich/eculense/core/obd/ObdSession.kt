@@ -41,6 +41,15 @@ interface ObdSession {
 
     /** On K-Line: sends a keepalive request when nothing was sent for [idleMs]. True when one was sent. */
     suspend fun keepAlive(idleMs: Long): Boolean = false
+
+    /**
+     * Raw OBD request ("0101", "020C00", "0902") for the diagnostics reads: the messages answering it, positive
+     * (SID + 0x40) or negative (7F SID NRC). null = NO DATA. Adapter errors throw [ObdException].
+     */
+    suspend fun request(command: String, timeoutMs: Long = 2_000): List<ByteArray>? = null
+
+    /** CAN framing (count bytes, ISO-TP) vs K-Line/J1850 (numbered lines); known after [initialize]. */
+    val isCanBus: Boolean get() = true
 }
 
 /** Settings and learned adapter facts handed to a new session; [onProfile] persists what the session learned. */
@@ -371,15 +380,21 @@ internal class Elm327Session(
 
     override suspend fun clearDtcs(): Boolean {
         val result = exchange("04", timeoutMs = 5_000)
-        return result is ElmResult.Data && result.lines.any { it.startsWith("44") }
+        if (result !is ElmResult.Data) return false
+        val messages = elmMessages(result.lines).map { it.toUnsigned() }
+        // 7F 04 NRC: the ECU refused (0x22 = conditions not correct: engine running / vehicle moving).
+        messages.firstOrNull { it.size >= 3 && it[0] == 0x7F && it[1] == 0x04 }?.let { throw ObdException(ObdError.ClearRefused(it[2])) }
+        return messages.any { it.firstOrNull() == 0x44 } || result.lines.any { it.startsWith("44") }
     }
 
-    /** MVP: VIN is assembled only from a single-message CAN response. K-Line VIN (5 numbered lines) — backlog 1.24. */
+    override val isCanBus: Boolean get() = isCan
+
+    override suspend fun request(command: String, timeoutMs: Long): List<ByteArray>? = query(command, timeoutMs)
+
+    /** VIN from mode 09 PID 02: one ISO-TP message on CAN, numbered lines on K-Line (B7). */
     override suspend fun readVin(): String? {
         val messages = query("0902", timeoutMs = 5_000) ?: return null
-        val message = messages.map { it.toUnsigned() }.firstOrNull { it.size > 3 && it[0] == 0x49 } ?: return null
-        return message.drop(3).map { it.toChar() }.filter { it.isLetterOrDigit() }
-            .joinToString("").takeIf { it.length == 17 }
+        return VehicleInfoDecoder.vin(messages, isCan)
     }
 
     override suspend fun batteryVoltage(): Double? = try {

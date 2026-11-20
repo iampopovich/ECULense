@@ -15,6 +15,8 @@
     <string name="obd_error_usb_not_open">USB-порт не открыт</string>
     <string name="obd_error_usb_detached">USB-адаптер отключён</string>
     <string name="obd_error_link_lost">Связь с адаптером потеряна: %1$s</string>
+    <string name="obd_error_clear_refused_conditions">Блок не дал стереть коды: заглушите двигатель, зажигание оставьте включённым</string>
+    <string name="obd_error_clear_refused">Блок отказался стирать коды (отрицательный ответ 7F 04 %1$s)</string>
     <string name="obd_endpoint_demo">Демо-режим (симуляция)</string>
     <string name="obd_endpoint_demo_detail">Виртуальный ELM327 · CAN 11/500 · без машины</string>
     <string name="obd_endpoint_demo_flaky">Демо: капризный клон</string>

@@ -16,6 +16,8 @@
     <string name="obd_error_usb_not_open">USB port is not open</string>
     <string name="obd_error_usb_detached">USB adapter disconnected</string>
     <string name="obd_error_link_lost">Connection to the adapter lost: %1$s</string>
+    <string name="obd_error_clear_refused_conditions">The ECU did not let the codes be cleared: switch the engine off, keep the ignition on</string>
+    <string name="obd_error_clear_refused">The ECU refused to clear the codes (negative reply 7F 04 %1$s)</string>
     <string name="obd_endpoint_demo">Demo mode (simulation)</string>
     <string name="obd_endpoint_demo_detail">Virtual ELM327 · CAN 11/500 · no car</string>
     <string name="obd_endpoint_demo_flaky">Demo: flaky clone</string>

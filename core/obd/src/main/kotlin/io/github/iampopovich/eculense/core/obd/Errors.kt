@@ -64,6 +64,9 @@ sealed interface ObdError {
     /** The link dropped while connected; [cause] is what the transport reported. */
     data class LinkLost(val cause: ObdError) : ObdError
 
+    /** The ECU refused to clear DTCs with negative response 7F 04 [nrc] (0x22: conditions not correct). */
+    data class ClearRefused(val nrc: Int) : ObdError
+
     /** Any other failure; [detail] is the technical message, shown as is. */
     data class Other(val detail: String) : ObdError
 
@@ -88,6 +91,7 @@ sealed interface ObdError {
             UsbNotOpen -> "USB port is not open"
             UsbDetached -> "USB adapter detached"
             is LinkLost -> "link to the adapter lost: ${cause.technicalMessage}"
+            is ClearRefused -> "ECU refused to clear DTCs (7F 04 %02X)".format(nrc)
             is Other -> detail
         }
 

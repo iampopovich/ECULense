@@ -175,6 +175,8 @@ class DemoTransport internal constructor(
             0x03 -> singleFrame(dtcReply(0x43, stored))
             0x07 -> singleFrame(dtcReply(0x47, pending))
             0x0A -> singleFrame(dtcReply(0x4A, emptyList()))
+            0x02 -> freezeFrame(pid, withFrame = command.length >= 6)
+            0x06 -> pid?.let(::mode06) ?: NO_DATA
             0x04 -> {
                 stored = emptyList()
                 pending = emptyList()
@@ -182,12 +184,54 @@ class DemoTransport internal constructor(
                 singleFrame("44")
             }
             0x09 -> when (pid) {
-                0x00 -> singleFrame("490040000000")
+                0x00 -> singleFrame("490054000000")
                 0x02 -> multiFrame("490201" + VIN_HEX)
+                0x04 -> multiFrame("490401" + CALID_HEX)
+                0x06 -> singleFrame("490601" + CVN)
                 else -> NO_DATA
             }
             else -> NO_DATA
         }
+    }
+
+    /**
+     * Service 02 frame 0: the conditions frozen when P0133 was stored (a moment of the cruise phase). Answers with
+     * the frame byte when it was asked for ("02 0C 00"), without it for the short form ("02 0C"). Gone after 04.
+     */
+    private fun freezeFrame(pid: Int?, withFrame: Boolean): String {
+        if (pid == null || clearedAtMs != null || stored.isEmpty()) return NO_DATA
+        val data = when {
+            pid == 0x00 -> mask(0x00, FREEZE_PIDS + 0x02)
+            pid % 0x20 == 0 -> null
+            pid == 0x02 -> "%04X".format(stored.first())
+            pid in FREEZE_PIDS -> encodePid(pid, frozen)?.drop(4)
+            else -> null
+        } ?: return NO_DATA
+        return singleFrame("42%02X".format(pid) + (if (withFrame) "00" else "") + data)
+    }
+
+    private val frozen: Map<Int, Double> by lazy { engine.values(FREEZE_AT_MS) }
+
+    /** Mode 06 (CAN): a few O2 sensor, catalyst and EGR results; one O2 test fails so the badge can be seen. */
+    private fun mode06(mid: Int): String? = when (mid) {
+        0x00 -> singleFrame("4600" + "%08X".format(midMask(0x00)))
+        0x20 -> singleFrame("4620" + "%08X".format(midMask(0x20)))
+        else -> MODE06[mid]?.let { blocks -> (("46" + blocks.joinToString("") { "%02X".format(mid) + it })).let { if (it.length / 2 <= 7) singleFrame(it) else multiFrame(it) } }
+    }
+
+    private fun midMask(base: Int): Long {
+        var bits = 0L
+        for (i in 1..32) {
+            val mid = base + i
+            if (mid in MODE06 || (i == 32 && MODE06.keys.any { it > mid })) bits = bits or (1L shl (32 - i))
+        }
+        return bits
+    }
+
+    private fun mask(base: Int, pids: Set<Int>): String {
+        var bits = 0L
+        for (i in 1..32) if (base + i in pids) bits = bits or (1L shl (32 - i))
+        return "%08X".format(bits)
     }
 
     /** Up to 6 PIDs in one service 01 request: one combined "41 pid data pid data..." message (ISO-TP when long). */
@@ -201,9 +245,20 @@ class DemoTransport internal constructor(
 
     private fun mode01(pid: Int): String? = when {
         pid % 0x20 == 0 -> supportMask(pid)
-        pid == 0x01 -> "4101%02X076500".format(if (stored.isEmpty()) 0 else 0x80 or stored.size)
-        else -> encodePid(pid, engine.values(elapsed(), clearedAtMs))
+        // MIL with the stored count; B=07 continuous complete; C=65 catalyst, EVAP, O2, O2 heater; after a clear the
+        // catalyst, EVAP and O2 monitors (D=25) are incomplete again, like on a real car right after a reset.
+        pid == 0x01 -> "4101%02X0765%02X".format(if (stored.isEmpty()) 0 else 0x80 or stored.size, if (clearedAtMs == null) 0 else 0x25)
+        pid == 0x41 -> "41410007%02X%02X".format(0x65, if (clearedAtMs == null) 0x01 else 0x25)
+        pid == 0x4D -> "414D%04X".format(if (clearedAtMs == null) 95 else 0)
+        pid == 0x4E -> "414E%04X".format(minutesSinceClear())
+        else -> encodePid(pid, engine.values(elapsed(), clearedAtMs) + clearedCounters())
     }
+
+    /** Before a clear: a car driven for days since the last reset; after it: counters start from zero. */
+    private fun minutesSinceClear(): Int = clearedAtMs?.let { ((elapsed() - it) / 60_000).toInt() } ?: (7_200 + (elapsed() / 60_000).toInt())
+
+    private fun clearedCounters(): Map<Int, Double> =
+        if (clearedAtMs == null) emptyMap() else mapOf(0x30 to 0.0, 0x21 to 0.0)
 
     private fun dtcReply(sid: Int, codes: List<Int>): String =
         "%02X%02X".format(sid, codes.size) + codes.joinToString("") { "%04X".format(it) }
@@ -265,9 +320,23 @@ class DemoTransport internal constructor(
         private const val ENGINE_OFF_VOLTAGE = 12.3
         private const val HEX = "0123456789ABCDEF"
         private val VIN_HEX = DemoEngine.VIN.encodeToByteArray().joinToString("") { "%02X".format(it) }
+        private val CALID_HEX = "DEMOCAL000000001".encodeToByteArray().joinToString("") { "%02X".format(it) }
+        private const val CVN = "1A2B3C4D"
 
-        /** All service 01 PIDs the demo answers (except masks): 0x01 + everything from StandardPids. */
-        private val ANSWERED: Set<Int> = StandardPids.all.map { it.code }.toSet() + 0x01
+        /** Freeze frame: the PIDs saved and the moment of the simulated drive they come from (cruise). */
+        private val FREEZE_PIDS = setOf(0x03, 0x04, 0x05, 0x06, 0x07, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x11)
+        private const val FREEZE_AT_MS = 38_000L
+
+        /** Mode 06 blocks per MID without the MID byte: TID, UAS, value, min, max (hex). */
+        private val MODE06: Map<Int, List<String>> = mapOf(
+            0x01 to listOf("010B01C200C803E8", "0510004800000096"),
+            0x02 to listOf("010B02A80000038A", "0A24000300000002"),
+            0x21 to listOf("8020001F00000080"),
+            0x31 to listOf("801702EE01F407D0"),
+        )
+
+        /** All service 01 PIDs the demo answers (except masks): 0x01, 0x41, 0x4D, 0x4E + everything from StandardPids. */
+        private val ANSWERED: Set<Int> = StandardPids.all.map { it.code }.toSet() + setOf(0x01, 0x41, 0x4D, 0x4E)
 
         /** Latency like a BT ELM327 clone: 30–60 ms per response, reset takes longer. */
         fun defaultLatency(command: String): Long =

@@ -33,6 +33,8 @@ object ObdText {
         ObdError.UsbNotOpen -> UiText.Res(R.string.obd_error_usb_not_open)
         ObdError.UsbDetached -> UiText.Res(R.string.obd_error_usb_detached)
         is ObdError.LinkLost -> UiText.Res(R.string.obd_error_link_lost, listOf(error(e.cause)))
+        is ObdError.ClearRefused ->
+            if (e.nrc == 0x22) UiText.Res(R.string.obd_error_clear_refused_conditions) else UiText.Res(R.string.obd_error_clear_refused, listOf("%02X".format(e.nrc)))
         is ObdError.Other -> UiText.Raw(e.detail)
     }
 
