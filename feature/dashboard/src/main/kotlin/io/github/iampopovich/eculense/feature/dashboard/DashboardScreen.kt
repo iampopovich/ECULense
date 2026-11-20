@@ -1,6 +1,25 @@
 package io.github.iampopovich.eculense.feature.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
+import android.widget.Toast
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import io.github.iampopovich.eculense.core.data.MarkResult
+import io.github.iampopovich.eculense.core.model.CarProfile
+import io.github.iampopovich.eculense.core.navigation.DtcDestination
+import io.github.iampopovich.eculense.core.ui.CarNames
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -57,7 +76,54 @@ internal fun DashboardRoute(viewModel: DashboardViewModel = koinViewModel()) {
         onConnect = { navigator.navigate(ConnectDestination) },
         onCarData = if (hasCarData) ({ navigator.navigate(CarDataDestination) }) else null,
         onDriving = { navigator.navigate(DrivingModeDestination) },
+        onMark = viewModel::markEvent,
+        onOpenCodes = {
+            viewModel.dismissNewCodes()
+            navigator.navigate(DtcDestination)
+        },
     )
+    MarkResultEffect(state.markResult, viewModel::markShown)
+    state.carChoice?.let { cars -> CarChoiceSheet(cars, onPick = viewModel::startRecordingFor, onDismiss = viewModel::dismissCarChoice) }
+}
+
+/** B10: the result of a mark shows as a short toast (no reading needed while driving: the button gives feedback too). */
+@Composable
+internal fun MarkResultEffect(result: MarkResult?, onShown: () -> Unit) {
+    val context = LocalContext.current
+    LaunchedEffect(result) {
+        val r = result ?: return@LaunchedEffect
+        val text = when (r) {
+            MarkResult.SAVED -> R.string.dash_mark_saved
+            MarkResult.NOT_RECORDING -> R.string.dash_mark_not_recording
+            MarkResult.SIMULATED -> R.string.dash_mark_demo
+        }
+        Toast.makeText(context, context.getString(text), Toast.LENGTH_SHORT).show()
+        onShown()
+    }
+}
+
+/** C8: «For which car?» before a recording, with «Don't ask again». */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CarChoiceSheet(cars: List<CarProfile>, onPick: (Long?, Boolean) -> Unit, onDismiss: () -> Unit) {
+    var dontAsk by rememberSaveable { mutableStateOf(false) }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(bottom = 24.dp)) {
+            Text(stringResource(R.string.dash_which_car), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            cars.forEach { car ->
+                ListItem(
+                    headlineContent = { Text(CarNames.display(car)) },
+                    supportingContent = listOfNotNull(car.brand, car.model).joinToString(" ").takeIf { it.isNotBlank() }?.let { { Text(it) } },
+                    modifier = Modifier.clickable { onPick(car.id, dontAsk) },
+                )
+            }
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.dash_dont_ask)) },
+                leadingContent = { Checkbox(checked = dontAsk, onCheckedChange = null) },
+                modifier = Modifier.toggleable(dontAsk, role = Role.Checkbox) { dontAsk = it },
+            )
+        }
+    }
 }
 
 /** C6: keep the screen on while connected (setting, default on). */
@@ -78,6 +144,8 @@ internal fun DashboardScreen(
     onCarData: (() -> Unit)?,
     onDriving: () -> Unit,
     modifier: Modifier = Modifier,
+    onMark: () -> Unit = {},
+    onOpenCodes: () -> Unit = {},
 ) {
     if (!state.connected) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -89,6 +157,7 @@ internal fun DashboardScreen(
         return
     }
     Column(modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        AlertBanners(state, onOpenCodes)
         state.banner?.let {
             Surface(color = MaterialTheme.colorScheme.tertiaryContainer, shape = MaterialTheme.shapes.medium) {
                 Text(
@@ -118,6 +187,14 @@ internal fun DashboardScreen(
                 Icon(painterResource(R.drawable.ic_fullscreen), contentDescription = stringResource(R.string.dash_open_driving))
             }
         }
+        // B10: a big full-width target of its own, only while a recording runs (a mark belongs to a recording).
+        if (state.recording) {
+            Button(onClick = onMark, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                Icon(painterResource(R.drawable.ic_flag), contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.dash_mark_event), style = MaterialTheme.typography.titleMedium)
+            }
+        }
         if (state.tiles.isEmpty()) {
             Text(stringResource(R.string.dash_no_pids), style = MaterialTheme.typography.bodyLarge)
         }
@@ -130,10 +207,19 @@ internal fun DashboardScreen(
 @Composable
 private fun DashboardTile(tile: TileState) {
     val dim = tile.status == ValueStatus.STALE
-    val valueColor = if (dim) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+    val valueColor = when {
+        tile.alert -> MaterialTheme.colorScheme.onErrorContainer
+        dim -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.onSurface
+    }
     val note = tileNote(tile)
     val valueText = tileValueText(tile)
-    Card {
+    val colors = if (tile.alert) {
+        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer)
+    } else {
+        CardDefaults.cardColors()
+    }
+    Card(colors = colors) {
         Column(Modifier.padding(12.dp)) {
             Text(tileName(tile), style = MaterialTheme.typography.labelMedium, maxLines = 2)
             Text(

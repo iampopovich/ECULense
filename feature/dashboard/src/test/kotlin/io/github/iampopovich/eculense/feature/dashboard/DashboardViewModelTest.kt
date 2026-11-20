@@ -220,7 +220,7 @@ class DashboardViewModelTest {
     }
 }
 
-private class FakeUnits : UnitsRepository {
+internal class FakeUnits : UnitsRepository {
     override val units = MutableStateFlow(UnitsSettings())
     override suspend fun save(units: UnitsSettings) {
         this.units.value = units

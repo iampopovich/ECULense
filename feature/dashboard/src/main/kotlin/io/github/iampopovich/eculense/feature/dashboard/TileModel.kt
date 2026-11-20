@@ -39,6 +39,8 @@ internal data class TileState(
     /** Last 60 s, oldest first, in stored (metric) units; only the shape matters. */
     val spark: List<Float> = emptyList(),
     val decimals: Int = decimalsOf(pid),
+    /** C4: a live alert is active for this sensor (error color). */
+    val alert: Boolean = false,
 )
 
 internal data class Stamped(val value: Double, val atMs: Long)

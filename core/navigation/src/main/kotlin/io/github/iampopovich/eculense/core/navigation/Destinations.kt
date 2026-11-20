@@ -53,10 +53,20 @@ object DeepLinks {
     const val EXTRA_SCREEN = "io.github.iampopovich.eculense.SCREEN"
     const val ANALYSIS = "analysis"
     const val MAINTENANCE = "maintenance"
+    /** C4: «new code during the trip» opens the DTC screen. */
+    const val DTC = "dtc"
 
     fun destination(screen: String?): NavKey? = when (screen) {
         ANALYSIS -> AnalysisDestination
         MAINTENANCE -> MaintenanceDestination
+        DTC -> DtcDestination
         else -> null
     }
 }
+
+/** B6: quick health check on Pit-stop (:feature:health). */
+@Serializable data object HealthCheckDestination : NavKey
+@Serializable data class HealthReportDestination(val checkId: Long) : NavKey
+
+/** C4: live alert thresholds (Settings hub of :feature:dashboard). */
+@Serializable data object AlertSettingsDestination : NavKey

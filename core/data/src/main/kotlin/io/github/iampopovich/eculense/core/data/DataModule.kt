@@ -67,7 +67,24 @@ val dataModule = module {
             if (events.isEmpty()) recomputeAll(koin, scope) else events.forEach { it.recordingFinished(id) }
         }
     }
-    single<AnalyticsRepository> { RoomAnalyticsRepository(get(), get(), get(), get()) }
+    single<AnalyticsRepository> {
+        val events = get<io.github.iampopovich.eculense.core.database.EventDao>()
+        RoomAnalyticsRepository(get(), get(), get(), get(), tripEvents = { carId -> events.forCar(carId, 0, Long.MAX_VALUE).mapNotNull { it.toModel()?.toFact() } })
+    }
+    single<TripEventRepository> { RoomTripEventRepository(get()) }
+    single(createdAtStart = true) {
+        val moves = get<io.github.iampopovich.eculense.core.database.SessionMoveDao>()
+        LiveEventRecorder(get(), get(), get(), get(), get(AppScope), carOf = { moves.carOf(it) }).also { it.start() }
+    } binds arrayOf(EventMarker::class)
+    single<SessionMover> {
+        val analytics = get<AnalyticsRepository>()
+        RoomSessionMover(get(), get(AppScope)) { analytics.recompute(it) }
+    }
+    single<AlertPrefs> { DataStoreAlertPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("alerts") }) }
+    single(createdAtStart = true) {
+        val koin = getKoin()
+        LiveAlertMonitor(get(), get(), get(AppScope), notifier = { koin.getOrNull<TripAlertNotifier>() }).also { it.start() }
+    } binds arrayOf(LiveAlerts::class)
     single<AutomationPrefs> { DataStoreAutomationPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("automation") }) }
     single(createdAtStart = true) {
         val context = androidContext()

@@ -117,4 +117,11 @@
     <string name="finding_bank_one">на банке %1$d</string>
     <string name="finding_dtc_repeat">Коды повторялись в течение 30 дней: %1$s — неисправность не ушла сама.</string>
     <string name="finding_dtc_other">Однократные или давние коды: %1$s.</string>
+    <string name="finding_title_stalls">Двигатель глохнет</string>
+    <string name="finding_stalls_no_data">Нет своих записей, в которых можно искать заглохания.</string>
+    <string name="finding_stalls_ok">В своих записях двигатель не глох.</string>
+    <string name="finding_stalls_seen">Двигатель глох на ходу (ЭБУ продолжал отвечать): %1$d раз в %2$d записях.</string>
+    <string name="finding_stalls_hint">Повторяющиеся заглохания указывают на регулятор холостого хода, грязную дроссельную заслонку, подсос воздуха или подачу топлива.</string>
+    <string name="finding_evidence_stalls">Заглохания</string>
+    <string name="finding_evidence_last_stall">Последнее заглохание</string>
 </resources>

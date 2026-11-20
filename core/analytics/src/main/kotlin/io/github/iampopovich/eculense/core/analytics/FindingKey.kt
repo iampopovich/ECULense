@@ -105,6 +105,13 @@ enum class FindingKey(val en: String, val enOne: String? = null) {
     BANK_ONE("on bank %1\$d"),
     DTC_REPEAT("Codes recurred within 30 days: %1\$s — the fault didn’t go away by itself."),
     DTC_OTHER("One-off or old codes: %1\$s."),
+    TITLE_STALLS("Engine stalls"),
+    STALLS_NO_DATA("No own recordings to look for stalls in."),
+    STALLS_OK("No engine stalls in own recordings."),
+    STALLS_SEEN("The engine stalled while running (the ECU kept answering): %1\$d in %2\$d recordings."),
+    STALLS_HINT("Repeated stalls point at idle air control, a dirty throttle body, a vacuum leak or fuel delivery."),
+    EVIDENCE_STALLS("Stalls"),
+    EVIDENCE_LAST_STALL("Last stall"),
     ;
 
     val isPlural: Boolean get() = enOne != null

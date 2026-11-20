@@ -34,6 +34,8 @@ class DemoTransport internal constructor(
     lateScope: CoroutineScope? = null,
     /** Elapsed-time window (ms after open) in which the engine is off: the ECU is silent, ATRV shows 12.3 V. */
     private val engineOff: LongRange? = null,
+    /** Elapsed-time window in which the engine has stalled: rpm and speed read 0, the ECU keeps answering (B10). */
+    private val stall: LongRange? = null,
 ) : ObdTransport {
 
     constructor(
@@ -41,7 +43,8 @@ class DemoTransport internal constructor(
         latencyMs: (String) -> Long = ::defaultLatency,
         flaky: Boolean = false,
         engineOff: LongRange? = null,
-    ) : this(clock, latencyMs, DemoEngine(), flaky, engineOff = engineOff)
+        stall: LongRange? = null,
+    ) : this(clock, latencyMs, DemoEngine(), flaky, engineOff = engineOff, stall = stall)
 
     private val incoming = Channel<ByteArray>(Channel.UNLIMITED)
     private val inbox = StringBuilder()
@@ -251,8 +254,12 @@ class DemoTransport internal constructor(
         pid == 0x41 -> "41410007%02X%02X".format(0x65, if (clearedAtMs == null) 0x01 else 0x25)
         pid == 0x4D -> "414D%04X".format(if (clearedAtMs == null) 95 else 0)
         pid == 0x4E -> "414E%04X".format(minutesSinceClear())
-        else -> encodePid(pid, engine.values(elapsed(), clearedAtMs) + clearedCounters())
+        else -> encodePid(pid, stallAdjusted(engine.values(elapsed(), clearedAtMs)) + clearedCounters())
     }
+
+    /** B10 demo: in [stall] the ECU still answers but the engine stopped (rpm 0) — a stall, before it is switched off. */
+    private fun stallAdjusted(values: Map<Int, Double>): Map<Int, Double> =
+        if (stall?.contains(elapsed()) == true) values + mapOf(0x0C to 0.0, 0x0D to 0.0) else values
 
     /** Before a clear: a car driven for days since the last reset; after it: counters start from zero. */
     private fun minutesSinceClear(): Int = clearedAtMs?.let { ((elapsed() - it) / 60_000).toInt() } ?: (7_200 + (elapsed() / 60_000).toInt())
@@ -394,10 +401,12 @@ class EngineStopDemoTransportFactory(
     private val clock: () -> Long = System::currentTimeMillis,
     private val latencyMs: (String) -> Long = DemoTransport.Companion::defaultLatency,
     private val offWindow: LongRange = 30_000L..60_000L,
+    /** The engine stalls (rpm 0, ECU answering) for the last 3 s before it is switched off. */
+    private val stallWindow: LongRange = 27_000L until 30_000L,
 ) : TransportFactory {
     override val kind = KIND
     override suspend fun discover() = listOf(ENDPOINT)
-    override fun create(endpoint: AdapterEndpoint): ObdTransport = DemoTransport(clock, latencyMs, engineOff = offWindow)
+    override fun create(endpoint: AdapterEndpoint): ObdTransport = DemoTransport(clock, latencyMs, engineOff = offWindow, stall = stallWindow)
 
     companion object {
         const val KIND = "demo-engine-off"

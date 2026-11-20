@@ -2,10 +2,20 @@ package io.github.iampopovich.eculense.feature.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.iampopovich.eculense.core.analytics.LiveAlertKind
+import io.github.iampopovich.eculense.core.analytics.SensorIds
+import io.github.iampopovich.eculense.core.data.ActiveAlert
+import io.github.iampopovich.eculense.core.data.AutomationPrefs
+import io.github.iampopovich.eculense.core.data.CarRepository
 import io.github.iampopovich.eculense.core.data.DashboardPrefs
 import io.github.iampopovich.eculense.core.data.DashboardSelection
+import io.github.iampopovich.eculense.core.data.EventMarker
+import io.github.iampopovich.eculense.core.data.LiveAlerts
+import io.github.iampopovich.eculense.core.data.MarkResult
 import io.github.iampopovich.eculense.core.data.SessionRecorder
 import io.github.iampopovich.eculense.core.data.UnitsRepository
+import io.github.iampopovich.eculense.core.model.CarProfile
+import kotlinx.coroutines.flow.first
 import io.github.iampopovich.eculense.core.obd.ConnectionController
 import io.github.iampopovich.eculense.core.obd.ConnectionState
 import io.github.iampopovich.eculense.core.obd.DEFAULT_OWNER
@@ -39,7 +49,21 @@ internal data class DashboardUiState(
     val keepScreenOn: Boolean = true,
     val hudMirror: Boolean = false,
     val drivingTiles: Int = DashboardSelection.DEFAULT_DRIVING_TILES,
+    /** C4: threshold alerts (full-width banner, the tile turns red). */
+    val alerts: List<ActiveAlert> = emptyList(),
+    /** C4: codes that appeared during this connection (banner opens the DTC screen). */
+    val newCodes: List<String> = emptyList(),
+    /** C8: «which car?» sheet before a recording starts. */
+    val carChoice: List<CarProfile>? = null,
+    /** B10: result of the last «Mark event» tap, shown once. */
+    val markResult: MarkResult? = null,
 )
+
+/** Sensors whose tile turns into the error color for an alert kind. */
+internal fun LiveAlertKind.sensorIds(): Set<String> = when (this) {
+    LiveAlertKind.OVERHEAT -> setOf(SensorIds.COOLANT)
+    LiveAlertKind.NOT_CHARGING, LiveAlertKind.OVERCHARGE -> setOf(SensorIds.MODULE_VOLTAGE, SensorIds.ELM_VOLTAGE)
+}
 
 /** The voltage is passed as a number: the resource formats it with the app locale (12.6 V in English, 12,6 V in Russian). */
 internal fun ConnectionState.statusLine(liveVoltage: Double? = null): UiText? {
@@ -72,8 +96,20 @@ internal class DashboardViewModel(
     private val prefs: DashboardPrefs,
     private val now: () -> Long = System::currentTimeMillis,
     ticks: Flow<Unit> = everySecond(),
+    private val alerts: LiveAlerts? = null,
+    private val marker: EventMarker? = null,
+    private val cars: CarRepository? = null,
+    private val automation: AutomationPrefs? = null,
 ) : ViewModel() {
     private val buffer = LiveBuffer()
+    private val carChoice = MutableStateFlow<List<CarProfile>?>(null)
+    private val markResult = MutableStateFlow<MarkResult?>(null)
+    private val extras = combine(
+        alerts?.active ?: MutableStateFlow(emptyList()),
+        alerts?.newCodes ?: MutableStateFlow(emptyList()),
+        carChoice,
+        markResult,
+    ) { a, c, choice, mark -> Extras(a, c, choice, mark) }
 
     /** Bumped when the buffer changes (at most every [REDRAW_MS]) so the UI is not rebuilt for every reading. */
     private val version = MutableStateFlow(0L)
@@ -102,17 +138,29 @@ internal class DashboardViewModel(
 
     /** Values are stored in metric; km/h → mph, °C → °F etc. only at display time. */
     val uiState: StateFlow<DashboardUiState> =
-        combine(facts, selected, combine(version, ticks) { v, _ -> v }, units.units, display) { f, pids, _, u, d ->
-            val t = now()
-            DashboardUiState(
-                connected = f.state.isSessionAlive,
-                banner = ObdText.sessionState(f.state),
-                tiles = TileModel.build(pids, buffer, f.state, f.disabled, f.cycleMs, t, fuelEstimate.value) { v, unit -> u.display(v, unit) },
-                recording = f.recording,
-                status = f.state.statusLine(buffer.latest(PollTiers.ADAPTER_VOLTAGE_ID)?.value),
-                keepScreenOn = d.first,
-                hudMirror = d.second,
-                drivingTiles = d.third,
+        combine(
+            combine(facts, selected, combine(version, ticks) { v, _ -> v }, units.units, display) { f, pids, _, u, d ->
+                val t = now()
+                DashboardUiState(
+                    connected = f.state.isSessionAlive,
+                    banner = ObdText.sessionState(f.state),
+                    tiles = TileModel.build(pids, buffer, f.state, f.disabled, f.cycleMs, t, fuelEstimate.value) { v, unit -> u.display(v, unit) },
+                    recording = f.recording,
+                    status = f.state.statusLine(buffer.latest(PollTiers.ADAPTER_VOLTAGE_ID)?.value),
+                    keepScreenOn = d.first,
+                    hudMirror = d.second,
+                    drivingTiles = d.third,
+                )
+            },
+            extras,
+        ) { base, x ->
+            val alerting = x.alerts.flatMap { it.kind.sensorIds() }.toSet()
+            base.copy(
+                tiles = base.tiles.map { if (it.pid.sensorId in alerting) it.copy(alert = true) else it },
+                alerts = x.alerts,
+                newCodes = x.newCodes,
+                carChoice = x.carChoice,
+                markResult = x.mark,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardUiState())
 
@@ -134,13 +182,50 @@ internal class DashboardViewModel(
         }
     }
 
-    /** [name] turns the "dd.MM HH:mm" stamp into the session name (the UI passes the localized template). */
+    /**
+     * [name] turns the "dd.MM HH:mm" stamp into the session name (the UI passes the localized template). C8: with more
+     * than one car and «ask» on, the car sheet opens first ([startRecordingFor]).
+     */
     fun toggleRecording(name: (stamp: String) -> String = { it }) {
-        if (recorder.activeSessionId.value == null) {
-            recorder.start(name(LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM HH:mm"))))
-        } else {
+        if (recorder.activeSessionId.value != null) {
             recorder.stop()
+            return
         }
+        pendingName = name
+        viewModelScope.launch {
+            val all = runCatching { cars?.cars() }.getOrNull().orEmpty()
+            val ask = automation?.settings?.first()?.askCar ?: true
+            if (all.size > 1 && ask) carChoice.value = all else startRecordingFor(null, dontAskAgain = false)
+        }
+    }
+
+    private var pendingName: (String) -> String = { it }
+
+    /** [carId] = null → the active car. */
+    fun startRecordingFor(carId: Long?, dontAskAgain: Boolean) {
+        carChoice.value = null
+        if (dontAskAgain) viewModelScope.launch { automation?.update { it.copy(askCar = false) } }
+        if (recorder.activeSessionId.value == null) {
+            recorder.start(pendingName(LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM HH:mm"))), carId, auto = false)
+        }
+    }
+
+    fun dismissCarChoice() {
+        carChoice.value = null
+    }
+
+    /** B10: one-tap mark in the running recording. */
+    fun markEvent() {
+        val m = marker ?: return
+        viewModelScope.launch { markResult.value = m.mark() }
+    }
+
+    fun markShown() {
+        markResult.value = null
+    }
+
+    fun dismissNewCodes() {
+        alerts?.dismissNewCodes()
     }
 
     fun setHudMirror(on: Boolean) {
@@ -152,6 +237,8 @@ internal class DashboardViewModel(
     }
 
     private data class Facts(val state: ConnectionState, val disabled: Set<Int>, val cycleMs: Long?, val recording: Boolean)
+
+    private data class Extras(val alerts: List<ActiveAlert>, val newCodes: List<String>, val carChoice: List<CarProfile>?, val mark: MarkResult?)
 
     internal companion object {
         const val REDRAW_MS = 250L

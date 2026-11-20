@@ -102,4 +102,11 @@ internal fun FindingKey.resId(): Int? = when (this) {
     FindingKey.BANK_ONE -> R.string.finding_bank_one
     FindingKey.DTC_REPEAT -> R.string.finding_dtc_repeat
     FindingKey.DTC_OTHER -> R.string.finding_dtc_other
+    FindingKey.TITLE_STALLS -> R.string.finding_title_stalls
+    FindingKey.STALLS_NO_DATA -> R.string.finding_stalls_no_data
+    FindingKey.STALLS_OK -> R.string.finding_stalls_ok
+    FindingKey.STALLS_SEEN -> R.string.finding_stalls_seen
+    FindingKey.STALLS_HINT -> R.string.finding_stalls_hint
+    FindingKey.EVIDENCE_STALLS -> R.string.finding_evidence_stalls
+    FindingKey.EVIDENCE_LAST_STALL -> R.string.finding_evidence_last_stall
 }

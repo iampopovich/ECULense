@@ -20,4 +20,14 @@
     </plurals>
     <string name="bg_overdue">overdue</string>
     <string name="bg_soon">due soon</string>
+    <string name="bg_channel_trip_alerts">Trip warnings</string>
+    <string name="bg_channel_trip_alerts_description">Overheating, charging problems and new trouble codes while connected</string>
+    <string name="bg_alert_overheat">Engine overheating: %1$.0f °C</string>
+    <string name="bg_alert_overheat_text">Stop when it is safe and let the engine idle or switch it off; check the coolant level once it has cooled.</string>
+    <string name="bg_alert_not_charging">Battery not charging: %1$.1f V</string>
+    <string name="bg_alert_not_charging_text">The engine runs but the voltage is below normal: alternator or its belt. Avoid switching the engine off far from help.</string>
+    <string name="bg_alert_overcharge">Overcharge: %1$.1f V</string>
+    <string name="bg_alert_overcharge_text">The voltage regulator lets the voltage too high: it damages the battery and electronics.</string>
+    <string name="bg_alert_new_code">New trouble code %1$s</string>
+    <string name="bg_alert_new_code_text">Appeared during this trip. Tap to open the codes.</string>
 </resources>

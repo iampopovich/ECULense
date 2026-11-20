@@ -45,7 +45,14 @@ data class AnalysisInput(
     val dtcEvents: List<DtcEvent>,
     val nowMs: Long,
     val zone: ZoneId = ZoneId.systemDefault(),
+    /** B10: stalls and user marks stored with the car's recordings. */
+    val events: List<TripEventFact> = emptyList(),
 )
+
+/** B10: what happened inside a recording. */
+enum class TripEventType { STALL, USER_MARK }
+
+data class TripEventFact(val sessionId: Long, val atMs: Long, val type: TripEventType)
 
 interface AnalyticsRule {
     /** All ruleIds the rule can return (for «no data» and links). */
@@ -54,7 +61,7 @@ interface AnalyticsRule {
 }
 
 object AnalyticsEngine {
-    val RULES: List<AnalyticsRule> = listOf(CoolantOverheatRule, VoltageRule, FuelTrimRule, MafIdleRule, DtcRule, MilDistanceRule, WarmupTrendRule)
+    val RULES: List<AnalyticsRule> = listOf(CoolantOverheatRule, VoltageRule, FuelTrimRule, MafIdleRule, DtcRule, MilDistanceRule, WarmupTrendRule, StallRule)
 
     fun evaluate(input: AnalysisInput, rules: List<AnalyticsRule> = RULES): List<Finding> =
         rules.flatMap { it.evaluate(input) }.sortedByDescending { it.severity.rank }
@@ -309,6 +316,37 @@ object MilDistanceRule : AnalyticsRule {
                 ID, Severity.WARNING, TITLE,
                 listOfNotNull(t(K.MIL_DRIVEN, num(last, 0)), growth, t(K.MIL_FIX)),
                 evidence, lit.map { it.sessionId }, lit.first().startedAtMs, lit.last().startedAtMs,
+            ),
+        )
+    }
+}
+
+/** B10: engine stalls found live (rpm → 0 with the ECU answering). 1 = info, 2+ = warning, 4+ = critical. */
+object StallRule : AnalyticsRule {
+    private const val ID = "engine-stalls"
+    private val TITLE = t(K.TITLE_STALLS)
+    override val ids = listOf(ID)
+
+    override fun evaluate(input: AnalysisInput): List<Finding> {
+        val stalls = input.events.filter { it.type == TripEventType.STALL }.sortedBy { it.atMs }
+        if (stalls.isEmpty()) {
+            return listOf(if (input.sessions.isEmpty()) noData(ID, TITLE, t(K.STALLS_NO_DATA)) else ok(ID, TITLE, t(K.STALLS_OK)))
+        }
+        val sessions = stalls.map { it.sessionId }.distinct()
+        val severity = when {
+            stalls.size >= Thresholds.STALL_FINDING_CRITICAL -> Severity.CRITICAL
+            stalls.size >= Thresholds.STALL_FINDING_MIN -> Severity.WARNING
+            else -> Severity.INFO
+        }
+        return listOf(
+            Finding(
+                ID, severity, TITLE,
+                listOfNotNull(t(K.STALLS_SEEN, cnt(stalls.size), cnt(sessions.size)), t(K.STALLS_HINT).takeIf { severity != Severity.INFO }),
+                listOf(
+                    ev(K.EVIDENCE_STALLS, countValue(stalls.size)),
+                    ev(K.EVIDENCE_LAST_STALL, t(K.RAW, FindingArg.Date(stalls.last().atMs))),
+                ),
+                sessions, stalls.first().atMs, stalls.last().atMs,
             ),
         )
     }

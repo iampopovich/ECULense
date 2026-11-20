@@ -24,4 +24,14 @@
     </plurals>
     <string name="bg_overdue">просрочено</string>
     <string name="bg_soon">скоро</string>
+    <string name="bg_channel_trip_alerts">Предупреждения в поездке</string>
+    <string name="bg_channel_trip_alerts_description">Перегрев, проблемы с зарядкой и новые коды неисправностей во время подключения</string>
+    <string name="bg_alert_overheat">Перегрев двигателя: %1$.0f °C</string>
+    <string name="bg_alert_overheat_text">Остановитесь, когда это безопасно, дайте двигателю поработать на холостых или заглушите его; уровень ОЖ проверяйте после остывания.</string>
+    <string name="bg_alert_not_charging">Нет зарядки: %1$.1f В</string>
+    <string name="bg_alert_not_charging_text">Двигатель работает, а напряжение ниже нормы: генератор или его ремень. Не глушите двигатель вдали от помощи.</string>
+    <string name="bg_alert_overcharge">Перезаряд: %1$.1f В</string>
+    <string name="bg_alert_overcharge_text">Регулятор напряжения пропускает слишком высокое напряжение: это вредит АКБ и электронике.</string>
+    <string name="bg_alert_new_code">Новый код %1$s</string>
+    <string name="bg_alert_new_code_text">Появился во время этой поездки. Нажмите, чтобы открыть коды.</string>
 </resources>

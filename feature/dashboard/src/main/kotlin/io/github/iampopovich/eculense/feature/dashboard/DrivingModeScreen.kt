@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -62,7 +64,9 @@ internal fun DrivingModeRoute(viewModel: DashboardViewModel = koinViewModel()) {
         onExit = { back?.onBackPressed() },
         onTiles = viewModel::setDrivingTiles,
         onMirror = viewModel::setHudMirror,
+        onMark = viewModel::markEvent,
     )
+    MarkResultEffect(state.markResult, viewModel::markShown)
 }
 
 @Composable
@@ -93,6 +97,7 @@ internal fun DrivingModeScreen(
     onExit: () -> Unit,
     onTiles: (Int) -> Unit,
     onMirror: (Boolean) -> Unit,
+    onMark: () -> Unit = {},
 ) {
     var controls by rememberSaveable { mutableStateOf(true) }
     val mirror = state.hudMirror
@@ -113,12 +118,27 @@ internal fun DrivingModeScreen(
             ) {
                 DrivingContent(state, tiles, foreground, dark, mirror)
             }
+            // B10: the mark is a big target at the bottom edge while recording (not mirrored, never hidden).
+            if (state.recording) {
+                Button(onClick = onMark, modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp)) {
+                    Icon(painterResource(R.drawable.ic_flag), contentDescription = null)
+                    Text(stringResource(R.string.dash_mark_event), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 8.dp))
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun ColumnScope.DrivingContent(state: DashboardUiState, tiles: List<TileState>, foreground: Color, dark: Boolean, mirror: Boolean) {
+            state.alerts.forEach { a ->
+                Text(
+                    alertBannerText(a),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onError,
+                    modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.error, MaterialTheme.shapes.medium).padding(12.dp),
+                )
+            }
             state.banner?.let {
                 Text(
                     it.asString(),

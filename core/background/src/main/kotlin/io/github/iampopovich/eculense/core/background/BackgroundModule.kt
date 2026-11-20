@@ -89,6 +89,7 @@ class BackgroundScheduler(private val context: Context) : DataEvents {
 /** Add/remove = a line in AppModules + settings.gradle.kts; without the module the data layer recomputes findings. */
 val backgroundModule = module {
     single<Notifier> { AndroidNotifier(androidContext()) }
+    single<io.github.iampopovich.eculense.core.data.TripAlertNotifier> { AndroidTripAlertNotifier(androidContext()) }
     single<AlertLedger>(named("findings-ledger")) { PrefsAlertLedger(androidContext(), "findings") }
     single<AlertLedger>(named("maintenance-ledger")) { PrefsAlertLedger(androidContext(), "maintenance") }
     single<TripBackfill> {

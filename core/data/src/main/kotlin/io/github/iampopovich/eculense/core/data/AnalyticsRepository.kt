@@ -16,6 +16,7 @@ import io.github.iampopovich.eculense.core.analytics.SensorIds
 import io.github.iampopovich.eculense.core.analytics.SessionDigest
 import io.github.iampopovich.eculense.core.analytics.SessionDigester
 import io.github.iampopovich.eculense.core.analytics.Severity
+import io.github.iampopovich.eculense.core.analytics.TripEventFact
 import io.github.iampopovich.eculense.core.database.AnalyticsDao
 import io.github.iampopovich.eculense.core.database.DtcDao
 import io.github.iampopovich.eculense.core.database.FindingDao
@@ -112,6 +113,8 @@ internal class RoomAnalyticsRepository(
     private val zone: () -> ZoneId = ZoneId::systemDefault,
     private val compute: CoroutineDispatcher = Dispatchers.Default,
     private val log: (String) -> Unit = { msg -> runCatching { Log.i(TAG, msg) } },
+    /** B10: stalls and marks stored with the car's recordings. */
+    private val tripEvents: suspend (carId: Long) -> List<TripEventFact> = { emptyList() },
 ) : AnalyticsRepository {
     private val _state = MutableStateFlow<AnalysisState>(AnalysisState.Idle)
     override val state: StateFlow<AnalysisState> = _state.asStateFlow()
@@ -142,7 +145,7 @@ internal class RoomAnalyticsRepository(
                 _state.value = AnalysisState.Running(i + 1, sessions.size)
                 digest
             }
-            val input = AnalysisInput(cars.cars().firstOrNull { it.id == carId }, digests, dtcEvents(carId), clock(), zone())
+            val input = AnalysisInput(cars.cars().firstOrNull { it.id == carId }, digests, dtcEvents(carId), clock(), zone(), runCatching { tripEvents(carId) }.getOrDefault(emptyList()))
             val findings = withContext(compute) { AnalyticsEngine.evaluate(input) }
             val now = clock()
             findingDao.replaceForCar(carId, findings.map { it.toEntity(carId, now) })
