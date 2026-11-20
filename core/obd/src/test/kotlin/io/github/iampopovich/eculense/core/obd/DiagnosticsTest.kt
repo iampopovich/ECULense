@@ -53,7 +53,10 @@ class DiagnosticsTest {
     fun `all supported monitors complete reads as ready`() {
         val r = ReadinessDecoder.status(ints("00 07 65 00"))
         assertTrue(r.allComplete)
+        assertTrue(r.inspectionReady)
         assertEquals(0, r.incompleteCount)
+        // Complete monitors with the Check Engine lamp on are not ready for an inspection.
+        assertFalse(ReadinessDecoder.status(ints("82 07 65 00")).inspectionReady)
     }
 
     @Test

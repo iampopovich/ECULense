@@ -36,6 +36,9 @@ data class Readiness(
 
     /** OBD readiness only (not a legal inspection verdict): every supported monitor has completed. */
     val allComplete: Boolean get() = supported.isNotEmpty() && incompleteCount == 0
+
+    /** Monitors complete AND the Check Engine lamp is off: what an OBD-based inspection looks at. */
+    val inspectionReady: Boolean get() = allComplete && !milOn
 }
 
 /** Pure decoder of PIDs 01 and 41 after the SAE J1979 bit layout. */

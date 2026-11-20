@@ -209,4 +209,4 @@ private fun volts(v: Double): String = String.format(Locale.getDefault(), "%.1f"
 
 private fun perSecond(v: Double): String = String.format(Locale.getDefault(), if (v >= 10) "%.0f" else "%.1f", v)
 
-private fun seconds(v: Double): String = String.format(Locale.getDefault(), if (v >= 10) "%.0f" else "%.1f", v)
+private fun seconds(v: Double): String = String.format(Locale.getDefault(), if (v >= 10) "%.0f" else if (v >= 1) "%.1f" else "%.2f", v)

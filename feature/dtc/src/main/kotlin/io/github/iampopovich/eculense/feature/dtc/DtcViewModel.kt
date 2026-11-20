@@ -110,7 +110,10 @@ internal class DtcViewModel(
     private val lastSpeed = MutableStateFlow<Pair<Double, Long>?>(null)
 
     val uiState: StateFlow<DtcUiState> = combine(state, lastSpeed.flatMapLatest { if (it == null) flowOf(Unit) else ticks }) { s, _ ->
-        s.copy(speed = gateOf(lastSpeed.value, now()))
+        val gate = gateOf(lastSpeed.value, now())
+        // The «stop the car» refusal is shown by the screen while moving; it must not outlive the movement.
+        val error = s.error.takeUnless { it == MOVING_ERROR }
+        s.copy(speed = gate, error = error)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, state.value)
 
     init {
@@ -150,7 +153,7 @@ internal class DtcViewModel(
     fun clear(stationaryConfirmed: Boolean = false) = launchGuarded {
         when (gateOf(lastSpeed.value, now())) {
             SpeedGate.MOVING -> {
-                state.update { it.copy(error = UiText.Res(R.string.dtc_clear_blocked_moving)) }
+                state.update { it.copy(error = MOVING_ERROR) }
                 return@launchGuarded
             }
             SpeedGate.UNKNOWN -> if (!stationaryConfirmed) {
@@ -249,6 +252,7 @@ internal class DtcViewModel(
         const val SPEED = 0x0D
         const val SPEED_ID = "01.0D"
         const val SPEED_FRESH_MS = 2_000L
+        val MOVING_ERROR: UiText = UiText.Res(R.string.dtc_clear_blocked_moving)
 
         fun gateOf(speed: Pair<Double, Long>?, nowMs: Long): SpeedGate = when {
             speed == null || nowMs - speed.second > SPEED_FRESH_MS -> SpeedGate.UNKNOWN

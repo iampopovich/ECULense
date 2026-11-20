@@ -70,9 +70,10 @@ internal object DiagText {
         MidGroup.OTHER -> R.string.mode06_group_other
     }
 
-    /** Plain helper outside composables (lint NonObservableLocale): up to [decimals] digits, no trailing zeros. */
+    /** Plain helper outside composables (lint NonObservableLocale): up to [decimals] digits, no trailing zeros; none from 100 up. */
     fun number(v: Double, decimals: Int = 1): String {
-        val text = String.format(Locale.getDefault(), "%.${decimals}f", v)
+        val digits = if (kotlin.math.abs(v) >= 100) 0 else decimals
+        val text = String.format(Locale.getDefault(), "%.${digits}f", v)
         val sep = text.indexOfAny(charArrayOf('.', ','))
         return if (sep < 0) text else text.trimEnd('0').trimEnd('.', ',')
     }

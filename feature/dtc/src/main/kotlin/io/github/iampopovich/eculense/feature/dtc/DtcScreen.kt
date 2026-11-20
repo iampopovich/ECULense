@@ -205,7 +205,8 @@ private fun ReadinessSection(r: Readiness, thisCycle: List<MonitorState>?) {
         )
         val verdict = when {
             r.supported.isEmpty() -> stringResource(R.string.dtc_readiness_none)
-            r.allComplete -> stringResource(R.string.dtc_readiness_ready)
+            r.inspectionReady -> stringResource(R.string.dtc_readiness_ready)
+            r.allComplete -> stringResource(R.string.dtc_readiness_mil_blocks)
             else -> pluralStringResource(R.plurals.dtc_readiness_not_ready, r.incompleteCount, r.incompleteCount)
         }
         Text(verdict, style = MaterialTheme.typography.bodyLarge)

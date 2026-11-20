@@ -38,6 +38,7 @@
     <string name="dtc_readiness_mil_on">Check Engine горит (сохранено кодов: %1$d)</string>
     <string name="dtc_readiness_mil_off">Check Engine не горит</string>
     <string name="dtc_readiness_ready">Готова к техосмотру: все поддерживаемые мониторы завершены</string>
+    <string name="dtc_readiness_mil_blocks">Мониторы завершены, но горит Check Engine: к техосмотру не готова</string>
     <plurals name="dtc_readiness_not_ready">
         <item quantity="one">%1$d монитор не завершён: к техосмотру пока не готова</item>
         <item quantity="few">%1$d монитора не завершены: к техосмотру пока не готова</item>

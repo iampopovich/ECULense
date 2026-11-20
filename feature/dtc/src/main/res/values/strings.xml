@@ -36,6 +36,7 @@
     <string name="dtc_readiness_mil_on">Check Engine lamp is ON (stored codes: %1$d)</string>
     <string name="dtc_readiness_mil_off">Check Engine lamp is off</string>
     <string name="dtc_readiness_ready">Ready for inspection: every supported monitor is complete</string>
+    <string name="dtc_readiness_mil_blocks">The monitors are complete, but the Check Engine lamp is on: not ready for inspection</string>
     <plurals name="dtc_readiness_not_ready">
         <item quantity="one">%1$d monitor is not complete: not ready for inspection yet</item>
         <item quantity="other">%1$d monitors are not complete: not ready for inspection yet</item>

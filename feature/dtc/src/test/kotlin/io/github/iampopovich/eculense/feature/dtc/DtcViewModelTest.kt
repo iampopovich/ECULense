@@ -215,7 +215,8 @@ class DtcViewModelTest {
         assertEquals(SpeedGate.MOVING, vm.uiState.value.speed)
         vm.clear(stationaryConfirmed = true)
         assertEquals(0, session.clearCalls)
-        assertEquals(UiText.Res(R.string.dtc_clear_blocked_moving), vm.uiState.value.error)
+        // The refusal is not kept as a lasting error: the screen shows the «stop the car» hint while moving.
+        assertEquals(null, vm.uiState.value.error)
         controller.readingsFlow.emit(SensorReading("01.0D", 0.0, "km/h", 0))
         assertEquals(SpeedGate.STOPPED, vm.uiState.value.speed)
         t += 2_500
