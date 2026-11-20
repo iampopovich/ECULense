@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense.core.data
 
+import io.github.iampopovich.eculense.core.analytics.EngineMaps
 import io.github.iampopovich.eculense.core.analytics.SensorIds
 import io.github.iampopovich.eculense.core.model.SensorReading
 import io.github.iampopovich.eculense.core.model.SessionSource
@@ -116,9 +117,11 @@ internal fun ConnectionState.endsRecording(): Boolean =
 /**
  * PIDs a recording always polls (C1/C2): what the analytics rules and the trip calculator read, so a dashboard
  * without coolant or trims still yields complete recordings. They are read in their own (mostly slow) tier.
+ * Engine maps (D5) need load and trims against rpm, so their sensors are part of every recording too.
  */
 internal fun requiredPids(supported: Set<Int>): List<Pid> =
-    (SensorIds.FOR_RULES + SensorIds.FUEL_RATE)
+    (SensorIds.FOR_RULES + SensorIds.FUEL_RATE + EngineMaps.SENSORS)
+        .distinct()
         .mapNotNull { id -> StandardPids.all.firstOrNull { it.sensorId == id } }
         .filter { it.code in supported }
         .sortedBy { it.code }
