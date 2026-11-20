@@ -6,6 +6,7 @@ import io.github.iampopovich.eculense.core.dtcdb.DtcDescriptions
 import io.github.iampopovich.eculense.core.navigation.DtcDestination
 import io.github.iampopovich.eculense.core.navigation.Hub
 import io.github.iampopovich.eculense.core.navigation.HubEntry
+import io.github.iampopovich.eculense.core.navigation.Mode06Destination
 import kotlinx.coroutines.flow.first
 import org.koin.core.annotation.KoinExperimentalAPI
 import org.koin.core.module.dsl.viewModel
@@ -30,8 +31,13 @@ val dtcModule = module {
         }
     }
     viewModel { DtcViewModel(get(), get(), get(), routeHandlers = getAll(), historySource = get()) }
+    viewModel { Mode06ViewModel(get()) }
     navigation<DtcDestination> { DtcRoute() }
+    navigation<Mode06Destination> { Mode06Route() }
     single(named("dtc-hub")) {
         HubEntry(Hub.PITSTOP, DtcDestination, R.string.dtc_hub_title, R.string.dtc_hub_subtitle, R.drawable.ic_dtc, order = 10)
+    }
+    single(named("mode06-hub")) {
+        HubEntry(Hub.PITSTOP, Mode06Destination, R.string.mode06_hub_title, R.string.mode06_hub_subtitle, R.drawable.ic_check, order = 11)
     }
 }

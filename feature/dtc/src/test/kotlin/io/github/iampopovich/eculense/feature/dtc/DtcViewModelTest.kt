@@ -1,19 +1,27 @@
 package io.github.iampopovich.eculense.feature.dtc
 
 import io.github.iampopovich.eculense.core.data.DtcRepository
+import io.github.iampopovich.eculense.core.data.ReadinessReason
 import io.github.iampopovich.eculense.core.dtcdb.DtcInfo
 import io.github.iampopovich.eculense.core.dtcdb.DtcSource
 import io.github.iampopovich.eculense.core.model.Dtc
 import io.github.iampopovich.eculense.core.model.DtcKind
+import io.github.iampopovich.eculense.core.model.FreezeFrame
+import io.github.iampopovich.eculense.core.model.SensorReading
 import io.github.iampopovich.eculense.core.obd.AdapterEndpoint
+import io.github.iampopovich.eculense.core.obd.ClearedCounters
 import io.github.iampopovich.eculense.core.obd.ConnectionState
 import io.github.iampopovich.eculense.core.obd.FakeCar
 import io.github.iampopovich.eculense.core.obd.FakeConnectionController
 import io.github.iampopovich.eculense.core.obd.FakeSession
 import io.github.iampopovich.eculense.core.obd.ObdConnectionManager
+import io.github.iampopovich.eculense.core.obd.ObdError
 import io.github.iampopovich.eculense.core.obd.ObdTransport
+import io.github.iampopovich.eculense.core.obd.Readiness
+import io.github.iampopovich.eculense.core.obd.RecentClearVerdict
 import io.github.iampopovich.eculense.core.obd.ScriptedTransport
 import io.github.iampopovich.eculense.core.obd.TransportFactory
+import io.github.iampopovich.eculense.core.obdtext.R as ObdTextR
 import io.github.iampopovich.eculense.core.ui.UiText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -33,6 +41,8 @@ private class FakeDtcRepository(private val session: FakeSession? = null) : DtcR
     val saved = mutableListOf<Dtc>()
     /** Every successful read passed to the repository (the repository itself drops duplicates). */
     val reads = mutableListOf<List<Dtc>>()
+    val frames = mutableListOf<FreezeFrame?>()
+    val readiness = mutableListOf<Pair<ReadinessReason, Readiness?>>()
     /** How many clears had happened at write time: the snapshot must come before the clear. */
     val clearCallsAtRecord = mutableListOf<Int>()
     override suspend fun saveSnapshot(dtcs: List<Dtc>, vin: String?, takenAtMs: Long?, carId: Long?) {
@@ -42,6 +52,13 @@ private class FakeDtcRepository(private val session: FakeSession? = null) : DtcR
         reads += dtcs
         clearCallsAtRecord += session?.clearCalls ?: 0
         return true
+    }
+    override suspend fun recordRead(dtcs: List<Dtc>, vin: String?, freezeFrame: FreezeFrame?): Boolean {
+        if (freezeFrame != null) frames += freezeFrame
+        return recordRead(dtcs, vin)
+    }
+    override suspend fun saveReadiness(reason: ReadinessReason, readiness: Readiness?, counters: ClearedCounters?) {
+        this.readiness += reason to readiness
     }
 }
 
@@ -135,12 +152,87 @@ class DtcViewModelTest {
         val repository = FakeDtcRepository(session)
         val vm = DtcViewModel(FakeConnectionController(session = session), descriptions, repository, emptyList())
         vm.read()
-        vm.clear()
+        vm.clear(stationaryConfirmed = true)
         // read + snapshot before clearing (identical, the repository drops the duplicate); both before the clear
         assertEquals(listOf(listOf(p0133), listOf(p0133)), repository.reads)
         assertEquals(listOf(0, 0), repository.clearCallsAtRecord)
         assertEquals(1, session.clearCalls)
         assertEquals(emptyList<Any>(), vm.uiState.value.items)
+    }
+
+    // Readiness: MIL + 2 codes, all complete; after the clear 3 monitors incomplete. Freeze frame for P0133.
+    private val diagReplies = mapOf(
+        "0101" to "41 01 82 07 65 00",
+        "0130" to "41 30 0C",
+        "0131" to "41 31 04 E2",
+        "020000" to "42 00 00 40 08 00 00",
+        "020200" to "42 02 00 01 33",
+        "020D00" to "42 0D 00 3F",
+    )
+    private val afterClearReplies = mapOf("0101" to "41 01 00 07 65 25", "0130" to "41 30 00", "0131" to "41 31 00 00")
+    private val connectedState = FakeConnectionController.connected(setOf(0x0D, 0x30, 0x31))
+
+    @Test
+    fun `read shows the freeze frame on its code, readiness and the used-car check`() = runTest {
+        val session = FakeSession(dtcs = listOf(p0133, Dtc("P0171", DtcKind.PENDING)), replies = diagReplies)
+        val repository = FakeDtcRepository(session)
+        val vm = DtcViewModel(FakeConnectionController(initial = connectedState, session = session), descriptions, repository, emptyList())
+        vm.read()
+        val s = vm.uiState.value
+        assertEquals(63.0, s.items.first { it.dtc.code == "P0133" }.freezeFrame!!.value("01.0D")!!, 1e-9)
+        assertEquals(null, s.items.first { it.dtc.code == "P0171" }.freezeFrame)
+        assertTrue(s.readiness!!.milOn)
+        assertTrue(s.readiness!!.allComplete)
+        assertEquals(RecentClearVerdict.NO_SIGNS, s.usedCar!!.verdict)
+        assertEquals(1250, s.usedCar!!.counters.kmSinceClear)
+        assertEquals("P0133", repository.frames.single()?.dtcCode)
+    }
+
+    @Test
+    fun `clear saves readiness before and after and shows the comparison`() = runTest {
+        val session = FakeSession(dtcs = listOf(p0133), replies = diagReplies, afterClear = afterClearReplies)
+        val repository = FakeDtcRepository(session)
+        val vm = DtcViewModel(FakeConnectionController(initial = connectedState, session = session), descriptions, repository, emptyList())
+        vm.read()
+        vm.clear(stationaryConfirmed = true)
+        val c = vm.uiState.value.comparison!!
+        assertEquals(listOf("P0133"), c.codesBefore)
+        assertEquals(emptyList<String>(), c.codesAfter)
+        assertEquals(true to false, c.milBefore to c.milAfter)
+        assertEquals(0 to 3, c.incompleteBefore to c.incompleteAfter)
+        assertEquals(listOf(ReadinessReason.BEFORE_CLEAR, ReadinessReason.AFTER_CLEAR), repository.readiness.map { it.first })
+        assertEquals(RecentClearVerdict.LIKELY_CLEARED, vm.uiState.value.usedCar!!.verdict)
+    }
+
+    @Test
+    fun `clear is refused while the car moves and without confirmation when speed is unknown`() = runTest {
+        var t = 10_000L
+        val session = FakeSession(dtcs = listOf(p0133))
+        val controller = FakeConnectionController(initial = connectedState, session = session)
+        val vm = DtcViewModel(controller, descriptions, FakeDtcRepository(session), emptyList(), now = { t })
+        assertEquals(listOf(0x0D), controller.polledBy.value.getValue(DtcViewModel.OWNER).map { it.code })
+        controller.readingsFlow.emit(SensorReading("01.0D", 30.0, "km/h", 0))
+        assertEquals(SpeedGate.MOVING, vm.uiState.value.speed)
+        vm.clear(stationaryConfirmed = true)
+        assertEquals(0, session.clearCalls)
+        assertEquals(UiText.Res(R.string.dtc_clear_blocked_moving), vm.uiState.value.error)
+        controller.readingsFlow.emit(SensorReading("01.0D", 0.0, "km/h", 0))
+        assertEquals(SpeedGate.STOPPED, vm.uiState.value.speed)
+        t += 2_500
+        controller.readingsFlow.emit(SensorReading("01.0C", 800.0, "rpm", 0))
+        assertEquals(SpeedGate.UNKNOWN, DtcViewModel.gateOf(0.0 to 10_000L, t))
+        vm.clear()
+        assertEquals(0, session.clearCalls)
+        vm.onClearedForTest()
+        assertTrue(DtcViewModel.OWNER !in controller.polledBy.value)
+    }
+
+    @Test
+    fun `a clear refused by the ECU shows the typed error`() = runTest {
+        val session = FakeSession(dtcs = listOf(p0133), clearError = ObdError.ClearRefused(0x22))
+        val vm = DtcViewModel(FakeConnectionController(session = session), descriptions, FakeDtcRepository(session), emptyList())
+        vm.clear(stationaryConfirmed = true)
+        assertEquals(UiText.Res(ObdTextR.string.obd_error_clear_refused_conditions), vm.uiState.value.error)
     }
 
     @Test

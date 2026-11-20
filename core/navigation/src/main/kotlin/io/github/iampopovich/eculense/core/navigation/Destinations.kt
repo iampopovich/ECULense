@@ -21,6 +21,9 @@ interface FullScreenDestination
 @Serializable data object PitstopDestination : NavKey
 @Serializable data object SettingsDestination : NavKey
 @Serializable data object DtcDestination : NavKey
+
+/** B8: on-board test results (mode 06), a Pit-stop item of the DTC feature. */
+@Serializable data object Mode06Destination : NavKey
 @Serializable data object SessionsDestination : NavKey
 @Serializable data class SessionDetailDestination(val sessionId: Long) : NavKey
 @Serializable data object AiSettingsDestination : NavKey

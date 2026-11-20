@@ -13,7 +13,7 @@
         <item quantity="other">%1$d раза, последний раз %2$s</item>
     </plurals>
     <string name="dtc_clear_title">Сбросить ошибки?</string>
-    <string name="dtc_clear_text">Двигатель заглушен, зажигание включено? Сброс сотрёт коды и стоп-кадры, мониторы готовности обнулятся (машина не пройдёт экологический тест до полного ездового цикла). Текущие коды сохранятся в истории.</string>
+    <string name="dtc_clear_text">Двигатель заглушен, зажигание включено. Перед сбросом всё ниже сохранится в историю. Сброс сотрёт:</string>
     <string name="dtc_ask_ai">Спросить ИИ</string>
     <string name="dtc_causes">Причины: %1$s</string>
     <string name="dtc_symptoms">Симптомы: %1$s</string>
@@ -29,4 +29,92 @@
     <string name="dtc_ask_ai_oem_unknown">заводской код производителя, расшифровка неизвестна</string>
     <string name="dtc_ask_ai_causes">Частые причины по базе OBDex: %1$s</string>
     <string name="dtc_ask_ai_tail">причины, что проверить, насколько срочно.</string>
+
+    <!-- B3 freeze frame -->
+    <string name="dtc_freeze_title">Стоп-кадр по %1$s</string>
+
+    <!-- B1 readiness -->
+    <string name="dtc_readiness_title">Готовность систем</string>
+    <string name="dtc_readiness_mil_on">Check Engine горит (сохранено кодов: %1$d)</string>
+    <string name="dtc_readiness_mil_off">Check Engine не горит</string>
+    <string name="dtc_readiness_ready">Готова к техосмотру: все поддерживаемые мониторы завершены</string>
+    <plurals name="dtc_readiness_not_ready">
+        <item quantity="one">%1$d монитор не завершён: к техосмотру пока не готова</item>
+        <item quantity="few">%1$d монитора не завершены: к техосмотру пока не готова</item>
+        <item quantity="many">%1$d мониторов не завершены: к техосмотру пока не готова</item>
+        <item quantity="other">%1$d монитора не завершены: к техосмотру пока не готова</item>
+    </plurals>
+    <string name="dtc_readiness_none">Блок не сообщает о мониторах готовности</string>
+    <string name="dtc_readiness_disclaimer">Это OBD-готовность по данным блока, а не гарантия прохождения техосмотра.</string>
+    <string name="dtc_monitor_complete">завершён</string>
+    <string name="dtc_monitor_incomplete">не завершён</string>
+    <string name="dtc_monitor_not_supported">не поддерживается</string>
+    <string name="dtc_monitor_this_trip">в этой поездке: %1$s</string>
+    <string name="dtc_monitor_misfire">Пропуски зажигания</string>
+    <string name="dtc_monitor_fuel_system">Топливная система</string>
+    <string name="dtc_monitor_components">Компоненты</string>
+    <string name="dtc_monitor_catalyst">Катализатор</string>
+    <string name="dtc_monitor_heated_catalyst">Подогрев катализатора</string>
+    <string name="dtc_monitor_evap">Улавливание паров топлива (EVAP)</string>
+    <string name="dtc_monitor_secondary_air">Вторичный воздух</string>
+    <string name="dtc_monitor_ac">Хладагент кондиционера</string>
+    <string name="dtc_monitor_o2">Датчики кислорода</string>
+    <string name="dtc_monitor_o2_heater">Подогрев датчиков кислорода</string>
+    <string name="dtc_monitor_egr">Система EGR</string>
+    <string name="dtc_monitor_nmhc">Катализатор NMHC</string>
+    <string name="dtc_monitor_nox">NOx / SCR</string>
+    <string name="dtc_monitor_boost">Давление наддува</string>
+    <string name="dtc_monitor_exhaust_sensor">Датчик отработавших газов</string>
+    <string name="dtc_monitor_pm_filter">Сажевый фильтр</string>
+    <string name="dtc_monitor_egr_vvt">EGR / VVT</string>
+
+    <!-- B2 used-car check -->
+    <string name="dtc_usedcar_title">Коды недавно стёрли?</string>
+    <string name="dtc_usedcar_likely">Похоже, коды стирали недавно</string>
+    <string name="dtc_usedcar_possibly">Возможно, коды стирали недавно</string>
+    <string name="dtc_usedcar_no_signs">Признаков недавнего сброса нет</string>
+    <string name="dtc_usedcar_unknown">Блок не отдаёт счётчики для проверки</string>
+    <string name="dtc_usedcar_likely_explain">После сброса счётчики начинаются с нуля, а мониторам снова нужен полный ездовой цикл. При покупке б/у машины так могут скрыть неисправность: спросите, зачем стирали коды, и проверьте снова через 100–200 км.</string>
+    <string name="dtc_usedcar_possibly_explain">Есть только один признак: малые счётчики или незавершённые мониторы. Так же бывает после отключения аккумулятора; проверьте снова через несколько поездок.</string>
+    <string name="dtc_usedcar_no_signs_explain">Счётчики показывают, что с последнего сброса прошло много времени, мониторы завершены.</string>
+    <string name="dtc_usedcar_warmups">Прогревов после сброса: %1$d</string>
+    <string name="dtc_usedcar_km">Пробег после сброса: %1$d км</string>
+    <string name="dtc_usedcar_minutes">Работа двигателя после сброса: %1$d ч %2$d мин</string>
+    <string name="dtc_usedcar_mil_minutes">Время с горящим Check Engine: %1$d ч %2$d мин</string>
+    <string name="dtc_usedcar_mil_km">Пробег с горящим Check Engine: %1$d км</string>
+    <string name="dtc_usedcar_incomplete">Незавершённых мониторов: %1$d</string>
+
+    <!-- B4 safe clear -->
+    <string name="dtc_clear_blocked_moving">Остановите машину: коды стираются только на месте</string>
+    <string name="dtc_clear_confirm_stationary">Подтвердите, что машина стоит</string>
+    <string name="dtc_clear_no_speed">Машина сейчас не отдаёт скорость.</string>
+    <string name="dtc_clear_checkbox">Машина стоит, двигатель можно заглушить</string>
+    <string name="dtc_clear_loss_freeze">стоп-кадр (условия, при которых появился код)</string>
+    <string name="dtc_clear_loss_readiness">результаты готовности: мониторы начнут заново, до полного ездового цикла машина не готова к техосмотру</string>
+    <string name="dtc_clear_loss_counters">счётчики после прошлого сброса (прогревы, пробег, время)</string>
+    <string name="dtc_clear_return">Если неисправность осталась, коды вернутся.</string>
+    <string name="dtc_compare_title">До и после сброса</string>
+    <string name="dtc_compare_codes">Коды: %1$d → %2$d</string>
+    <string name="dtc_compare_mil">Check Engine: %1$s → %2$s</string>
+    <string name="dtc_compare_incomplete">Незавершённых мониторов: %1$d → %2$d</string>
+    <string name="dtc_compare_returned">Сразу вернулись: %1$s (неисправность осталась)</string>
+    <string name="dtc_compare_clean">Сразу коды не вернулись</string>
+    <string name="dtc_mil_on">горит</string>
+    <string name="dtc_mil_off">не горит</string>
+
+    <!-- B8 mode 06 -->
+    <string name="dtc_mode06_open">Результаты самодиагностики (режим 06)</string>
+    <string name="mode06_hub_title">Результаты самодиагностики</string>
+    <string name="mode06_hub_subtitle">Тесты мониторов блока с пределами (машины с CAN)</string>
+    <string name="mode06_intro">Собственные тесты блока по каждому монитору: измеренное значение и его пределы. Проваленный тест часто появляется раньше кода.</string>
+    <string name="mode06_read">Прочитать результаты</string>
+    <string name="mode06_kline">На машинах с K-Line эти результаты идут в старом заводском формате и не показываются. Для такой машины это нормально.</string>
+    <string name="mode06_none">Блок не отдаёт результатов тестов</string>
+    <string name="mode06_test">Тест %1$s · MID %2$s</string>
+    <string name="mode06_limits">%1$s · пределы %2$s…%3$s</string>
+    <string name="mode06_raw">(сырое значение, единица %1$s)</string>
+    <string name="mode06_pass">НОРМА</string>
+    <string name="mode06_fail">НЕ НОРМА</string>
+    <string name="mode06_group_o2">Датчики кислорода</string>
+    <string name="mode06_group_other">Прочее</string>
 </resources>

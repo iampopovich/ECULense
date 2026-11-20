@@ -69,15 +69,35 @@ class DtcScreenTest {
     @Test
     fun clearAsksForConfirmation() {
         var cleared = 0
-        rule.setContent { DtcScreen(DtcUiState(items = items), onRead = {}, onClear = { cleared++ }, onAskAi = { _, _ -> }) }
+        rule.setContent { DtcScreen(DtcUiState(items = items, speed = SpeedGate.STOPPED), onRead = {}, onClear = { cleared++ }, onAskAi = { _, _ -> }) }
         rule.onNodeWithText(str(R.string.dtc_clear)).performClick()
         rule.onNodeWithText(str(R.string.dtc_clear_title)).assertExists()
+        rule.onNodeWithText(str(R.string.dtc_clear_loss_freeze), substring = true).assertExists()
         rule.onNodeWithText(str(CoreUiR.string.common_cancel)).performClick()
         assertEquals(0, cleared)
         rule.onNodeWithText(str(R.string.dtc_clear)).performClick()
         rule.onNode(hasText(str(R.string.dtc_clear)) and hasAnyAncestor(isDialog())).performClick()
         rule.waitForIdle()
         assertEquals(1, cleared)
+    }
+
+    @Test
+    fun withoutSpeedTheClearNeedsTheStationaryCheckbox() {
+        var confirmed: Boolean? = null
+        rule.setContent { DtcScreen(DtcUiState(items = items), onRead = {}, onClear = { confirmed = it }, onAskAi = { _, _ -> }) }
+        rule.onNodeWithText(str(R.string.dtc_clear)).performClick()
+        rule.onNode(hasText(str(R.string.dtc_clear)) and hasAnyAncestor(isDialog())).assertIsNotEnabled()
+        rule.onNodeWithText(str(R.string.dtc_clear_checkbox)).performClick()
+        rule.onNode(hasText(str(R.string.dtc_clear)) and hasAnyAncestor(isDialog())).performClick()
+        rule.waitForIdle()
+        assertEquals(true, confirmed)
+    }
+
+    @Test
+    fun clearDisabledWhileMoving() {
+        rule.setContent { DtcScreen(DtcUiState(items = items, speed = SpeedGate.MOVING), onRead = {}, onClear = {}, onAskAi = { _, _ -> }) }
+        rule.onNodeWithText(str(R.string.dtc_clear)).assertIsNotEnabled()
+        rule.onNodeWithText(str(R.string.dtc_clear_blocked_moving)).assertExists()
     }
 
     @Test

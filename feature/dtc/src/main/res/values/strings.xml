@@ -11,7 +11,7 @@
         <item quantity="other">%1$d times, last on %2$s</item>
     </plurals>
     <string name="dtc_clear_title">Clear codes?</string>
-    <string name="dtc_clear_text">Engine off, ignition on? Clearing erases codes and freeze frames and resets readiness monitors (the car won\'t pass an emissions test until a full drive cycle). Current codes are kept in the history.</string>
+    <string name="dtc_clear_text">Engine off, ignition on. Before the clear, everything below is saved to the history. A clear erases:</string>
     <string name="dtc_ask_ai">Ask AI</string>
     <string name="dtc_causes">Causes: %1$s</string>
     <string name="dtc_symptoms">Symptoms: %1$s</string>
@@ -27,4 +27,90 @@
     <string name="dtc_ask_ai_oem_unknown">manufacturer-specific code, description unknown</string>
     <string name="dtc_ask_ai_causes">Common causes per the OBDex database: %1$s</string>
     <string name="dtc_ask_ai_tail">causes, what to check, how urgent.</string>
+
+    <!-- B3 freeze frame -->
+    <string name="dtc_freeze_title">Freeze frame for %1$s</string>
+
+    <!-- B1 readiness -->
+    <string name="dtc_readiness_title">Readiness</string>
+    <string name="dtc_readiness_mil_on">Check Engine lamp is ON (stored codes: %1$d)</string>
+    <string name="dtc_readiness_mil_off">Check Engine lamp is off</string>
+    <string name="dtc_readiness_ready">Ready for inspection: every supported monitor is complete</string>
+    <plurals name="dtc_readiness_not_ready">
+        <item quantity="one">%1$d monitor is not complete: not ready for inspection yet</item>
+        <item quantity="other">%1$d monitors are not complete: not ready for inspection yet</item>
+    </plurals>
+    <string name="dtc_readiness_none">The ECU reports no readiness monitors</string>
+    <string name="dtc_readiness_disclaimer">This is the OBD readiness the ECU reports, not a guarantee of passing a legal inspection.</string>
+    <string name="dtc_monitor_complete">complete</string>
+    <string name="dtc_monitor_incomplete">not complete</string>
+    <string name="dtc_monitor_not_supported">not supported</string>
+    <string name="dtc_monitor_this_trip">this trip: %1$s</string>
+    <string name="dtc_monitor_misfire">Misfire</string>
+    <string name="dtc_monitor_fuel_system">Fuel system</string>
+    <string name="dtc_monitor_components">Components</string>
+    <string name="dtc_monitor_catalyst">Catalyst</string>
+    <string name="dtc_monitor_heated_catalyst">Heated catalyst</string>
+    <string name="dtc_monitor_evap">Evaporative system (EVAP)</string>
+    <string name="dtc_monitor_secondary_air">Secondary air</string>
+    <string name="dtc_monitor_ac">A/C refrigerant</string>
+    <string name="dtc_monitor_o2">Oxygen sensors</string>
+    <string name="dtc_monitor_o2_heater">Oxygen sensor heaters</string>
+    <string name="dtc_monitor_egr">EGR system</string>
+    <string name="dtc_monitor_nmhc">NMHC catalyst</string>
+    <string name="dtc_monitor_nox">NOx / SCR</string>
+    <string name="dtc_monitor_boost">Boost pressure</string>
+    <string name="dtc_monitor_exhaust_sensor">Exhaust gas sensor</string>
+    <string name="dtc_monitor_pm_filter">Particulate filter</string>
+    <string name="dtc_monitor_egr_vvt">EGR / VVT</string>
+
+    <!-- B2 used-car check -->
+    <string name="dtc_usedcar_title">Codes cleared recently?</string>
+    <string name="dtc_usedcar_likely">Looks like the codes were cleared recently</string>
+    <string name="dtc_usedcar_possibly">The codes may have been cleared recently</string>
+    <string name="dtc_usedcar_no_signs">No signs of a recent clear</string>
+    <string name="dtc_usedcar_unknown">The ECU gives no counters to check this</string>
+    <string name="dtc_usedcar_likely_explain">After a clear the counters start from zero and the monitors need a full drive cycle again. When buying a used car this can hide a fault: ask why the codes were cleared and check again after 100–200 km.</string>
+    <string name="dtc_usedcar_possibly_explain">Only one sign: low counters or monitors that are not complete. A disconnected battery gives the same picture; check again after a few trips.</string>
+    <string name="dtc_usedcar_no_signs_explain">The counters show a long time since the last clear and the monitors are complete.</string>
+    <string name="dtc_usedcar_warmups">Warm-ups since the clear: %1$d</string>
+    <string name="dtc_usedcar_km">Distance since the clear: %1$d km</string>
+    <string name="dtc_usedcar_minutes">Engine time since the clear: %1$d h %2$d min</string>
+    <string name="dtc_usedcar_mil_minutes">Time with Check Engine on: %1$d h %2$d min</string>
+    <string name="dtc_usedcar_mil_km">Distance with Check Engine on: %1$d km</string>
+    <string name="dtc_usedcar_incomplete">Monitors not complete: %1$d</string>
+
+    <!-- B4 safe clear -->
+    <string name="dtc_clear_blocked_moving">Stop the car: codes can only be cleared at a standstill</string>
+    <string name="dtc_clear_confirm_stationary">Confirm that the car stands still</string>
+    <string name="dtc_clear_no_speed">The car gives no speed data right now.</string>
+    <string name="dtc_clear_checkbox">The car stands still, the engine can be switched off</string>
+    <string name="dtc_clear_loss_freeze">the freeze frame (conditions when the code appeared)</string>
+    <string name="dtc_clear_loss_readiness">readiness results: the monitors start over, the car is not ready for inspection until a full drive cycle</string>
+    <string name="dtc_clear_loss_counters">the counters since the last clear (warm-ups, distance, time)</string>
+    <string name="dtc_clear_return">If the fault is still there, the codes come back.</string>
+    <string name="dtc_compare_title">Before and after the clear</string>
+    <string name="dtc_compare_codes">Codes: %1$d → %2$d</string>
+    <string name="dtc_compare_mil">Check Engine: %1$s → %2$s</string>
+    <string name="dtc_compare_incomplete">Monitors not complete: %1$d → %2$d</string>
+    <string name="dtc_compare_returned">Came back right away: %1$s (the fault is still there)</string>
+    <string name="dtc_compare_clean">No codes came back right away</string>
+    <string name="dtc_mil_on">on</string>
+    <string name="dtc_mil_off">off</string>
+
+    <!-- B8 mode 06 -->
+    <string name="dtc_mode06_open">Self-test results (mode 06)</string>
+    <string name="mode06_hub_title">Self-test results</string>
+    <string name="mode06_hub_subtitle">ECU monitor tests with limits (CAN cars)</string>
+    <string name="mode06_intro">The ECU\'s own test results for each monitor: the measured value and its limits. A failed test often comes before a code.</string>
+    <string name="mode06_read">Read results</string>
+    <string name="mode06_kline">On K-Line cars these results use an older maker-specific format and are not shown. This is normal for such a car.</string>
+    <string name="mode06_none">The ECU reports no test results</string>
+    <string name="mode06_test">Test %1$s · MID %2$s</string>
+    <string name="mode06_limits">%1$s · limits %2$s…%3$s</string>
+    <string name="mode06_raw">(raw, unit id %1$s)</string>
+    <string name="mode06_pass">OK</string>
+    <string name="mode06_fail">FAIL</string>
+    <string name="mode06_group_o2">Oxygen sensors</string>
+    <string name="mode06_group_other">Other</string>
 </resources>
