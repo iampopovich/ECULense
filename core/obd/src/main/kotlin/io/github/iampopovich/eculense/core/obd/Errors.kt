@@ -19,6 +19,9 @@ sealed interface ObdError {
     /** The ECU does not answer (ignition off?). */
     data object EcuSilent : ObdError
 
+    /** K-Line bus initialization failed ("BUS INIT: ...ERROR"): ignition off or the ECU did not wake up. */
+    data object BusInitFailed : ObdError
+
     /** The adapter answered [command] with the error reply [detail]. */
     data class CommandFailed(val command: String, val detail: String) : ObdError
 
@@ -61,6 +64,7 @@ sealed interface ObdError {
             is NoTransport -> "no transport '$kind'"
             is NoProtocol -> "adapter found no protocol: $detail"
             EcuSilent -> "ECU does not respond"
+            BusInitFailed -> "bus init failed (BUS INIT: ERROR)"
             is CommandFailed -> "$command → $detail"
             AdapterClosed -> "adapter closed the connection"
             NotOpen -> "transport is not open"

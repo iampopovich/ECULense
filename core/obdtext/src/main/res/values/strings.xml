@@ -4,6 +4,7 @@
     <string name="obd_error_no_transport">No transport for \'%1$s\'</string>
     <string name="obd_error_no_protocol">The adapter found no vehicle protocol: %1$s</string>
     <string name="obd_error_ecu_silent">The ECU does not respond. Is the ignition on?</string>
+    <string name="obd_error_bus_init_failed">The vehicle bus did not initialize. Turn the ignition on and try again.</string>
     <string name="obd_error_command_failed" translatable="false">%1$s → %2$s</string>
     <string name="obd_error_adapter_closed">The adapter closed the connection</string>
     <string name="obd_error_not_open">The connection is not open</string>

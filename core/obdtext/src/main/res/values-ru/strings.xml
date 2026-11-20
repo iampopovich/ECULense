@@ -4,6 +4,7 @@
     <string name="obd_error_no_transport">Нет транспорта \'%1$s\'</string>
     <string name="obd_error_no_protocol">Адаптер не нашёл протокол: %1$s</string>
     <string name="obd_error_ecu_silent">ЭБУ молчит. Зажигание включено?</string>
+    <string name="obd_error_bus_init_failed">Шина не инициализировалась — включите зажигание и повторите</string>
     <string name="obd_error_adapter_closed">Адаптер закрыл соединение</string>
     <string name="obd_error_not_open">Транспорт не открыт</string>
     <string name="obd_error_no_baud_rate">ELM327 не отвечает ни на одной скорости: %1$s</string>

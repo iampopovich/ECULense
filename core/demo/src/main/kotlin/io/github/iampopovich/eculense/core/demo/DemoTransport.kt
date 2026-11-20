@@ -68,6 +68,8 @@ class DemoTransport internal constructor(
         throw ObdIoException(ObdError.DemoDisconnected, e)
     }
 
+    override suspend fun readAvailable(): ByteArray? = incoming.tryReceive().getOrNull()
+
     override suspend fun close() {
         closed = true
         incoming.close()

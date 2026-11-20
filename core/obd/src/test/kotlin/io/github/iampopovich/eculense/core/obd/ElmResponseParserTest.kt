@@ -30,4 +30,22 @@ class ElmResponseParserTest {
     fun `OK of AT command is empty data`() {
         assertEquals(ElmResult.Data(emptyList()), ElmResponseParser.parse("OK\r\r"))
     }
+
+    @Test
+    fun `BUS INIT progress and OK are noise`() {
+        assertEquals(ElmResult.Data(listOf("4100BE3FA813")), ElmResponseParser.parse("BUS INIT: ...OK\r41 00 BE 3F A8 13\r"))
+        assertEquals(ElmResult.Data(listOf("410D20")), ElmResponseParser.parse("BUS INIT: OK\r410D20\r"))
+    }
+
+    @Test
+    fun `BUS INIT ERROR is its own result`() {
+        assertEquals(ElmResult.BusInitFailed, ElmResponseParser.parse("BUS INIT: ...ERROR\r\r"))
+        assertEquals(ElmResult.BusInitFailed, ElmResponseParser.parse("BUS INIT: ERROR\r"))
+    }
+
+    @Test
+    fun `echo of the command and clone plus-lines are dropped`() {
+        assertEquals(ElmResult.Data(listOf("410D20")), ElmResponseParser.parse("01 0D\r410D20\r", command = "010D"))
+        assertEquals(ElmResult.Data(listOf("410D20")), ElmResponseParser.parse("+CONNECTED\r410D20\r", command = "010D"))
+    }
 }

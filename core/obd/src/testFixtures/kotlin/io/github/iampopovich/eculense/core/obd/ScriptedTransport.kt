@@ -27,6 +27,8 @@ class ScriptedTransport(
 
     override suspend fun read(): ByteArray = incoming.receive()
 
+    override suspend fun readAvailable(): ByteArray? = incoming.tryReceive().getOrNull()
+
     override suspend fun close() {
         incoming.close()
     }

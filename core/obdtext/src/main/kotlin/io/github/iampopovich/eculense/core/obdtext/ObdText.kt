@@ -13,6 +13,7 @@ object ObdText {
         is ObdError.NoTransport -> UiText.Res(R.string.obd_error_no_transport, listOf(e.kind))
         is ObdError.NoProtocol -> UiText.Res(R.string.obd_error_no_protocol, listOf(e.detail))
         ObdError.EcuSilent -> UiText.Res(R.string.obd_error_ecu_silent)
+        ObdError.BusInitFailed -> UiText.Res(R.string.obd_error_bus_init_failed)
         is ObdError.CommandFailed -> UiText.Res(R.string.obd_error_command_failed, listOf(e.command, e.detail))
         ObdError.AdapterClosed -> UiText.Res(R.string.obd_error_adapter_closed)
         ObdError.NotOpen -> UiText.Res(R.string.obd_error_not_open)

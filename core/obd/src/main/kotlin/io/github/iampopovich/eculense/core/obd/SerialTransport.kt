@@ -85,6 +85,8 @@ class SerialTransport(
 
     override suspend fun read(): ByteArray = chunks.receive()
 
+    override suspend fun readAvailable(): ByteArray? = chunks.tryReceive().getOrNull()
+
     override suspend fun close() {
         scope.cancel()
         withContext(Dispatchers.IO) { runCatching { port.close() } }

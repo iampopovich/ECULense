@@ -38,7 +38,7 @@ class ObdTextTest {
             ObdError.Timeout("x"), ObdError.NoTransport("x"), ObdError.NoProtocol("x"), ObdError.EcuSilent,
             ObdError.CommandFailed("x", "y"), ObdError.AdapterClosed, ObdError.NotOpen, ObdError.NoBaudRate(listOf(1)),
             ObdError.DemoDisconnected, ObdError.NoBluetooth, ObdError.UsbNoAccess, ObdError.UsbPermissionDenied,
-            ObdError.UsbNotOpen, ObdError.UsbDetached, ObdError.LinkLost(ObdError.NotOpen),
+            ObdError.UsbNotOpen, ObdError.UsbDetached, ObdError.LinkLost(ObdError.NotOpen), ObdError.BusInitFailed,
         )
         typed.forEach { assertTrue(it.toString(), ObdText.error(it) is UiText.Res) }
     }

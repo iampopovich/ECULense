@@ -1,12 +1,25 @@
 package io.github.iampopovich.eculense.core.obd
 
+import kotlinx.coroutines.withTimeoutOrNull
+
 /** Channel to the adapter. One instance = one connection (not reused after close()). */
 interface ObdTransport {
     suspend fun open()
     suspend fun write(data: ByteArray)
     /** Waits until at least one byte arrives. Throws IOException if the link is lost. */
     suspend fun read(): ByteArray
+
+    /**
+     * Bytes that already arrived, without waiting; null when nothing is pending. Used to drop stale replies before a
+     * new command. The default polls [read] for a few milliseconds; channel-based transports override it to be instant.
+     */
+    suspend fun readAvailable(): ByteArray? = withTimeoutOrNull(DRAIN_POLL_MS) { read() }
+
     suspend fun close()
+
+    companion object {
+        const val DRAIN_POLL_MS = 5L
+    }
 }
 
 /**
