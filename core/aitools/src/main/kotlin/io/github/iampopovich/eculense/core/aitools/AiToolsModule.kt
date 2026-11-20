@@ -2,7 +2,9 @@ package io.github.iampopovich.eculense.core.aitools
 
 import ai.koog.agents.core.tools.ToolRegistry
 import io.github.iampopovich.eculense.core.ai.VehicleToolbox
+import io.github.iampopovich.eculense.core.data.AccelCalibrations
 import io.github.iampopovich.eculense.core.data.AnalyticsRepository
+import io.github.iampopovich.eculense.core.data.StylePrefs
 import io.github.iampopovich.eculense.core.data.CarRepository
 import io.github.iampopovich.eculense.core.data.ExpenseRepository
 import io.github.iampopovich.eculense.core.data.FuelPrefs
@@ -27,10 +29,13 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
         fuelPrefs: FuelPrefs? = null,
         expenses: ExpenseRepository? = null,
         sessions: SessionRepository? = null,
+        stylePrefs: StylePrefs? = null,
+        calibrations: AccelCalibrations? = null,
     ) : this(
         ToolContext(
             analytics, cars, trips, describeDtc = { codes, make -> dtc?.describeAll(codes, make).orEmpty() }, maintenance = maintenance, events = events,
             fuel = fuel, fuelPrefs = fuelPrefs, expenses = expenses, sessions = sessions,
+            stylePrefs = stylePrefs, calibrations = calibrations,
         ),
     )
 
@@ -86,5 +91,5 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
 
 /** Wiring: one line in AppModules. Without this module the chat works, but without vehicle data. */
 val aiToolsModule = module {
-    single<VehicleToolbox> { VehicleDataToolbox(get(), get(), get(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull()) }
+    single<VehicleToolbox> { VehicleDataToolbox(get(), get(), get(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull()) }
 }

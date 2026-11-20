@@ -369,10 +369,13 @@ object AccelCalibrationRules {
             val da = p.a - ma
             s11 += d1 * d1; s22 += d2 * d2; s12 += d1 * d2; c1 += d1 * da; c2 += d2 * da
         }
+        if (s11 + s22 <= 1e-12 * n) return null // no horizontal variation at all
         val det = s11 * s22 - s12 * s12
-        if (det <= 1e-12 * n * n) return null
-        val w1 = (s22 * c1 - s12 * c2) / det
-        val w2 = (s11 * c2 - s12 * c1) / det
+        // One-dimensional signal (the sensor moved along a single line): Σ is singular, the covariance direction is
+        // then the regression direction.
+        val singular = det <= 1e-9 * (s11 + s22) * (s11 + s22)
+        val w1 = if (singular) c1 else (s22 * c1 - s12 * c2) / det
+        val w2 = if (singular) c2 else (s11 * c2 - s12 * c1) / det
         val wn = sqrt(w1 * w1 + w2 * w2).takeIf { it > 1e-12 } ?: return null
         val cos = w1 / wn
         val sin = w2 / wn

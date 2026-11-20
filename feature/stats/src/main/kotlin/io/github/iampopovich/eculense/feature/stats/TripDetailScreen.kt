@@ -1,6 +1,11 @@
 package io.github.iampopovich.eculense.feature.stats
 
+import android.content.Intent
 import androidx.annotation.StringRes
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,11 +61,27 @@ internal fun TripDetailRoute(tripId: Long, viewModel: TripDetailViewModel = koin
     val navigator = LocalNavigator.current
     val koin = getKoin()
     val hasMaps = remember { koin.getAll<RouteHandler>().any { it.routeClass == EngineMapDestination::class } }
-    TripDetailScreen(state, onEngineMap = if (hasMaps) ({ id -> navigator.navigate(EngineMapDestination(id)) }) else null)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val chooserTitle = stringResource(R.string.calib_export)
+    val actions = CalibrationActions(
+        onApply = viewModel::applyCalibration,
+        onReset = viewModel::resetCalibration,
+        onExport = {
+            scope.launch {
+                val file = viewModel.exportCsv() ?: return@launch
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.stats.files", file)
+                val send = Intent(Intent.ACTION_SEND).setType("text/csv").putExtra(Intent.EXTRA_STREAM, uri)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                context.startActivity(Intent.createChooser(send, chooserTitle))
+            }
+        },
+    )
+    TripDetailScreen(state, onEngineMap = if (hasMaps) ({ id -> navigator.navigate(EngineMapDestination(id)) }) else null, calibration = actions)
 }
 
 @Composable
-internal fun TripDetailScreen(state: TripDetailUiState, onEngineMap: ((Long) -> Unit)? = null) {
+internal fun TripDetailScreen(state: TripDetailUiState, onEngineMap: ((Long) -> Unit)? = null, calibration: CalibrationActions? = null) {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         val t = state.trip
         if (state.loading) {
@@ -93,6 +114,7 @@ internal fun TripDetailScreen(state: TripDetailUiState, onEngineMap: ((Long) -> 
             Text(stringResource(R.string.trip_no_recording), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         state.style?.let { StyleCard(it) }
+        if (calibration != null) state.calibration?.let { CalibrationCard(it, calibration) }
         state.series.forEach { Chart(it) }
         if (state.events.isNotEmpty()) {
             Text(stringResource(R.string.trip_events), style = MaterialTheme.typography.titleMedium)

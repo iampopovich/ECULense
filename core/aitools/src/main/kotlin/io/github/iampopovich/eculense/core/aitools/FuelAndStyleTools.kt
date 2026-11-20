@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense.core.aitools
 
+import io.github.iampopovich.eculense.core.analytics.StyleThresholds
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
 import io.github.iampopovich.eculense.core.analytics.CostSummary
@@ -194,6 +195,8 @@ internal class DrivingStyleTool(ctx: ToolContext) : VehicleTool<StyleArgs>(
         val sessions = ctx.sessions ?: return Compact.noData("recordings are not available")
         val zone = ctx.zone()
         val trips = ctx.trips.trips(carId).sortedByDescending { it.startedAtMs }
+        val override = ctx.stylePrefs?.let { p -> runCatching { p.harshMs2(carId).first() }.getOrNull() }
+        val harsh = override ?: StyleThresholds.HARSH_ACCEL_MS2
         val rows = mutableListOf<JsonObject>()
         for (t in trips) {
             if (rows.size >= args.limit.coerceIn(1, 5)) break
@@ -201,18 +204,22 @@ internal class DrivingStyleTool(ctx: ToolContext) : VehicleTool<StyleArgs>(
             val pts = sessions.readings(id)
                 .filter { (it.sensorId == SensorIds.SPEED || it.sensorId == SensorIds.RPM) && it.timestampMs in t.startedAtMs..t.endedAtMs }
                 .sortedBy { it.timestampMs }
-            val style = DrivingStyleRules.evaluate(pts.map { Triple(it.sensorId, it.value, it.timestampMs) })
+            val style = DrivingStyleRules.evaluate(pts.map { Triple(it.sensorId, it.value, it.timestampMs) }, harsh)
+            val calibration = ctx.calibrations?.takeIf { it.exists(id) }?.let { c -> runCatching { c.english(id, t.startedAtMs, t.endedAtMs) }.getOrNull() }
             rows += buildJsonObject {
                 put("date", Dates.dateTime(t.startedAtMs, zone))
                 put("km", Compact.num(t.distanceKm, 1))
                 if (style is DrivingStyle.Scored) put("score", style.score)
                 put("summary", DrivingStyleRules.english(style))
+                calibration?.let { put("phone_calibration", it) }
             }
         }
         if (rows.isEmpty()) return Compact.noData("no trips with a recording")
         return Compact.fit(rows, render = { it }) { list, truncated ->
             buildJsonObject {
                 put("trips", list)
+                put("harsh_threshold_g", Compact.num(harsh / StyleThresholds.G, 2))
+                put("threshold_source", if (override != null) "this car, from phone-accelerometer calibration" else "default (Geotab 0.3 g)")
                 if (truncated) put("truncated", true)
             }
         }

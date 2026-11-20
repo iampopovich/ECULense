@@ -156,6 +156,20 @@ class FuelAndStyleToolsTest {
         val style = DrivingStyleTool(ctx).json(StyleArgs())
         val first = style["trips"]!!.jsonArray.first().jsonObject
         assertTrue(first["summary"]!!.jsonPrimitive.content, first["summary"]!!.jsonPrimitive.content.contains("harsh accelerations 1"))
+        assertEquals("0.3", style["harsh_threshold_g"]!!.jsonPrimitive.content)
+        assertTrue(style["threshold_source"]!!.jsonPrimitive.content.startsWith("default"))
+    }
+
+    @Test
+    fun `driving style tool uses the per-car threshold from the calibration`() = runBlocking {
+        val prefs = io.github.iampopovich.eculense.core.data.InMemoryStylePrefs().apply { setHarshMs2(1, 100.0) }
+        val style = DrivingStyleTool(
+            ToolContext(analytics, cars, trips, clock = { T0 }, zone = { ZoneOffset.UTC }, log = { _, _, _ -> }, sessions = sessions, stylePrefs = prefs),
+        ).json(StyleArgs())
+        val first = style["trips"]!!.jsonArray.first().jsonObject
+        assertTrue(first["summary"]!!.jsonPrimitive.content.contains("harsh accelerations 0"))
+        assertTrue(style["threshold_source"]!!.jsonPrimitive.content.contains("calibration"))
+        assertFalse(style.toString().contains("phone_calibration"))
     }
 
     @Test

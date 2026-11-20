@@ -57,6 +57,9 @@ internal class ToolContext(
     val fuelPrefs: io.github.iampopovich.eculense.core.data.FuelPrefs? = null,
     val expenses: io.github.iampopovich.eculense.core.data.ExpenseRepository? = null,
     val sessions: io.github.iampopovich.eculense.core.data.SessionRepository? = null,
+    /** E5-lite: per-car harsh threshold and the phone-accelerometer calibration summary; null = not wired in. */
+    val stylePrefs: io.github.iampopovich.eculense.core.data.StylePrefs? = null,
+    val calibrations: io.github.iampopovich.eculense.core.data.AccelCalibrations? = null,
 )
 
 /** B10: events of one recording for the model (English, no location): type, local time, seconds from the start. */
