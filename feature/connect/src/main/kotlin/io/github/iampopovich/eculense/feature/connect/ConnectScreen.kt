@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -115,36 +116,42 @@ internal fun ConnectScreen(
     pollStats: PollStats? = null,
     vehicleInfo: VehicleInfo? = null,
 ) {
-    Column(modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(statusText(state), style = MaterialTheme.typography.titleMedium)
+    // One scrolling list: with a large font the adapter card alone fills the screen, and a fixed Column cut off
+    // the buttons and the adapter list below it (C13 screenshot).
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item(key = "status") { Text(statusText(state), style = MaterialTheme.typography.titleMedium) }
         if (state is ConnectionState.Failed) {
             ObdText.hint(state.error, state.endpoint.kind)?.let { hint ->
-                Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
-                    Text(
-                        hint.asString(),
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    )
+                item(key = "hint") {
+                    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
+                        Text(
+                            hint.asString(),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        )
+                    }
                 }
             }
         }
-        if (state is ConnectionState.Connected) AdapterRows(state, pollStats, vehicleInfo)
-        if (state.isSessionAlive) {
-            Button(onClick = onDisconnect) { Text(stringResource(R.string.connect_disconnect)) }
-        }
-        OutlinedButton(onClick = onRefresh) { Text(stringResource(R.string.connect_refresh)) }
-        TextButton(onClick = onSettings) { Text(stringResource(R.string.connect_settings)) }
-        if (endpoints.isEmpty()) {
-            Text(stringResource(R.string.connect_empty))
-        }
-        LazyColumn {
-            items(endpoints, key = { it.kind + it.address }) { endpoint ->
-                ListItem(
-                    headlineContent = { Text(ObdText.endpointLabel(endpoint).asString()) },
-                    supportingContent = { Text(ObdText.endpointDetail(endpoint).asString()) },
-                    modifier = Modifier.clickable(enabled = state !is ConnectionState.Connecting) { onConnect(endpoint) },
-                )
+        if (state is ConnectionState.Connected) item(key = "caps") { AdapterRows(state, pollStats, vehicleInfo) }
+        item(key = "actions") {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (state.isSessionAlive) {
+                    Button(onClick = onDisconnect) { Text(stringResource(R.string.connect_disconnect)) }
+                }
+                OutlinedButton(onClick = onRefresh) { Text(stringResource(R.string.connect_refresh)) }
+                TextButton(onClick = onSettings) { Text(stringResource(R.string.connect_settings)) }
+                if (endpoints.isEmpty()) {
+                    Text(stringResource(R.string.connect_empty))
+                }
             }
+        }
+        items(endpoints, key = { it.kind + it.address }) { endpoint ->
+            ListItem(
+                headlineContent = { Text(ObdText.endpointLabel(endpoint).asString()) },
+                supportingContent = { Text(ObdText.endpointDetail(endpoint).asString()) },
+                modifier = Modifier.clickable(enabled = state !is ConnectionState.Connecting) { onConnect(endpoint) },
+            )
         }
     }
 }

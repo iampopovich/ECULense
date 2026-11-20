@@ -2,6 +2,8 @@ package io.github.iampopovich.eculense.feature.dtc
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,6 +76,7 @@ internal fun DtcRoute(viewModel: DtcViewModel = koinViewModel()) {
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun DtcScreen(
     state: DtcUiState,
@@ -88,7 +91,8 @@ internal fun DtcScreen(
     LazyColumn(modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item(key = "actions") {
             Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // FlowRow: with a large font the second button moves to the next line instead of wrapping by letters.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = onRead, enabled = !state.loading) { Text(stringResource(R.string.dtc_read)) }
                     OutlinedButton(onClick = { confirmClear = true }, enabled = canClear) { Text(stringResource(R.string.dtc_clear)) }
                 }
@@ -105,8 +109,7 @@ internal fun DtcScreen(
             Column {
                 ListItem(
                     headlineContent = { Text("${item.dtc.code} · ${stringResource(item.dtc.kind.labelRes)}") },
-                    supportingContent = { DtcInfoText(item.info) },
-                    trailingContent = askAi(state.canAskAi) { onAskAi(item.dtc.code, item.info) },
+                    supportingContent = { InfoWithAi(item.info, state.canAskAi) { onAskAi(item.dtc.code, item.info) } },
                 )
                 item.freezeFrame?.let { FreezeFrameBlock(item.dtc.code, it) }
             }
@@ -127,8 +130,7 @@ internal fun DtcScreen(
                 ListItem(
                     headlineContent = { Text("${h.code} · ${stringResource(h.kind.labelRes)}") },
                     overlineContent = { Text(pluralStringResource(R.plurals.dtc_history_seen, h.count, h.count, EcuDates.date(h.lastMs))) },
-                    supportingContent = { DtcInfoText(h.info) },
-                    trailingContent = askAi(state.canAskAi) { onAskAi(h.code, h.info) },
+                    supportingContent = { InfoWithAi(h.info, state.canAskAi) { onAskAi(h.code, h.info) } },
                 )
             }
         }
@@ -277,12 +279,17 @@ private fun ComparisonCard(c: ClearComparison) {
 
 private fun onOff(on: Boolean) = if (on) R.string.dtc_mil_on else R.string.dtc_mil_off
 
-private fun askAi(enabled: Boolean, onClick: () -> Unit): (@Composable () -> Unit)? =
-    if (enabled) {
-        { TextButton(onClick = onClick) { Text(stringResource(R.string.dtc_ask_ai)) } }
-    } else {
-        null
+/**
+ * The description with «Ask AI» under it. A trailing button squeezed the code headline to letter-by-letter
+ * wrapping with a large font (C13 screenshot), so the action sits below the text.
+ */
+@Composable
+private fun InfoWithAi(info: DtcInfo, aiEnabled: Boolean, onAskAi: () -> Unit) {
+    Column {
+        DtcInfoText(info)
+        if (aiEnabled) TextButton(onClick = onAskAi) { Text(stringResource(R.string.dtc_ask_ai)) }
     }
+}
 
 /** Name, plus for OBDex two common causes and symptoms; the source is labeled (whose decoding it is). */
 @Composable

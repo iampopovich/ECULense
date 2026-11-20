@@ -173,19 +173,21 @@ internal fun DashboardScreen(
             Text(it.asString(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         // Record button on the left, icon-only actions on the right: no long label next to a weight(1f) text.
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            FilledTonalButton(onClick = onToggleRecording) {
-                Text(stringResource(if (state.recording) R.string.dash_stop_recording else R.string.dash_record))
+        // The button may shrink and wrap (large font, small screen) but never pushes the icons off screen.
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            FilledTonalButton(onClick = onToggleRecording, modifier = Modifier.weight(1f, fill = false)) {
+                Text(stringResource(if (state.recording) R.string.dash_stop_recording else R.string.dash_record), maxLines = 2)
             }
-            Spacer(Modifier.weight(1f))
-            if (onCarData != null) {
-                IconButton(onClick = onCarData) {
-                    Icon(painterResource(R.drawable.ic_list), contentDescription = stringResource(R.string.dash_open_car_data))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onCarData != null) {
+                    IconButton(onClick = onCarData) {
+                        Icon(painterResource(R.drawable.ic_list), contentDescription = stringResource(R.string.dash_open_car_data))
+                    }
                 }
-            }
-            Spacer(Modifier.width(4.dp))
-            IconButton(onClick = onDriving) {
-                Icon(painterResource(R.drawable.ic_fullscreen), contentDescription = stringResource(R.string.dash_open_driving))
+                Spacer(Modifier.width(4.dp))
+                IconButton(onClick = onDriving) {
+                    Icon(painterResource(R.drawable.ic_fullscreen), contentDescription = stringResource(R.string.dash_open_driving))
+                }
             }
         }
         // B10: a big full-width target of its own, only while a recording runs (a mark belongs to a recording).

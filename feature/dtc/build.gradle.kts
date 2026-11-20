@@ -1,5 +1,6 @@
 plugins {
     id("ecu.android.feature")
+    id("ecu.android.screenshots")
 }
 
 dependencies {

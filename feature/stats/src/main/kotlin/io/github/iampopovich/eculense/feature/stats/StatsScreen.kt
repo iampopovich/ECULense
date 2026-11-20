@@ -114,16 +114,16 @@ private fun Header(carName: String?, actions: HeaderActions) {
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             actions.onFuel?.let {
-                FilledTonalButton(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.stats_fuel_log), maxLines = 1) }
+                FilledTonalButton(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.stats_fuel_log)) }
             }
             actions.onExpenses?.let {
-                FilledTonalButton(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.stats_expenses), maxLines = 1) }
+                FilledTonalButton(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.stats_expenses)) }
             }
             actions.onImport?.let {
                 FilledTonalButton(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) {
                     Icon(painterResource(R.drawable.ic_import), contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.stats_import), maxLines = 1)
+                    Text(stringResource(R.string.stats_import))
                 }
             }
         }
@@ -168,7 +168,7 @@ private fun PeriodSelector(selected: StatsPeriod, onPeriod: (StatsPeriod) -> Uni
                         stringResource(p.labelRes),
                         maxLines = 1,
                         style = MaterialTheme.typography.labelMedium,
-                        autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = MaterialTheme.typography.labelMedium.fontSize),
+                        autoSize = TextAutoSize.StepBased(minFontSize = 6.sp, maxFontSize = MaterialTheme.typography.labelMedium.fontSize),
                     )
                 },
             )
