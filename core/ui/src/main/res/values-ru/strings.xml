@@ -6,6 +6,8 @@
     <string name="common_delete">Удалить</string>
     <string name="common_ok">ОК</string>
     <string name="common_back">Назад</string>
+    <string name="common_vin_show">Показать</string>
+    <string name="common_vin_hide">Скрыть</string>
     <string name="common_car_default_name">Мой автомобиль</string>
     <string name="common_unit_km">км</string>
     <string name="common_unit_mi">ми</string>

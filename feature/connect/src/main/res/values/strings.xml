@@ -15,6 +15,15 @@
     <string name="connect_row_protocol">Protocol: %1$s</string>
     <string name="connect_row_voltage">Battery: %1$s V</string>
     <string name="connect_row_pids">Supported PIDs: %1$d</string>
+    <string name="connect_caps_title">Adapter and ECU</string>
+    <string name="connect_row_poll_rate">Polling: %1$s cycles/s, rpm refreshed every %2$s s</string>
+    <string name="connect_row_poll_rate_unknown">Polling speed: measured once the dashboard reads data</string>
+    <string name="connect_kline_note">On K-Line this is normal: every request goes separately, so values refresh slower than on CAN.</string>
+    <string name="connect_row_vin">VIN:</string>
+    <string name="connect_row_vin_reading">VIN: reading…</string>
+    <string name="connect_row_no_vin">The ECU does not report a VIN</string>
+    <string name="connect_row_calid">Calibration ID: %1$s</string>
+    <string name="connect_row_cvn">CVN: %1$s</string>
     <string name="connect_row_unsupported">Not supported by the adapter: %1$s</string>
     <string name="adapter_settings_title">Adapter settings</string>
     <string name="adapter_settings_protocol">Protocol</string>

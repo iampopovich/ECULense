@@ -7,6 +7,8 @@
     <string name="common_delete">Delete</string>
     <string name="common_ok">OK</string>
     <string name="common_back">Back</string>
+    <string name="common_vin_show">Show</string>
+    <string name="common_vin_hide">Hide</string>
     <!-- Default name of a car the user hasn't named, and units of measurement. -->
     <string name="common_car_default_name">My car</string>
     <string name="common_unit_km">km</string>

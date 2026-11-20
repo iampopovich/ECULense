@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -31,6 +32,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.model.DriveType
@@ -38,6 +40,7 @@ import io.github.iampopovich.eculense.core.model.FuelType
 import io.github.iampopovich.eculense.core.model.Gearbox
 import io.github.iampopovich.eculense.core.ui.R as CoreUiR
 import io.github.iampopovich.eculense.core.ui.UiText
+import io.github.iampopovich.eculense.core.ui.VinPrivacy
 import io.github.iampopovich.eculense.core.ui.aboveKeyboard
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -159,8 +162,8 @@ internal fun CarEditScreen(
                 onEdit { it.copy(currency = v) }
             }
         }
-        Field(
-            stringResource(R.string.car_field_vin), f.vin, e[CarField.VIN], "vin", capitalize = true,
+        VinField(
+            stringResource(R.string.car_field_vin), f.vin, e[CarField.VIN],
             hint = stringResource(R.string.car_vin_hint),
         ) { v -> onEdit { it.copy(vin = v) } }
 
@@ -257,5 +260,27 @@ private fun Field(
             capitalization = if (capitalize) KeyboardCapitalization.Sentences else KeyboardCapitalization.None,
         ),
         modifier = modifier.testTag("car-$tag"),
+    )
+}
+
+/** C14: the VIN is drawn as bullets until «Show» is tapped (reset when the screen is left). */
+@Composable
+private fun VinField(label: String, value: String, error: UiText?, hint: String?, onChange: (String) -> Unit) {
+    var shown by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        isError = error != null,
+        supportingText = (error?.asString() ?: hint)?.let { { Text(it) } },
+        singleLine = true,
+        visualTransformation = if (shown) VisualTransformation.None else VinPrivacy.fieldMask,
+        trailingIcon = {
+            TextButton(onClick = { shown = !shown }) {
+                Text(stringResource(if (shown) CoreUiR.string.common_vin_hide else CoreUiR.string.common_vin_show))
+            }
+        },
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+        modifier = Modifier.fillMaxWidth().testTag("car-vin"),
     )
 }

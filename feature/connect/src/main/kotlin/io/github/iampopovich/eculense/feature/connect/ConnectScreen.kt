@@ -35,8 +35,12 @@ import io.github.iampopovich.eculense.core.navigation.AdapterSettingsDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import io.github.iampopovich.eculense.core.obd.AdapterEndpoint
 import io.github.iampopovich.eculense.core.obd.ConnectionState
+import io.github.iampopovich.eculense.core.obd.ObdProtocols
+import io.github.iampopovich.eculense.core.obd.PollStats
 import io.github.iampopovich.eculense.core.obd.ReplayTransportFactory
+import io.github.iampopovich.eculense.core.obd.VehicleInfo
 import io.github.iampopovich.eculense.core.obd.isSessionAlive
+import io.github.iampopovich.eculense.core.ui.HiddenVin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -48,6 +52,8 @@ import java.util.Locale
 internal fun ConnectRoute(viewModel: ConnectViewModel = koinViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val endpoints by viewModel.endpoints.collectAsStateWithLifecycle()
+    val pollStats by viewModel.pollStats.collectAsStateWithLifecycle()
+    val vehicleInfo by viewModel.vehicleInfo.collectAsStateWithLifecycle()
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -90,6 +96,8 @@ internal fun ConnectRoute(viewModel: ConnectViewModel = koinViewModel()) {
         viewModel::disconnect,
         viewModel::refresh,
         onSettings = { navigator.navigate(AdapterSettingsDestination) },
+        pollStats = pollStats,
+        vehicleInfo = vehicleInfo,
     )
 }
 
@@ -104,6 +112,8 @@ internal fun ConnectScreen(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
     onSettings: () -> Unit = {},
+    pollStats: PollStats? = null,
+    vehicleInfo: VehicleInfo? = null,
 ) {
     Column(modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(statusText(state), style = MaterialTheme.typography.titleMedium)
@@ -118,7 +128,7 @@ internal fun ConnectScreen(
                 }
             }
         }
-        if (state is ConnectionState.Connected) AdapterRows(state)
+        if (state is ConnectionState.Connected) AdapterRows(state, pollStats, vehicleInfo)
         if (state.isSessionAlive) {
             Button(onClick = onDisconnect) { Text(stringResource(R.string.connect_disconnect)) }
         }
@@ -139,12 +149,14 @@ internal fun ConnectScreen(
     }
 }
 
-/** A6: compact rows with what the adapter is and how it talks to the car. */
+/** A6 + B5: what the adapter is, how it talks to the car, what the ECU offers and how fast polling really is. */
 @Composable
-private fun AdapterRows(state: ConnectionState.Connected) {
+private fun AdapterRows(state: ConnectionState.Connected, stats: PollStats?, info: VehicleInfo?) {
     val caps = state.capabilities
     val version = ObdText.adapterVersion(state.info.version).asString()
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
+    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(stringResource(R.string.connect_caps_title), style = MaterialTheme.typography.titleSmall)
         Row(stringResource(R.string.connect_row_adapter_version, version))
         ObdText.adapterNote(caps)?.let {
             Text(it.asString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -153,9 +165,27 @@ private fun AdapterRows(state: ConnectionState.Connected) {
         Row(stringResource(R.string.connect_row_protocol, ObdText.protocolName(state.info.protocolNumber).asString()))
         state.info.batteryVoltage?.let { Row(stringResource(R.string.connect_row_voltage, volts(it))) }
         Row(stringResource(R.string.connect_row_pids, state.supportedPids.size))
+        val cycleMs = stats?.cycleMsP50?.takeIf { it > 0 }
+        if (cycleMs != null) {
+            Row(stringResource(R.string.connect_row_poll_rate, perSecond(1_000.0 / cycleMs), seconds(cycleMs / 1_000.0)))
+        } else {
+            Row(stringResource(R.string.connect_row_poll_rate_unknown))
+        }
+        if (ObdProtocols.isKLine(state.info.protocolNumber)) {
+            Text(stringResource(R.string.connect_kline_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        val vin = info?.vin
+        when {
+            info == null -> Row(stringResource(R.string.connect_row_vin_reading))
+            vin != null -> HiddenVin(vin, stringResource(R.string.connect_row_vin))
+            else -> Row(stringResource(R.string.connect_row_no_vin))
+        }
+        info?.calibrationIds?.takeIf { it.isNotEmpty() }?.let { Row(stringResource(R.string.connect_row_calid, it.joinToString(", "))) }
+        info?.cvns?.takeIf { it.isNotEmpty() }?.let { Row(stringResource(R.string.connect_row_cvn, it.joinToString(", "))) }
         if (caps.unsupported.isNotEmpty()) {
             Row(stringResource(R.string.connect_row_unsupported, caps.unsupported.sorted().joinToString(", ")))
         }
+    }
     }
 }
 
@@ -176,3 +206,7 @@ private fun statusText(state: ConnectionState): String = when (state) {
 
 /** Plain helper: number formatting outside composables (lint NonObservableLocale). */
 private fun volts(v: Double): String = String.format(Locale.getDefault(), "%.1f", v)
+
+private fun perSecond(v: Double): String = String.format(Locale.getDefault(), if (v >= 10) "%.0f" else "%.1f", v)
+
+private fun seconds(v: Double): String = String.format(Locale.getDefault(), if (v >= 10) "%.0f" else "%.1f", v)

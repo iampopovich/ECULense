@@ -15,6 +15,15 @@
     <string name="connect_row_protocol">Протокол: %1$s</string>
     <string name="connect_row_voltage">АКБ: %1$s В</string>
     <string name="connect_row_pids">Поддерживаемых PID: %1$d</string>
+    <string name="connect_caps_title">Адаптер и блок управления</string>
+    <string name="connect_row_poll_rate">Опрос: %1$s цикл./с, обороты обновляются раз в %2$s с</string>
+    <string name="connect_row_poll_rate_unknown">Скорость опроса: появится, когда панель начнёт читать данные</string>
+    <string name="connect_kline_note">На K-Line это нормально: каждый запрос идёт отдельно, поэтому значения обновляются медленнее, чем на CAN.</string>
+    <string name="connect_row_vin">VIN:</string>
+    <string name="connect_row_vin_reading">VIN: читаем…</string>
+    <string name="connect_row_no_vin">Блок не отдаёт VIN</string>
+    <string name="connect_row_calid">Калибровка (CALID): %1$s</string>
+    <string name="connect_row_cvn">CVN: %1$s</string>
     <string name="connect_row_unsupported">Адаптер не поддерживает: %1$s</string>
     <string name="adapter_settings_title">Настройки адаптера</string>
     <string name="adapter_settings_protocol">Протокол</string>
