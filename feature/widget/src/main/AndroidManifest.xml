@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- C9 home-screen widget (Glance). It only opens the app; the app itself connects (no service from here). -->
+        <receiver
+            android:name="io.github.iampopovich.eculense.feature.widget.EcuWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/ecu_widget_info" />
+        </receiver>
+    </application>
+</manifest>

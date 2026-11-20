@@ -51,6 +51,8 @@ interface FullScreenDestination
  */
 object DeepLinks {
     const val EXTRA_SCREEN = "io.github.iampopovich.eculense.SCREEN"
+    /** C9: the widget's «Connect»: the activity connects to the last adapter once it is in front. */
+    const val EXTRA_CONNECT_LAST = "io.github.iampopovich.eculense.CONNECT_LAST"
     const val ANALYSIS = "analysis"
     const val MAINTENANCE = "maintenance"
     /** C4: «new code during the trip» opens the DTC screen. */

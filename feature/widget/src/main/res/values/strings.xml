@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_label">ECULense</string>
+    <string name="widget_description">Live values while connected; otherwise the last battery voltage, code check and trip</string>
+    <string name="widget_connect">Connect</string>
+    <string name="widget_demo">Demo</string>
+    <string name="widget_no_data">No data yet: connect to the car once</string>
+    <string name="widget_voltage">Battery %1$s V · %2$s</string>
+    <string name="widget_dtc_none">No codes · %1$s</string>
+    <string name="widget_dtc_some">Codes: %1$d · %2$s</string>
+    <string name="widget_trip">Trip %1$s km · %2$s</string>
+    <string name="widget_age_now">just now</string>
+    <string name="widget_age_min">%1$d min ago</string>
+    <string name="widget_age_hours">%1$d h ago</string>
+    <string name="widget_age_days">%1$d d ago</string>
+</resources>

@@ -32,6 +32,7 @@ import io.github.iampopovich.eculense.feature.pitstop.pitstopModule
 import io.github.iampopovich.eculense.feature.sessions.sessionsModule
 import io.github.iampopovich.eculense.feature.settings.settingsModule
 import io.github.iampopovich.eculense.feature.stats.statsModule
+import io.github.iampopovich.eculense.feature.widget.widgetModule
 import org.koin.core.module.Module
 
 /** Add/remove a feature = add/remove a line here and in settings.gradle.kts. */
@@ -71,6 +72,8 @@ val appModules: List<Module> = listOf(
     backupFeatureModule,
     // B6 quick health check + report (Pit-stop hub); without it nothing else changes.
     healthModule,
+    // C9 home-screen widget: live values or the last voltage, code check and trip; without it no widget.
+    widgetModule,
     // Demo mode (virtual ELM327) — last in the transport list, in all builds.
     demoModule,
     // AI (stage 2): remove these lines + the modules in settings.gradle.kts/app → the app works without AI.

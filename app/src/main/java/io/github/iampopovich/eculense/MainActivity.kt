@@ -6,10 +6,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.lifecycleScope
 import io.github.iampopovich.eculense.core.data.AutoConnect
 import io.github.iampopovich.eculense.core.navigation.DeepLinks
 import io.github.iampopovich.eculense.core.obd.ConnectionController
 import io.github.iampopovich.eculense.core.ui.theme.ECULenseTheme
+import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
 /** AppCompatActivity: needed for AppCompatDelegate.setApplicationLocales (in-app language on API < 33). */
@@ -19,10 +21,16 @@ class MainActivity : AppCompatActivity() {
     private val connection: ConnectionController by inject()
     private val autoConnect: AutoConnect by inject()
 
+    /** C9: the widget's «Connect» asked for the last adapter; handled once the activity is resumed (in front). */
+    private var connectLastPending = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (savedInstanceState == null) deepLink.value = intent.screen()
+        if (savedInstanceState == null) {
+            deepLink.value = intent.screen()
+            connectLastPending = intent.connectLast()
+        }
         setContent {
             ECULenseTheme { EcuLenseApp(deepLink = deepLink.value, onDeepLinkHandled = { deepLink.value = null }) }
         }
@@ -32,6 +40,7 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         intent.screen()?.let { deepLink.value = it }
+        if (intent.connectLast()) connectLastPending = true
     }
 
     // C2: with the app hidden or the screen off only a recording reads the PIDs, so slower tiers are read less often.
@@ -42,10 +51,20 @@ class MainActivity : AppCompatActivity() {
         autoConnect.onAppStart()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (connectLastPending) {
+            connectLastPending = false
+            lifecycleScope.launch { autoConnect.connectLast() }
+        }
+    }
+
     override fun onStop() {
         connection.setBackground(true)
         super.onStop()
     }
 
     private fun Intent?.screen(): String? = this?.getStringExtra(DeepLinks.EXTRA_SCREEN)
+
+    private fun Intent?.connectLast(): Boolean = this?.getBooleanExtra(DeepLinks.EXTRA_CONNECT_LAST, false) == true
 }

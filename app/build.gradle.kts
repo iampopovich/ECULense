@@ -112,6 +112,8 @@ dependencies {
     implementation(project(":core:backup"))
     implementation(project(":feature:backup"))
     implementation(project(":feature:health"))
+    // C9 home-screen widget (Glance); remove with its line in AppModules.
+    implementation(project(":feature:widget"))
     implementation(project(":core:obd"))
     implementation(project(":core:model"))
     implementation(project(":core:bluetooth"))
