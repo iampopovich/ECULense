@@ -36,7 +36,8 @@ internal fun CalibrationCard(ui: CalibrationUi, actions: CalibrationActions) {
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                c.axis?.let { stringResource(R.string.calib_axis, StatsFormat.number(it.correlation, 2)) } ?: stringResource(R.string.calib_axis_none),
+                c.axis?.let { stringResource(R.string.calib_axis, StatsFormat.number(it.correlation, 2), StatsFormat.number(AccelCalibrationThresholds.MIN_AXIS_CORRELATION, 2)) }
+                    ?: stringResource(R.string.calib_axis_none),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(stringResource(R.string.calib_events, c.events.size, c.eventsWithObd), style = MaterialTheme.typography.bodyMedium)

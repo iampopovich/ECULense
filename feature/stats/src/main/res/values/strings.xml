@@ -58,7 +58,7 @@
     <string name="trip_chart_coolant">Coolant, °C</string>
     <string name="calib_title">Threshold calibration</string>
     <string name="calib_samples">Phone sensor: %1$d samples, %2$s</string>
-    <string name="calib_axis">Car axis found, confidence %1$s</string>
+    <string name="calib_axis">Car axis confidence: %1$s (needs %2$s)</string>
     <string name="calib_axis_none">Car axis not found</string>
     <string name="calib_events">Events above 0.3 g on the sensor: %1$d (with OBD speed: %2$d)</string>
     <string name="calib_ratio">OBD / sensor ratio: median %1$s (IQR %2$s–%3$s)</string>

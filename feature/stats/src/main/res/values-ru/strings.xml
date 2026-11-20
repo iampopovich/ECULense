@@ -58,7 +58,7 @@
     <string name="trip_chart_coolant">Охлаждающая жидкость, °C</string>
     <string name="calib_title">Калибровка порогов</string>
     <string name="calib_samples">Датчик телефона: %1$d отсчётов, %2$s</string>
-    <string name="calib_axis">Ось машины найдена, уверенность %1$s</string>
+    <string name="calib_axis">Уверенность в оси машины: %1$s (нужно %2$s)</string>
     <string name="calib_axis_none">Ось машины не найдена</string>
     <string name="calib_events">Событий сильнее 0,3 g по датчику: %1$d (со скоростью OBD: %2$d)</string>
     <string name="calib_ratio">Отношение OBD / датчик: медиана %1$s (IQR %2$s–%3$s)</string>
