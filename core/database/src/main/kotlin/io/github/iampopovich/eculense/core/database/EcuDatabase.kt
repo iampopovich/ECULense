@@ -57,6 +57,24 @@ data class DtcSnapshotEntity(
     val code: String,
     val kind: String,
     @ColumnInfo(index = true) val carId: Long? = null,
+    /** B3: the freeze frame stored with this code (encoded by FreezeFrameCodec in :core:data); null = none. */
+    val freezeFrame: String? = null,
+)
+
+/**
+ * B4: readiness and the cleared-codes counters at one moment (before / after a clear), so the history keeps what a
+ * clear erases. [monitors] = "MONITOR=STATUS;...", [counters] = "name=value;..." (encoded in :core:data).
+ */
+@Entity(tableName = "readiness_snapshots")
+data class ReadinessSnapshotEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(index = true) val carId: Long?,
+    val takenAtMs: Long,
+    val reason: String,
+    val milOn: Boolean?,
+    val dtcCount: Int?,
+    val monitors: String?,
+    val counters: String?,
 )
 
 /** Car profile. externalId is "carscanner:<car id in backup>" for re-import without duplicates. */
@@ -151,6 +169,11 @@ interface DtcDao {
     /** The car's latest snapshot (all codes with the max takenAtMs); carId = null means snapshots without a car. */
     @Query("SELECT * FROM dtc_snapshots WHERE carId IS :carId AND takenAtMs = (SELECT MAX(takenAtMs) FROM dtc_snapshots WHERE carId IS :carId)")
     suspend fun latestForCar(carId: Long?): List<DtcSnapshotEntity>
+
+    @Insert suspend fun insertReadiness(item: ReadinessSnapshotEntity): Long
+
+    @Query("SELECT * FROM readiness_snapshots WHERE carId IS :carId ORDER BY takenAtMs DESC LIMIT :limit")
+    suspend fun readinessForCar(carId: Long?, limit: Int): List<ReadinessSnapshotEntity>
 }
 
 /** Per-sensor aggregate: computed by SQLite, Kotlin gets one row instead of thousands of values. */
@@ -458,6 +481,7 @@ interface ImportDao {
     entities = [
         SessionEntity::class, ReadingEntity::class, DtcSnapshotEntity::class, CarEntity::class, TripEntity::class, FindingEntity::class,
         MaintenanceItemEntity::class, OdometerEntity::class, ImportHistoryEntity::class, ImportedFileEntity::class, ImportSnapshotEntity::class,
+        ReadinessSnapshotEntity::class,
     ],
     version = EcuDatabase.VERSION,
 )
@@ -474,9 +498,9 @@ abstract class EcuDatabase : RoomDatabase() {
 
     companion object {
         /** Schema version; an ECULense backup with a newer version is not restored. */
-        const val VERSION = 7
+        const val VERSION = 8
         const val FILE_NAME = "ecu.db"
-        val MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+        val MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
 
         const val DEFAULT_CAR_ID = 1L
         /** Blank: the UI shows the localized default name (older DBs keep their Russian literal, see LegacyValues). */
@@ -651,6 +675,21 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
         LegacyValues.MAINTENANCE_NOTES_RU.forEach { (note, kind) ->
             db.execSQL("UPDATE maintenance_items SET noteKind = ?, note = NULL WHERE noteKind IS NULL AND note = ?", arrayOf<Any>(kind.name, note))
         }
+    }
+}
+
+/**
+ * 7 → 8 (diagnostics, B3/B4): the freeze frame column on DTC snapshots and the readiness snapshots table. Only ADD
+ * COLUMN and CREATE TABLE: existing rows are untouched.
+ */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `dtc_snapshots` ADD COLUMN `freezeFrame` TEXT")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `readiness_snapshots` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `carId` INTEGER, " +
+                "`takenAtMs` INTEGER NOT NULL, `reason` TEXT NOT NULL, `milOn` INTEGER, `dtcCount` INTEGER, `monitors` TEXT, `counters` TEXT)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_readiness_snapshots_carId` ON `readiness_snapshots` (`carId`)")
     }
 }
 

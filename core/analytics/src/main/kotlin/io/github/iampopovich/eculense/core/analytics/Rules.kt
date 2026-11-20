@@ -3,6 +3,7 @@ package io.github.iampopovich.eculense.core.analytics
 import io.github.iampopovich.eculense.core.analytics.FindingKey as K
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.DtcKind
+import io.github.iampopovich.eculense.core.model.FreezeFrame
 import java.time.ZoneId
 import kotlin.math.abs
 
@@ -35,7 +36,8 @@ data class Finding(
 }
 
 /** Trouble code event: live snapshot or imported Car Scanner event. */
-data class DtcEvent(val code: String, val kind: DtcKind, val atMs: Long)
+/** [freezeFrame]: B3, the conditions the ECU saved with this code (live reads only). */
+data class DtcEvent(val code: String, val kind: DtcKind, val atMs: Long, val freezeFrame: FreezeFrame? = null)
 
 data class AnalysisInput(
     val car: CarProfile?,

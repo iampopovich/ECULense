@@ -410,6 +410,8 @@ internal class DtcHistoryTool(ctx: ToolContext) : VehicleTool<LimitArgs>(
     typeToken<LimitArgs>(), "dtcHistory",
     "History of diagnostic trouble codes: live reads in the app and DTC events imported from Car Scanner. Per code: kind (stored/pending), " +
         "number of events, first and last date, title, and (when known) the most likely causes and symptoms from the OBDex database. " +
+        "freeze_frame (when the ECU saved one) = conditions at the moment the code was stored: sensor id -> value with unit " +
+        "(01.0C rpm, 01.0D speed, 01.05 coolant, 01.04 load, 01.06/01.07 fuel trims). " +
         "source=oem_unknown means a manufacturer-specific code whose meaning for this make is unknown — do not guess it from other makes.",
     ctx,
 ) {
@@ -431,6 +433,16 @@ internal class DtcHistoryTool(ctx: ToolContext) : VehicleTool<LimitArgs>(
                     put("events", list.map { it.atMs }.distinct().size)
                     put("first", Dates.date(list.first().atMs, zone))
                     put("last", Dates.date(list.last().atMs, zone))
+                    // B3: the latest freeze frame of this code, compact (at most 8 values).
+                    if (detail >= 1) {
+                        list.lastOrNull { it.freezeFrame != null }?.freezeFrame?.let { ff ->
+                            put("freeze_frame", buildJsonObject {
+                                ff.readings.take(8).forEach { r ->
+                                    put(r.sensorId, BigDecimal(r.value).setScale(1, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + (if (r.unit.isEmpty()) "" else " ${r.unit}"))
+                                }
+                            })
+                        }
+                    }
                     info[code]?.let { i ->
                         i.title?.let { put("title", short(it, 70)) }
                         put("source", i.source.json)

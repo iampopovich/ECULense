@@ -209,7 +209,9 @@ internal class RoomAnalyticsRepository(
     }
 
     override suspend fun dtcEvents(carId: Long): List<DtcEvent> =
-        dtcDao.forCar(carId).map { DtcEvent(it.code, runCatching { DtcKind.valueOf(it.kind) }.getOrDefault(DtcKind.STORED), it.takenAtMs) }
+        dtcDao.forCar(carId).map {
+            DtcEvent(it.code, runCatching { DtcKind.valueOf(it.kind) }.getOrDefault(DtcKind.STORED), it.takenAtMs, DiagCodec.decodeFreezeFrame(it.freezeFrame, it.takenAtMs))
+        }
 
     private fun SensorAggregateRow.toSummary(sample: List<Double>) = SensorSummary(
         sensorId = sensorId, unit = unit, count = count, sessions = sessions, min = min, max = max, mean = mean,

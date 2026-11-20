@@ -96,6 +96,33 @@ class MigrationTest {
     }
 
     @Test
+    fun v7DtcSnapshotsKeepRowsAndGetFreezeFrameAndReadinessTable() = runTest {
+        helper.createDatabase(dbName, 7).use { db ->
+            db.execSQL("INSERT INTO cars (id, name) VALUES (1, 'Тестовая')")
+            db.execSQL("INSERT INTO sessions (id, name, startedAtMs, endedAtMs, source, vin, externalId, carId) VALUES (1, 'live', 30, 40, 'LIVE', NULL, NULL, 1)")
+            db.execSQL("INSERT INTO readings (sessionId, sensorId, value, unit, timestampMs) VALUES (1, '01.0C', 800.0, 'rpm', 31)")
+            db.execSQL("INSERT INTO dtc_snapshots (takenAtMs, vin, code, kind, carId) VALUES (35, NULL, 'P0133', 'STORED', 1)")
+        }
+        helper.runMigrationsAndValidate(dbName, 8, true, MIGRATION_7_8).use { db ->
+            fun count(sql: String) = db.query(sql).use { c -> c.moveToFirst(); c.getInt(0) }
+            assertEquals(1, count("SELECT COUNT(*) FROM readings"))
+            assertEquals(1, count("SELECT COUNT(*) FROM dtc_snapshots WHERE code = 'P0133' AND freezeFrame IS NULL"))
+            assertEquals(0, count("SELECT COUNT(*) FROM readiness_snapshots"))
+        }
+        val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
+            .addMigrations(*EcuDatabase.MIGRATIONS).build()
+        try {
+            val dao = room.dtcDao()
+            dao.insert(listOf(DtcSnapshotEntity(takenAtMs = 50, vin = null, code = "P0300", kind = "STORED", carId = 1, freezeFrame = "dtc=P0300;01.0C=812.5|rpm")))
+            assertEquals("dtc=P0300;01.0C=812.5|rpm", dao.forCar(1).last().freezeFrame)
+            dao.insertReadiness(ReadinessSnapshotEntity(carId = 1, takenAtMs = 60, reason = "BEFORE_CLEAR", milOn = true, dtcCount = 2, monitors = "CATALYST=COMPLETE", counters = "warmUps=12"))
+            assertEquals("BEFORE_CLEAR", dao.readinessForCar(1, 5).single().reason)
+        } finally {
+            room.close()
+        }
+    }
+
+    @Test
     fun v3CarGetsDriveAndMassColumnsKeepingData() = runTest {
         helper.createDatabase(dbName, 3).use { db ->
             db.execSQL("INSERT INTO cars (id, name, brand, year) VALUES (1, 'Тестовая', 'Kia', 2005)")

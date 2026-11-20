@@ -2,10 +2,15 @@ package io.github.iampopovich.eculense.core.data
 
 import io.github.iampopovich.eculense.core.database.DtcDao
 import io.github.iampopovich.eculense.core.database.DtcSnapshotEntity
+import io.github.iampopovich.eculense.core.database.ReadinessSnapshotEntity
 import io.github.iampopovich.eculense.core.database.ReadingEntity
 import io.github.iampopovich.eculense.core.database.SessionDao
 import io.github.iampopovich.eculense.core.database.SessionEntity
 import io.github.iampopovich.eculense.core.model.Dtc
+import io.github.iampopovich.eculense.core.model.DtcKind
+import io.github.iampopovich.eculense.core.model.FreezeFrame
+import io.github.iampopovich.eculense.core.obd.ClearedCounters
+import io.github.iampopovich.eculense.core.obd.Readiness
 import io.github.iampopovich.eculense.core.model.SensorReading
 import io.github.iampopovich.eculense.core.model.Session
 import io.github.iampopovich.eculense.core.model.SessionSource
@@ -40,6 +45,15 @@ interface DtcRepository {
      * again within [DEDUP_WINDOW_MS] is not duplicated. An empty read writes nothing. true — snapshot written.
      */
     suspend fun recordRead(dtcs: List<Dtc>, vin: String? = null): Boolean = false
+
+    /**
+     * Same as [recordRead], with the freeze frame (B3) stored on the row of the code that froze it (the first
+     * stored code when the ECU did not name one).
+     */
+    suspend fun recordRead(dtcs: List<Dtc>, vin: String?, freezeFrame: FreezeFrame?): Boolean = recordRead(dtcs, vin)
+
+    /** B4: readiness and counters at [reason] (before/after a clear), kept in the history. */
+    suspend fun saveReadiness(reason: ReadinessReason, readiness: Readiness?, counters: ClearedCounters?) {}
 
     /** Whether an event with this code already exists in the time window — repeat import does not duplicate events. */
     suspend fun hasEvent(code: String, fromMs: Long, toMs: Long): Boolean = false
@@ -87,22 +101,50 @@ internal class RoomDtcRepository(
     private val clock: () -> Long = System::currentTimeMillis,
     private val activeCarId: suspend () -> Long? = { null },
 ) : DtcRepository {
-    override suspend fun saveSnapshot(dtcs: List<Dtc>, vin: String?, takenAtMs: Long?, carId: Long?) {
+    override suspend fun saveSnapshot(dtcs: List<Dtc>, vin: String?, takenAtMs: Long?, carId: Long?) =
+        save(dtcs, vin, takenAtMs, carId, null)
+
+    private suspend fun save(dtcs: List<Dtc>, vin: String?, takenAtMs: Long?, carId: Long?, freezeFrame: FreezeFrame?) {
         val at = takenAtMs ?: clock()
         val car = carId ?: activeCarId()
-        dao.insert(dtcs.map { DtcSnapshotEntity(takenAtMs = at, vin = vin, code = it.code, kind = it.kind.name, carId = car) })
+        val frameCode = freezeFrame?.let { it.dtcCode ?: dtcs.firstOrNull { d -> d.kind == DtcKind.STORED }?.code }
+        val encoded = freezeFrame?.let(DiagCodec::encode)
+        dao.insert(
+            dtcs.map {
+                DtcSnapshotEntity(
+                    takenAtMs = at, vin = vin, code = it.code, kind = it.kind.name, carId = car,
+                    freezeFrame = encoded.takeIf { _ -> it.code == frameCode && it.kind == DtcKind.STORED },
+                )
+            },
+        )
     }
 
     override suspend fun hasEvent(code: String, fromMs: Long, toMs: Long): Boolean = dao.countEvents(code, fromMs, toMs) > 0
 
-    override suspend fun recordRead(dtcs: List<Dtc>, vin: String?): Boolean {
+    override suspend fun recordRead(dtcs: List<Dtc>, vin: String?): Boolean = recordRead(dtcs, vin, null)
+
+    override suspend fun recordRead(dtcs: List<Dtc>, vin: String?, freezeFrame: FreezeFrame?): Boolean {
         if (dtcs.isEmpty()) return false
         val at = clock()
         val car = activeCarId()
         val last = dao.latestForCar(car)
         val sameSet = last.map { it.code to it.kind }.toSet() == dtcs.map { it.code to it.kind.name }.toSet()
-        if (last.isNotEmpty() && sameSet && at - last.first().takenAtMs in 0..DtcRepository.DEDUP_WINDOW_MS) return false
-        saveSnapshot(dtcs.distinct(), vin, takenAtMs = at, carId = car)
+        val frameKnown = freezeFrame == null || last.any { it.freezeFrame != null }
+        if (last.isNotEmpty() && sameSet && frameKnown && at - last.first().takenAtMs in 0..DtcRepository.DEDUP_WINDOW_MS) return false
+        save(dtcs.distinct(), vin, takenAtMs = at, carId = car, freezeFrame = freezeFrame)
         return true
     }
+
+    override suspend fun saveReadiness(reason: ReadinessReason, readiness: Readiness?, counters: ClearedCounters?) {
+        if (readiness == null && counters == null) return
+        dao.insertReadiness(
+            ReadinessSnapshotEntity(
+                carId = activeCarId(), takenAtMs = clock(), reason = reason.name, milOn = readiness?.milOn,
+                dtcCount = readiness?.dtcCount, monitors = readiness?.let(DiagCodec::encode), counters = counters?.let(DiagCodec::encode),
+            ),
+        )
+    }
 }
+
+/** Why a readiness snapshot was stored. */
+enum class ReadinessReason { BEFORE_CLEAR, AFTER_CLEAR }

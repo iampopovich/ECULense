@@ -22,6 +22,8 @@ import io.github.iampopovich.eculense.core.dtcdb.DtcInfo
 import io.github.iampopovich.eculense.core.dtcdb.DtcSource
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.DtcKind
+import io.github.iampopovich.eculense.core.model.FreezeFrame
+import io.github.iampopovich.eculense.core.model.SensorReading
 import io.github.iampopovich.eculense.core.model.SessionSource
 import io.github.iampopovich.eculense.core.model.Trip
 import io.github.iampopovich.eculense.core.model.TripSource
@@ -93,7 +95,8 @@ private class Analytics : AnalyticsRepository {
         return if (sensorId == "01.07") SensorSummary("01.07", "%", 4, 2, -8.59375, 12.5, 7.03125, 12.5, 12.5) else null
     }
     override suspend fun dtcEvents(carId: Long) = if (noDtc) emptyList() else (1..40).flatMap { i ->
-        listOf(DtcEvent("P0%03d".format(100 + i), DtcKind.STORED, NOW - i * DAY), DtcEvent("P0%03d".format(100 + i), DtcKind.STORED, NOW - i * DAY + 5 * DAY))
+        val frame = if (i == 1) FreezeFrame("P0101", listOf(SensorReading("01.0C", 812.54, "rpm", 0), SensorReading("01.0D", 63.0, "km/h", 0))) else null
+        listOf(DtcEvent("P0%03d".format(100 + i), DtcKind.STORED, NOW - i * DAY), DtcEvent("P0%03d".format(100 + i), DtcKind.STORED, NOW - i * DAY + 5 * DAY, frame))
     }
     /** One recording every 3 days over ~200 days: coolant rises from 88 to ~94 °C, voltage 14.1 V. */
     var digests: List<SessionDigest> = (1..66).map { i ->
@@ -213,6 +216,11 @@ class VehicleDataToolsTest {
         assertEquals(listOf("P0101", "P0102", "P0103"), codes.map { it.getValue("code").jsonPrimitive.content })
         assertEquals(2, codes.first().getValue("events").jsonPrimitive.content.toInt())
         assertEquals(80, d.getValue("total_events").jsonPrimitive.content.toInt())
+        // B3: the freeze frame of the latest event, English sensor ids with units.
+        val ff = codes.first().getValue("freeze_frame").jsonObject
+        assertEquals("812.5 rpm", ff.getValue("01.0C").jsonPrimitive.content)
+        assertEquals("63 km/h", ff.getValue("01.0D").jsonPrimitive.content)
+        assertFalse(codes[1].containsKey("freeze_frame"))
     }
 
     private val describer: suspend (Collection<String>, String?) -> Map<String, DtcInfo> = { codes, make ->

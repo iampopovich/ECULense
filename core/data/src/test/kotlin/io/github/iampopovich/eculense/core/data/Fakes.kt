@@ -2,6 +2,7 @@ package io.github.iampopovich.eculense.core.data
 
 import io.github.iampopovich.eculense.core.database.DtcDao
 import io.github.iampopovich.eculense.core.database.DtcSnapshotEntity
+import io.github.iampopovich.eculense.core.database.ReadinessSnapshotEntity
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.Trip
 import io.github.iampopovich.eculense.core.model.UnitsSettings
@@ -74,7 +75,10 @@ internal class FakeUnits : UnitsRepository {
 }
 
 /** In-memory code snapshots; queries mirror the SQL in DtcDao. */
-internal class FakeDtcDao(val items: MutableList<DtcSnapshotEntity> = mutableListOf()) : DtcDao {
+internal class FakeDtcDao(
+    val items: MutableList<DtcSnapshotEntity> = mutableListOf(),
+    val readiness: MutableList<ReadinessSnapshotEntity> = mutableListOf(),
+) : DtcDao {
     override suspend fun insert(items: List<DtcSnapshotEntity>) { this.items += items }
     override suspend fun forCar(carId: Long) = items.filter { it.carId == carId }.sortedBy { it.takenAtMs }
     override suspend fun countEvents(code: String, fromMs: Long, toMs: Long) = items.count { it.code == code && it.takenAtMs in fromMs..toMs }
@@ -83,4 +87,10 @@ internal class FakeDtcDao(val items: MutableList<DtcSnapshotEntity> = mutableLis
         val last = mine.maxOfOrNull { it.takenAtMs } ?: return emptyList()
         return mine.filter { it.takenAtMs == last }
     }
+    override suspend fun insertReadiness(item: ReadinessSnapshotEntity): Long {
+        readiness += item.copy(id = readiness.size + 1L)
+        return readiness.size.toLong()
+    }
+    override suspend fun readinessForCar(carId: Long?, limit: Int) =
+        readiness.filter { it.carId == carId }.sortedByDescending { it.takenAtMs }.take(limit)
 }
