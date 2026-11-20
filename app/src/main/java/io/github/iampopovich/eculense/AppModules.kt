@@ -20,6 +20,7 @@ import io.github.iampopovich.eculense.feature.aisettings.aiSettingsModule
 import io.github.iampopovich.eculense.feature.analysis.analysisModule
 import io.github.iampopovich.eculense.feature.car.carModule
 import io.github.iampopovich.eculense.feature.connect.connectModule
+import io.github.iampopovich.eculense.feature.obdlog.obdLogModule
 import io.github.iampopovich.eculense.feature.dashboard.dashboardModule
 import io.github.iampopovich.eculense.feature.datapacks.dataPacksFeatureModule
 import io.github.iampopovich.eculense.feature.dtc.dtcModule
@@ -47,6 +48,8 @@ val appModules: List<Module> = listOf(
     vehicleDbModule,
     dtcDbModule,
     connectModule,
+    // Adapter traffic log screen (Settings hub); without it the log still records in memory, unseen.
+    obdLogModule,
     dashboardModule,
     pitstopModule,
     settingsModule,

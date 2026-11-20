@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="obdlog_hub_title">Adapter traffic log</string>
+    <string name="obdlog_hub_subtitle">Commands and replies of the ELM327, for bug reports</string>
+    <string name="obdlog_record">Record traffic log</string>
+    <string name="obdlog_record_hint">Kept in memory only (last 5000 lines), VIN is masked. A file is created only when you share it.</string>
+    <string name="obdlog_share">Share</string>
+    <string name="obdlog_clear">Clear</string>
+    <string name="obdlog_count">Entries: %1$d</string>
+    <string name="obdlog_empty">No entries yet. Connect an adapter.</string>
+    <string name="obdlog_chooser">Send adapter traffic log</string>
+    <string name="obdlog_duration">%1$d ms</string>
+</resources>

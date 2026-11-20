@@ -4,6 +4,8 @@ import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
 @Serializable data object ConnectDestination : NavKey
+/** Adapter traffic log (:feature:obdlog), an item of the Settings hub. */
+@Serializable data object ObdLogDestination : NavKey
 @Serializable data object DashboardDestination : NavKey
 @Serializable data object PitstopDestination : NavKey
 @Serializable data object SettingsDestination : NavKey

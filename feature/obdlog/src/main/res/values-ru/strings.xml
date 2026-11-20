@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="obdlog_hub_title">Журнал обмена с адаптером</string>
+    <string name="obdlog_hub_subtitle">Команды и ответы ELM327 для отчётов об ошибках</string>
+    <string name="obdlog_record">Записывать журнал обмена</string>
+    <string name="obdlog_record_hint">Хранится только в памяти (последние 5000 строк), VIN скрыт. Файл создаётся только при отправке.</string>
+    <string name="obdlog_share">Поделиться</string>
+    <string name="obdlog_clear">Очистить</string>
+    <string name="obdlog_count">Записей: %1$d</string>
+    <string name="obdlog_empty">Записей пока нет. Подключите адаптер.</string>
+    <string name="obdlog_chooser">Отправить журнал обмена</string>
+    <string name="obdlog_duration">%1$d мс</string>
+</resources>

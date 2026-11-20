@@ -97,6 +97,7 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":feature:dashboard"))
     implementation(project(":feature:connect"))
+    implementation(project(":feature:obdlog"))
     implementation(project(":feature:pitstop"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:dtc"))
