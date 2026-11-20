@@ -152,6 +152,16 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun `diesel car gets no MAF fuel estimate`() = runTest {
+        val controller = FakeConnectionController(initial = FakeConnectionController.connected(setOf(0x0C, 0x10)))
+        val vm = vm(controller, InMemoryDashboardPrefs(selection = listOf(0x0C, 0x5E), fuelEstimate = false))
+        // No fuel-rate tile at all, and MAF is not polled for it.
+        assertEquals(listOf(0x0C), controller.polled.value.map { it.code })
+        controller.readingsFlow.emit(SensorReading("01.10", 10.0, "g/s", 0))
+        assertTrue(vm.uiState.value.tiles.none { it.pid.code == 0x5E })
+    }
+
+    @Test
     fun `sparkline keeps the last 60 s`() = runTest {
         val controller = FakeConnectionController(initial = FakeConnectionController.connected(setOf(0x0C)))
         val vm = vm(controller)

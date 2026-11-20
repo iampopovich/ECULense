@@ -6,12 +6,14 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.github.iampopovich.eculense.core.model.FuelType
 import io.github.iampopovich.eculense.core.obd.StandardPids
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 /**
@@ -34,6 +36,12 @@ interface DashboardPrefs {
     /** Driving mode: how many of the first selected PIDs are shown (2..6). */
     val drivingTiles: Flow<Int>
     suspend fun setDrivingTiles(count: Int)
+
+    /**
+     * Whether the fuel rate may be estimated from MAF for the active car: the estimate assumes petrol, so it is off
+     * for diesel cars. An unknown fuel type counts as petrol.
+     */
+    val fuelEstimate: Flow<Boolean> get() = flowOf(true)
 }
 
 /** Pure edits of the dashboard selection (no text input: star toggles, up/down moves). */
@@ -47,11 +55,15 @@ object DashboardSelection {
     const val MAF = 0x10
 
     /** What the dashboard shows for a car: the saved order (or defaults), limited to what the car can deliver. */
-    fun resolve(saved: List<Int>?, supported: Set<Int>): List<Int> =
-        (saved ?: StandardPids.dashboardDefaults).distinct().filter { canShow(it, supported) }
+    fun resolve(saved: List<Int>?, supported: Set<Int>, estimate: Boolean = true): List<Int> =
+        (saved ?: StandardPids.dashboardDefaults).distinct().filter { canShow(it, supported, estimate) }
 
-    fun canShow(code: Int, supported: Set<Int>): Boolean =
-        StandardPids.byCode(code) != null && (code in supported || (code == FUEL_RATE && MAF in supported))
+    /** [estimate]: the fuel rate may be estimated from MAF (not for diesel, see [canEstimateFuel]). */
+    fun canShow(code: Int, supported: Set<Int>, estimate: Boolean = true): Boolean =
+        StandardPids.byCode(code) != null && (code in supported || (estimate && code == FUEL_RATE && MAF in supported))
+
+    /** The MAF estimate uses petrol stoichiometry: wrong for diesel. Unknown fuel type = petrol. */
+    fun canEstimateFuel(fuel: FuelType?): Boolean = fuel != FuelType.DIESEL
 
     fun toggle(current: List<Int>, code: Int): List<Int> = if (code in current) current - code else current + code
 
@@ -76,7 +88,10 @@ object DashboardSelection {
 internal class DataStoreDashboardPrefs(
     private val store: DataStore<Preferences>,
     private val activeCarId: Flow<Long?>,
+    activeFuelType: Flow<FuelType?> = flowOf(null),
 ) : DashboardPrefs {
+    override val fuelEstimate: Flow<Boolean> = activeFuelType.map(DashboardSelection::canEstimateFuel)
+
     override val selection: Flow<List<Int>?> = activeCarId.flatMapLatest { id ->
         store.data.map { p -> p[selectionKey(id)]?.let(DashboardSelection::decode) }
     }
@@ -121,7 +136,9 @@ class InMemoryDashboardPrefs(
     keepScreenOn: Boolean = true,
     hudMirror: Boolean = false,
     drivingTiles: Int = DashboardSelection.DEFAULT_DRIVING_TILES,
+    fuelEstimate: Boolean = true,
 ) : DashboardPrefs {
+    override val fuelEstimate = MutableStateFlow(fuelEstimate)
     override val selection = MutableStateFlow(selection)
     override val keepScreenOn = MutableStateFlow(keepScreenOn)
     override val hudMirror = MutableStateFlow(hudMirror)

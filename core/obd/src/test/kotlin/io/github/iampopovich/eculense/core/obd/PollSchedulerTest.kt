@@ -21,8 +21,11 @@ class PollSchedulerTest {
     @Test
     fun `tiers come from the data table`() {
         assertEquals(PollTier.FAST, PollTiers.tierOf(0x0C))
-        assertEquals(PollTier.FAST, PollTiers.tierOf(0x11))
+        assertEquals(PollTier.FAST, PollTiers.tierOf(0x0D))
+        assertEquals(PollTier.MEDIUM, PollTiers.tierOf(0x11))
+        assertEquals(PollTier.MEDIUM, PollTiers.tierOf(0x04))
         assertEquals(PollTier.MEDIUM, PollTiers.tierOf(0x10))
+        assertEquals(PollTier.SLOW, PollTiers.tierOf(0x0F))
         assertEquals(PollTier.MEDIUM, PollTiers.tierOf(0x14))
         assertEquals(PollTier.SLOW, PollTiers.tierOf(0x05))
         assertEquals(PollTier.SLOW, PollTiers.tierOf(0x07))
@@ -108,12 +111,25 @@ class PollSchedulerTest {
     }
 
     @Test
-    fun `dashboard plus recording set on K-Line gets faster too`() = runTest {
+    fun `default dashboard plus recording set on K-Line refreshes rpm and speed at least 3x more often`() = runTest {
         val list = pids(0x0C, 0x0D, 0x05, 0x04, 0x11, 0x42, 0x0F, 0x10, 0x06, 0x07, 0x2F)
         val before = countReadings(list, RoundRobin(), 120_000)
         val after = countReadings(list, PollScheduler(), 120_000)
-        val ratio = after.getValue("01.0C").toDouble() / before.getValue("01.0C")
-        assertTrue("rpm ${before["01.0C"]} -> ${after["01.0C"]} ($ratio x)", ratio >= 1.8)
+        for (id in listOf("01.0C", "01.0D")) {
+            val ratio = after.getValue(id).toDouble() / before.getValue(id)
+            assertTrue("$id ${before[id]} -> ${after[id]} ($ratio x)", ratio >= 3.0)
+        }
+    }
+
+    @Test
+    fun `default dashboard set alone on K-Line refreshes rpm at least 2x more often`() = runTest {
+        val list = pids(*StandardPids.dashboardDefaults.toIntArray())
+        val before = countReadings(list, RoundRobin(), 120_000)
+        val after = countReadings(list, PollScheduler(), 120_000)
+        for (id in listOf("01.0C", "01.0D")) {
+            val ratio = after.getValue(id).toDouble() / before.getValue(id)
+            assertTrue("$id ${before[id]} -> ${after[id]} ($ratio x)", ratio >= 2.0)
+        }
     }
 
     @Test

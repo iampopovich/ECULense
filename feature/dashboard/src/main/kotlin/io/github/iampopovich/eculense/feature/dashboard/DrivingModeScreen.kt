@@ -3,6 +3,7 @@ package io.github.iampopovich.eculense.feature.dashboard
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -102,10 +104,21 @@ internal fun DrivingModeScreen(
         Modifier.fillMaxSize().background(background)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { controls = !controls },
     ) {
-        Column(
-            Modifier.fillMaxSize().padding(8.dp).graphicsLayer { if (mirror) scaleX = -1f },
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Controls take their own row at the top (never drawn over the tiles) and are not mirrored.
+            if (controls) DrivingControls(state, onExit, onTiles, onMirror, Modifier.align(Alignment.CenterHorizontally))
+            Column(
+                Modifier.weight(1f).fillMaxWidth().graphicsLayer { if (mirror) scaleX = -1f },
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                DrivingContent(state, tiles, foreground, dark, mirror)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.DrivingContent(state: DashboardUiState, tiles: List<TileState>, foreground: Color, dark: Boolean, mirror: Boolean) {
             state.banner?.let {
                 Text(
                     it.asString(),
@@ -124,16 +137,21 @@ internal fun DrivingModeScreen(
                             for (c in 0 until columns) {
                                 val tile = tiles.getOrNull(r * columns + c)
                                 Box(Modifier.weight(1f).fillMaxSize()) {
-                                    if (tile != null) DrivingTile(tile, foreground, dark)
+                                    if (tile != null) {
+                                        // A subtle surface + outline so neighbouring tiles read as separate.
+                                        val shape = MaterialTheme.shapes.large
+                                        val surface = if (mirror) Color(0xFF161616) else MaterialTheme.colorScheme.surfaceContainer
+                                        val outline = if (mirror) Color(0xFF3A3A3A) else MaterialTheme.colorScheme.outlineVariant
+                                        Box(Modifier.fillMaxSize().background(surface, shape).border(1.dp, outline, shape)) {
+                                            DrivingTile(tile, foreground, dark)
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-        if (controls) DrivingControls(state, onExit, onTiles, onMirror, Modifier.align(Alignment.BottomCenter))
-    }
 }
 
 @Composable
@@ -166,7 +184,7 @@ private fun DrivingControls(
     onMirror: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(modifier.padding(12.dp), shape = MaterialTheme.shapes.extraLarge, tonalElevation = 6.dp, shadowElevation = 6.dp) {
+    Surface(modifier, shape = MaterialTheme.shapes.extraLarge, tonalElevation = 6.dp, shadowElevation = 6.dp) {
         Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             FilledTonalIconButton(onClick = onExit) {
                 Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.drive_exit))

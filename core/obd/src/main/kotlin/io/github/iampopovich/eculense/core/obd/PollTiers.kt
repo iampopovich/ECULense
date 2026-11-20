@@ -8,10 +8,12 @@ enum class PollTier(val everyCycles: Int) { FAST(1), MEDIUM(3), SLOW(10) }
 
 /** Tier table (data, not code paths) plus the timing constants of the scheduler. */
 object PollTiers {
-    private val FAST = listOf(0x04, 0x0C, 0x0D, 0x11)
+    // Only rpm and speed: on K-Line every extra FAST PID slows them down for the whole drive.
+    private val FAST = listOf(0x0C, 0x0D)
 
-    // MAF, MAP, IAT, timing, fuel rate, lambda, relative throttle, all O2 sensors (narrow and wide band).
-    private val MEDIUM = listOf(0x0B, 0x0E, 0x0F, 0x10, 0x44, 0x45, 0x5E) +
+    // Load, throttle, MAF, MAP, timing, fuel rate, lambda, relative throttle, all O2 sensors (narrow and wide band).
+    // Intake air temperature changes slowly and is SLOW.
+    private val MEDIUM = listOf(0x04, 0x11, 0x0B, 0x0E, 0x10, 0x44, 0x45, 0x5E) +
         (0x14..0x1B) + (0x24..0x2B) + (0x34..0x3B)
 
     val defaults: Map<Int, PollTier> =

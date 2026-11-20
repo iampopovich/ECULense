@@ -84,13 +84,15 @@ internal class DashboardViewModel(
         controller.state.filter { it is ConnectionState.Connected || it is ConnectionState.Disconnected || it is ConnectionState.Failed }
             .stateIn(viewModelScope, SharingStarted.Eagerly, controller.state.value)
 
-    private val selected: StateFlow<List<Pid>> = combine(lastConnected, prefs.selection) { state, saved ->
+    private val selected: StateFlow<List<Pid>> = combine(lastConnected, prefs.selection, prefs.fuelEstimate) { state, saved, estimate ->
         if (state is ConnectionState.Connected) {
-            DashboardSelection.resolve(saved, state.supportedPids).mapNotNull { StandardPids.byCode(it) }
+            DashboardSelection.resolve(saved, state.supportedPids, estimate).mapNotNull { StandardPids.byCode(it) }
         } else {
             emptyList()
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val fuelEstimate: StateFlow<Boolean> = prefs.fuelEstimate.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     private val display = combine(prefs.keepScreenOn, prefs.hudMirror, prefs.drivingTiles) { a, b, c -> Triple(a, b, c) }
 
@@ -105,7 +107,7 @@ internal class DashboardViewModel(
             DashboardUiState(
                 connected = f.state.isSessionAlive,
                 banner = ObdText.sessionState(f.state),
-                tiles = TileModel.build(pids, buffer, f.state, f.disabled, f.cycleMs, t) { v, unit -> u.display(v, unit) },
+                tiles = TileModel.build(pids, buffer, f.state, f.disabled, f.cycleMs, t, fuelEstimate.value) { v, unit -> u.display(v, unit) },
                 recording = f.recording,
                 status = f.state.statusLine(buffer.latest(PollTiers.ADAPTER_VOLTAGE_ID)?.value),
                 keepScreenOn = d.first,
@@ -115,7 +117,7 @@ internal class DashboardViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardUiState())
 
     init {
-        viewModelScope.launch { selected.collect { controller.setPolledPids(DEFAULT_OWNER, polledFor(it, lastConnected.value)) } }
+        viewModelScope.launch { selected.collect { controller.setPolledPids(DEFAULT_OWNER, polledFor(it, lastConnected.value, fuelEstimate.value)) } }
         viewModelScope.launch {
             controller.readings.collect { r ->
                 val t = now()
@@ -155,11 +157,11 @@ internal class DashboardViewModel(
         const val REDRAW_MS = 250L
 
         /** What the poller needs for [shown] tiles: helpers for the open-loop marker and the fuel-rate estimate. */
-        fun polledFor(shown: List<Pid>, state: ConnectionState): List<Pid> {
+        fun polledFor(shown: List<Pid>, state: ConnectionState, estimate: Boolean = true): List<Pid> {
             val supported = (state as? ConnectionState.Connected)?.supportedPids ?: return shown
             val extra = buildList {
                 if (shown.any { it.code in StandardPids.FUEL_TRIMS } && 0x03 in supported) add(0x03)
-                if (shown.any { it.code == DashboardSelection.FUEL_RATE }) {
+                if (estimate && shown.any { it.code == DashboardSelection.FUEL_RATE }) {
                     if (DashboardSelection.MAF in supported) add(DashboardSelection.MAF)
                 }
             }

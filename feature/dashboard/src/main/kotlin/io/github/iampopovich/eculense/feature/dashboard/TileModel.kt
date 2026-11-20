@@ -114,6 +114,7 @@ internal object TileModel {
         disabled: Set<Int>,
         cycleMs: Long?,
         nowMs: Long,
+        estimateFuel: Boolean = true,
         convert: (Double, String) -> Pair<Double, String>,
     ): List<TileState> {
         val paused = state is ConnectionState.Reconnecting || state is ConnectionState.EngineOff
@@ -122,7 +123,7 @@ internal object TileModel {
             val unit = convert(0.0, pid.unit).second
             val own = buffer.latest(pid.sensorId)
             val maf = buffer.latest(StandardPids.byCode(DashboardSelection.MAF)!!.sensorId)
-            val estimate = pid.code == DashboardSelection.FUEL_RATE && maf != null &&
+            val estimate = estimateFuel && pid.code == DashboardSelection.FUEL_RATE && maf != null &&
                 (own == null || pid.code in disabled)
             val sample = when {
                 estimate -> Stamped(fuelRateFromMaf(maf!!.value), maf.atMs)

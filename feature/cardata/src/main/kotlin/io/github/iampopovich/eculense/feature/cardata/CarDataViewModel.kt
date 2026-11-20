@@ -62,19 +62,19 @@ internal class CarDataViewModel(
         controller.state.filter { it is ConnectionState.Connected || it is ConnectionState.Disconnected || it is ConnectionState.Failed }
             .stateIn(viewModelScope, SharingStarted.Eagerly, controller.state.value)
 
-    private val panelCodes = combine(lastConnected, prefs.selection) { s, saved ->
-        DashboardSelection.resolve(saved, (s as? ConnectionState.Connected)?.supportedPids.orEmpty())
+    private val panelCodes = combine(lastConnected, prefs.selection, prefs.fuelEstimate) { s, saved, estimate ->
+        DashboardSelection.resolve(saved, (s as? ConnectionState.Connected)?.supportedPids.orEmpty(), estimate)
     }
 
     val uiState: StateFlow<CarDataUiState> = combine(
         combine(controller.state, lastConnected, controller.disabledPids) { s, c, d -> Triple(s, c, d) },
         panelCodes,
         latest,
-        combine(editing, prefs.keepScreenOn) { e, k -> e to k },
+        combine(editing, prefs.keepScreenOn, prefs.fuelEstimate) { e, k, f -> Triple(e, k, f) },
         units.units,
-    ) { (state, connected, disabled), panel, values, (edit, keep), u ->
+    ) { (state, connected, disabled), panel, values, (edit, keep, estimate), u ->
         val supported = (connected as? ConnectionState.Connected)?.supportedPids.orEmpty()
-        val rows = rowsFor(supported).map { pid ->
+        val rows = rowsFor(supported, estimate).map { pid ->
             val estimated = pid.code == DashboardSelection.FUEL_RATE && pid.code !in supported
             val raw = if (estimated) {
                 values[StandardPids.byCode(DashboardSelection.MAF)!!.sensorId]
@@ -94,7 +94,7 @@ internal class CarDataViewModel(
         CarDataUiState(
             connected = state.isSessionAlive,
             groups = rows.groupBy { StandardPids.systemOf(it.pid.code) }.toSortedMap().map { (system, list) -> CarDataGroup(system, list) },
-            unsupported = if (connected is ConnectionState.Connected) StandardPids.all.filter { !DashboardSelection.canShow(it.code, supported) } else emptyList(),
+            unsupported = if (connected is ConnectionState.Connected) StandardPids.all.filter { !DashboardSelection.canShow(it.code, supported, estimate) } else emptyList(),
             panel = panel.mapNotNull { StandardPids.byCode(it) },
             editing = edit,
             keepScreenOn = keep,
@@ -134,7 +134,8 @@ internal class CarDataViewModel(
     internal companion object {
         const val OWNER = "cardata"
 
-        /** Supported known PIDs, plus the fuel rate when it can be estimated from MAF. */
-        fun rowsFor(supported: Set<Int>): List<Pid> = StandardPids.all.filter { DashboardSelection.canShow(it.code, supported) }
+        /** Supported known PIDs, plus the fuel rate when it can be estimated from MAF (not for diesel). */
+        fun rowsFor(supported: Set<Int>, estimate: Boolean = true): List<Pid> =
+            StandardPids.all.filter { DashboardSelection.canShow(it.code, supported, estimate) }
     }
 }

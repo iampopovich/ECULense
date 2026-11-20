@@ -15,6 +15,15 @@ class DashboardSelectionTest {
     }
 
     @Test
+    fun `no MAF fuel estimate for diesel, unknown fuel type counts as petrol`() {
+        assertEquals(listOf(0x0C), DashboardSelection.resolve(listOf(0x5E, 0x0C), setOf(0x0C, 0x10), estimate = false))
+        assertEquals(listOf(0x5E), DashboardSelection.resolve(listOf(0x5E), setOf(0x5E), estimate = false))
+        assertEquals(false, DashboardSelection.canEstimateFuel(io.github.iampopovich.eculense.core.model.FuelType.DIESEL))
+        assertEquals(true, DashboardSelection.canEstimateFuel(io.github.iampopovich.eculense.core.model.FuelType.PETROL))
+        assertEquals(true, DashboardSelection.canEstimateFuel(null))
+    }
+
+    @Test
     fun `edits toggle and move without text input`() {
         val s = listOf(1, 2, 3)
         assertEquals(listOf(1, 3), DashboardSelection.toggle(s, 2))

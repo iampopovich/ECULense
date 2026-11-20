@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense.core.data
 
+import kotlinx.coroutines.flow.map
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
 import io.github.iampopovich.eculense.core.database.AnalyticsDao
@@ -33,7 +34,12 @@ val dataModule = module {
     single<TripRepository> { RoomTripRepository(get()) }
     single<DashboardPrefs> {
         val vehicle = get<DataStoreVehiclePrefs>()
-        DataStoreDashboardPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("dashboard") }, vehicle.activeCarId)
+        val cars = get<CarRepository>()
+        DataStoreDashboardPrefs(
+            PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("dashboard") },
+            vehicle.activeCarId,
+            cars.observeActiveCar().map { it?.fuelType },
+        )
     }
     single<MaintenanceRepository> { RoomMaintenanceRepository(get(), get(), get(), get()) }
     single {
