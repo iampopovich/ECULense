@@ -2,6 +2,7 @@ package io.github.iampopovich.eculense.core.data
 
 import io.github.iampopovich.eculense.core.analytics.EngineMaps
 import io.github.iampopovich.eculense.core.analytics.SensorIds
+import io.github.iampopovich.eculense.core.model.AppLogger
 import io.github.iampopovich.eculense.core.model.SensorReading
 import io.github.iampopovich.eculense.core.model.SessionSource
 import io.github.iampopovich.eculense.core.obd.ConnectionController
@@ -9,6 +10,7 @@ import io.github.iampopovich.eculense.core.obd.ConnectionState
 import io.github.iampopovich.eculense.core.obd.Pid
 import io.github.iampopovich.eculense.core.obd.StandardPids
 import io.github.iampopovich.eculense.core.obd.isSessionAlive
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -47,6 +49,7 @@ internal class LiveSessionRecorder(
     private val scope: CoroutineScope,
     /** After finish: trip for the recording and background analysis (3.9). Errors here do not break the recording. */
     private val onFinished: suspend (sessionId: Long) -> Unit = {},
+    private val logger: AppLogger = AppLogger.NONE,
 ) : SessionRecorder {
     private val _active = MutableStateFlow<Long?>(null)
     override val activeSessionId: StateFlow<Long?> = _active.asStateFlow()
@@ -58,7 +61,16 @@ internal class LiveSessionRecorder(
         if (job?.isActive == true) return
         _auto.value = auto
         job = scope.launch {
-            val id = repository.start(name, SessionSource.LIVE, vin = null, carId = carId)
+            val id = try {
+                repository.start(name, SessionSource.LIVE, vin = null, carId = carId)
+            } catch (e: CancellationException) {
+                _auto.value = false
+                throw e
+            } catch (e: Exception) {
+                logger.error(TAG, "recording: start failed", e)
+                _auto.value = false
+                return@launch
+            }
             _active.value = id
             val batch = mutableListOf<SensorReading>()
             try {
@@ -69,6 +81,7 @@ internal class LiveSessionRecorder(
                         controller.readings.collect { reading ->
                             batch += reading
                             if (batch.size >= BATCH_SIZE) {
+                                // A DB error ends the recording (finally below still closes the session).
                                 repository.append(id, batch.toList())
                                 batch.clear()
                             }
@@ -85,17 +98,52 @@ internal class LiveSessionRecorder(
                     collector.cancel()
                     demand.cancel()
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.error(TAG, "recording $id: append failed, recording ends", e)
             } finally {
-                withContext(NonCancellable) {
-                    controller.setPolledPids(OWNER, emptyList())
-                    if (batch.isNotEmpty()) repository.append(id, batch.toList())
-                    repository.finish(id)
-                    _active.value = null
-                    _auto.value = false
-                    runCatching { onFinished(id) }
-                }
-                _active.value = null
+                withContext(NonCancellable) { close(id, batch) }
             }
+        }
+    }
+
+    /** Every step on its own: a failing one must not keep the session open or the recorder busy. */
+    private suspend fun close(id: Long, batch: List<SensorReading>) {
+        try {
+            controller.setPolledPids(OWNER, emptyList())
+            if (batch.isNotEmpty()) {
+                try {
+                    repository.append(id, batch.toList())
+                } catch (e: Exception) {
+                    logger.error(TAG, "recording $id: final append failed (${batch.size} readings dropped)", e)
+                }
+            }
+            val finished = try {
+                repository.finish(id)
+                true
+            } catch (e: Exception) {
+                logger.warn(TAG, "recording $id: finish failed, retrying once", e)
+                try {
+                    repository.finish(id)
+                    true
+                } catch (e2: Exception) {
+                    logger.error(TAG, "recording $id: finish failed, the session stays without an end time", e2)
+                    false
+                }
+            }
+            _active.value = null
+            _auto.value = false
+            if (finished) {
+                try {
+                    onFinished(id)
+                } catch (e: Exception) {
+                    logger.error(TAG, "recording $id: post-recording work (trip, analysis) failed", e)
+                }
+            }
+        } finally {
+            _active.value = null
+            _auto.value = false
         }
     }
 
@@ -107,6 +155,7 @@ internal class LiveSessionRecorder(
     private companion object {
         const val BATCH_SIZE = 25
         const val OWNER = "recorder"
+        const val TAG = "EcuRecorder"
     }
 }
 
