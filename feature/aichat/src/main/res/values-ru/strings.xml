@@ -67,10 +67,10 @@
         <item quantity="other">%d месяца</item>
     </plurals>
     <plurals name="aichat_period_days">
-        <item quantity="one">%d дн.</item>
-        <item quantity="few">%d дн.</item>
-        <item quantity="many">%d дн.</item>
-        <item quantity="other">%d дн.</item>
+        <item quantity="one">%d день</item>
+        <item quantity="few">%d дня</item>
+        <item quantity="many">%d дней</item>
+        <item quantity="other">%d дня</item>
     </plurals>
     <string name="aichat_subject_ai">ИИ</string>
     <string name="aichat_tool_car_profile">%1$s смотрит профиль машины…</string>

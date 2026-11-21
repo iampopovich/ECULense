@@ -38,7 +38,10 @@
     <string name="backup_line_trips">trips +%1$d</string>
     <string name="backup_line_trips_updated">trips +%1$d, %2$d updated</string>
     <string name="backup_line_dtc">error events +%1$d</string>
-    <string name="backup_line_car_fields">car profile: %1$d fields updated</string>
+    <plurals name="backup_line_car_fields">
+        <item quantity="one">car profile: %1$d field updated</item>
+        <item quantity="other">car profile: %1$d fields updated</item>
+    </plurals>
     <string name="backup_line_units">units from the backup</string>
     <string name="backup_line_errors">errors %1$d</string>
     <string name="backup_saved">Backup saved: database, settings. API keys and tokens are not included.</string>
@@ -53,7 +56,7 @@
     <string name="backup_rejected_not_sqlite">The backup is damaged: the database is not SQLite</string>
     <string name="backup_file_create_failed">Couldn\'t create the file</string>
     <string name="backup_file_unavailable">Couldn\'t open the file</string>
-    <string name="backup_cancelled_progress">Cancelled: %1$d of %2$d recordings processed</string>
+    <string name="backup_cancelled_progress">Cancelled: recordings processed %1$d of %2$d</string>
     <string name="backup_accel_included">Phone accelerometer logs: %1$d.</string>
     <string name="backup_accel_skipped">Phone accelerometer logs (%1$d MB) are over 50 MB and were not included; they stay on this phone.</string>
 </resources>

@@ -140,9 +140,12 @@ private fun CarScannerCard(state: BackupUiState, onPickFile: () -> Unit, onPickF
             Text(stringResource(R.string.backup_folder_title), style = MaterialTheme.typography.titleSmall)
             Secondary(
                 if (state.folderUri != null) {
-                    stringResource(R.string.backup_folder, state.folderName ?: stringResource(R.string.backup_folder_selected)) + "\n" +
-                        (state.newest?.let { n -> stringResource(R.string.backup_folder_newest, n.name, EcuDates.dateTime(n.lastModifiedMs)) }
-                            ?: stringResource(R.string.backup_folder_no_cbz))
+                    stringResource(
+                        CoreUiR.string.common_two_lines,
+                        stringResource(R.string.backup_folder, state.folderName ?: stringResource(R.string.backup_folder_selected)),
+                        state.newest?.let { n -> stringResource(R.string.backup_folder_newest, n.name, EcuDates.dateTime(n.lastModifiedMs)) }
+                            ?: stringResource(R.string.backup_folder_no_cbz),
+                    )
                 } else {
                     stringResource(R.string.backup_folder_hint)
                 },
@@ -215,7 +218,7 @@ internal fun historyParts(item: ImportHistoryItem): List<UiText> = buildList {
         else UiText.Res(R.string.backup_line_trips, listOf(item.tripsAdded)),
     )
     add(UiText.Res(R.string.backup_line_dtc, listOf(item.dtcAdded)))
-    if (item.carFieldsUpdated > 0) add(UiText.Res(R.string.backup_line_car_fields, listOf(item.carFieldsUpdated)))
+    if (item.carFieldsUpdated > 0) add(UiText.Plural(R.plurals.backup_line_car_fields, item.carFieldsUpdated))
     if (item.unitsUpdated) add(UiText.Res(R.string.backup_line_units))
     if (item.errors > 0) add(UiText.Res(R.string.backup_line_errors, listOf(item.errors)))
 }

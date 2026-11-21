@@ -155,7 +155,7 @@ internal fun HealthScreen(
             }
             if (record.dtcs.isNotEmpty()) {
                 item(key = "codes") {
-                    Text(stringResource(R.string.health_codes) + ": " + record.dtcs.joinToString(", ") { it.code }, style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.health_codes_line, record.dtcs.joinToString(", ") { it.code }), style = MaterialTheme.typography.bodyLarge)
                 }
             }
             // Actions on their own rows (large font).

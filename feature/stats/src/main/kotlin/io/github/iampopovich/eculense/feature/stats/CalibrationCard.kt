@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -32,7 +33,7 @@ internal fun CalibrationCard(ui: CalibrationUi, actions: CalibrationActions) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(R.string.calib_title), style = MaterialTheme.typography.titleMedium)
             Text(
-                stringResource(R.string.calib_samples, ui.report.samples, StatsFormat.duration(ui.report.durationMs)),
+                pluralStringResource(R.plurals.calib_samples, ui.report.samples, ui.report.samples, StatsFormat.duration(ui.report.durationMs)),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
@@ -63,7 +64,7 @@ internal fun CalibrationCard(ui: CalibrationUi, actions: CalibrationActions) {
             Text(
                 when {
                     ui.driverLoading -> stringResource(R.string.calib_driver_loading)
-                    ui.driver != null -> stringResource(R.string.calib_driver, g(ui.driver.thresholdMs2), ui.driver.windows)
+                    ui.driver != null -> pluralStringResource(R.plurals.calib_driver, ui.driver.windows, g(ui.driver.thresholdMs2), ui.driver.windows)
                     else -> stringResource(R.string.calib_driver_none)
                 },
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,

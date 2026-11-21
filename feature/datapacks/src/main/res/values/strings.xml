@@ -46,8 +46,8 @@
     <string name="datapacks_no_repo">OBDb has no repository %1$s — no signals for this model yet.</string>
     <string name="datapacks_not_covered">OBDb (%1$s) doesn\'t cover %2$d: there\'s no data from real cars for it. OBDb signals target CAN cars of later generations; for this car, extended PIDs will come from user files or your own contribution to OBDb.</string>
     <string name="datapacks_not_covered_gen">OBDb (%1$s) doesn\'t cover %2$d — generation “%3$s”, %4$s: there\'s no data from real cars for it. OBDb signals target CAN cars of later generations; for this car, extended PIDs will come from user files or your own contribution to OBDb.</string>
-    <string name="datapacks_covered">%1$s, %2$d: %3$d commands, %4$d signals, %5$d ECUs. Version %6$s. CC BY-SA 4.0.</string>
-    <string name="datapacks_covered_gen">%1$s, %2$d (%7$s): %3$d commands, %4$d signals, %5$d ECUs. Version %6$s. CC BY-SA 4.0.</string>
+    <string name="datapacks_covered">%1$s, %2$d: commands: %3$d, signals: %4$d, ECUs: %5$d. Version %6$s. CC BY-SA 4.0.</string>
+    <string name="datapacks_covered_gen">%1$s, %2$d (%7$s): commands: %3$d, signals: %4$d, ECUs: %5$d. Version %6$s. CC BY-SA 4.0.</string>
     <string name="datapacks_version">Version %1$s</string>
     <string name="datapacks_about_tagline">OBD-II scanner. Car data stays on the phone.</string>
     <string name="datapacks_sources">Data sources</string>

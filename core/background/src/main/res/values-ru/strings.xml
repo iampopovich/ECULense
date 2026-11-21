@@ -5,22 +5,32 @@
     <string name="bg_channel_maintenance">Обслуживание</string>
     <string name="bg_channel_maintenance_description">Напоминания о плановом ТО</string>
     <string name="bg_findings_one">Анализ: %1$s</string>
-    <string name="bg_findings_many">Анализ: новых находок — %1$d</string>
+    <plurals name="bg_findings_many">
+        <item quantity="one">Анализ: %1$d новая находка</item>
+        <item quantity="few">Анализ: %1$d новые находки</item>
+        <item quantity="many">Анализ: %1$d новых находок</item>
+        <item quantity="other">Анализ: %1$d новой находки</item>
+    </plurals>
     <string name="bg_maintenance_one">Пора ТО: %1$s</string>
-    <string name="bg_maintenance_many">Пора ТО: работ — %1$d</string>
+    <plurals name="bg_maintenance_many">
+        <item quantity="one">Пора ТО: %1$d работа</item>
+        <item quantity="few">Пора ТО: %1$d работы</item>
+        <item quantity="many">Пора ТО: %1$d работ</item>
+        <item quantity="other">Пора ТО: %1$d работы</item>
+    </plurals>
     <string name="bg_overdue_by_km">просрочено на %1$d км</string>
     <string name="bg_km_left">осталось %1$d км</string>
     <plurals name="bg_due_days_ago">
-        <item quantity="one">срок прошёл %1$d дн. назад</item>
-        <item quantity="few">срок прошёл %1$d дн. назад</item>
-        <item quantity="many">срок прошёл %1$d дн. назад</item>
-        <item quantity="other">срок прошёл %1$d дн. назад</item>
+        <item quantity="one">срок прошёл %1$d день назад</item>
+        <item quantity="few">срок прошёл %1$d дня назад</item>
+        <item quantity="many">срок прошёл %1$d дней назад</item>
+        <item quantity="other">срок прошёл %1$d дня назад</item>
     </plurals>
     <plurals name="bg_in_days">
-        <item quantity="one">через %1$d дн.</item>
-        <item quantity="few">через %1$d дн.</item>
-        <item quantity="many">через %1$d дн.</item>
-        <item quantity="other">через %1$d дн.</item>
+        <item quantity="one">через %1$d день</item>
+        <item quantity="few">через %1$d дня</item>
+        <item quantity="many">через %1$d дней</item>
+        <item quantity="other">через %1$d дня</item>
     </plurals>
     <string name="bg_overdue">просрочено</string>
     <string name="bg_soon">скоро</string>

@@ -57,7 +57,12 @@
     <string name="trip_chart_rpm">Обороты, об/мин</string>
     <string name="trip_chart_coolant">Охлаждающая жидкость, °C</string>
     <string name="calib_title">Калибровка порогов</string>
-    <string name="calib_samples">Датчик телефона: %1$d отсчётов, %2$s</string>
+    <plurals name="calib_samples">
+        <item quantity="one">Датчик телефона: %1$d отсчёт, %2$s</item>
+        <item quantity="few">Датчик телефона: %1$d отсчёта, %2$s</item>
+        <item quantity="many">Датчик телефона: %1$d отсчётов, %2$s</item>
+        <item quantity="other">Датчик телефона: %1$d отсчёта, %2$s</item>
+    </plurals>
     <string name="calib_axis">Уверенность в оси машины: %1$s (нужно %2$s)</string>
     <string name="calib_axis_none">Ось машины не найдена</string>
     <string name="calib_events">Событий сильнее 0,3 g по датчику: %1$d (со скоростью OBD: %2$d)</string>
@@ -66,7 +71,12 @@
     <string name="calib_recommended">Рекомендуемый порог: %1$s g</string>
     <string name="calib_current_default">Сейчас: %1$s g (по умолчанию, Geotab)</string>
     <string name="calib_current_car">Сейчас: %1$s g (задан для этой машины)</string>
-    <string name="calib_driver">Личный порог μ + 2σ: %1$s g (%2$d окон скорости)</string>
+    <plurals name="calib_driver">
+        <item quantity="one">Личный порог μ + 2σ: %1$s g (%2$d окно скорости)</item>
+        <item quantity="few">Личный порог μ + 2σ: %1$s g (%2$d окна скорости)</item>
+        <item quantity="many">Личный порог μ + 2σ: %1$s g (%2$d окон скорости)</item>
+        <item quantity="other">Личный порог μ + 2σ: %1$s g (%2$d окна скорости)</item>
+    </plurals>
     <string name="calib_driver_loading">Личный порог μ + 2σ: считаю…</string>
     <string name="calib_driver_none">Личный порог μ + 2σ: мало записей со скоростью</string>
     <string name="calib_apply">Применить для этой машины</string>

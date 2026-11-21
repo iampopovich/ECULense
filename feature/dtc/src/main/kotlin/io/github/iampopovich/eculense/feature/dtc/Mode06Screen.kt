@@ -119,10 +119,14 @@ private fun ResultRow(r: TestResult) {
             Text(stringResource(R.string.mode06_test, "%02X".format(r.tid), "%02X".format(r.mid)), style = MaterialTheme.typography.bodyMedium)
             val unit = r.unit?.symbol?.takeIf { it.isNotEmpty() }?.let { " $it" }.orEmpty()
             val decimals = if (r.unit == null) 0 else 3
-            val line = stringResource(
-                R.string.mode06_limits,
-                DiagText.number(r.value, decimals) + unit, DiagText.number(r.min, decimals), DiagText.number(r.max, decimals) + unit,
-            ) + if (r.unit == null) " " + stringResource(R.string.mode06_raw, "%02X".format(r.uasId)) else ""
+            val value = DiagText.number(r.value, decimals) + unit
+            val min = DiagText.number(r.min, decimals)
+            val max = DiagText.number(r.max, decimals) + unit
+            val line = if (r.unit == null) {
+                stringResource(R.string.mode06_limits_raw, value, min, max, "%02X".format(r.uasId))
+            } else {
+                stringResource(R.string.mode06_limits, value, min, max)
+            }
             Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.width(8.dp))

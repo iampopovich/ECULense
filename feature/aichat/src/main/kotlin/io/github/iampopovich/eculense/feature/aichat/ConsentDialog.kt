@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
 
 /** What is sent to the provider when vehicle data is enabled (the :core:aitools tools list the same). */
 internal val SHARED_DATA = listOf(
@@ -32,7 +33,7 @@ internal fun ConsentDialog(request: ConsentRequest, onAccept: () -> Unit, onDecl
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.aichat_consent_intro))
-                SHARED_DATA.forEach { Text("• " + stringResource(it)) }
+                SHARED_DATA.forEach { Text(stringResource(CoreUiR.string.common_bullet, stringResource(it))) }
                 Text(
                     stringResource(R.string.aichat_consent_where, ChatTexts.providerTitle(request.provider).asString(), request.provider.model),
                     style = MaterialTheme.typography.bodyMedium,

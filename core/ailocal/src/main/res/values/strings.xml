@@ -78,7 +78,11 @@
     <string name="ailocal_verdict_slow_desc">Works, but slowly: a short answer takes tens of seconds, longer with car data.</string>
     <string name="ailocal_verdict_unsuitable_desc">No backend worked on this phone.</string>
     <string name="ailocal_best_backend">Best backend: %1$s</string>
-    <string name="ailocal_bench_params">Test: %1$d-token prompt, %2$d-token answer.</string>
+    <string name="ailocal_bench_params">Test: prompt of %1$s, answer of %2$s.</string>
+    <plurals name="ailocal_tokens">
+        <item quantity="one">%1$d token</item>
+        <item quantity="other">%1$d tokens</item>
+    </plurals>
     <string name="ailocal_in_use">Used in chat: %1$s</string>
     <string name="ailocal_switch_to">Switch to %1$s</string>
     <string name="ailocal_run_ok">%1$s: first token %2$s s · %3$s tok/s · prompt read %4$s tok/s · load %5$s s</string>

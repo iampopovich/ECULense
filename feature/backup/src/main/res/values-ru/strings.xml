@@ -38,7 +38,12 @@
     <string name="backup_line_trips">поездки +%1$d</string>
     <string name="backup_line_trips_updated">поездки +%1$d, обновлено %2$d</string>
     <string name="backup_line_dtc">события ошибок +%1$d</string>
-    <string name="backup_line_car_fields">профиль машины: обновлено полей %1$d</string>
+    <plurals name="backup_line_car_fields">
+        <item quantity="one">профиль машины: обновлено %1$d поле</item>
+        <item quantity="few">профиль машины: обновлено %1$d поля</item>
+        <item quantity="many">профиль машины: обновлено %1$d полей</item>
+        <item quantity="other">профиль машины: обновлено %1$d поля</item>
+    </plurals>
     <string name="backup_line_units">единицы из бэкапа</string>
     <string name="backup_line_errors">ошибок %1$d</string>
     <string name="backup_saved">Копия сохранена: база данных, настройки. Ключи API и токены в копию не входят.</string>

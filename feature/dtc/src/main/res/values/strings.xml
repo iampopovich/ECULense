@@ -47,6 +47,7 @@
     <string name="dtc_monitor_incomplete">not complete</string>
     <string name="dtc_monitor_not_supported">not supported</string>
     <string name="dtc_monitor_this_trip">this trip: %1$s</string>
+    <string name="dtc_monitor_status_this_trip">%1$s · this trip: %2$s</string>
 
     <!-- B2 used-car check -->
     <string name="dtc_usedcar_title">Codes cleared recently?</string>
@@ -92,7 +93,7 @@
     <string name="mode06_none">The ECU reports no test results</string>
     <string name="mode06_test">Test %1$s · MID %2$s</string>
     <string name="mode06_limits">%1$s · limits %2$s…%3$s</string>
-    <string name="mode06_raw">(raw, unit id %1$s)</string>
+    <string name="mode06_limits_raw">%1$s · limits %2$s…%3$s (raw, unit id %4$s)</string>
     <string name="mode06_pass">OK</string>
     <string name="mode06_fail">FAIL</string>
     <string name="mode06_group_o2">Oxygen sensors</string>

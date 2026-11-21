@@ -89,9 +89,9 @@ internal object MaintenanceFormat {
 
     private fun days(d: Long): UiText = when {
         d == 0L -> UiText.Res(R.string.maint_due_today)
-        d < 0 -> if (-d > 60) UiText.Res(R.string.maint_due_months_ago, listOf((-d / 30).toInt())) else UiText.Res(R.string.maint_due_days_ago, listOf((-d).toInt()))
+        d < 0 -> if (-d > 60) UiText.Res(R.string.maint_due_months_ago, listOf((-d / 30).toInt())) else UiText.Plural(R.plurals.maint_due_days_ago, (-d).toInt())
         d > 60 -> UiText.Res(R.string.maint_in_months, listOf((d / 30).toInt()))
-        else -> UiText.Res(R.string.maint_in_days, listOf(d.toInt()))
+        else -> UiText.Plural(R.plurals.maint_in_days, d.toInt())
     }
 
     const val SEPARATOR = " · "

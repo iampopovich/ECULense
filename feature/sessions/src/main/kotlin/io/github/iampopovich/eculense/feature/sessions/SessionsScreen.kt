@@ -64,7 +64,7 @@ internal fun SessionsScreen(
             items(sessions, key = { it.id }) { session ->
                 ListItem(
                     headlineContent = { Text(session.name) },
-                    supportingContent = { Text(EcuDates.dateTime(session.startedAtMs) + " · " + stringResource(session.source.labelRes)) },
+                    supportingContent = { Text(stringResource(CoreUiR.string.common_join_dot, EcuDates.dateTime(session.startedAtMs), stringResource(session.source.labelRes))) },
                     trailingContent = { TextButton(onClick = { onDelete(session) }) { Text(stringResource(CoreUiR.string.common_delete)) } },
                     modifier = Modifier.clickable { onOpen(session) },
                 )

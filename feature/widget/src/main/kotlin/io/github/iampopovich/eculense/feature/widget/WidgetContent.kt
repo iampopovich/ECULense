@@ -121,7 +121,7 @@ internal fun ageText(context: Context, ms: Long): String = when (val a = Age.of(
     Age.Now -> context.getString(R.string.widget_age_now)
     is Age.Minutes -> context.getString(R.string.widget_age_min, a.n)
     is Age.Hours -> context.getString(R.string.widget_age_hours, a.n)
-    is Age.Days -> context.getString(R.string.widget_age_days, a.n)
+    is Age.Days -> context.resources.getQuantityString(R.plurals.widget_age_days, a.n, a.n)
 }
 
 private fun formatValue(code: Int, v: Double): String {

@@ -116,7 +116,7 @@
     <string name="finding_title_stalls">Engine stalls</string>
     <string name="finding_stalls_no_data">No own recordings to look for stalls in.</string>
     <string name="finding_stalls_ok">No engine stalls in own recordings.</string>
-    <string name="finding_stalls_seen">The engine stalled while running (the ECU kept answering): %1$d in %2$d recordings.</string>
+    <string name="finding_stalls_seen">The engine stalled while running (the ECU kept answering): stalls: %1$d, recordings: %2$d.</string>
     <string name="finding_stalls_hint">Repeated stalls point at idle air control, a dirty throttle body, a vacuum leak or fuel delivery.</string>
     <string name="finding_evidence_stalls">Stalls</string>
     <string name="finding_evidence_last_stall">Last stall</string>

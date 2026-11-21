@@ -20,7 +20,7 @@ class StallRuleTest {
         val two = StallRule.evaluate(input(1L to 10L, 2L to 20L)).single()
         assertEquals(Severity.WARNING, two.severity)
         assertEquals(listOf(1L, 2L), two.sessionIds)
-        assertEquals("The engine stalled while running (the ECU kept answering): 2 in 2 recordings.", FindingEnglish.render(two.message.first()))
+        assertEquals("The engine stalled while running (the ECU kept answering): stalls: 2, recordings: 2.", FindingEnglish.render(two.message.first()))
         assertEquals(Severity.CRITICAL, StallRule.evaluate(input(1L to 1L, 1L to 2L, 1L to 3L, 2L to 4L)).single().severity)
     }
 

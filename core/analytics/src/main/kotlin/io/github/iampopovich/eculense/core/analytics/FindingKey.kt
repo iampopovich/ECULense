@@ -108,7 +108,7 @@ enum class FindingKey(val en: String, val enOne: String? = null) {
     TITLE_STALLS("Engine stalls"),
     STALLS_NO_DATA("No own recordings to look for stalls in."),
     STALLS_OK("No engine stalls in own recordings."),
-    STALLS_SEEN("The engine stalled while running (the ECU kept answering): %1\$d in %2\$d recordings."),
+    STALLS_SEEN("The engine stalled while running (the ECU kept answering): stalls: %1\$d, recordings: %2\$d."),
     STALLS_HINT("Repeated stalls point at idle air control, a dirty throttle body, a vacuum leak or fuel delivery."),
     EVIDENCE_STALLS("Stalls"),
     EVIDENCE_LAST_STALL("Last stall"),

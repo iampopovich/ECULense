@@ -39,6 +39,7 @@ import io.github.iampopovich.eculense.core.navigation.ConnectDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import io.github.iampopovich.eculense.core.obd.Pid
 import io.github.iampopovich.eculense.core.obdtext.ObdText
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
 import org.koin.compose.viewmodel.koinViewModel
 import java.util.Locale
 
@@ -102,7 +103,10 @@ internal fun CarDataScreen(
                 item(key = "unsupported") {
                     HorizontalDivider(Modifier.padding(top = 12.dp))
                     Text(
-                        (if (unsupportedOpen) "▾ " else "▸ ") + stringResource(R.string.cardata_unsupported, state.unsupported.size),
+                        stringResource(
+                            if (unsupportedOpen) CoreUiR.string.common_expander_open else CoreUiR.string.common_expander_closed,
+                            stringResource(R.string.cardata_unsupported, state.unsupported.size),
+                        ),
                         style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { unsupportedOpen = !unsupportedOpen }
                             .padding(horizontal = 16.dp, vertical = 12.dp),

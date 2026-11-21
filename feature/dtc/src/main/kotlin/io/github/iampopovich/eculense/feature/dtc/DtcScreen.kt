@@ -151,7 +151,7 @@ private fun ClearDialog(state: DtcUiState, onDismiss: () -> Unit, onConfirm: (Bo
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(stringResource(R.string.dtc_clear_text))
                 listOf(R.string.dtc_clear_loss_freeze, R.string.dtc_clear_loss_readiness, R.string.dtc_clear_loss_counters).forEach {
-                    Text("• " + stringResource(it), style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(CoreUiR.string.common_bullet, stringResource(it)), style = MaterialTheme.typography.bodyMedium)
                 }
                 Text(stringResource(R.string.dtc_clear_return), style = MaterialTheme.typography.bodyMedium)
                 if (needsConfirm) {
@@ -231,9 +231,9 @@ private fun MonitorRow(m: MonitorState, thisCycle: MonitorStatus?) {
         Column(Modifier.weight(1f)) {
             Text(stringResource(DiagText.monitor(m.monitor)), style = MaterialTheme.typography.bodyMedium)
             val status = stringResource(DiagText.status(m.status))
-            val extra = thisCycle?.takeIf { m.status != MonitorStatus.NOT_SUPPORTED && it != MonitorStatus.NOT_SUPPORTED }
-                ?.let { " · " + stringResource(R.string.dtc_monitor_this_trip, stringResource(DiagText.status(it))) }.orEmpty()
-            Text(status + extra, style = MaterialTheme.typography.bodySmall, color = if (m.status == MonitorStatus.NOT_SUPPORTED) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified)
+            val text = thisCycle?.takeIf { m.status != MonitorStatus.NOT_SUPPORTED && it != MonitorStatus.NOT_SUPPORTED }
+                ?.let { stringResource(R.string.dtc_monitor_status_this_trip, status, stringResource(DiagText.status(it))) } ?: status
+            Text(text, style = MaterialTheme.typography.bodySmall, color = if (m.status == MonitorStatus.NOT_SUPPORTED) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified)
         }
     }
 }

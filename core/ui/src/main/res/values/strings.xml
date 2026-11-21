@@ -21,4 +21,9 @@
     <string name="common_unit_mpg_imp" translatable="false">mpg (Imp)</string>
     <string name="common_years_open">%1$d–present</string>
     <string name="common_years_range" translatable="false">%1$d–%2$d</string>
+    <string name="common_bullet" translatable="false">• %1$s</string>
+    <string name="common_join_dot" translatable="false">%1$s · %2$s</string>
+    <string name="common_two_lines" translatable="false">%1$s\n%2$s</string>
+    <string name="common_expander_open" translatable="false">▾ %1$s</string>
+    <string name="common_expander_closed" translatable="false">▸ %1$s</string>
 </resources>

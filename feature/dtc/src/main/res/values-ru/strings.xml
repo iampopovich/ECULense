@@ -51,6 +51,7 @@
     <string name="dtc_monitor_incomplete">не завершён</string>
     <string name="dtc_monitor_not_supported">не поддерживается</string>
     <string name="dtc_monitor_this_trip">в этой поездке: %1$s</string>
+    <string name="dtc_monitor_status_this_trip">%1$s · в этой поездке: %2$s</string>
 
     <!-- B2 used-car check -->
     <string name="dtc_usedcar_title">Коды недавно стёрли?</string>
@@ -96,7 +97,7 @@
     <string name="mode06_none">Блок не отдаёт результатов тестов</string>
     <string name="mode06_test">Тест %1$s · MID %2$s</string>
     <string name="mode06_limits">%1$s · пределы %2$s…%3$s</string>
-    <string name="mode06_raw">(сырое значение, единица %1$s)</string>
+    <string name="mode06_limits_raw">%1$s · пределы %2$s…%3$s (сырое значение, единица %4$s)</string>
     <string name="mode06_pass">НОРМА</string>
     <string name="mode06_fail">НЕ НОРМА</string>
     <string name="mode06_group_o2">Датчики кислорода</string>

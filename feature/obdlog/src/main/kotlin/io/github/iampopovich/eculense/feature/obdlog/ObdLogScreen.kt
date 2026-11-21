@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.obd.TrafficDirection
 import io.github.iampopovich.eculense.core.obd.TrafficEntry
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 import java.time.Instant
@@ -107,10 +108,11 @@ private fun EntryRow(entry: TrafficEntry) {
         TrafficDirection.NOTE -> MaterialTheme.colorScheme.tertiary
     }
     val time = timeFormat.format(Instant.ofEpochMilli(entry.timestampMs).atZone(ZoneId.systemDefault()))
-    val duration = entry.durationMs?.let { " · " + stringResource(R.string.obdlog_duration, it.toInt()) }.orEmpty()
+    val head = "$time  ${entry.direction.name}"
+    val header = entry.durationMs?.let { stringResource(CoreUiR.string.common_join_dot, head, stringResource(R.string.obdlog_duration, it.toInt())) } ?: head
     Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Text(
-            "$time  ${entry.direction.name}$duration",
+            header,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

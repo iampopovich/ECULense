@@ -12,5 +12,8 @@
     <string name="widget_age_now">just now</string>
     <string name="widget_age_min">%1$d min ago</string>
     <string name="widget_age_hours">%1$d h ago</string>
-    <string name="widget_age_days">%1$d d ago</string>
+    <plurals name="widget_age_days">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
 </resources>

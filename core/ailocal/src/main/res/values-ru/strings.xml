@@ -74,7 +74,13 @@
     <string name="ailocal_verdict_slow_desc">Работает, но медленно: короткий ответ — десятки секунд, с данными машины — дольше.</string>
     <string name="ailocal_verdict_unsuitable_desc">Ни один бэкенд не заработал на этом телефоне.</string>
     <string name="ailocal_best_backend">Лучший бэкенд: %1$s</string>
-    <string name="ailocal_bench_params">Тест: запрос %1$d токенов, ответ %2$d токенов.</string>
+    <string name="ailocal_bench_params">Тест: запрос %1$s, ответ %2$s.</string>
+    <plurals name="ailocal_tokens">
+        <item quantity="one">%1$d токен</item>
+        <item quantity="few">%1$d токена</item>
+        <item quantity="many">%1$d токенов</item>
+        <item quantity="other">%1$d токена</item>
+    </plurals>
     <string name="ailocal_in_use">Используется в чате: %1$s</string>
     <string name="ailocal_switch_to">Перейти на %1$s</string>
     <string name="ailocal_run_ok">%1$s: первый токен %2$s с · %3$s ток/с · чтение запроса %4$s ток/с · загрузка %5$s с</string>

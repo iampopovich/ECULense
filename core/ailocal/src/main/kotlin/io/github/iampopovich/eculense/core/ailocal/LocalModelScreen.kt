@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -494,7 +495,8 @@ private fun VerdictCard(report: BenchReport, row: ModelRow, actions: LocalModelA
             )
             report.best?.let { Text(stringResource(R.string.ailocal_best_backend, it.backend.label), fontWeight = FontWeight.SemiBold) }
             report.runs.forEach { RunLine(it) }
-            Text(stringResource(R.string.ailocal_bench_params, report.runs.firstOrNull { it.ok }?.prefillTokens ?: BenchService.PREFILL_TOKENS, BenchService.DECODE_TOKENS), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val prefill = report.runs.firstOrNull { it.ok }?.prefillTokens ?: BenchService.PREFILL_TOKENS
+            Text(stringResource(R.string.ailocal_bench_params, pluralStringResource(R.plurals.ailocal_tokens, prefill, prefill), pluralStringResource(R.plurals.ailocal_tokens, BenchService.DECODE_TOKENS, BenchService.DECODE_TOKENS)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             row.activeBackend?.let { active ->
                 Text(stringResource(R.string.ailocal_in_use, active.label), fontWeight = FontWeight.SemiBold)
                 val others = report.runs.filter { it.ok && it.backend != active }

@@ -57,7 +57,10 @@
     <string name="trip_chart_rpm">Engine speed, rpm</string>
     <string name="trip_chart_coolant">Coolant, °C</string>
     <string name="calib_title">Threshold calibration</string>
-    <string name="calib_samples">Phone sensor: %1$d samples, %2$s</string>
+    <plurals name="calib_samples">
+        <item quantity="one">Phone sensor: %1$d sample, %2$s</item>
+        <item quantity="other">Phone sensor: %1$d samples, %2$s</item>
+    </plurals>
     <string name="calib_axis">Car axis confidence: %1$s (needs %2$s)</string>
     <string name="calib_axis_none">Car axis not found</string>
     <string name="calib_events">Events above 0.3 g on the sensor: %1$d (with OBD speed: %2$d)</string>
@@ -66,7 +69,10 @@
     <string name="calib_recommended">Recommended threshold: %1$s g</string>
     <string name="calib_current_default">Now: %1$s g (default, Geotab)</string>
     <string name="calib_current_car">Now: %1$s g (set for this car)</string>
-    <string name="calib_driver">Personal threshold μ + 2σ: %1$s g (%2$d speed windows)</string>
+    <plurals name="calib_driver">
+        <item quantity="one">Personal threshold μ + 2σ: %1$s g (%2$d speed window)</item>
+        <item quantity="other">Personal threshold μ + 2σ: %1$s g (%2$d speed windows)</item>
+    </plurals>
     <string name="calib_driver_loading">Personal threshold μ + 2σ: counting…</string>
     <string name="calib_driver_none">Personal threshold μ + 2σ: too few recordings with speed</string>
     <string name="calib_apply">Apply for this car</string>
@@ -78,7 +84,7 @@
     <string name="calib_gap_no_movement">the car barely moved</string>
     <string name="calib_gap_axis">no accelerations or brakings to find the car axis</string>
     <string name="calib_gap_low_axis">the car axis is uncertain (%1$s below %2$s): is the holder rigid?</string>
-    <string name="calib_gap_few_events">%1$d events with OBD speed, at least %2$d needed</string>
+    <string name="calib_gap_few_events">events with OBD speed: %1$d, at least %2$d needed</string>
     <string name="calib_gap_sign">the sensor and OBD disagree on the direction</string>
     <string name="calib_gap_no_gravity">the file has no gravity samples, the horizontal plane is unknown</string>
 </resources>

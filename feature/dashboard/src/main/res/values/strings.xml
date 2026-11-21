@@ -21,7 +21,7 @@
     <string name="drive_fewer">Fewer tiles</string>
     <string name="drive_more">More tiles</string>
     <string name="drive_mirror">Mirror for windshield (HUD)</string>
-    <string name="drive_tiles_count">%1$d tiles</string>
+    <string name="drive_tiles_count">Tiles: %1$d</string>
     <string name="drive_hint">Tap anywhere to show or hide the controls</string>
     <string name="dash_mark_event">Mark event</string>
     <string name="dash_mark_saved">Event marked in the recording</string>

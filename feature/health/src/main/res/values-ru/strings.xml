@@ -19,6 +19,7 @@
     <string name="health_share_chooser">Отправить отчёт о проверке</string>
     <string name="health_report_title">Отчёт о проверке</string>
     <string name="health_codes">Коды неисправностей</string>
+    <string name="health_codes_line">Коды неисправностей: %1$s</string>
     <string name="health_freeze_frame">Стоп-кадр</string>
     <string name="health_readiness">Мониторы готовности</string>
     <string name="health_findings">Последние выводы анализа</string>

@@ -13,14 +13,14 @@
     <string name="fuel_consumption_title">Consumption by fill-ups</string>
     <string name="fuel_consumption_none">Needs two full tanks with the odometer entered.</string>
     <string name="fuel_l_per_100">%1$s L/100 km</string>
-    <string name="fuel_consumption_basis">Median of the last %1$d full-to-full intervals</string>
-    <string name="fuel_totals">%1$d fill-ups · %2$s L · %3$s</string>
+    <string name="fuel_consumption_basis">Median of the last full-to-full intervals: %1$d</string>
+    <string name="fuel_totals">Fill-ups: %1$d · %2$s L · %3$s</string>
     <string name="fuel_calibration_title">App estimate check</string>
     <string name="fuel_calibration_none">Needs recorded trips covering at least half of the distance between two full tanks (50 km or more).</string>
     <string name="fuel_calibration_exact">The app\'s estimate matches the fill-ups.</string>
     <string name="fuel_calibration_low">The app\'s estimate is %1$s %% low</string>
     <string name="fuel_calibration_high">The app\'s estimate is %1$s %% high</string>
-    <string name="fuel_calibration_basis">Estimate %1$s vs. filled %2$s L/100 km over %3$s km of recordings (%4$d intervals)</string>
+    <string name="fuel_calibration_basis">Estimate %1$s vs. filled %2$s L/100 km over %3$s km of recordings (intervals: %4$d)</string>
     <string name="fuel_correction">Correct the MAF estimate</string>
     <string name="fuel_correction_hint">Multiply estimated trip fuel by the factor from the fill-ups (Stats, range)</string>
     <string name="fuel_km">%1$s km</string>

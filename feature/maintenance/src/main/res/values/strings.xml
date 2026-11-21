@@ -58,7 +58,13 @@
     <string name="maint_km_left">%1$s left</string>
     <string name="maint_due_today">due today</string>
     <string name="maint_due_months_ago">due %1$d\u00A0mo. ago</string>
-    <string name="maint_due_days_ago">due %1$d\u00A0d ago</string>
+    <plurals name="maint_due_days_ago">
+        <item quantity="one">due %1$d\u00A0day ago</item>
+        <item quantity="other">due %1$d\u00A0days ago</item>
+    </plurals>
     <string name="maint_in_months">in %1$d\u00A0mo.</string>
-    <string name="maint_in_days">in %1$d\u00A0d</string>
+    <plurals name="maint_in_days">
+        <item quantity="one">in %1$d\u00A0day</item>
+        <item quantity="other">in %1$d\u00A0days</item>
+    </plurals>
 </resources>

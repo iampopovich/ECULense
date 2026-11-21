@@ -39,7 +39,7 @@ internal class AndroidNotifier(private val context: Context) : Notifier {
         val title = if (items.size == 1) {
             context.getString(R.string.bg_findings_one, AnalyticsText.title(context, items.single()))
         } else {
-            context.getString(R.string.bg_findings_many, items.size)
+            context.resources.getQuantityString(R.plurals.bg_findings_many, items.size, items.size)
         }
         val lines = items.map { "${AnalyticsText.severity(context, it.severity)}: ${AnalyticsText.title(context, it)} — ${AnalyticsText.message(context, it)}" }
         post(CHANNEL_ANALYSIS, ID_ANALYSIS, title, CarNames.display(context, carName) + " · " + lines.first(), lines, DeepLinks.ANALYSIS)
@@ -49,7 +49,7 @@ internal class AndroidNotifier(private val context: Context) : Notifier {
         val title = if (items.size == 1) {
             context.getString(R.string.bg_maintenance_one, AnalyticsText.maintenanceTitle(context, items.single().item))
         } else {
-            context.getString(R.string.bg_maintenance_many, items.size)
+            context.resources.getQuantityString(R.plurals.bg_maintenance_many, items.size, items.size)
         }
         val lines = items.map { "${AnalyticsText.maintenanceTitle(context, it.item)} — ${it.describe(context)}" }
         post(CHANNEL_MAINTENANCE, ID_MAINTENANCE, title, CarNames.display(context, carName) + " · " + lines.first(), lines, DeepLinks.MAINTENANCE)

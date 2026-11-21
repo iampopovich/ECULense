@@ -21,7 +21,7 @@ class HistoryLineTest {
                     res(R.string.backup_line_recordings_skipped, 1, 2),
                     res(R.string.backup_line_trips_updated, 1, 1),
                     res(R.string.backup_line_dtc, 1),
-                    res(R.string.backup_line_car_fields, 2),
+                    UiText.Plural(R.plurals.backup_line_car_fields, 2),
                 ),
             ),
             historyLine(item),

@@ -19,6 +19,7 @@
     <string name="health_share_chooser">Share health report</string>
     <string name="health_report_title">Health check report</string>
     <string name="health_codes">Trouble codes</string>
+    <string name="health_codes_line">Trouble codes: %1$s</string>
     <string name="health_freeze_frame">Freeze frame</string>
     <string name="health_readiness">Readiness monitors</string>
     <string name="health_findings">Recent analysis findings</string>

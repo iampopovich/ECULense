@@ -58,7 +58,17 @@
     <string name="maint_km_left">осталось %1$s</string>
     <string name="maint_due_today">срок — сегодня</string>
     <string name="maint_due_months_ago">срок прошёл %1$d\u00A0мес. назад</string>
-    <string name="maint_due_days_ago">срок прошёл %1$d\u00A0дн. назад</string>
+    <plurals name="maint_due_days_ago">
+        <item quantity="one">срок прошёл %1$d\u00A0день назад</item>
+        <item quantity="few">срок прошёл %1$d\u00A0дня назад</item>
+        <item quantity="many">срок прошёл %1$d\u00A0дней назад</item>
+        <item quantity="other">срок прошёл %1$d\u00A0дня назад</item>
+    </plurals>
     <string name="maint_in_months">через %1$d\u00A0мес.</string>
-    <string name="maint_in_days">через %1$d\u00A0дн.</string>
+    <plurals name="maint_in_days">
+        <item quantity="one">через %1$d\u00A0день</item>
+        <item quantity="few">через %1$d\u00A0дня</item>
+        <item quantity="many">через %1$d\u00A0дней</item>
+        <item quantity="other">через %1$d\u00A0дня</item>
+    </plurals>
 </resources>
