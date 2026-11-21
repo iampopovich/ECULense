@@ -30,6 +30,8 @@ data class ModuleScanEntity(
     val protocol: String,
     /** «7D1/7D9» on CAN, «0x10» on K-Line. */
     val address: String,
+    /** Answered the functional OBD request (an emission ECU: its codes are cleared on the DTC screen). */
+    val emission: Boolean,
     /** ModuleKind name. */
     val moduleKind: String,
     /** CODES, NOT_SUPPORTED, NO_REPLY or REFUSED. */
@@ -62,7 +64,7 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS `module_scans` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `carId` INTEGER NOT NULL, " +
                 "`scanAtMs` INTEGER NOT NULL, `protocol` TEXT NOT NULL, `address` TEXT NOT NULL, `moduleKind` TEXT NOT NULL, " +
-                "`result` TEXT NOT NULL, `detail` TEXT, `dtcs` TEXT NOT NULL, " +
+                "`emission` INTEGER NOT NULL, `result` TEXT NOT NULL, `detail` TEXT, `dtcs` TEXT NOT NULL, " +
                 "FOREIGN KEY(`carId`) REFERENCES `cars`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_module_scans_carId_scanAtMs` ON `module_scans` (`carId`, `scanAtMs`)")

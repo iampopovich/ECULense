@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 13,
-    "identityHash": "bc2bbc513854158de94a1d482476fdd5",
+    "identityHash": "d4668353c83f8882a84263b26ef12899",
     "entities": [
       {
         "tableName": "sessions",
@@ -1401,7 +1401,7 @@
       },
       {
         "tableName": "module_scans",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `carId` INTEGER NOT NULL, `scanAtMs` INTEGER NOT NULL, `protocol` TEXT NOT NULL, `address` TEXT NOT NULL, `moduleKind` TEXT NOT NULL, `result` TEXT NOT NULL, `detail` TEXT, `dtcs` TEXT NOT NULL, FOREIGN KEY(`carId`) REFERENCES `cars`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `carId` INTEGER NOT NULL, `scanAtMs` INTEGER NOT NULL, `protocol` TEXT NOT NULL, `address` TEXT NOT NULL, `emission` INTEGER NOT NULL, `moduleKind` TEXT NOT NULL, `result` TEXT NOT NULL, `detail` TEXT, `dtcs` TEXT NOT NULL, FOREIGN KEY(`carId`) REFERENCES `cars`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -1431,6 +1431,12 @@
             "fieldPath": "address",
             "columnName": "address",
             "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "emission",
+            "columnName": "emission",
+            "affinity": "INTEGER",
             "notNull": true
           },
           {
@@ -1492,7 +1498,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'bc2bbc513854158de94a1d482476fdd5')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd4668353c83f8882a84263b26ef12899')"
     ]
   }
 }

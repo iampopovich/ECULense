@@ -18,6 +18,17 @@
     <string name="obd_error_clear_refused">Блок отказался стирать коды (отрицательный ответ 7F 04 %1$s)</string>
     <string name="obd_error_module_scan_unsupported">Этот адаптер или протокол не поддерживает поиск блоков</string>
     <string name="obd_error_request_denied">ECULense не отправляет этот запрос (%1$s): разрешены только читающие запросы</string>
+    <string name="obd_module_engine">Двигатель</string>
+    <string name="obd_module_transmission">Коробка передач</string>
+    <string name="obd_module_abs">ABS / ESC</string>
+    <string name="obd_module_body">Кузов</string>
+    <string name="obd_module_cluster">Приборная панель</string>
+    <string name="obd_module_hybrid">Гибридная система</string>
+    <string name="obd_module_motor">Электромотор</string>
+    <string name="obd_module_battery">Тяговая батарея</string>
+    <string name="obd_module_steering">Рулевое управление</string>
+    <string name="obd_module_srs">Подушки безопасности</string>
+    <string name="obd_module_unknown">Неизвестный блок %1$s</string>
     <string name="obd_adapter_version_unknown">неизвестно</string>
     <string name="obd_error_adapter_not_responding">Адаптер не отвечает</string>
     <string name="obd_error_adapter_no_power">У адаптера нет питания (%1$.1f В). Он вставлен в разъём OBD?</string>

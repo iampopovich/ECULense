@@ -7,6 +7,7 @@ import io.github.iampopovich.eculense.core.navigation.DtcDestination
 import io.github.iampopovich.eculense.core.navigation.Hub
 import io.github.iampopovich.eculense.core.navigation.HubEntry
 import io.github.iampopovich.eculense.core.navigation.Mode06Destination
+import io.github.iampopovich.eculense.core.navigation.VehicleModulesDestination
 import kotlinx.coroutines.flow.first
 import org.koin.core.annotation.KoinExperimentalAPI
 import org.koin.core.module.dsl.viewModel
@@ -32,12 +33,18 @@ val dtcModule = module {
     }
     viewModel { DtcViewModel(get(), get(), get(), routeHandlers = getAll(), historySource = get()) }
     viewModel { Mode06ViewModel(get()) }
+    viewModel { VehicleModulesViewModel(get(), get(), get()) }
     navigation<DtcDestination> { DtcRoute() }
     navigation<Mode06Destination> { Mode06Route() }
+    navigation<VehicleModulesDestination> { VehicleModulesRoute() }
     single(named("dtc-hub")) {
         HubEntry(Hub.PITSTOP, DtcDestination, R.string.dtc_hub_title, R.string.dtc_hub_subtitle, R.drawable.ic_dtc, order = 10)
     }
     single(named("mode06-hub")) {
         HubEntry(Hub.PITSTOP, Mode06Destination, R.string.mode06_hub_title, R.string.mode06_hub_subtitle, R.drawable.ic_check, order = 11)
+    }
+    // R-D: the car's other modules (read-only module scan).
+    single(named("modules-hub")) {
+        HubEntry(Hub.PITSTOP, VehicleModulesDestination, R.string.modules_hub_title, R.string.modules_hub_subtitle, R.drawable.ic_dtc, order = 12)
     }
 }

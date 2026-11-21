@@ -24,6 +24,9 @@ interface FullScreenDestination
 
 /** B8: on-board test results (mode 06), a Pit-stop item of the DTC feature. */
 @Serializable data object Mode06Destination : NavKey
+
+/** R-D: the vehicle's modules (engine, transmission, ABS...) and their codes, a Pit-stop item of the DTC feature. */
+@Serializable data object VehicleModulesDestination : NavKey
 @Serializable data object SessionsDestination : NavKey
 @Serializable data class SessionDetailDestination(val sessionId: Long) : NavKey
 @Serializable data object AiSettingsDestination : NavKey

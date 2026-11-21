@@ -19,6 +19,17 @@
     <string name="obd_error_clear_refused">The ECU refused to clear the codes (negative reply 7F 04 %1$s)</string>
     <string name="obd_error_module_scan_unsupported">Module scan is not supported by this adapter or protocol</string>
     <string name="obd_error_request_denied">ECULense does not send this request (%1$s): only reading requests are allowed</string>
+    <string name="obd_module_engine">Engine</string>
+    <string name="obd_module_transmission">Transmission</string>
+    <string name="obd_module_abs">ABS / ESC</string>
+    <string name="obd_module_body">Body</string>
+    <string name="obd_module_cluster">Instrument cluster</string>
+    <string name="obd_module_hybrid">Hybrid system</string>
+    <string name="obd_module_motor">Electric motor</string>
+    <string name="obd_module_battery">High-voltage battery</string>
+    <string name="obd_module_steering">Steering</string>
+    <string name="obd_module_srs">Airbags</string>
+    <string name="obd_module_unknown">Unknown module %1$s</string>
     <string name="obd_adapter_version_unknown">unknown</string>
     <string name="obd_error_adapter_not_responding">The adapter does not respond</string>
     <string name="obd_error_adapter_no_power">The adapter has no power (%1$.1f V). Is it plugged into the OBD port?</string>

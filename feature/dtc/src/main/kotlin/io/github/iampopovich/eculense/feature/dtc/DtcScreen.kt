@@ -50,6 +50,7 @@ import io.github.iampopovich.eculense.core.model.FreezeFrame
 import io.github.iampopovich.eculense.core.navigation.AiChatDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import io.github.iampopovich.eculense.core.navigation.Mode06Destination
+import io.github.iampopovich.eculense.core.navigation.VehicleModulesDestination
 import io.github.iampopovich.eculense.core.obd.MonitorState
 import io.github.iampopovich.eculense.core.obd.MonitorStatus
 import io.github.iampopovich.eculense.core.obd.Readiness
@@ -73,6 +74,7 @@ internal fun DtcRoute(viewModel: DtcViewModel = koinViewModel()) {
             navigator.navigate(AiChatDestination(prompt))
         },
         onMode06 = { navigator.navigate(Mode06Destination) },
+        onModules = { navigator.navigate(VehicleModulesDestination) },
     )
 }
 
@@ -85,6 +87,7 @@ internal fun DtcScreen(
     onAskAi: (String, DtcInfo) -> Unit,
     modifier: Modifier = Modifier,
     onMode06: () -> Unit = {},
+    onModules: () -> Unit = {},
 ) {
     var confirmClear by remember { mutableStateOf(false) }
     val canClear = !state.loading && (state.items.isNotEmpty() || state.readiness?.milOn == true) && state.speed != SpeedGate.MOVING
@@ -118,7 +121,10 @@ internal fun DtcScreen(
         state.usedCar?.let { u -> item(key = "usedcar") { UsedCarCard(u) } }
         if (state.checked) {
             item(key = "mode06") {
-                TextButton(onClick = onMode06) { Text(stringResource(R.string.dtc_mode06_open)) }
+                Column {
+                    TextButton(onClick = onMode06) { Text(stringResource(R.string.dtc_mode06_open)) }
+                    TextButton(onClick = onModules) { Text(stringResource(R.string.dtc_modules_open)) }
+                }
             }
         }
         if (state.history.isNotEmpty()) {

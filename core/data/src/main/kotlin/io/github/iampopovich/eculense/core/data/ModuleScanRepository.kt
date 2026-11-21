@@ -10,7 +10,7 @@ import io.github.iampopovich.eculense.core.obd.ModuleKind
 import io.github.iampopovich.eculense.core.obd.ModuleScanResult
 
 /** One module of a stored scan. [address] = EcuAddress.label («7D1/7D9», «0x10»). */
-data class StoredModule(val address: String, val kind: ModuleKind, val read: ModuleDtcRead)
+data class StoredModule(val address: String, val kind: ModuleKind, val read: ModuleDtcRead, val emission: Boolean = false)
 
 data class StoredModuleScan(val atMs: Long, val protocol: Char, val modules: List<StoredModule>)
 
@@ -33,7 +33,7 @@ internal class RoomModuleScanRepository(
         if (!liveWrites.allowed() || result.modules.isEmpty()) return false
         val car = activeCarId() ?: return false
         val at = clock()
-        dao.insert(result.modules.map { r -> ModuleScanCodec.entity(car, at, result.protocol, StoredModule(r.module.address.label, r.module.kind, r.read)) })
+        dao.insert(result.modules.map { r -> ModuleScanCodec.entity(car, at, result.protocol, StoredModule(r.module.address.label, r.module.kind, r.read, r.module.emission)) })
         return true
     }
 
@@ -66,7 +66,7 @@ internal object ModuleScanCodec {
             ModuleDtcRead.NoReply -> Triple("NO_REPLY", null, "")
             is ModuleDtcRead.Refused -> Triple("REFUSED", "%02X".format(r.nrc), "")
         }
-        return ModuleScanEntity(carId = carId, scanAtMs = atMs, protocol = protocol.toString(), address = m.address, moduleKind = m.kind.name, result = result, detail = detail, dtcs = dtcs)
+        return ModuleScanEntity(carId = carId, scanAtMs = atMs, protocol = protocol.toString(), address = m.address, emission = m.emission, moduleKind = m.kind.name, result = result, detail = detail, dtcs = dtcs)
     }
 
     fun module(e: ModuleScanEntity): StoredModule {
@@ -80,6 +80,6 @@ internal object ModuleScanCodec {
             "REFUSED" -> ModuleDtcRead.Refused(e.detail?.toIntOrNull(16) ?: 0)
             else -> ModuleDtcRead.NoReply
         }
-        return StoredModule(e.address, kind, read)
+        return StoredModule(e.address, kind, read, e.emission)
     }
 }

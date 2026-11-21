@@ -33,6 +33,21 @@ object ObdText {
         io.github.iampopovich.eculense.core.obd.Monitor.PM_FILTER -> R.string.obd_monitor_pm_filter
         io.github.iampopovich.eculense.core.obd.Monitor.EGR_VVT -> R.string.obd_monitor_egr_vvt
     }
+    /** R-D: own neutral label of a vehicle module; unknown modules show their address. */
+    fun moduleName(kind: io.github.iampopovich.eculense.core.obd.ModuleKind, address: String): UiText = when (kind) {
+        io.github.iampopovich.eculense.core.obd.ModuleKind.ENGINE -> UiText.Res(R.string.obd_module_engine)
+        io.github.iampopovich.eculense.core.obd.ModuleKind.TRANSMISSION -> UiText.Res(R.string.obd_module_transmission)
+        io.github.iampopovich.eculense.core.obd.ModuleKind.ABS_ESC -> UiText.Res(R.string.obd_module_abs)
+        io.github.iampopovich.eculense.core.obd.ModuleKind.BODY -> UiText.Res(R.string.obd_module_body)
+        io.github.iampopovich.eculense.core.obd.ModuleKind.CLUSTER -> UiText.Res(R.string.obd_module_cluster)
+        io.github.iampopovich.eculense.core.obd.ModuleKind.HYBRID -> UiText.Res(R.string.obd_module_hybrid)
+        io.github.iampopovich.eculense.core.obd.ModuleKind.MOTOR -> UiText.Res(R.string.obd_module_motor)
+        io.github.iampopovich.eculense.core.obd.ModuleKind.BATTERY -> UiText.Res(R.string.obd_module_battery)
+        io.github.iampopovich.eculense.core.obd.ModuleKind.STEERING -> UiText.Res(R.string.obd_module_steering)
+        io.github.iampopovich.eculense.core.obd.ModuleKind.SRS -> UiText.Res(R.string.obd_module_srs)
+        io.github.iampopovich.eculense.core.obd.ModuleKind.UNKNOWN -> UiText.Res(R.string.obd_module_unknown, listOf(address))
+    }
+
     fun error(e: ObdError): UiText = when (e) {
         is ObdError.Timeout -> UiText.Res(R.string.obd_error_timeout, listOf(e.command))
         is ObdError.NoTransport -> UiText.Res(R.string.obd_error_no_transport, listOf(e.kind))

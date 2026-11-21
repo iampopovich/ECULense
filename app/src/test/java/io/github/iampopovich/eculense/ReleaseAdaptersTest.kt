@@ -53,7 +53,7 @@ class ReleaseAdaptersTest {
     fun `developer endpoints are debug only and all simulated`() {
         if (BuildConfig.DEBUG) {
             val kinds = factoryQualifiers(devModules)
-            assertEquals(setOf("demo", "demo-flaky", "demo-engine-off", "demo-ble", ReplayTransportFactory.KIND), kinds)
+            assertEquals(setOf("demo", "demo-flaky", "demo-engine-off", "demo-ble", "demo-multi-ecu", "demo-kline", ReplayTransportFactory.KIND), kinds)
             assertTrue(devWifiEndpoints.isNotEmpty())
             assertTrue(devWifiEndpoints.all { it.isSimulated })
         } else {

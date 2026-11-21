@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- R-D: «Vehicle modules» screen. -->
+    <string name="modules_hub_title">Блоки машины</string>
+    <string name="modules_hub_subtitle">Коды коробки, ABS и других блоков</string>
+    <string name="modules_title">Блоки машины</string>
+    <string name="modules_intro">Находит отвечающие блоки и читает их коды неисправностей. Отправляются только читающие запросы: в машине ничего не меняется.</string>
+    <string name="modules_scan">Найти блоки</string>
+    <string name="modules_need_connection">Сначала подключитесь к адаптеру</string>
+    <string name="modules_stop_car">Остановите машину, чтобы опросить блоки</string>
+    <string name="modules_waiting_speed">Ждём показания скорости…</string>
+    <string name="modules_discovering">Ищем отвечающие блоки…</string>
+    <string name="modules_probing">Проверяем %1$s: %2$d/%3$d</string>
+    <string name="modules_reading">Читаем коды: %1$s</string>
+    <string name="modules_none">Ни один блок не ответил</string>
+    <string name="modules_limited">Адаптер не умеет обращаться к отдельным блокам (нет ATCRA): показаны только OBD-блоки</string>
+    <string name="modules_srs_note">Подушки безопасности не опрашиваются</string>
+    <string name="modules_last_scan">Последний опрос: %1$s</string>
+    <string name="modules_row_address">Адрес %1$s</string>
+    <string name="modules_codes_count">Коды: %1$d</string>
+    <string name="modules_no_codes">Кодов нет</string>
+    <string name="modules_not_supported">Чтение кодов не поддерживается</string>
+    <string name="modules_no_reply">Нет ответа</string>
+    <string name="modules_refused">Отказ (7F %1$s)</string>
+    <string name="modules_back">К списку блоков</string>
+    <string name="modules_status_failed">Активен сейчас</string>
+    <string name="modules_status_pending">Ожидающий</string>
+    <string name="modules_status_confirmed">Подтверждён</string>
+    <string name="modules_status_lamp">Горит лампа</string>
+    <string name="modules_clear_not_supported">Стирание кодов этого блока в ECULense не поддерживается</string>
+    <string name="modules_clear_emission_hint">Коды этого блока, связанные с экологией (OBD), стираются на экране кодов ошибок</string>
+    <string name="dtc_modules_open">Коды других блоков</string>
+</resources>
