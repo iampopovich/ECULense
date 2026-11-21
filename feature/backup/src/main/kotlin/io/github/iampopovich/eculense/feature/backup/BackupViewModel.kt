@@ -3,6 +3,9 @@ package io.github.iampopovich.eculense.feature.backup
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.iampopovich.eculense.core.backup.CompactState
+import io.github.iampopovich.eculense.core.backup.StorageService
+import io.github.iampopovich.eculense.core.backup.StorageSizes
 import io.github.iampopovich.eculense.core.backup.BackupManifest
 import io.github.iampopovich.eculense.core.backup.BackupPrefs
 import io.github.iampopovich.eculense.core.backup.BackupRejectedException
@@ -44,6 +47,10 @@ internal data class BackupUiState(
     val history: List<ImportHistoryItem> = emptyList(),
     val includeAiChat: Boolean = false,
     val copy: CopyState = CopyState(),
+    /** R3.2: sizes on the phone; null until measured or without the storage service. */
+    val storage: StorageSizes? = null,
+    val compact: CompactState = CompactState.Idle,
+    val recording: Boolean = false,
 ) {
     val importing: Boolean get() = importState is ImportWorkState.Running
 }
@@ -54,17 +61,38 @@ internal class BackupViewModel(
     private val prefs: BackupPrefs,
     private val folder: BackupFolder,
     private val backup: BackupService,
+    private val storage: StorageService? = null,
 ) : ViewModel() {
     private val folderInfo = MutableStateFlow<Pair<String?, CbzCandidate?>>(null to null)
     private val copy = MutableStateFlow(CopyState())
+    private val sizes = MutableStateFlow<StorageSizes?>(null)
+
+    private data class StorageUi(val sizes: StorageSizes?, val compact: CompactState, val recording: Boolean)
+
+    private val storageUi: kotlinx.coroutines.flow.Flow<StorageUi> = storage?.let { s ->
+        combine(sizes, s.compaction, s.recording) { z, c, r -> StorageUi(z, c, r) }
+    } ?: kotlinx.coroutines.flow.flowOf(StorageUi(null, CompactState.Idle, false))
 
     val state: StateFlow<BackupUiState> = combine(
-        imports.state, history.observe(), prefs.folderUri, prefs.includeAiChat, combine(folderInfo, copy) { f, c -> f to c },
-    ) { importState, items, folderUri, aiChat, (info, copyState) ->
-        BackupUiState(folderUri, info.first, info.second, importState, items, aiChat, copyState)
+        imports.state, history.observe(), prefs.folderUri, prefs.includeAiChat,
+        combine(folderInfo, copy, storageUi) { f, c, st -> Triple(f, c, st) },
+    ) { importState, items, folderUri, aiChat, (info, copyState, st) ->
+        BackupUiState(folderUri, info.first, info.second, importState, items, aiChat, copyState, st.sizes, st.compact, st.recording)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BackupUiState())
 
+    /** Sizes are measured on open and again after a compaction finished. */
+    private fun measure() {
+        val s = storage ?: return
+        viewModelScope.launch { sizes.value = runCatching { s.sizes() }.getOrNull() }
+    }
+
+    fun compact() {
+        storage?.compact()
+    }
+
     init {
+        measure()
+        storage?.let { s -> viewModelScope.launch { s.compaction.map { it is CompactState.Done }.distinctUntilChanged().collect { if (it) measure() } } }
         // folder selected/changed or import finished — re-check which backup in the folder is the newest
         viewModelScope.launch { prefs.folderUri.distinctUntilChanged().collect { refreshFolder(it) } }
         viewModelScope.launch {

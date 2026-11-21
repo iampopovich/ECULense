@@ -126,4 +126,5 @@ val backupModule = module {
         )
     }
     single<BackupService> { AndroidBackupService(androidContext(), get()) }
+    single<StorageService> { AndroidStorageService(androidContext(), getOrNull<io.github.iampopovich.eculense.core.data.SessionRecorder>()) }
 }

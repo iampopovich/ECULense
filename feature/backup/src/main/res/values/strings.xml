@@ -59,4 +59,15 @@
     <string name="backup_cancelled_progress">Cancelled: recordings processed %1$d of %2$d</string>
     <string name="backup_accel_included">Phone accelerometer logs: %1$d.</string>
     <string name="backup_accel_skipped">Phone accelerometer logs (%1$d MB) are over 50 MB and were not included; they stay on this phone.</string>
+    <string name="backup_storage_title">Storage on this phone</string>
+    <string name="backup_storage_db">Database: %1$s</string>
+    <string name="backup_storage_accel">Phone accelerometer logs: %1$s</string>
+    <string name="backup_storage_cache">Cache (shared exports, temporary files): %1$s</string>
+    <string name="backup_storage_index_note">About 29 % of the database file is the readings index that keeps charts and analysis fast. Nothing is deleted automatically.</string>
+    <string name="backup_compact_hint">Compacting rebuilds the database file without the free space left by deleted recordings (VACUUM). It needs free space about the size of the database and may take a minute; no data is removed.</string>
+    <string name="backup_compact">Compact database</string>
+    <string name="backup_compact_running">Compacting the database…</string>
+    <string name="backup_compact_done">Database compacted: %1$s → %2$s</string>
+    <string name="backup_compact_recording">A recording is running: stop it first, then compact the database.</string>
+    <string name="backup_compact_failed">Could not compact the database.</string>
 </resources>

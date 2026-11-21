@@ -15,7 +15,7 @@ import org.koin.dsl.navigation3.navigation
 @OptIn(KoinExperimentalAPI::class)
 val backupFeatureModule = module {
     single<BackupFolder> { SafBackupFolder(androidContext()) }
-    viewModel { BackupViewModel(get(), get(), get(), get(), get()) }
+    viewModel { BackupViewModel(get(), get(), get(), get(), get(), getOrNull<io.github.iampopovich.eculense.core.backup.StorageService>()) }
     navigation<BackupDestination> { BackupRoute() }
     single(named("backup-hub")) {
         HubEntry(Hub.SETTINGS, BackupDestination, R.string.backup_hub_title, R.string.backup_hub_subtitle, R.drawable.ic_backup, order = 25)

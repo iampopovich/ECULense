@@ -36,6 +36,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.iampopovich.eculense.core.backup.CompactState
+import io.github.iampopovich.eculense.core.backup.StorageSizes
 import io.github.iampopovich.eculense.core.backup.EcuBackup
 import io.github.iampopovich.eculense.core.backup.ImportWorkState
 import io.github.iampopovich.eculense.core.data.ImportHistoryItem
@@ -75,6 +77,7 @@ internal fun BackupRoute(viewModel: BackupViewModel = koinViewModel()) {
         onRestore = { pickCopy.launch(arrayOf("*/*")) },
         onConfirmRestore = viewModel::confirmRestore,
         onDismissRestore = viewModel::dismissRestore,
+        onCompact = viewModel::compact,
     )
 }
 
@@ -90,12 +93,14 @@ internal fun BackupScreen(
     onRestore: () -> Unit = {},
     onConfirmRestore: () -> Unit = {},
     onDismissRestore: () -> Unit = {},
+    onCompact: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text(stringResource(R.string.backup_hub_title), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp)) }
         item { CarScannerCard(state, onPickFile, onPickFolder, onImportNewest, onCancelImport) }
         item { CopyCard(state, onIncludeAiChat, onExport, onRestore) }
+        state.storage?.let { sizes -> item(key = "storage") { StorageCard(sizes, state.compact, state.recording, onCompact) } }
         item { Text(stringResource(R.string.backup_history_title), style = MaterialTheme.typography.titleMedium) }
         if (state.history.isEmpty()) {
             item { Secondary(stringResource(R.string.backup_history_empty)) }
@@ -114,6 +119,34 @@ internal fun BackupScreen(
             confirmButton = { Button(onClick = onConfirmRestore, enabled = !state.importing) { Text(stringResource(R.string.backup_replace_data)) } },
             dismissButton = { TextButton(onClick = onDismissRestore) { Text(stringResource(CoreUiR.string.common_cancel)) } },
         )
+    }
+}
+
+/** R3.2: what the app keeps on the phone and «Compact database» (VACUUM in WorkManager, never while recording). */
+@Composable
+private fun StorageCard(sizes: StorageSizes, compact: CompactState, recording: Boolean, onCompact: () -> Unit) {
+    val context = LocalContext.current
+    fun size(bytes: Long) = android.text.format.Formatter.formatShortFileSize(context, bytes)
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.backup_storage_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.backup_storage_db, size(sizes.databaseBytes)))
+            Text(stringResource(R.string.backup_storage_accel, size(sizes.accelBytes)))
+            Text(stringResource(R.string.backup_storage_cache, size(sizes.cacheBytes)))
+            Secondary(stringResource(R.string.backup_storage_index_note))
+            Secondary(stringResource(R.string.backup_compact_hint))
+            val running = compact is CompactState.Running
+            FilledTonalButton(onClick = onCompact, enabled = !running && !recording) { Text(stringResource(R.string.backup_compact)) }
+            if (running) LinearProgressIndicator(Modifier.fillMaxWidth())
+            val message = when {
+                running -> stringResource(R.string.backup_compact_running)
+                recording || compact is CompactState.Recording -> stringResource(R.string.backup_compact_recording)
+                compact is CompactState.Done -> stringResource(R.string.backup_compact_done, size(compact.beforeBytes), size(compact.afterBytes))
+                compact is CompactState.Failed -> stringResource(R.string.backup_compact_failed)
+                else -> null
+            }
+            message?.let { Text(it) }
+        }
     }
 }
 

@@ -61,4 +61,15 @@
     <string name="backup_cancelled_progress">Отменено: обработано записей %1$d из %2$d</string>
     <string name="backup_accel_included">Записи акселерометра телефона: %1$d.</string>
     <string name="backup_accel_skipped">Записи акселерометра телефона (%1$d МБ) больше 50 МБ и в копию не вошли, они остались на этом телефоне.</string>
+    <string name="backup_storage_title">Место на телефоне</string>
+    <string name="backup_storage_db">База данных: %1$s</string>
+    <string name="backup_storage_accel">Записи акселерометра телефона: %1$s</string>
+    <string name="backup_storage_cache">Кэш (выгрузки для отправки, временные файлы): %1$s</string>
+    <string name="backup_storage_index_note">Около 29 % файла базы занимает индекс показаний, благодаря ему графики и анализ работают быстро. Ничего не удаляется автоматически.</string>
+    <string name="backup_compact_hint">Сжатие пересобирает файл базы без места, освободившегося после удалённых записей (VACUUM). Нужно свободное место примерно размером с базу, это может занять минуту; данные не удаляются.</string>
+    <string name="backup_compact">Сжать базу</string>
+    <string name="backup_compact_running">Сжимаю базу…</string>
+    <string name="backup_compact_done">База сжата: %1$s → %2$s</string>
+    <string name="backup_compact_recording">Идёт запись: остановите её, потом сожмите базу.</string>
+    <string name="backup_compact_failed">Не удалось сжать базу.</string>
 </resources>
