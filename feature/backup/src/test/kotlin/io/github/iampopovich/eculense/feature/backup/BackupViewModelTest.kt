@@ -123,7 +123,7 @@ class BackupViewModelTest {
     private val imports = FakeImports()
     private val backup = FakeBackup()
     private val storage = FakeStorage()
-    private val folder = FakeFolder(CbzCandidate("content://tree/backups/doc/b.cbz", "2026-01-01 00-00-00.cbz", 1_000L))
+    private val folder = FakeFolder(CbzCandidate("content://tree/backups/doc/b.cbz", "test-backup.cbz", 1_000L))
     private val uri: Uri = Uri.parse("content://test/backup.eculense")
 
     private fun prefs() = BackupPrefs(PreferenceDataStoreFactory.create(scope = scope, produceFile = { File(tmp.root, "backup.preferences_pb") }))
@@ -159,7 +159,7 @@ class BackupViewModelTest {
         await("folder read") { vm.state.value.newest != null }
         assertEquals("Backups", vm.state.value.folderName)
         vm.importNewest()
-        assertEquals(Triple("content://tree/backups/doc/b.cbz", "2026-01-01 00-00-00.cbz", false), imports.started.single())
+        assertEquals(Triple("content://tree/backups/doc/b.cbz", "test-backup.cbz", false), imports.started.single())
         val looks = folder.looks
         imports.state.value = ImportWorkState.Finished(ok = true)
         await("folder re-checked") { folder.looks > looks }
