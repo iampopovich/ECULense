@@ -530,7 +530,7 @@ internal class Elm327Session(
 
         override suspend fun request(target: EcuTarget, command: String, timeoutMs: Long): List<ByteArray>? {
             policy.require(target, command) // before anything is written
-            return answer(command, target.address?.rx?.takeIf { receiveFilter != null || format.isCan }, timeoutMs)
+            return answer(command, target.address?.rx, timeoutMs)
         }
 
         /** Sends [command]; the messages of [rx] (all ECUs when null), waiting out 7F xx 78 «response pending» twice. */

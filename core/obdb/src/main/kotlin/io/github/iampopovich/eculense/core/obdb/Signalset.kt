@@ -28,9 +28,28 @@ data class SignalFormat(
     val min: Double? = null,
     val max: Double? = null,
     val unit: String? = null,
+    /** Multi-byte raw value with the least significant byte first. */
+    val blsb: Boolean = false,
+    /** Scaled values ≤ [nullMin] or ≥ [nullMax] mean «no value». */
+    val nullMin: Double? = null,
+    val nullMax: Double? = null,
+    /** Raw value → label (enumerations). */
+    val map: Map<Long, String> = emptyMap(),
 )
 
-data class Signal(val id: String, val name: String, val path: String?, val fmt: SignalFormat?, val description: String? = null)
+data class Signal(
+    val id: String,
+    val name: String,
+    val path: String?,
+    val fmt: SignalFormat?,
+    val description: String? = null,
+    val hidden: Boolean = false,
+    /** OBDb `suggestedMetric` («stateOfCharge», «tractionBatteryCurrent», ...). */
+    val suggestedMetric: String? = null,
+)
+
+/** K-Line fast-init timing (`init`), ms. */
+data class InitTiming(val lo: Int, val hi: Int)
 
 /** Command: ECU header (hdr), response address (rax), service → PID (`{"22": "F010"}`), polling frequency, year filter. */
 data class SignalCommand(
@@ -42,11 +61,31 @@ data class SignalCommand(
     val filter: YearFilter?,
     val protocol: String?,
     val signals: List<Signal>,
+    val eax: String? = null,
+    val pri: String? = null,
+    val tst: String? = null,
+    val tmo: String? = null,
+    val fcm1: Boolean = false,
+    val dbg: Boolean = false,
+    val dbgFilter: YearFilter? = null,
+    val din: String? = null,
+    val dout: String? = null,
+    val baud: Int? = null,
+    val init: InitTiming? = null,
 ) {
     fun appliesTo(year: Int): Boolean = filter?.matches(year) ?: true
 
+    /**
+     * OBDb marks commands still being verified for a model year as debug (`dbg`, or a year matched by `dbgfilter`).
+     * Without a known year only `dbg` counts.
+     */
+    fun isDebug(year: Int?): Boolean = dbg || (year != null && dbgFilter?.matches(year) == true)
+
     /** «22 F010 → 7E0». */
     val label: String get() = "$service $pid → $hdr"
+
+    /** OBDb test-case style id: «7E4.7EC.220101» (without rax: «7E0.0101»). */
+    val id: String get() = listOfNotNull(hdr, rax).joinToString(".") + "." + service + pid
 }
 
 data class Ecu(val hdr: String, val type: String)
@@ -85,6 +124,21 @@ object SignalsetParser {
             filter = (o["filter"] as? JsonObject)?.let(::filter),
             protocol = o.str("proto"),
             signals = (o["signals"] as? JsonArray).orEmpty().mapNotNull { s -> signal(s as? JsonObject ?: return@mapNotNull null) },
+            eax = o.str("eax"),
+            pri = o.str("pri"),
+            tst = o.str("tst"),
+            tmo = o.str("tmo"),
+            fcm1 = (o["fcm1"] as? JsonPrimitive)?.booleanOrNull ?: false,
+            dbg = (o["dbg"] as? JsonPrimitive)?.booleanOrNull ?: false,
+            dbgFilter = (o["dbgfilter"] as? JsonObject)?.let(::filter),
+            din = o.str("din"),
+            dout = o.str("dout"),
+            baud = (o["baud"] as? JsonPrimitive)?.intOrNull,
+            init = (o["init"] as? JsonObject)?.let { i ->
+                val lo = (i["lo"] as? JsonPrimitive)?.intOrNull
+                val hi = (i["hi"] as? JsonPrimitive)?.intOrNull
+                if (lo != null && hi != null) InitTiming(lo, hi) else null
+            },
         )
     }
 
@@ -108,9 +162,25 @@ object SignalsetParser {
                 min = d("min"),
                 max = d("max"),
                 unit = f.str("unit"),
+                blsb = (f["blsb"] as? JsonPrimitive)?.booleanOrNull ?: false,
+                nullMin = d("nullmin"),
+                nullMax = d("nullmax"),
+                map = (f["map"] as? JsonObject)?.entries?.mapNotNull { (k, v) ->
+                    val key = k.toLongOrNull() ?: return@mapNotNull null
+                    val label = when (v) {
+                        is JsonPrimitive -> v.content
+                        is JsonObject -> (v["description"] as? JsonPrimitive)?.content ?: (v["value"] as? JsonPrimitive)?.content
+                        else -> null
+                    } ?: return@mapNotNull null
+                    key to label
+                }?.toMap().orEmpty(),
             )
         }
-        return Signal(id, o.str("name") ?: id, o.str("path"), fmt, o.str("description"))
+        return Signal(
+            id, o.str("name") ?: id, o.str("path"), fmt, o.str("description"),
+            hidden = (o["hidden"] as? JsonPrimitive)?.booleanOrNull ?: false,
+            suggestedMetric = o.str("suggestedMetric"),
+        )
     }
 
     private fun JsonObject.str(k: String): String? = (this[k] as? JsonPrimitive)?.takeIf { it.isString }?.content

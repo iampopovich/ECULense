@@ -40,6 +40,9 @@ internal class LivePoller(
     private val guard: CommandGuard = CommandGuard(clock),
     private val extendedDisabled: MutableStateFlow<Set<String>> = MutableStateFlow(emptySet()),
 ) {
+    /** R-E: when each extended command was last read (its own period inside a group). */
+    private val commandAt = HashMap<String, Long>()
+
     fun poll(pids: List<Pid>, extended: List<ExtendedPollGroup> = emptyList()): Flow<SensorReading> = flow {
         if (pids.isEmpty() && extended.isEmpty()) return@flow
         val misses = mutableMapOf<Int, Int>()
@@ -120,8 +123,10 @@ internal class LivePoller(
      * header support switches every extended command off for this connection; other adapter errors count as NO DATA.
      */
     private suspend fun readGroup(group: ExtendedPollGroup, all: List<ExtendedPollGroup>): List<SensorReading> {
-        val due = group.commands.filter { guard.allowed(it.command.id) }
+        val now = clock()
+        val due = group.commands.filter { guard.allowed(it.command.id) && now - (commandAt[it.command.id] ?: Long.MIN_VALUE / 2) >= it.periodMs }
         if (due.isEmpty()) return emptyList()
+        due.forEach { commandAt[it.command.id] = now }
         val out = mutableListOf<SensorReading>()
         var done = 0
         try {

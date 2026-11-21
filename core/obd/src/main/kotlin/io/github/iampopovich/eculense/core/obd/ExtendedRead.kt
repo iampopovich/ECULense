@@ -83,6 +83,7 @@ suspend fun HeaderedChannel.runExtended(command: ExtendedCommand, timeoutMs: Lon
         if (decision is PolicyDecision.Denied) return ExtendedOutcome.Denied(decision.reason.name)
     }
     var data: ExtendedOutcome = ExtendedOutcome.NoData
+    var collected = false
     for (step in command.steps) {
         when (step) {
             is ElmStep.Setting -> {
@@ -103,11 +104,14 @@ suspend fun HeaderedChannel.runExtended(command: ExtendedCommand, timeoutMs: Lon
                 val sid = step.command.take(2).toInt(16)
                 val nrc = reply?.let { negativeCode(it, sid) }
                 if (!step.collect) {
-                    // A refused session switch: the data request would be answered in the wrong session.
+                    // After the data: a failed «10 dout» does not spoil the reply (the ECU drops back by itself).
+                    if (collected) continue
+                    // Before the data: a refused session switch means the read would run in the wrong session.
                     if (reply == null) return ExtendedOutcome.NoData
                     if (nrc != null) return ExtendedOutcome.Negative(nrc)
                     continue
                 }
+                collected = true
                 data = when {
                     reply == null -> ExtendedOutcome.NoData
                     nrc != null -> ExtendedOutcome.Negative(nrc)
@@ -187,8 +191,15 @@ class CommandGuard(
     }
 }
 
-/** One extended command of a poll group and how its reply becomes readings (decoding lives outside :core:obd). */
-class ExtendedPollCommand(val command: ExtendedCommand, val decode: (messages: List<ByteArray>, atMs: Long) -> List<SensorReading>)
+/**
+ * One extended command of a poll group and how its reply becomes readings (decoding lives outside :core:obd).
+ * [periodMs]: the command is read at most this often even when its group is read more often.
+ */
+class ExtendedPollCommand(
+    val command: ExtendedCommand,
+    val periodMs: Long = 0,
+    val decode: (messages: List<ByteArray>, atMs: Long) -> List<SensorReading>,
+)
 
 /**
  * R-E: extended commands to one ECU header, read together in one headered scope so ATSH changes once per group.
