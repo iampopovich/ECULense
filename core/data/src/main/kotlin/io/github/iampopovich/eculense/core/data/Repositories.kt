@@ -1,5 +1,7 @@
 package io.github.iampopovich.eculense.core.data
 
+import io.github.iampopovich.eculense.core.model.AppLogger
+import io.github.iampopovich.eculense.core.model.attempt
 import io.github.iampopovich.eculense.core.database.DtcDao
 import io.github.iampopovich.eculense.core.database.DtcSnapshotEntity
 import io.github.iampopovich.eculense.core.database.ReadinessSnapshotEntity
@@ -70,6 +72,7 @@ internal class RoomSessionRepository(
     private val activeCarId: suspend () -> Long? = { null },
     /** Files that belong to a recording (E5-lite accelerometer log) go with it. */
     private val onDeleted: (sessionId: Long) -> Unit = {},
+    private val logger: AppLogger = AppLogger.NONE,
 ) : SessionRepository {
     override fun observeSessions(): Flow<List<Session>> = dao.observeSessions().map { list -> list.map { it.toModel() } }
 
@@ -92,7 +95,7 @@ internal class RoomSessionRepository(
     /** Deleting a recording also deletes the trip derived from it; the stats follow the trips table. */
     override suspend fun delete(sessionId: Long) {
         dao.deleteWithDerivedTrips(sessionId)
-        runCatching { onDeleted(sessionId) }
+        logger.attempt("EcuSessions", "deleting files of recording $sessionId") { onDeleted(sessionId) }
     }
 
     override suspend fun hasExternal(externalId: String): Boolean = dao.countByExternalId(externalId) > 0

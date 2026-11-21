@@ -1,5 +1,7 @@
 package io.github.iampopovich.eculense.feature.stats
 
+import io.github.iampopovich.eculense.core.model.attempt
+import io.github.iampopovich.eculense.core.model.AppLogger
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.iampopovich.eculense.core.analytics.DrivingStyle
@@ -76,6 +78,7 @@ internal class TripDetailViewModel(
     private val stylePrefs: StylePrefs? = null,
     /** cache/exports for the CSV share (FileProvider path). */
     private val exportDir: File? = null,
+    private val logger: AppLogger = AppLogger.NONE,
 ) : ViewModel() {
     private val _state = MutableStateFlow(TripDetailUiState())
     val state: StateFlow<TripDetailUiState> = _state.asStateFlow()
@@ -147,7 +150,8 @@ internal class TripDetailViewModel(
         val dir = exportDir ?: return null
         return withContext(Dispatchers.IO) {
             val f = File(dir, "ecu-accel-$id.csv")
-            runCatching { cal.writeCsv(id, f) }.getOrNull()?.takeIf { it > 0 }?.let { f }
+            logger.attempt("EcuStats", "accelerometer CSV export of recording $id") { cal.writeCsv(id, f) }
+                .getOrNull()?.takeIf { it > 0 }?.let { f }
         }
     }
 

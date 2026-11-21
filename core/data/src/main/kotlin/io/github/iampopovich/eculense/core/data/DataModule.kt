@@ -11,6 +11,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.Koin
+import org.koin.core.scope.Scope
+import io.github.iampopovich.eculense.core.model.AppLogger
+import io.github.iampopovich.eculense.core.model.attempt
 import org.koin.dsl.binds
 import org.koin.dsl.module
 
@@ -54,7 +57,7 @@ val dataModule = module {
     single<SessionRepository> {
         val cars = get<CarRepository>()
         val accel = get<AccelFiles>()
-        RoomSessionRepository(get(), activeCarId = { cars.activeCarId() }, onDeleted = { accel.delete(it) })
+        RoomSessionRepository(get(), activeCarId = { cars.activeCarId() }, onDeleted = { accel.delete(it) }, logger = logger())
     }
     single<StylePrefs> { DataStoreStylePrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("style") }) }
     single {
@@ -89,11 +92,12 @@ val dataModule = module {
         val koin = getKoin()
         val scope = get<CoroutineScope>(AppScope)
         // Trip from the recording right away (fast, single recording); analysis and notifications in the background module.
-        LiveSessionRecorder(get(), get(), scope) { id ->
-            runCatching { trips.backfill() }
+        val logger = logger()
+        LiveSessionRecorder(get(), get(), scope, logger = logger, onFinished = { id ->
+            logger.attempt(TAG, "trip backfill after recording $id") { trips.backfill() }
             val events = koin.dataEvents()
             if (events.isEmpty()) recomputeAll(koin, scope) else events.forEach { it.recordingFinished(id) }
-        }
+        })
     }
     single<AnalyticsRepository> {
         val events = get<io.github.iampopovich.eculense.core.database.EventDao>()
@@ -102,7 +106,7 @@ val dataModule = module {
     single<TripEventRepository> { RoomTripEventRepository(get()) }
     single(createdAtStart = true) {
         val moves = get<io.github.iampopovich.eculense.core.database.SessionMoveDao>()
-        LiveEventRecorder(get(), get(), get(), get(), get(AppScope), carOf = { moves.carOf(it) }).also { it.start() }
+        LiveEventRecorder(get(), get(), get(), get(), get(AppScope), carOf = { moves.carOf(it) }, logger = logger()).also { it.start() }
     } binds arrayOf(EventMarker::class)
     single<SessionMover> {
         val analytics = get<AnalyticsRepository>()
@@ -117,7 +121,7 @@ val dataModule = module {
     single<AlertPrefs> { DataStoreAlertPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("alerts") }) }
     single(createdAtStart = true) {
         val koin = getKoin()
-        LiveAlertMonitor(get(), get(), get(AppScope), notifier = { koin.getOrNull<TripAlertNotifier>() }).also { it.start() }
+        LiveAlertMonitor(get(), get(), get(AppScope), notifier = { koin.getOrNull<TripAlertNotifier>() }, logger = logger()).also { it.start() }
     } binds arrayOf(LiveAlerts::class)
     single<AutomationPrefs> { DataStoreAutomationPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("automation") }) }
     single(createdAtStart = true) {
@@ -131,11 +135,12 @@ val dataModule = module {
         val scope = get<CoroutineScope>(AppScope)
         val koin = getKoin()
         val trips = get<RecordingTrips>()
+        val logger = logger()
         // New recordings and codes → trips for recordings without a Car Scanner trip, then findings (in background, for all cars).
         CarScannerImporter(androidContext(), get(), get(), get(), get(), get(), get()) { report ->
             if (report.imported > 0 || report.tripsImported > 0 || report.tripsUpdated > 0 || report.dtcEventsAdded > 0) {
                 scope.launch {
-                    runCatching { trips.backfill() }
+                    logger.attempt(TAG, "trip backfill after import") { trips.backfill() }
                     val events = koin.dataEvents()
                     if (events.isEmpty()) recomputeAll(koin, scope) else events.forEach { it.importFinished() }
                 }
@@ -143,6 +148,11 @@ val dataModule = module {
         }
     }
 }
+
+private const val TAG = "EcuData"
+
+/** The app's logger, or a silent one in tests without it. */
+internal fun Scope.logger(): AppLogger = getOrNull<AppLogger>() ?: AppLogger.NONE
 
 private fun Koin.dataEvents(): List<DataEvents> = runCatching { getAll<DataEvents>() }.getOrDefault(emptyList())
 

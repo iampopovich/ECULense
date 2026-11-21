@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense.core.data
 
+import io.github.iampopovich.eculense.core.model.AppLogger
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -101,6 +102,7 @@ class LiveAlertMonitor internal constructor(
     private val notifier: () -> TripAlertNotifier?,
     private val clock: () -> Long = System::currentTimeMillis,
     private val dtcEveryMs: Long = DTC_EVERY_MS,
+    private val logger: AppLogger = AppLogger.NONE,
 ) : LiveAlerts {
     private val evaluator = LiveAlertEvaluator()
     private val tracker = NewDtcTracker()
@@ -168,7 +170,8 @@ class LiveAlertMonitor internal constructor(
             controller.withSession { s -> s.readDtcs(DtcKind.STORED) + s.readDtcs(DtcKind.PENDING) }
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logger.warn("EcuAlerts", "periodic code read failed: ${e::class.java.simpleName}", e)
             null
         } ?: return
         val fresh = tracker.onRead(codes.map { it.code })

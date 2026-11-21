@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense.feature.stats
 
+import io.github.iampopovich.eculense.core.model.AppLogger
 import io.github.iampopovich.eculense.core.data.AccelCalibrations
 import io.github.iampopovich.eculense.core.data.FuelPrefs
 import io.github.iampopovich.eculense.core.data.StylePrefs
@@ -25,6 +26,7 @@ val statsModule = module {
             tripId, get(), get(), get(), getOrNull<SessionRepository>(), getOrNull<TripEventRepository>(),
             calibrations = getOrNull<AccelCalibrations>(), stylePrefs = getOrNull<StylePrefs>(),
             exportDir = java.io.File(androidContext().cacheDir, "exports"),
+            logger = getOrNull<AppLogger>() ?: AppLogger.NONE,
         )
     }
     navigation<StatsDestination> { StatsRoute() }

@@ -1,5 +1,7 @@
 package io.github.iampopovich.eculense.core.data
 
+import io.github.iampopovich.eculense.core.model.AppLogger
+import io.github.iampopovich.eculense.core.model.attempt
 import io.github.iampopovich.eculense.core.analytics.StallDetector
 import io.github.iampopovich.eculense.core.analytics.TripEventFact
 import io.github.iampopovich.eculense.core.analytics.TripEventType
@@ -56,6 +58,7 @@ internal class LiveEventRecorder(
     private val scope: CoroutineScope,
     private val carOf: suspend (sessionId: Long) -> Long?,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val logger: AppLogger = AppLogger.NONE,
 ) : EventMarker {
     private val _stalls = MutableSharedFlow<Long>(extraBufferCapacity = 4)
     /** Times of stalls detected live (also for a simulated link, so the screen can show them). */
@@ -91,6 +94,8 @@ internal class LiveEventRecorder(
 
     private suspend fun save(sessionId: Long, atMs: Long, type: TripEventType) {
         if (!gate.allowed()) return
-        runCatching { dao.insert(TripEventEntity(sessionId = sessionId, carId = carOf(sessionId), atMs = atMs, type = type.name)) }
+        logger.attempt("EcuEvents", "trip event ${type.name} for recording $sessionId") {
+            dao.insert(TripEventEntity(sessionId = sessionId, carId = carOf(sessionId), atMs = atMs, type = type.name))
+        }
     }
 }
