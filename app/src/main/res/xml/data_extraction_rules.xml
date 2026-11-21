@@ -7,11 +7,13 @@
     <cloud-backup>
         <!-- The LLM key is encrypted with a Keystore key that does not transfer to another device. -->
         <exclude domain="file" path="datastore/llm_settings.preferences_pb" />
+        <exclude domain="file" path="datastore/mqtt.preferences_pb" />
         <!-- Data packs (reference databases) are re-downloaded on demand. -->
         <exclude domain="file" path="packs/" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/llm_settings.preferences_pb" />
+        <exclude domain="file" path="datastore/mqtt.preferences_pb" />
         <exclude domain="file" path="packs/" />
     </device-transfer>
 </data-extraction-rules>

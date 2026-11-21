@@ -114,6 +114,8 @@ dependencies {
     implementation(project(":feature:health"))
     // C9 home-screen widget (Glance); remove with its line in AppModules.
     implementation(project(":feature:widget"))
+    // R-F optional MQTT / Home Assistant publishing; remove with :core:mqtt in settings.gradle.kts and appModules.
+    implementation(project(":feature:mqtt"))
     implementation(project(":core:obd"))
     implementation(project(":core:model"))
     implementation(project(":core:bluetooth"))

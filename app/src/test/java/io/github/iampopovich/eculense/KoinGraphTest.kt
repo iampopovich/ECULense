@@ -5,6 +5,7 @@ import io.github.iampopovich.eculense.core.aitools.aiToolsModule
 import io.github.iampopovich.eculense.core.database.databaseModule
 import io.github.iampopovich.eculense.feature.aichat.aiChatModule
 import io.github.iampopovich.eculense.feature.aisettings.aiSettingsModule
+import io.github.iampopovich.eculense.feature.mqtt.mqttModule
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.koin.core.annotation.KoinExperimentalAPI
@@ -31,6 +32,16 @@ class KoinGraphTest {
         val withoutAi = appModules.filterNot { it in aiModules }
         assertEquals(appModules.size - aiModules.size, withoutAi.size)
         module { includes(withoutAi) }.verify(extraTypes = KoinExtraTypes.all)
+    }
+
+    @Test
+    fun `graph without the MQTT module verifies`() {
+        // R-F: :feature:mqtt / :core:mqtt are optional like the AI modules.
+        val withoutMqtt = appModules.filterNot { it === mqttModule }
+        assertEquals(appModules.size - 1, withoutMqtt.size)
+        module { includes(withoutMqtt) }.verify(extraTypes = KoinExtraTypes.all)
+        // ... and without MQTT and AI together
+        module { includes(withoutMqtt.filterNot { it in aiModules }) }.verify(extraTypes = KoinExtraTypes.all)
     }
 
     @Test

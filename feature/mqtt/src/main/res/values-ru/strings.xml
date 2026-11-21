@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mqtt_hub_title">Умный дом (MQTT)</string>
+    <string name="mqtt_hub_subtitle">Живые значения на ваш брокер и в Home Assistant</string>
+    <string name="mqtt_intro">Публикует живые значения подключённой машины на ваш собственный MQTT-брокер, с обнаружением в Home Assistant. По умолчанию выключено; работает только при подключённом реальном адаптере.</string>
+    <string name="mqtt_enabled">Публиковать в MQTT</string>
+    <string name="mqtt_enable_locked">Сначала проверьте подключение: публикацию можно включить после того, как брокер принял эти настройки.</string>
+    <string name="mqtt_section_broker">Брокер</string>
+    <string name="mqtt_host">Адрес брокера</string>
+    <string name="mqtt_port">Порт</string>
+    <string name="mqtt_port_invalid">Порт 1–65535</string>
+    <string name="mqtt_tls">TLS (шифрование)</string>
+    <string name="mqtt_username">Логин (необязательно)</string>
+    <string name="mqtt_password">Пароль (необязательно)</string>
+    <string name="mqtt_password_saved">Пароль сохранён — введите новый, чтобы заменить</string>
+    <string name="mqtt_password_clear">Удалить сохранённый пароль</string>
+    <string name="mqtt_check">Проверить подключение</string>
+    <string name="mqtt_checking">Проверяем…</string>
+    <string name="mqtt_result_ok">✓ Брокер принял подключение</string>
+    <string name="mqtt_result_bad_credentials">Неверный логин или пароль: брокер не пустил</string>
+    <string name="mqtt_result_refused">Брокер отказал в подключении (код %1$d)</string>
+    <string name="mqtt_result_unreachable">Брокер недоступен: проверьте адрес, порт и сеть</string>
+    <string name="mqtt_result_tls">Ошибка TLS: сертификату нет доверия, имя не совпадает или на этом порту нет TLS</string>
+    <string name="mqtt_result_protocol">Ответ брокера не похож на MQTT 3.1.1</string>
+    <string name="mqtt_plain_not_allowed">Без TLS можно только адреса локальной сети (192.168.x, 10.x, *.local …)</string>
+    <string name="mqtt_section_data">Что публиковать</string>
+    <string name="mqtt_prefix">Префикс топиков</string>
+    <string name="mqtt_period">Публиковать раз в, с</string>
+    <string name="mqtt_period_invalid">От 5 до 3600 секунд</string>
+    <string name="mqtt_send_dashboard">Значения с Панели машины</string>
+    <string name="mqtt_send_battery">Напряжение АКБ</string>
+    <string name="mqtt_send_connection">Состояние подключения адаптера</string>
+    <string name="mqtt_send_dtc">Число кодов ошибок (последняя проверка)</string>
+    <string name="mqtt_privacy">Данные уходят только на указанный здесь брокер. Никогда не отправляются: VIN, GPS, адрес адаптера и имя машины в приложении; Home Assistant видит машину как марку, модель и год.</string>
+    <string name="mqtt_ha_hint">Home Assistant: машина появится в «Настройки → Устройства и службы → MQTT», если включено MQTT discovery (префикс по умолчанию «homeassistant»).</string>
+    <string name="mqtt_status_off">Публикация выключена</string>
+    <string name="mqtt_status_waiting_adapter">Включено: ждём подключения реального адаптера</string>
+    <string name="mqtt_status_simulated">Включено: симулированные адаптеры ничего не публикуют</string>
+    <string name="mqtt_status_connecting">Подключаемся к брокеру…</string>
+    <string name="mqtt_status_publishing">Публикуем на брокер</string>
+    <string name="mqtt_status_retry">Брокер недоступен, следующая попытка через %1$d с</string>
+    <string name="mqtt_status_failed">Остановлено: %1$s</string>
+</resources>

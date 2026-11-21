@@ -101,3 +101,6 @@ object DeepLinks {
 
 /** D5: fuel trims against rpm and load for a recording (:feature:sessions); [compareWith] = a second recording. */
 @Serializable data class EngineMapDestination(val sessionId: Long, val compareWith: Long? = null) : NavKey
+
+/** R-F: optional MQTT / Home Assistant publishing settings (Settings hub of :feature:mqtt). */
+@Serializable data object MqttSettingsDestination : NavKey

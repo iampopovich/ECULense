@@ -8,6 +8,8 @@
 <full-backup-content>
     <!-- The LLM key is encrypted with a Keystore key that does not transfer to another device. -->
     <exclude domain="file" path="datastore/llm_settings.preferences_pb" />
+    <!-- R-F: the MQTT broker password is encrypted with a Keystore key that does not transfer either. -->
+    <exclude domain="file" path="datastore/mqtt.preferences_pb" />
     <!-- Data packs (reference databases, tens of MB) are re-downloaded on demand. -->
     <exclude domain="file" path="packs/" />
 </full-backup-content>

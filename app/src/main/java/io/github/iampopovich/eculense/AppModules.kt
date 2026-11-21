@@ -35,6 +35,7 @@ import io.github.iampopovich.eculense.feature.sessions.sessionsModule
 import io.github.iampopovich.eculense.feature.settings.settingsModule
 import io.github.iampopovich.eculense.feature.stats.statsModule
 import io.github.iampopovich.eculense.feature.widget.widgetModule
+import io.github.iampopovich.eculense.feature.mqtt.mqttModule
 import io.github.iampopovich.eculense.core.model.AppBuild
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -89,6 +90,9 @@ val appModules: List<Module> = listOf(
     healthModule,
     // C9 home-screen widget: live values or the last voltage, code check and trip; without it no widget.
     widgetModule,
+    // R-F «Smart home (MQTT)»: optional publishing to the user's own broker + Home Assistant discovery; without it
+    // nothing else changes (remove the line + :feature:mqtt/:core:mqtt in settings.gradle.kts and app).
+    mqttModule,
     // AI (stage 2): remove these lines + the modules in settings.gradle.kts/app → the app works without AI.
     aiModule,
     // Car data tools for AI (stage 3): without them chat works, but without data.

@@ -31,5 +31,8 @@ object KoinExtraTypes {
         // R-E: ExtendedSensors gets the active-car flow and the debug-only simulated signalsets (getAll, empty in release).
         kotlinx.coroutines.flow.Flow::class,
         io.github.iampopovich.eculense.core.obdb.SimulatedSignalset::class,
+    ) + listOfNotNull(
+        // R-F: the MQTT client is built inside the bridge definition; by name so the test compiles without :core:mqtt.
+        runCatching { Class.forName("io.github.iampopovich.eculense.core.mqtt.MqttPublisher").kotlin }.getOrNull(),
     )
 }

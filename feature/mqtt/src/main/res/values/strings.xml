@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mqtt_hub_title">Smart home (MQTT)</string>
+    <string name="mqtt_hub_subtitle">Live values to your own broker and Home Assistant</string>
+    <string name="mqtt_intro">Publishes live values of the connected car to your own MQTT broker, with Home Assistant discovery. Off by default; only while a real adapter is connected.</string>
+    <string name="mqtt_enabled">Publish to MQTT</string>
+    <string name="mqtt_enable_locked">Check the connection first: publishing can be turned on after the broker accepted these settings.</string>
+    <string name="mqtt_section_broker">Broker</string>
+    <string name="mqtt_host">Broker address</string>
+    <string name="mqtt_port">Port</string>
+    <string name="mqtt_port_invalid">Port 1–65535</string>
+    <string name="mqtt_tls">TLS (encrypted)</string>
+    <string name="mqtt_username">User name (optional)</string>
+    <string name="mqtt_password">Password (optional)</string>
+    <string name="mqtt_password_saved">Password saved — type to replace</string>
+    <string name="mqtt_password_clear">Remove the saved password</string>
+    <string name="mqtt_check">Check connection</string>
+    <string name="mqtt_checking">Checking…</string>
+    <string name="mqtt_result_ok">✓ The broker accepted the connection</string>
+    <string name="mqtt_result_bad_credentials">Wrong user name or password: the broker refused the login</string>
+    <string name="mqtt_result_refused">The broker refused the connection (code %1$d)</string>
+    <string name="mqtt_result_unreachable">Broker unreachable: check the address, the port and the network</string>
+    <string name="mqtt_result_tls">TLS error: the certificate is not trusted, the name does not match or the port does not speak TLS</string>
+    <string name="mqtt_result_protocol">The broker\'s answer is not MQTT 3.1.1</string>
+    <string name="mqtt_plain_not_allowed">Without TLS only local-network addresses are allowed (192.168.x, 10.x, *.local …)</string>
+    <string name="mqtt_section_data">What to publish</string>
+    <string name="mqtt_prefix">Topic prefix</string>
+    <string name="mqtt_period">Publish every, s</string>
+    <string name="mqtt_period_invalid">From 5 to 3600 seconds</string>
+    <string name="mqtt_send_dashboard">Dashboard values of the car</string>
+    <string name="mqtt_send_battery">Battery voltage</string>
+    <string name="mqtt_send_connection">Adapter connection state</string>
+    <string name="mqtt_send_dtc">Number of trouble codes (last check)</string>
+    <string name="mqtt_privacy">Data goes only to the broker entered here. Never sent: VIN, GPS, the adapter address and the car\'s name in the app; Home Assistant sees the car as make, model and year.</string>
+    <string name="mqtt_ha_hint">Home Assistant: the car appears under Settings → Devices &amp; services → MQTT when MQTT discovery is on (default prefix «homeassistant»).</string>
+    <string name="mqtt_status_off">Publishing is off</string>
+    <string name="mqtt_status_waiting_adapter">On: waiting for a real adapter connection</string>
+    <string name="mqtt_status_simulated">On: simulated adapters never publish</string>
+    <string name="mqtt_status_connecting">Connecting to the broker…</string>
+    <string name="mqtt_status_publishing">Publishing to the broker</string>
+    <string name="mqtt_status_retry">Broker not reachable, next try in %1$d s</string>
+    <string name="mqtt_status_failed">Stopped: %1$s</string>
+</resources>
