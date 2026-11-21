@@ -10,7 +10,6 @@ import io.github.iampopovich.eculense.core.datapacks.PackSource
 import io.github.iampopovich.eculense.core.ui.UiText
 import java.io.File
 import java.io.IOException
-import java.net.URL
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +24,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 /** Link checked: the model can be added; or a clear reason why not. */
@@ -120,12 +118,8 @@ class LocalModels(
 
     override fun manifests(): List<PackManifest> = all().mapNotNull { it.toPack() }
 
-    override fun headersFor(url: String): Map<String, String> {
-        val host = runCatching { URL(url).host }.getOrNull() ?: return emptyMap()
-        if (host != "huggingface.co") return emptyMap()
-        val token = runBlocking { store.token() } ?: return emptyMap()
-        return mapOf("Authorization" to "Bearer $token")
-    }
+    override suspend fun headersFor(url: String): Map<String, String> =
+        if (HfAuth.isHfHost(url)) HfAuth.headers(url, store.token()) else emptyMap()
 
     /**
      * Custom model via HF link: HEAD without following the redirect — size and sha256 of the LFS file (`x-linked-size`,

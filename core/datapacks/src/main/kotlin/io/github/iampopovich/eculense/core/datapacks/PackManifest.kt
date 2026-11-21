@@ -73,7 +73,8 @@ enum class PackGroup { REFERENCE, MODEL }
  * after a redirect to a CDN the token is not sent. The token is not stored in the manifest and never reaches WorkManager.
  */
 fun interface PackAuth {
-    fun headersFor(url: String): Map<String, String>
+    /** Suspending: the token comes from encrypted DataStore; no runBlocking on the download thread. */
+    suspend fun headersFor(url: String): Map<String, String>
 }
 
 /** Pack catalog that changes at runtime (user models added by link). */

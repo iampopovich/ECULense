@@ -75,7 +75,7 @@ class PackInstaller(
             }
         }
 
-    private fun headersFor(url: String): Map<String, String> = auth.fold(emptyMap()) { acc, a -> acc + a.headersFor(url) }
+    private suspend fun headersFor(url: String): Map<String, String> = auth.fold(emptyMap()) { acc, a -> acc + a.headersFor(url) }
 
     /** Writes to `.part`, checks length and sha256, then renames. Returns the size. */
     private suspend fun download(file: PackFile, dest: File, resumable: Boolean, progress: DownloadProgress): Long {
