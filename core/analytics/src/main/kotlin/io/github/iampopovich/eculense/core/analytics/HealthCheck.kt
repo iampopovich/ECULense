@@ -33,9 +33,14 @@ enum class HealthNote {
     MOVING,
     /** Counters since clear are low: codes were cleared recently. */
     CLEARED_RECENTLY,
+    /** R-H: diesel — petrol fuel-trim norms do not apply. */
+    NOT_APPLICABLE_DIESEL,
+    /** R-H: wideband upstream O2 sensor — the 0.1–0.9 V swing check does not apply. */
+    WIDEBAND_O2,
 }
 
-data class HealthItem(val id: HealthItemId, val status: HealthStatus, val value: Double? = null, val note: HealthNote = HealthNote.NONE)
+/** [norm] = the per-car norm the value was compared with (R-H), shown as «compared with» and sent to the AI. */
+data class HealthItem(val id: HealthItemId, val status: HealthStatus, val value: Double? = null, val note: HealthNote = HealthNote.NONE, val norm: Norm? = null)
 
 data class HealthResult(val verdict: HealthStatus, val items: List<HealthItem>)
 
@@ -56,11 +61,19 @@ data class HealthInput(
     val samples: Map<String, List<Double>>,
 )
 
-/** Deterministic quick health check (B6). Numbers come from [Thresholds]; context decides whether a value is judged. */
+/**
+ * Deterministic quick health check (B6). Class-2 limits (coolant, battery, not charging / overcharge) come from
+ * [Thresholds] and stay absolute; engine-specific items (charging window, trims, O2 swing, idle) compare with the car's
+ * [CarNorms] — with only a GENERIC norm a FAULT is capped at ATTENTION. Context decides whether a value is judged.
+ */
 object HealthCheck {
     const val O2 = "01.14"
 
-    fun evaluate(input: HealthInput): HealthResult {
+    /** FAULT from a generic norm is capped at ATTENTION (the generic number is not verified for this engine). */
+    private fun cap(status: HealthStatus, norm: Norm?) =
+        if (norm?.isGeneric == true && status == HealthStatus.FAULT) HealthStatus.ATTENTION else status
+
+    fun evaluate(input: HealthInput, norms: CarNorms = CarNorms.EMPTY): HealthResult {
         val s = input.samples
         val rpm = s[SensorIds.RPM].orEmpty()
         val running = rpm.isNotEmpty() && median(rpm) > Thresholds.RUNNING_RPM
@@ -84,10 +97,10 @@ object HealthCheck {
                 false -> HealthItem(HealthItemId.RECENT_CLEAR, HealthStatus.OK)
             },
             coolant(coolantMax, running),
-            voltage(s[SensorIds.MODULE_VOLTAGE] ?: s[SensorIds.ELM_VOLTAGE], running),
-            trims(s, running, warm),
-            o2(s[O2], running, warm),
-            idle(rpm, running, warm, moving),
+            voltage(s[SensorIds.MODULE_VOLTAGE] ?: s[SensorIds.ELM_VOLTAGE], running, moving, norms),
+            trims(s, running, warm, norms),
+            o2(s[O2], running, warm, norms),
+            idle(rpm, running, warm, moving, norms),
         )
         return HealthResult(verdict(items), items)
     }
@@ -124,7 +137,7 @@ object HealthCheck {
         else -> HealthItem(HealthItemId.COOLANT, HealthStatus.OK, max)
     }
 
-    private fun voltage(v: List<Double>?, running: Boolean): HealthItem {
+    private fun voltage(v: List<Double>?, running: Boolean, moving: Boolean, norms: CarNorms): HealthItem {
         if (v.isNullOrEmpty()) return HealthItem(HealthItemId.VOLTAGE, HealthStatus.NOT_SUPPORTED)
         val m = median(v)
         if (!running) {
@@ -135,51 +148,57 @@ object HealthCheck {
             }
             return HealthItem(HealthItemId.VOLTAGE, status, m, HealthNote.RESTING_VOLTAGE)
         }
+        val norm = norms.effective(if (moving) NormKey.CHARGING_DRIVING_V else NormKey.CHARGING_IDLE_V)
         val status = when {
             m < Thresholds.LIVE_NOT_CHARGING_V || m > Thresholds.LIVE_OVERCHARGE_V -> HealthStatus.FAULT
-            m < Thresholds.VOLTAGE_LOW_V || m > Thresholds.VOLTAGE_HIGH_V -> HealthStatus.ATTENTION
+            norm?.outside(m) == true -> HealthStatus.ATTENTION
             else -> HealthStatus.OK
         }
-        return HealthItem(HealthItemId.VOLTAGE, status, m, HealthNote.CHARGING_VOLTAGE)
+        return HealthItem(HealthItemId.VOLTAGE, status, m, HealthNote.CHARGING_VOLTAGE, norm)
     }
 
-    private fun trims(s: Map<String, List<Double>>, running: Boolean, warm: Boolean): HealthItem {
-        val banks = listOf(SensorIds.STFT1 to SensorIds.LTFT1, SensorIds.STFT2 to SensorIds.LTFT2)
-            .mapNotNull { (st, lt) -> s[lt]?.takeIf { it.isNotEmpty() }?.let { l -> (s[st]?.average() ?: 0.0) to l.average() } }
+    private fun trims(s: Map<String, List<Double>>, running: Boolean, warm: Boolean, norms: CarNorms): HealthItem {
+        val banks = listOf(Triple(SensorIds.STFT1, SensorIds.LTFT1, NormKey.LTFT_B1), Triple(SensorIds.STFT2, SensorIds.LTFT2, NormKey.LTFT_B2))
+            .mapNotNull { (st, lt, key) -> s[lt]?.takeIf { it.isNotEmpty() }?.let { l -> Triple(s[st]?.average() ?: 0.0, l.average(), key) } }
         if (banks.isEmpty()) return HealthItem(HealthItemId.FUEL_TRIMS, HealthStatus.NOT_SUPPORTED)
+        if (norms.traits.isDiesel) return HealthItem(HealthItemId.FUEL_TRIMS, HealthStatus.NOT_SUPPORTED, note = HealthNote.NOT_APPLICABLE_DIESEL)
         if (!running) return HealthItem(HealthItemId.FUEL_TRIMS, HealthStatus.NOT_JUDGED, note = HealthNote.ENGINE_OFF)
         if (!warm) return HealthItem(HealthItemId.FUEL_TRIMS, HealthStatus.NOT_JUDGED, note = HealthNote.COLD_ENGINE)
-        val worstTotal = banks.maxOf { abs(it.first + it.second) }
-        val worstLong = banks.maxOf { abs(it.second) }
-        val status = when {
-            worstTotal > Thresholds.TOTAL_TRIM_CRIT_PCT -> HealthStatus.FAULT
-            worstLong > Thresholds.LTFT_LIMIT_PCT -> HealthStatus.ATTENTION
-            else -> HealthStatus.OK
+        val totalNorm = norms.effective(NormKey.TOTAL_TRIM)
+        val worst = banks.maxBy { abs(it.first + it.second) }
+        val shown = worst.first + worst.second
+        val longOut = banks.firstOrNull { b -> norms.effective(b.third)?.outside(b.second) == true }
+        return when {
+            totalNorm?.outside(shown) == true -> HealthItem(HealthItemId.FUEL_TRIMS, cap(HealthStatus.FAULT, totalNorm), shown, norm = totalNorm)
+            longOut != null -> HealthItem(HealthItemId.FUEL_TRIMS, HealthStatus.ATTENTION, longOut.second, norm = norms.effective(longOut.third))
+            else -> HealthItem(HealthItemId.FUEL_TRIMS, HealthStatus.OK, shown, norm = totalNorm)
         }
-        val shown = banks.maxBy { abs(it.first + it.second) }.let { it.first + it.second }
-        return HealthItem(HealthItemId.FUEL_TRIMS, status, shown)
     }
 
-    private fun o2(v: List<Double>?, running: Boolean, warm: Boolean): HealthItem {
+    private fun o2(v: List<Double>?, running: Boolean, warm: Boolean, norms: CarNorms): HealthItem {
+        if (norms.traits.isWideband) return HealthItem(HealthItemId.O2_SENSOR, HealthStatus.NOT_SUPPORTED, note = HealthNote.WIDEBAND_O2)
         if (v.isNullOrEmpty()) return HealthItem(HealthItemId.O2_SENSOR, HealthStatus.NOT_SUPPORTED)
         if (!running) return HealthItem(HealthItemId.O2_SENSOR, HealthStatus.NOT_JUDGED, note = HealthNote.ENGINE_OFF)
         if (!warm) return HealthItem(HealthItemId.O2_SENSOR, HealthStatus.NOT_JUDGED, note = HealthNote.COLD_ENGINE)
         val span = v.max() - v.min()
-        return if (span < Thresholds.HEALTH_O2_MIN_SWING_V) HealthItem(HealthItemId.O2_SENSOR, HealthStatus.ATTENTION, span, HealthNote.O2_LAZY)
-        else HealthItem(HealthItemId.O2_SENSOR, HealthStatus.OK, span)
+        val norm = norms.effective(NormKey.O2_SWING) ?: return HealthItem(HealthItemId.O2_SENSOR, HealthStatus.NOT_JUDGED, span)
+        return if (norm.below(span)) HealthItem(HealthItemId.O2_SENSOR, HealthStatus.ATTENTION, span, HealthNote.O2_LAZY, norm)
+        else HealthItem(HealthItemId.O2_SENSOR, HealthStatus.OK, span, norm = norm)
     }
 
-    private fun idle(rpm: List<Double>, running: Boolean, warm: Boolean, moving: Boolean): HealthItem {
+    private fun idle(rpm: List<Double>, running: Boolean, warm: Boolean, moving: Boolean, norms: CarNorms): HealthItem {
         if (rpm.isEmpty()) return HealthItem(HealthItemId.IDLE, HealthStatus.NOT_SUPPORTED)
         if (!running) return HealthItem(HealthItemId.IDLE, HealthStatus.NOT_JUDGED, note = HealthNote.ENGINE_OFF)
         if (moving) return HealthItem(HealthItemId.IDLE, HealthStatus.NOT_JUDGED, note = HealthNote.MOVING)
         val m = median(rpm)
         if (!warm) return HealthItem(HealthItemId.IDLE, HealthStatus.NOT_JUDGED, m, HealthNote.COLD_ENGINE)
         val swing = rpm.max() - rpm.min()
+        val norm = norms.effective(NormKey.IDLE_RPM)
+        val swingNorm = norms.effective(NormKey.IDLE_RPM_SWING)
         return when {
-            m > Thresholds.IDLE_MAX_RPM || m < Thresholds.HEALTH_IDLE_MIN_RPM -> HealthItem(HealthItemId.IDLE, HealthStatus.ATTENTION, m)
-            swing > Thresholds.HEALTH_IDLE_MAX_SWING_RPM -> HealthItem(HealthItemId.IDLE, HealthStatus.ATTENTION, m, HealthNote.UNSTABLE_IDLE)
-            else -> HealthItem(HealthItemId.IDLE, HealthStatus.OK, m)
+            norm?.outside(m) == true -> HealthItem(HealthItemId.IDLE, HealthStatus.ATTENTION, m, norm = norm)
+            swingNorm?.above(swing) == true -> HealthItem(HealthItemId.IDLE, HealthStatus.ATTENTION, m, HealthNote.UNSTABLE_IDLE, swingNorm)
+            else -> HealthItem(HealthItemId.IDLE, HealthStatus.OK, m, norm = norm)
         }
     }
 

@@ -54,6 +54,9 @@ data class SessionDigest(
     /** Warm idle RPM: speed 0, RPM 400–1100. */
     val warmIdleRpm: Agg = Agg.EMPTY,
     val warmIdleRpmHist: Histogram = Histogram.EMPTY,
+    /** R-H: running voltage split by speed (0 = idle, > 0 = driving) for the charging norms. */
+    val idleVoltageHist: Histogram = Histogram.EMPTY,
+    val drivingVoltageHist: Histogram = Histogram.EMPTY,
 )
 
 object SessionDigester {
@@ -91,6 +94,7 @@ object SessionDigester {
 
         private fun fresh(at: Long, now: Long, maxAge: Long) = at != Long.MIN_VALUE && now - at <= maxAge
         private fun running(now: Long) = fresh(rpmAt, now, STATE_MAX_AGE_MS) && rpm > RUNNING_RPM
+        private fun speedState(now: Long): Boolean? = if (fresh(speedAt, now, STATE_MAX_AGE_MS)) speed > 0.0 else null
         private fun warm(now: Long) = fresh(coolantAt, now, COOLANT_MAX_AGE_MS) && coolantNow >= WARM_COOLANT_C
 
         fun accept(r: SensorReading) = accept(r.sensorId, r.value, r.timestampMs)
@@ -115,7 +119,7 @@ object SessionDigester {
                     val start = firstCoolant!!
                     if (warmupMs == null && start <= COLD_START_MAX_C && v >= WARM_COOLANT_C) warmupMs = t - firstCoolantAt
                 }
-                MODULE_VOLTAGE, ELM_VOLTAGE -> voltage.getValue(sensorId).accept(t, v, running(t))
+                MODULE_VOLTAGE, ELM_VOLTAGE -> voltage.getValue(sensorId).accept(t, v, running(t), speedState(t))
                 MAF -> {
                     val idle = fresh(speedAt, t, STATE_MAX_AGE_MS) && speed == 0.0 && running(t) && rpm <= IDLE_MAX_RPM
                     if (idle && warm(t)) idleMaf.add(v)
@@ -151,12 +155,14 @@ object SessionDigester {
                 warmTrimHist = trimBins.mapValues { it.value.toHistogram() },
                 warmIdleRpm = idleRpm.toAgg(),
                 warmIdleRpmHist = idleRpmBins.toHistogram(),
+                idleVoltageHist = vAcc?.idle?.toHistogram() ?: Histogram.EMPTY,
+                drivingVoltageHist = vAcc?.driving?.toHistogram() ?: Histogram.EMPTY,
             )
         }
     }
 
     /** Mutable histogram with a 0.1 step (like [Histogram]), without copying the map per value. */
-    private class Bins {
+    internal class Bins {
         private val bins = HashMap<Int, Int>()
         fun add(v: Double) {
             val bin = (v * 10).roundToInt()
@@ -193,13 +199,20 @@ object SessionDigester {
         val low = RunTracker()
         val high = RunTracker()
         private val bins = HashMap<Int, Int>()
+        val idle = Bins()
+        val driving = Bins()
 
-        fun accept(t: Long, v: Double, running: Boolean) {
+        fun accept(t: Long, v: Double, running: Boolean, moving: Boolean?) {
             if (!running) {
                 low.update(t, false); high.update(t, false)
                 return
             }
             agg.add(v)
+            when (moving) {
+                true -> driving.add(v)
+                false -> idle.add(v)
+                null -> Unit
+            }
             val bin = (v * 10).roundToInt()
             bins[bin] = (bins[bin] ?: 0) + 1
             low.update(t, v < VOLTAGE_LOW_V)

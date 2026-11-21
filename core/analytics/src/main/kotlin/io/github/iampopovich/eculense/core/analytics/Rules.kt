@@ -25,11 +25,14 @@ data class Finding(
     val sessionIds: List<Long> = emptyList(),
     val fromMs: Long? = null,
     val toMs: Long? = null,
+    /** R-H: the per-car norms this finding was compared with (shown as «compared with», sent to the AI). */
+    val norms: List<Norm> = emptyList(),
 ) {
     constructor(
         ruleId: String, severity: Severity, title: FindingText, message: FindingText,
         evidence: List<Evidence> = emptyList(), sessionIds: List<Long> = emptyList(), fromMs: Long? = null, toMs: Long? = null,
-    ) : this(ruleId, severity, title, listOf(message), evidence, sessionIds, fromMs, toMs)
+        norms: List<Norm> = emptyList(),
+    ) : this(ruleId, severity, title, listOf(message), evidence, sessionIds, fromMs, toMs, norms)
 
     /** Stored by a version before localization: raw (Russian) text; a recompute replaces it with typed text. */
     val isLegacyText: Boolean get() = title.key == K.RAW
@@ -47,7 +50,11 @@ data class AnalysisInput(
     val zone: ZoneId = ZoneId.systemDefault(),
     /** B10: stalls and user marks stored with the car's recordings. */
     val events: List<TripEventFact> = emptyList(),
-)
+    /** R-H: the car's norms (stored + generic fallbacks) and engine traits. */
+    val norms: CarNorms = CarNorms(car = car),
+) {
+    val traits: EngineTraits get() = norms.traits
+}
 
 /** B10: what happened inside a recording. */
 enum class TripEventType { STALL, USER_MARK }
@@ -61,10 +68,35 @@ interface AnalyticsRule {
 }
 
 object AnalyticsEngine {
-    val RULES: List<AnalyticsRule> = listOf(CoolantOverheatRule, VoltageRule, FuelTrimRule, MafIdleRule, DtcRule, MilDistanceRule, WarmupTrendRule, StallRule)
+    val RULES: List<AnalyticsRule> = listOf(
+        CoolantOverheatRule, CoolantPlateauRule, VoltageRule, FuelTrimRule, MafIdleRule, IdleRpmRule, DtcRule, MilDistanceRule, WarmupTrendRule, StallRule,
+    )
 
     fun evaluate(input: AnalysisInput, rules: List<AnalyticsRule> = RULES): List<Finding> =
-        rules.flatMap { it.evaluate(input) }.sortedByDescending { it.severity.rank }
+        rules.flatMap { it.evaluate(input) }.map(::withNorms).sortedByDescending { it.severity.rank }
+
+    /**
+     * R-H: every finding compared with norms shows them («compared with …» evidence). Compared only with GENERIC norms:
+     * severity capped at WARNING and the message says the norm is not verified for this engine. Class-2 safety findings
+     * carry no norms and keep their absolute severity.
+     */
+    fun withNorms(f: Finding): Finding {
+        if (f.norms.isEmpty()) return f
+        val generic = f.norms.all { it.isGeneric }
+        val flagged = generic && f.severity.rank >= Severity.INFO.rank
+        return f.copy(
+            severity = if (generic && f.severity.rank > Severity.WARNING.rank) Severity.WARNING else f.severity,
+            message = if (flagged) f.message + t(K.GENERIC_NORM_NOTE) else f.message,
+            evidence = f.evidence + f.norms.map(NormText::evidence),
+        )
+    }
+}
+
+/** Values of the newest sessions for [key] with [value] per session (newest first, at most [BaselineLearner.RECENT_SESSIONS]). */
+private fun recent(sessions: List<SessionDigest>, limit: Int = BaselineLearner.RECENT_SESSIONS, value: (SessionDigest) -> Double?): Pair<Double, List<SessionDigest>>? {
+    val r = sessions.sortedByDescending { it.startedAtMs }.mapNotNull { d -> value(d)?.let { d to it } }.take(limit)
+    if (r.isEmpty()) return null
+    return BaselineLearner.median(r.map { it.second }) to r.map { it.first }
 }
 
 /** Short builders for typed text. */
@@ -117,7 +149,12 @@ object CoolantOverheatRule : AnalyticsRule {
     }
 }
 
-/** Voltage with the engine running: < 13.2 V for over 60 s and > 14.8 V for over 10 s. */
+/**
+ * Voltage with the engine running. Class 2 (absolute, any car): a session median below [Thresholds.LIVE_NOT_CHARGING_V]
+ * (the alternator supplies nothing) or above [Thresholds.LIVE_OVERCHARGE_V]. Class 3 (per car): the median of the
+ * recent sessions' idle / driving medians against [NormKey.CHARGING_IDLE_V] / [NormKey.CHARGING_DRIVING_V] — a smart
+ * alternator's 12.6 V cruise is normal once the car's own baseline says so.
+ */
 object VoltageRule : AnalyticsRule {
     private const val LOW = "voltage-low"
     private const val HIGH = "voltage-high"
@@ -135,42 +172,73 @@ object VoltageRule : AnalyticsRule {
         val hist = withV.map { it.runningVoltageHist }.fold(Histogram.EMPTY) { a, b -> a + b }
         val median = hist.quantile(0.5)
         val sources = withV.mapNotNull { it.voltageSensor }.distinct().map { FindingText(K.VALUE_PLAIN, FindingArg.Sensor(it)) }
+        val idleNorm = input.norms.effective(NormKey.CHARGING_IDLE_V)
+        val drivingNorm = input.norms.effective(NormKey.CHARGING_DRIVING_V)
+        val idle = recent(withV) { BaselineLearner.sessionValue(NormKey.CHARGING_IDLE_V, it) }
+        val driving = recent(withV) { BaselineLearner.sessionValue(NormKey.CHARGING_DRIVING_V, it) }
         val evidence = listOfNotNull(
             hist.quantile(0.01)?.let { ev(K.EVIDENCE_VOLTAGE_P1, t(K.VALUE_VOLTS, num(it))) },
             median?.let { ev(K.EVIDENCE_MEDIAN, t(K.VALUE_VOLTS, num(it))) },
             ev(K.EVIDENCE_MAXIMUM, t(K.VALUE_VOLTS, num(all.max))),
             ev(K.EVIDENCE_VOLTAGE_MIN, t(K.VALUE_VOLTS, num(all.min))),
+            idle?.let { ev(K.EVIDENCE_VOLTAGE_IDLE, t(K.VALUE_VOLTS, num(it.first))) },
+            driving?.let { ev(K.EVIDENCE_VOLTAGE_DRIVING, t(K.VALUE_VOLTS, num(it.first))) },
             ev(K.EVIDENCE_SOURCE, t(K.VALUE_PLAIN, FindingArg.Join(sources))),
         )
-        val low = withV.filter { it.lowVoltageMs >= Thresholds.VOLTAGE_LOW_MIN_MS }
-        val high = withV.filter { it.highVoltageMs >= Thresholds.VOLTAGE_HIGH_MIN_MS }
-        val adapterNote = if (low.any { it.voltageSensor == SensorIds.ELM_VOLTAGE }) t(K.VOLTAGE_ADAPTER_NOTE) else null
-        return listOf(
-            if (low.isEmpty()) {
-                ok(LOW, TITLE_LOW, t(K.VOLTAGE_LOW_OK, num(Thresholds.VOLTAGE_LOW_V)), evidence)
-            } else {
+        val sessionMedian = { d: SessionDigest -> d.runningVoltageHist.quantile(0.5) }
+        val dead = withV.filter { (sessionMedian(it) ?: Double.NaN) < Thresholds.LIVE_NOT_CHARGING_V }
+        val over = withV.filter { (sessionMedian(it) ?: Double.NaN) > Thresholds.LIVE_OVERCHARGE_V }
+        val adapterNote = if (withV.any { it.voltageSensor == SensorIds.ELM_VOLTAGE }) t(K.VOLTAGE_ADAPTER_NOTE) else null
+        fun span(list: List<SessionDigest>) = list.minOf { it.startedAtMs } to list.maxOf { it.startedAtMs }
+        val used = listOfNotNull(idleNorm.takeIf { idle != null }, drivingNorm.takeIf { driving != null })
+
+        val lowParts = listOfNotNull(
+            idle?.takeIf { idleNorm?.below(it.first) == true }?.let { Triple(t(K.VOLTAGE_AT_IDLE, num(it.first)), idleNorm!!, it.second) },
+            driving?.takeIf { drivingNorm?.below(it.first) == true }?.let { Triple(t(K.VOLTAGE_WHILE_DRIVING, num(it.first)), drivingNorm!!, it.second) },
+        )
+        val highParts = listOfNotNull(
+            idle?.takeIf { idleNorm?.above(it.first) == true }?.let { Triple(t(K.VOLTAGE_AT_IDLE, num(it.first)), idleNorm!!, it.second) },
+            driving?.takeIf { drivingNorm?.above(it.first) == true }?.let { Triple(t(K.VOLTAGE_WHILE_DRIVING, num(it.first)), drivingNorm!!, it.second) },
+        )
+        val low = when {
+            dead.isNotEmpty() -> Finding(
+                LOW, Severity.WARNING, TITLE_LOW,
+                listOfNotNull(t(K.VOLTAGE_NOT_CHARGING, num(Thresholds.LIVE_NOT_CHARGING_V), cnt(dead.size)), adapterNote),
+                evidence, dead.map { it.sessionId }, span(dead).first, span(dead).second,
+            )
+            lowParts.isNotEmpty() -> {
+                val sessions = lowParts.flatMap { it.third }.distinctBy { it.sessionId }
                 Finding(
                     LOW, Severity.WARNING, TITLE_LOW,
-                    listOfNotNull(t(K.VOLTAGE_LOW, cnt(low.size), num(Thresholds.VOLTAGE_LOW_V)), adapterNote),
-                    evidence + ev(K.EVIDENCE_LONGEST, secondsValue(low.maxOf { it.lowVoltageMs })),
-                    low.map { it.sessionId }, low.minOf { it.startedAtMs }, low.maxOf { it.startedAtMs },
+                    listOfNotNull(t(K.VOLTAGE_LOW_NORM, FindingArg.Join(lowParts.map { it.first })), adapterNote),
+                    evidence, sessions.map { it.sessionId }, span(sessions).first, span(sessions).second, norms = lowParts.map { it.second },
                 )
-            },
-            if (high.isEmpty()) {
-                ok(HIGH, TITLE_HIGH, t(K.VOLTAGE_HIGH_OK, num(Thresholds.VOLTAGE_HIGH_V)), evidence)
-            } else {
+            }
+            else -> ok(LOW, TITLE_LOW, t(K.VOLTAGE_NORM_OK), evidence).copy(norms = used)
+        }
+        val high = when {
+            over.isNotEmpty() -> Finding(
+                HIGH, Severity.WARNING, TITLE_HIGH, t(K.VOLTAGE_OVERCHARGE, num(Thresholds.LIVE_OVERCHARGE_V), cnt(over.size)),
+                evidence, over.map { it.sessionId }, span(over).first, span(over).second,
+            )
+            highParts.isNotEmpty() -> {
+                val sessions = highParts.flatMap { it.third }.distinctBy { it.sessionId }
                 Finding(
-                    HIGH, Severity.WARNING, TITLE_HIGH,
-                    t(K.VOLTAGE_HIGH, cnt(high.size), num(Thresholds.VOLTAGE_HIGH_V)),
-                    evidence + ev(K.EVIDENCE_LONGEST, secondsValue(high.maxOf { it.highVoltageMs })),
-                    high.map { it.sessionId }, high.minOf { it.startedAtMs }, high.maxOf { it.startedAtMs },
+                    HIGH, Severity.WARNING, TITLE_HIGH, t(K.VOLTAGE_HIGH_NORM, FindingArg.Join(highParts.map { it.first })),
+                    evidence, sessions.map { it.sessionId }, span(sessions).first, span(sessions).second, norms = highParts.map { it.second },
                 )
-            },
-        )
+            }
+            else -> ok(HIGH, TITLE_HIGH, t(K.VOLTAGE_NORM_OK), evidence).copy(norms = used)
+        }
+        return listOf(low, high)
     }
 }
 
-/** Fuel trims on a warm engine. Sign «+» means the ECU adds fuel (lean mixture). */
+/**
+ * Fuel trims on a warm engine. Sign «+» means the ECU adds fuel (lean mixture). Judged = median of the recent sessions'
+ * warm means against the car's norms [NormKey.LTFT_B1]/[NormKey.LTFT_B2], [NormKey.TOTAL_TRIM], [NormKey.BANK_ASYMMETRY].
+ * Not judged on a diesel (lean, unthrottled: petrol trim norms do not apply).
+ */
 object FuelTrimRule : AnalyticsRule {
     private const val LONG = "fuel-trim-long"
     private const val TOTAL = "fuel-trim-total"
@@ -180,16 +248,29 @@ object FuelTrimRule : AnalyticsRule {
     private val TITLE_ASYM = t(K.TITLE_BANK_ASYMMETRY)
     override val ids = listOf(LONG, TOTAL, ASYM)
 
-    /** ltft/stft come from the latest recording with warm LTFT for the bank: ECU adaptation changes, old months don't describe it. */
-    private data class Bank(val n: Int, val stft: Agg, val ltft: Agg, val ltftAll: Agg, val atMs: Long, val sessions: List<Long>)
+    /** ltft/stft come from the latest recording with warm LTFT for the bank (evidence); [recentLtft] is what is judged. */
+    private data class Bank(
+        val n: Int, val stft: Agg, val ltft: Agg, val ltftAll: Agg, val atMs: Long, val sessions: List<Long>,
+        val recentLtft: Double, val recentTotal: Double?, val key: NormKey,
+    )
 
     override fun evaluate(input: AnalysisInput): List<Finding> {
-        fun bank(n: Int, stftId: String, ltftId: String): Bank? {
+        if (input.traits.isDiesel) {
+            val msg = t(K.FUEL_TRIM_NOT_APPLICABLE)
+            return listOf(noData(LONG, TITLE_LONG, msg), noData(TOTAL, TITLE_TOTAL, msg), noData(ASYM, TITLE_ASYM, msg))
+        }
+        fun bank(n: Int, stftId: String, ltftId: String, key: NormKey): Bank? {
             val latest = input.sessions.filter { (it.warmTrims[ltftId]?.count ?: 0) > 0 }.maxByOrNull { it.startedAtMs } ?: return null
             val stft = latest.warmTrims[stftId]?.takeIf { it.count > 0 } ?: Agg.EMPTY
-            return Bank(n, stft, latest.warmTrims.getValue(ltftId), input.sessions.mapNotNull { it.warmTrims[ltftId] }.merged(), latest.startedAtMs, listOf(latest.sessionId))
+            // LTFT is itself the ECU's long-term adaptation: the latest recording describes it (older months don't).
+            val lt = recent(input.sessions, limit = 1) { d -> d.warmTrims[ltftId]?.takeIf { it.count > 0 }?.mean }!!
+            val total = recent(input.sessions, limit = 1) { d -> d.total(stftId, ltftId) }
+            return Bank(
+                n, stft, latest.warmTrims.getValue(ltftId), input.sessions.mapNotNull { it.warmTrims[ltftId] }.merged(), latest.startedAtMs,
+                lt.second.map { it.sessionId }, lt.first, total?.first, key,
+            )
         }
-        val withLt = listOfNotNull(bank(1, SensorIds.STFT1, SensorIds.LTFT1), bank(2, SensorIds.STFT2, SensorIds.LTFT2))
+        val withLt = listOfNotNull(bank(1, SensorIds.STFT1, SensorIds.LTFT1, NormKey.LTFT_B1), bank(2, SensorIds.STFT2, SensorIds.LTFT2, NormKey.LTFT_B2))
         if (withLt.isEmpty()) {
             val msg = t(K.FUEL_TRIM_NO_DATA)
             return listOf(noData(LONG, TITLE_LONG, msg), noData(TOTAL, TITLE_TOTAL, msg), noData(ASYM, TITLE_ASYM, msg))
@@ -204,89 +285,145 @@ object FuelTrimRule : AnalyticsRule {
                 ),
                 b.stft.mean?.let { Evidence(t(K.EVIDENCE_STFT_BANK, cnt(b.n)), t(K.STFT_VALUE, signed(it), signed(b.stft.max), cnt(b.stft.count))) },
             )
-        }
+        } + ev(K.EVIDENCE_RECENT, t(K.VALUE_PLAIN, FindingArg.Join(withLt.map { t(K.BANK_PERCENT, cnt(it.n), signed(it.recentLtft)) })))
         val sessions = withLt.flatMap { it.sessions }.distinct()
         val fewNote = if (withLt.any(few)) t(K.FEW_SAMPLES_NOTE) else null
+        val ltNorm = withLt.associateWith { input.norms.effective(it.key) }
 
-        val out = withLt.filter { abs(it.ltft.mean!!) > Thresholds.LTFT_LIMIT_PCT }
+        val out = withLt.filter { ltNorm[it]?.outside(it.recentLtft) == true }
         val long = if (out.isEmpty()) {
-            ok(LONG, TITLE_LONG, t(K.LTFT_OK, num(Thresholds.LTFT_LIMIT_PCT, 0)), evidence)
+            ok(LONG, TITLE_LONG, t(K.LTFT_OK_NORM), evidence).copy(norms = ltNorm.values.filterNotNull())
         } else {
-            val parts = out.map { t(K.BANK_PERCENT, cnt(it.n), signed(it.ltft.mean!!)) }
-            val lean = out.all { it.ltft.mean!! > 0 }
+            val parts = out.map { t(K.BANK_PERCENT, cnt(it.n), signed(it.recentLtft)) }
+            val lean = out.all { it.recentLtft > 0 }
             Finding(
                 LONG, Severity.WARNING, TITLE_LONG,
-                listOfNotNull(
-                    t(K.LTFT_OUT, num(Thresholds.LTFT_LIMIT_PCT, 0), FindingArg.Join(parts)),
-                    if (lean) t(K.LEAN_NOTE) else null,
-                    fewNote,
-                ),
-                evidence, sessions,
+                listOfNotNull(t(K.LTFT_OUT_NORM, FindingArg.Join(parts)), if (lean) t(K.LEAN_NOTE) else null, fewNote),
+                evidence, sessions, norms = out.mapNotNull { ltNorm[it] },
             )
         }
 
-        val totals = withLt.filter { it.stft.count > 0 }.map { it to it.stft.mean!! + it.ltft.mean!! }
+        val totalNorm = input.norms.effective(NormKey.TOTAL_TRIM)
+        val totals = withLt.filter { it.stft.count > 0 && it.recentTotal != null }.map { it to it.recentTotal!! }
         val total = when {
-            totals.isEmpty() -> noData(TOTAL, TITLE_TOTAL, t(K.TOTAL_TRIM_NO_DATA))
-            totals.none { abs(it.second) > Thresholds.TOTAL_TRIM_CRIT_PCT } ->
-                ok(TOTAL, TITLE_TOTAL, t(K.TOTAL_TRIM_OK, num(Thresholds.TOTAL_TRIM_CRIT_PCT, 0)), evidence)
+            totals.isEmpty() || totalNorm == null -> noData(TOTAL, TITLE_TOTAL, t(K.TOTAL_TRIM_NO_DATA))
+            totals.none { totalNorm.outside(it.second) } ->
+                ok(TOTAL, TITLE_TOTAL, t(K.TOTAL_TRIM_OK_NORM), evidence).copy(norms = listOf(totalNorm))
             else -> {
-                val bad = totals.filter { abs(it.second) > Thresholds.TOTAL_TRIM_CRIT_PCT }
+                val bad = totals.filter { totalNorm.outside(it.second) }
                 val enough = bad.all { (b, _) -> b.ltft.count >= Thresholds.MIN_TRIM_SAMPLES && b.stft.count >= Thresholds.MIN_TRIM_SAMPLES }
                 Finding(
                     TOTAL, if (enough) Severity.CRITICAL else Severity.WARNING, TITLE_TOTAL,
                     listOfNotNull(
-                        t(K.TOTAL_TRIM_OUT, num(Thresholds.TOTAL_TRIM_CRIT_PCT, 0), FindingArg.Join(bad.map { (b, v) -> t(K.BANK_PERCENT, cnt(b.n), signed(v)) })),
+                        t(K.TOTAL_TRIM_OUT_NORM, FindingArg.Join(bad.map { (b, v) -> t(K.BANK_PERCENT, cnt(b.n), signed(v)) })),
                         if (enough) null else t(K.PRELIMINARY_NOTE),
                     ),
-                    evidence, sessions,
+                    evidence, sessions, norms = listOf(totalNorm),
                 )
             }
         }
 
-        val asym = if (withLt.size < 2) {
+        val asymNorm = input.norms.effective(NormKey.BANK_ASYMMETRY)
+        val asym = if (withLt.size < 2 || asymNorm == null) {
             noData(ASYM, TITLE_ASYM, t(K.BANK_ASYMMETRY_NO_DATA))
         } else {
-            val diff = abs(withLt[0].ltft.mean!! - withLt[1].ltft.mean!!)
+            val diff = abs(withLt[0].recentLtft - withLt[1].recentLtft)
             val ev = evidence + ev(K.EVIDENCE_LTFT_DIFFERENCE, t(K.VALUE_PERCENT, num(diff)))
-            if (diff > Thresholds.BANK_ASYMMETRY_PCT) {
-                Finding(ASYM, Severity.WARNING, TITLE_ASYM, listOfNotNull(t(K.BANK_ASYMMETRY, num(diff)), fewNote), ev, sessions)
+            if (asymNorm.above(diff)) {
+                Finding(ASYM, Severity.WARNING, TITLE_ASYM, listOfNotNull(t(K.BANK_ASYMMETRY, num(diff)), fewNote), ev, sessions, norms = listOf(asymNorm))
             } else {
-                ok(ASYM, TITLE_ASYM, t(K.BANK_ASYMMETRY_OK, num(diff)), ev)
+                ok(ASYM, TITLE_ASYM, t(K.BANK_ASYMMETRY_OK, num(diff)), ev).copy(norms = listOf(asymNorm))
             }
         }
         return listOf(long, total, asym)
     }
 }
 
-/** MAF at warm idle relative to engine displacement from the profile. */
+/**
+ * Warm idle air flow against [NormKey.IDLE_MAF]: the own baseline (absolute g/s, works without the displacement) or
+ * the generic 0.9–1.3 g/s per litre of a petrol engine. No MAF sensor (ECU) or a diesel without a baseline: no data.
+ */
 object MafIdleRule : AnalyticsRule {
     private const val ID = "maf-idle"
     private val TITLE = t(K.TITLE_MAF_IDLE)
     override val ids = listOf(ID)
 
     override fun evaluate(input: AnalysisInput): List<Finding> {
-        val maf = input.sessions.map { it.warmIdleMaf }.merged()
+        if (input.traits.hasMaf?.value == false) return listOf(noData(ID, TITLE, t(K.MAF_NOT_SUPPORTED)))
+        val qualifying = input.sessions.filter { it.warmIdleMaf.count >= Thresholds.MAF_IDLE_MIN_SAMPLES }
         val volume = input.car?.engineVolumeL?.takeIf { it > 0 }
-        if (volume == null) {
-            val measured = maf.mean?.let { t(K.MAF_MEASURED, num(it)) }
-            return listOf(Finding(ID, Severity.NO_DATA, TITLE, listOfNotNull(t(K.MAF_NO_VOLUME), measured)))
+        val maf = input.sessions.map { it.warmIdleMaf }.merged()
+        val norm = input.norms.effective(NormKey.IDLE_MAF)
+        if (norm == null) {
+            if (volume == null && !input.traits.isDiesel) {
+                val measured = maf.mean?.let { t(K.MAF_MEASURED, num(it)) }
+                return listOf(Finding(ID, Severity.NO_DATA, TITLE, listOfNotNull(t(K.MAF_NO_VOLUME), measured)))
+            }
+            return listOf(noData(ID, TITLE, t(K.MAF_LEARNING, cnt(BaselineLearner.MIN_SESSIONS))))
         }
-        if (maf.count < Thresholds.MAF_IDLE_MIN_SAMPLES) {
-            return listOf(noData(ID, TITLE, t(K.MAF_NO_SAMPLES)))
-        }
-        val perL = maf.mean!! / volume
-        val evidence = listOf(
-            ev(K.EVIDENCE_MAF_WARM_IDLE, t(K.MAF_VALUE, num(maf.mean!!), cnt(maf.count))),
-            ev(K.EVIDENCE_ENGINE_VOLUME, t(K.VALUE_LITERS, num(volume))),
-            ev(K.EVIDENCE_PER_LITER, t(K.PER_LITER_VALUE, num(perL, 2), num(Thresholds.MAF_IDLE_MIN_G_PER_L), num(Thresholds.MAF_IDLE_MAX_G_PER_L))),
+        val r = recent(qualifying) { it.warmIdleMaf.mean } ?: return listOf(noData(ID, TITLE, t(K.MAF_NO_SAMPLES)))
+        val value = r.first
+        val evidence = listOfNotNull(
+            ev(K.EVIDENCE_MAF_WARM_IDLE, t(K.MAF_VALUE, num(value), cnt(r.second.sumOf { it.warmIdleMaf.count }))),
+            volume?.let { ev(K.EVIDENCE_ENGINE_VOLUME, t(K.VALUE_LITERS, num(it))) },
+            volume?.let { ev(K.EVIDENCE_PER_LITER, t(K.PER_LITER_PLAIN, num(value / it, 2))) },
         )
-        val sessions = input.sessions.filter { it.warmIdleMaf.count > 0 }.map { it.sessionId }
+        val sessions = r.second.map { it.sessionId }
         return listOf(
             when {
-                perL < Thresholds.MAF_IDLE_MIN_G_PER_L -> Finding(ID, Severity.WARNING, TITLE, t(K.MAF_LOW, num(perL, 2)), evidence, sessions)
-                perL > Thresholds.MAF_IDLE_MAX_G_PER_L -> Finding(ID, Severity.INFO, TITLE, t(K.MAF_HIGH, num(perL, 2)), evidence, sessions)
-                else -> ok(ID, TITLE, t(K.MAF_OK, num(perL, 2)), evidence)
+                norm.below(value) -> Finding(ID, Severity.WARNING, TITLE, t(K.MAF_LOW_NORM, num(value)), evidence, sessions, norms = listOf(norm))
+                norm.above(value) -> Finding(ID, Severity.INFO, TITLE, t(K.MAF_HIGH_NORM, num(value)), evidence, sessions, norms = listOf(norm))
+                else -> ok(ID, TITLE, t(K.MAF_OK_NORM, num(value)), evidence).copy(norms = listOf(norm))
+            },
+        )
+    }
+}
+
+/** R-H: warm idle speed (recent sessions' medians) against [NormKey.IDLE_RPM]; low = stall risk (WARNING), high = INFO. */
+object IdleRpmRule : AnalyticsRule {
+    private const val ID = "idle-rpm"
+    private val TITLE = t(K.TITLE_IDLE_RPM)
+    override val ids = listOf(ID)
+
+    override fun evaluate(input: AnalysisInput): List<Finding> {
+        val r = recent(input.sessions) { BaselineLearner.sessionValue(NormKey.IDLE_RPM, it) }
+            ?: return listOf(noData(ID, TITLE, t(K.IDLE_RPM_NO_DATA)))
+        val norm = input.norms.effective(NormKey.IDLE_RPM) ?: return listOf(noData(ID, TITLE, t(K.IDLE_RPM_NO_DATA)))
+        val v = r.first
+        val evidence = listOf(ev(K.EVIDENCE_RECENT, NormText.value(NormUnit.RPM, v)))
+        val sessions = r.second.map { it.sessionId }
+        return listOf(
+            when {
+                norm.below(v) -> Finding(ID, Severity.WARNING, TITLE, t(K.IDLE_RPM_LOW, num(v, 0)), evidence, sessions, norms = listOf(norm))
+                norm.above(v) -> Finding(ID, Severity.INFO, TITLE, t(K.IDLE_RPM_HIGH, num(v, 0)), evidence, sessions, norms = listOf(norm))
+                else -> ok(ID, TITLE, t(K.IDLE_RPM_OK, num(v, 0)), evidence).copy(norms = listOf(norm))
+            },
+        )
+    }
+}
+
+/**
+ * R-H: coolant plateau (thermostat open) of the recent sessions against [NormKey.COOLANT_PLATEAU]. Below the own norm
+ * = thermostat opens early/stays open (WARNING); above = cooling margin shrinking (INFO). The generic band starts at
+ * the warm gate, so without a baseline this rule cannot fire low — honest: a generic number can't tell a 92 °C
+ * thermostat from an 82 °C one. Overheating itself is the class-2 [CoolantOverheatRule].
+ */
+object CoolantPlateauRule : AnalyticsRule {
+    private const val ID = "coolant-plateau"
+    private val TITLE = t(K.TITLE_COOLANT_PLATEAU)
+    override val ids = listOf(ID)
+
+    override fun evaluate(input: AnalysisInput): List<Finding> {
+        val r = recent(input.sessions) { it.coolantPlateau() } ?: return listOf(noData(ID, TITLE, t(K.COOLANT_PLATEAU_NO_DATA)))
+        val norm = input.norms.effective(NormKey.COOLANT_PLATEAU) ?: return listOf(noData(ID, TITLE, t(K.COOLANT_PLATEAU_NO_DATA)))
+        val v = r.first
+        val evidence = listOf(ev(K.EVIDENCE_RECENT, t(K.VALUE_CELSIUS, num(v, 0))))
+        val sessions = r.second.map { it.sessionId }
+        return listOf(
+            when {
+                norm.below(v) -> Finding(ID, Severity.WARNING, TITLE, t(K.COOLANT_PLATEAU_LOW, num(v, 0)), evidence, sessions, norms = listOf(norm))
+                norm.above(v) -> Finding(ID, Severity.INFO, TITLE, t(K.COOLANT_PLATEAU_HIGH, num(v, 0)), evidence, sessions, norms = listOf(norm))
+                else -> ok(ID, TITLE, t(K.COOLANT_PLATEAU_OK, num(v, 0)), evidence).copy(norms = listOf(norm))
             },
         )
     }
@@ -374,15 +511,16 @@ object WarmupTrendRule : AnalyticsRule {
             ev(K.EVIDENCE_WARMUP_LATE, t(K.MINUTES_IN_RANGE, minutes(late), FindingArg.DateRange(starts[starts.size - half].startedAtMs, starts.last().startedAtMs))),
             ev(K.EVIDENCE_COLD_STARTS, countValue(starts.size)),
         )
+        val norms = listOfNotNull(input.norms.effective(NormKey.WARMUP_MIN))
         return listOf(
             if (late > early * Thresholds.WARMUP_TREND_RATIO) {
                 Finding(
                     ID, Severity.INFO, TITLE,
                     t(K.WARMUP_LONGER, minutes(early), minutes(late)),
-                    evidence, starts.drop(starts.size - half).map { it.sessionId },
+                    evidence, starts.drop(starts.size - half).map { it.sessionId }, norms = norms,
                 )
             } else {
-                ok(ID, TITLE, t(K.WARMUP_OK), evidence)
+                ok(ID, TITLE, t(K.WARMUP_OK), evidence).copy(norms = norms)
             },
         )
     }

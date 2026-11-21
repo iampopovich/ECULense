@@ -79,8 +79,14 @@ class HealthCheckTest {
         assertEquals(HealthNote.O2_LAZY, r.of(HealthItemId.O2_SENSOR).note)
         assertEquals(HealthNote.UNSTABLE_IDLE, r.of(HealthItemId.IDLE).note)
         assertEquals(HealthStatus.ATTENTION, r.of(HealthItemId.VOLTAGE).status)
-        val worse = HealthCheck.evaluate(input(warmIdle + (SensorIds.STFT1 to List(5) { 15.0 }) + (SensorIds.LTFT1 to List(5) { 14.0 })))
-        assertEquals(HealthStatus.FAULT, worse.of(HealthItemId.FUEL_TRIMS).status)
+        val worseSamples = warmIdle + (SensorIds.STFT1 to List(5) { 15.0 }) + (SensorIds.LTFT1 to List(5) { 14.0 })
+        // generic ±25 % is not verified for this engine: capped at ATTENTION, the norm rides with the item
+        val worse = HealthCheck.evaluate(input(worseSamples))
+        assertEquals(HealthStatus.ATTENTION, worse.of(HealthItemId.FUEL_TRIMS).status)
+        assertEquals(NormSource.GENERIC, worse.of(HealthItemId.FUEL_TRIMS).norm?.source)
+        // the user's own norm keeps the full severity
+        val user = CarNorms(listOf(Norm(NormKey.TOTAL_TRIM, -20.0, 20.0, NormSource.USER)))
+        assertEquals(HealthStatus.FAULT, HealthCheck.evaluate(input(worseSamples), user).of(HealthItemId.FUEL_TRIMS).status)
     }
 
     @Test

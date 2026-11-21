@@ -23,6 +23,9 @@ class RulesTest {
         AnalysisInput(car, sessions, dtc, nowMs = 400 * day, zone = zone)
     private fun ms(y: Int, m: Int, d: Int) = LocalDate.of(y, m, d).atStartOfDay(zone).toInstant().toEpochMilli()
 
+    private fun hist(vararg v: Double) = v.fold(Histogram.EMPTY) { h, x -> h.add(x) }
+    private fun hist(n: Int, v: Double) = (1..n).fold(Histogram.EMPTY) { h, _ -> h.add(v) }
+
     private fun AnalyticsRule.only(input: AnalysisInput): Finding = evaluate(input).single()
     private fun en(t: FindingText) = FindingEnglish.render(t, zone)
     private fun msg(f: Finding) = FindingEnglish.message(f, zone)
@@ -52,7 +55,7 @@ class RulesTest {
     // --- voltage ---
     @Test
     fun `low voltage for a minute while running`() {
-        val low = digest().copy(voltageSensor = ELM_VOLTAGE, runningVoltage = aggOf(12.9, 13.0), lowVoltageMs = 61_000)
+        val low = digest().copy(voltageSensor = ELM_VOLTAGE, runningVoltage = aggOf(12.9, 13.0), runningVoltageHist = hist(20, 12.9), lowVoltageMs = 61_000, idleVoltageHist = hist(20, 12.9))
         val findings = VoltageRule.evaluate(input(listOf(low)))
         assertEquals(Severity.WARNING, findings.first { it.ruleId == "voltage-low" }.severity)
         assertEquals(Severity.OK, findings.first { it.ruleId == "voltage-high" }.severity)
@@ -72,7 +75,7 @@ class RulesTest {
     @Test
     fun `adapter voltage finding warns that the adapter reads lower`() {
         val hist = (1..199).fold(Histogram.EMPTY) { h, _ -> h.add(12.8) }.add(10.1)
-        val low = digest().copy(voltageSensor = ELM_VOLTAGE, runningVoltage = aggOf(10.1, 12.8), runningVoltageHist = hist, lowVoltageMs = 241_000)
+        val low = digest().copy(voltageSensor = ELM_VOLTAGE, runningVoltage = aggOf(10.1, 12.8), runningVoltageHist = hist, lowVoltageMs = 241_000, drivingVoltageHist = hist)
         val f = VoltageRule.evaluate(input(listOf(low))).first { it.ruleId == "voltage-low" }
         assertTrue(msg(f), f.message.any { it.key == FindingKey.VOLTAGE_ADAPTER_NOTE })
         // a brief dip (starter, restart) is separated from the steady level
@@ -81,7 +84,7 @@ class RulesTest {
 
     @Test
     fun `high voltage is a warning`() {
-        val high = digest().copy(voltageSensor = ELM_VOLTAGE, runningVoltage = aggOf(15.2), highVoltageMs = 20_000)
+        val high = digest().copy(voltageSensor = ELM_VOLTAGE, runningVoltage = aggOf(15.0), runningVoltageHist = hist(20, 15.0), highVoltageMs = 20_000, drivingVoltageHist = hist(20, 15.0))
         assertEquals(Severity.WARNING, VoltageRule.evaluate(input(listOf(high))).first { it.ruleId == "voltage-high" }.severity)
     }
 
