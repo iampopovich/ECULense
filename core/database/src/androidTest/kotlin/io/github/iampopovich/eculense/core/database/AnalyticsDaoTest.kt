@@ -58,10 +58,10 @@ class AnalyticsDaoTest {
                 Triple("01.05", 85.0, 10), Triple("01.07", 12.5, 11), Triple("01.07", 12.5, 12),
             ),
         )
-        val warm = dao.warmSensorAggregate(EcuDatabase.DEFAULT_CAR_ID, "01.07", 0, Long.MAX_VALUE)!!
+        val warm = dao.warmSensorAggregate(EcuDatabase.DEFAULT_CAR_ID, "01.07", 0, Long.MAX_VALUE, WARM_C)!!
         assertEquals(2, warm.count)
         assertEquals(12.5, warm.min, 1e-9)
-        assertEquals(listOf(12.5, 12.5), dao.sensorSample(EcuDatabase.DEFAULT_CAR_ID, "01.07", 0, Long.MAX_VALUE, 1, warmOnly = true))
+        assertEquals(listOf(12.5, 12.5), dao.sensorSample(EcuDatabase.DEFAULT_CAR_ID, "01.07", 0, Long.MAX_VALUE, 1, warmFromC = WARM_C))
     }
 
     @Test
@@ -75,3 +75,6 @@ class AnalyticsDaoTest {
         assertEquals(1, dao.sessions(EcuDatabase.DEFAULT_CAR_ID, 0, Long.MAX_VALUE, 1).size)
     }
 }
+
+/** Warm threshold the app passes from Thresholds.WARM_COOLANT_C. */
+private const val WARM_C = 80.0

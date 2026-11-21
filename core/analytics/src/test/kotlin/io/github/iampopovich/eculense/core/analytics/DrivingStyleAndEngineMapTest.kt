@@ -136,6 +136,9 @@ class DrivingStyleAndEngineMapTest {
 
     @Test
     fun `cold samples stale ltft and few points give no pattern`() {
+        val lukewarm = listOf(Triple(SensorIds.COOLANT, 75.0, 0L)) + map(List(10) { Triple(800.0, 20.0, 15.0) }).drop(1)
+        assertEquals("75 °C is below the shared warm threshold", 0, EngineMaps.build(lukewarm).points.size)
+        assertEquals(Thresholds.WARM_COOLANT_C, EngineMaps.WARM_C, 0.0)
         val cold = listOf(Triple(SensorIds.COOLANT, 30.0, 0L)) + map(List(10) { Triple(800.0, 20.0, 15.0) }).drop(1)
         assertEquals(0, EngineMaps.build(cold).points.size)
         val few = EngineMaps.build(map(List(3) { Triple(800.0, 20.0, 15.0) } + List(3) { Triple(3000.0, 70.0, 0.0) }))

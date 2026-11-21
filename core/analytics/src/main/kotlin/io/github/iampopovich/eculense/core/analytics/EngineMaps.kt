@@ -54,7 +54,14 @@ data class EngineMap(
 object EngineMaps {
     const val LOAD = "01.04"
     const val MAX_AGE_MS = 4_000L
-    const val WARM_C = 70.0
+    /**
+     * Cold-engine cut-off for the maps = the app-wide warm definition [Thresholds.WARM_COOLANT_C] (80 °C). The former
+     * 70 °C had no source; the real switch is closed-loop fuel control (SAE J1979 PID 03 = 2 «closed loop»), whose
+     * coolant condition is ECU-specific. One definition keeps the maps consistent with the warm trims of the findings
+     * and the health check. Calibrate on a real car: record PID 03 together with coolant during a cold start and see
+     * at which coolant temperature the status becomes «closed loop»; if it is well below 80 °C, lower the shared value.
+     */
+    const val WARM_C = Thresholds.WARM_COOLANT_C
     const val MIN_BIN = 5
     val RPM_EDGES = listOf(0.0, 1_000.0, 1_500.0, 2_000.0, 2_500.0, 3_000.0, 4_000.0)
     val LOAD_EDGES = listOf(0.0, 20.0, 40.0, 60.0, 80.0)

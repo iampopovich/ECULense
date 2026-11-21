@@ -57,10 +57,10 @@ private class FakeAnalyticsDao : AnalyticsDao {
     override suspend fun valuesPage(sessionId: Long, sensorId: String, afterTs: Long, afterId: Long, limit: Int) =
         rows.filter { it.sessionId == sessionId && it.sensorId == sensorId && (it.t > afterTs || (it.t == afterTs && it.id > afterId)) }
             .sortedWith(compareBy({ it.t }, { it.id })).take(limit).map { ValueRow(it.id, it.value, it.t) }
-    override suspend fun warmStart(sessionId: Long) = rows.filter { it.sessionId == sessionId && it.sensorId == "01.05" && it.value >= 80 }.minOfOrNull { it.t }
+    override suspend fun warmStart(sessionId: Long, warmC: Double) = rows.filter { it.sessionId == sessionId && it.sensorId == "01.05" && it.value >= warmC }.minOfOrNull { it.t }
     override suspend fun sensorAggregate(carId: Long, sensorId: String, fromMs: Long, toMs: Long) = agg(sensorId, rows.filter { it.sessionId in inCar(carId, fromMs, toMs) && it.sensorId == sensorId })
-    private fun warm(list: List<Row>) = list.filter { r -> rows.filter { it.sessionId == r.sessionId && it.sensorId == "01.05" && it.value >= 80 }.minOfOrNull { it.t }?.let { r.t >= it } == true }
-    override suspend fun warmSensorAggregate(carId: Long, sensorId: String, fromMs: Long, toMs: Long) = agg(sensorId, warm(rows.filter { it.sessionId in inCar(carId, fromMs, toMs) && it.sensorId == sensorId }))
+    private fun warm(list: List<Row>, warmC: Double) = list.filter { r -> rows.filter { it.sessionId == r.sessionId && it.sensorId == "01.05" && it.value >= warmC }.minOfOrNull { it.t }?.let { r.t >= it } == true }
+    override suspend fun warmSensorAggregate(carId: Long, sensorId: String, fromMs: Long, toMs: Long, warmC: Double) = agg(sensorId, warm(rows.filter { it.sessionId in inCar(carId, fromMs, toMs) && it.sensorId == sensorId }, warmC))
     override suspend fun points(sessionId: Long, sensorIds: Collection<String>) = rows.filter { it.sessionId == sessionId && it.sensorId in sensorIds }.sortedBy { it.t }.map { ReadingPoint(it.sensorId, it.value, it.t) }
 }
 

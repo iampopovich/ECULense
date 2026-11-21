@@ -6,7 +6,13 @@ package io.github.iampopovich.eculense.core.analytics
  */
 object Thresholds {
     // --- Engine state ---
-    /** "Warm engine": coolant ≥ 80 °C (plan 3.8; thermostats open at ~82–88 °C). */
+    /**
+     * "Warm engine": coolant ≥ 80 °C (plan 3.8; wax thermostats of passenger gasoline engines start to open at ~82–88 °C,
+     * so 80 °C is the point where the engine has left warm-up enrichment). The single definition for the SQL warm
+     * queries (passed as a parameter), the session digest, the health check and the engine maps.
+     * Calibrate on a real car: the coolant plateau of a long highway recording is the thermostat temperature; the
+     * threshold must stay a few degrees below it.
+     */
     const val WARM_COOLANT_C = 80.0
     /** "Engine running": RPM above 400 (below — cranking or stopped; plan 3.8). */
     const val RUNNING_RPM = 400.0

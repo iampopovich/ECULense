@@ -18,6 +18,7 @@ import io.github.iampopovich.eculense.core.analytics.SensorIds
 import io.github.iampopovich.eculense.core.analytics.SessionDigest
 import io.github.iampopovich.eculense.core.analytics.SessionDigester
 import io.github.iampopovich.eculense.core.analytics.Severity
+import io.github.iampopovich.eculense.core.analytics.Thresholds
 import io.github.iampopovich.eculense.core.analytics.TripEventFact
 import io.github.iampopovich.eculense.core.database.AnalyticsDao
 import io.github.iampopovich.eculense.core.database.DtcDao
@@ -237,10 +238,10 @@ internal class RoomAnalyticsRepository(
 
     override suspend fun sensorSummary(carId: Long, sensorId: String, fromMs: Long, toMs: Long, warmOnly: Boolean): SensorSummary? {
         if (SensorIds.isLocation(sensorId)) return null
-        val agg = (if (warmOnly) dao.warmSensorAggregate(carId, sensorId, fromMs, toMs) else dao.sensorAggregate(carId, sensorId, fromMs, toMs))
+        val agg = (if (warmOnly) dao.warmSensorAggregate(carId, sensorId, fromMs, toMs, Thresholds.WARM_COOLANT_C) else dao.sensorAggregate(carId, sensorId, fromMs, toMs))
             ?: return null
         val step = Percentiles.step(agg.count)
-        val sample = dao.sensorSample(carId, sensorId, fromMs, toMs, step, warmOnly)
+        val sample = dao.sensorSample(carId, sensorId, fromMs, toMs, step, Thresholds.WARM_COOLANT_C.takeIf { warmOnly })
         return agg.toSummary(sample)
     }
 

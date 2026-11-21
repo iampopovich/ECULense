@@ -220,7 +220,8 @@ data class SessionSummaryRow(
 /**
  * Analytics queries (stage 3). Aggregates are done in SQL without loading 1.3M values into memory; percentiles
  * use a sample thinned by position within the sensor ([Decimator], [sessionSample]/[sensorSample] in Sampling.kt).
- * "Warmed up" = after the first coolant reading ≥ 80 °C in this session. Every readings query filters by sessionId
+ * "Warmed up" = after the first coolant reading ≥ `warmC` in this session; callers pass `Thresholds.WARM_COOLANT_C`
+ * (:core:analytics), the one definition shared with the digest, health check and engine maps. Every readings query filters by sessionId
  * (+ sensorId) so it runs on the (sessionId, sensorId, timestampMs) index; the warm CTE is restricted to the car's
  * sessions in the period instead of scanning all coolant readings of the table.
  */
@@ -253,9 +254,9 @@ interface AnalyticsDao {
     )
     suspend fun valuesPage(sessionId: Long, sensorId: String, afterTs: Long, afterId: Long, limit: Int): List<ValueRow>
 
-    /** Time of the first coolant reading >= 80 °C in the session; null = never warmed up. */
-    @Query("SELECT MIN(timestampMs) FROM readings WHERE sessionId = :sessionId AND sensorId = '01.05' AND value >= 80")
-    suspend fun warmStart(sessionId: Long): Long?
+    /** Time of the first coolant reading >= [warmC] °C in the session; null = never warmed up. */
+    @Query("SELECT MIN(timestampMs) FROM readings WHERE sessionId = :sessionId AND sensorId = '01.05' AND value >= :warmC")
+    suspend fun warmStart(sessionId: Long, warmC: Double): Long?
 
     @Query(
         "SELECT r.sensorId, MIN(r.unit) AS unit, COUNT(*) AS count, MIN(r.value) AS min, MAX(r.value) AS max, " +
@@ -268,7 +269,7 @@ interface AnalyticsDao {
 
     @Query(
         "WITH warm AS (SELECT r.sessionId, MIN(r.timestampMs) AS t FROM sessions s JOIN readings r ON r.sessionId = s.id " +
-            "WHERE s.carId = :carId AND s.startedAtMs BETWEEN :fromMs AND :toMs AND r.sensorId = '01.05' AND r.value >= 80 " +
+            "WHERE s.carId = :carId AND s.startedAtMs BETWEEN :fromMs AND :toMs AND r.sensorId = '01.05' AND r.value >= :warmC " +
             "GROUP BY r.sessionId) " +
             "SELECT r.sensorId, MIN(r.unit) AS unit, COUNT(*) AS count, MIN(r.value) AS min, MAX(r.value) AS max, " +
             "AVG(r.value) AS mean, COUNT(DISTINCT r.sessionId) AS sessions " +
@@ -276,7 +277,7 @@ interface AnalyticsDao {
             "WHERE s.carId = :carId AND s.startedAtMs BETWEEN :fromMs AND :toMs AND r.sensorId = :sensorId AND r.timestampMs >= w.t " +
             "GROUP BY r.sensorId",
     )
-    suspend fun warmSensorAggregate(carId: Long, sensorId: String, fromMs: Long, toMs: Long): SensorAggregateRow?
+    suspend fun warmSensorAggregate(carId: Long, sensorId: String, fromMs: Long, toMs: Long, warmC: Double): SensorAggregateRow?
 
     /** Only the sensors the rules need for one session, ordered by time: input for the single-pass digest. */
     @Query("SELECT sensorId, value, timestampMs FROM readings WHERE sessionId = :sessionId AND sensorId IN (:sensorIds) ORDER BY timestampMs")

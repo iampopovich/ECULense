@@ -53,18 +53,15 @@ suspend fun AnalyticsDao.sessionSample(sessionId: Long, sensorId: String, step: 
 
 /**
  * Every [step]-th value of one sensor over the car's sessions started in [fromMs]..[toMs] (sessions in start order).
- * [warmOnly]: only values from the first coolant reading >= [WARM_COOLANT_C] of each session on; sessions that never
- * warmed up are skipped.
+ * [warmFromC] non-null: only values from the first coolant reading >= [warmFromC] °C of each session on (warm engine);
+ * sessions that never warmed up are skipped.
  */
-suspend fun AnalyticsDao.sensorSample(carId: Long, sensorId: String, fromMs: Long, toMs: Long, step: Int, warmOnly: Boolean = false): List<Double> {
+suspend fun AnalyticsDao.sensorSample(carId: Long, sensorId: String, fromMs: Long, toMs: Long, step: Int, warmFromC: Double? = null): List<Double> {
     val d = Decimator(step)
     for (s in sessionStarts(carId)) {
         if (s.startedAtMs !in fromMs..toMs) continue
-        val from = if (warmOnly) warmStart(s.id) ?: continue else Long.MIN_VALUE
+        val from = if (warmFromC != null) warmStart(s.id, warmFromC) ?: continue else Long.MIN_VALUE
         forEachValue(s.id, sensorId, from) { d.offer(it) }
     }
     return d.values
 }
-
-/** Coolant temperature that counts as "warmed up" in the analytics queries (same value as in the SQL CTEs). */
-const val WARM_COOLANT_C = 80

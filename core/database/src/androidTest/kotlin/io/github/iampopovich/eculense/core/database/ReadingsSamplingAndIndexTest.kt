@@ -94,9 +94,9 @@ class ReadingsSamplingAndIndexTest {
         )
         assertEquals(100 + 2, dao.sensorSample(EcuDatabase.DEFAULT_CAR_ID, "01.06", 0, Long.MAX_VALUE, 1).size)
         // The round-robin session's coolant (~2000 °C synthetic) is "warm" from its first row; the second session from 50_010.
-        assertEquals(100 + 1, dao.sensorSample(EcuDatabase.DEFAULT_CAR_ID, "01.06", 0, Long.MAX_VALUE, 1, warmOnly = true).size)
-        assertEquals(listOf(2.0), dao.sensorSample(EcuDatabase.DEFAULT_CAR_ID, "01.06", 10_000, Long.MAX_VALUE, 1, warmOnly = true))
-        assertEquals(50_010L, dao.warmStart(second))
+        assertEquals(100 + 1, dao.sensorSample(EcuDatabase.DEFAULT_CAR_ID, "01.06", 0, Long.MAX_VALUE, 1, warmFromC = WARM_C).size)
+        assertEquals(listOf(2.0), dao.sensorSample(EcuDatabase.DEFAULT_CAR_ID, "01.06", 10_000, Long.MAX_VALUE, 1, warmFromC = WARM_C))
+        assertEquals(50_010L, dao.warmStart(second, WARM_C))
     }
 
     /** EXPLAIN QUERY PLAN rows mentioning the readings table. */
@@ -148,3 +148,6 @@ class ReadingsSamplingAndIndexTest {
         assertEquals(listOf("index_readings_sessionId_sensorId_timestampMs"), indexes.filter { it.startsWith("index_") })
     }
 }
+
+/** Warm threshold the app passes from Thresholds.WARM_COOLANT_C. */
+private const val WARM_C = 80.0
