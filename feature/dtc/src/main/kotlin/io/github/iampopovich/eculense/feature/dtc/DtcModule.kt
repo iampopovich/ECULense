@@ -33,7 +33,7 @@ val dtcModule = module {
     }
     viewModel { DtcViewModel(get(), get(), get(), routeHandlers = getAll(), historySource = get()) }
     viewModel { Mode06ViewModel(get()) }
-    viewModel { VehicleModulesViewModel(get(), get(), get()) }
+    viewModel { VehicleModulesViewModel(get(), get(), get(), logger = get()) }
     navigation<DtcDestination> { DtcRoute() }
     navigation<Mode06Destination> { Mode06Route() }
     navigation<VehicleModulesDestination> { VehicleModulesRoute() }

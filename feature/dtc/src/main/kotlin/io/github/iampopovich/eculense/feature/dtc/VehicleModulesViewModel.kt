@@ -6,6 +6,7 @@ import io.github.iampopovich.eculense.core.data.ModuleScanRepository
 import io.github.iampopovich.eculense.core.data.StoredModule
 import io.github.iampopovich.eculense.core.dtcdb.DtcInfo
 import io.github.iampopovich.eculense.core.dtcdb.DtcSource
+import io.github.iampopovich.eculense.core.model.AppLogger
 import io.github.iampopovich.eculense.core.obd.ConnectionController
 import io.github.iampopovich.eculense.core.obd.ConnectionState
 import io.github.iampopovich.eculense.core.obd.ModuleDtc
@@ -62,7 +63,20 @@ internal data class ModulesUiState(
 ) {
     /** Read-only, but still only with the car standing (the safe-clear speed gate): the scan pauses live data. */
     val canScan: Boolean get() = connected && !scanning && (speed == SpeedGate.STOPPED || !speedSupported)
+
+    /** Why the scan button is disabled (null = enabled); the screen always shows it next to the button. */
+    val scanBlock: ScanBlock?
+        get() = when {
+            canScan -> null
+            !connected -> ScanBlock.NOT_CONNECTED
+            scanning -> ScanBlock.SCANNING
+            speed == SpeedGate.MOVING -> ScanBlock.MOVING
+            else -> ScanBlock.WAITING_SPEED
+        }
 }
+
+/** Gate states of the «Find modules» button. */
+internal enum class ScanBlock { NOT_CONNECTED, SCANNING, MOVING, WAITING_SPEED }
 
 /**
  * R-D «Vehicle modules»: finds the car's modules with [ModuleScanner] (read-only, policy-checked, airbags never asked)
@@ -76,6 +90,7 @@ internal class VehicleModulesViewModel(
     private val now: () -> Long = System::currentTimeMillis,
     ticks: Flow<Unit> = untilStale(),
     private val scanner: ModuleScanner = ModuleScanner(),
+    private val logger: AppLogger = AppLogger.NONE,
 ) : ViewModel() {
     private val state = MutableStateFlow(ModulesUiState())
     private val lastSpeed = MutableStateFlow<Pair<Double, Long>?>(null)
@@ -110,10 +125,14 @@ internal class VehicleModulesViewModel(
     internal fun onClearedForTest() = onCleared()
 
     fun scan() {
-        if (!uiState.value.canScan) {
+        val gate = uiState.value
+        if (!gate.canScan) {
+            // Diagnoses «the first tap did nothing»: which gate refused the tap (no personal data).
+            logger.info(TAG, "scan refused: ${gate.scanBlock} connected=${gate.connected} speed=${gate.speed} speedSupported=${gate.speedSupported}")
             if (uiState.value.speed == SpeedGate.MOVING) state.update { it.copy(error = UiText.Res(R.string.modules_stop_car)) }
             return
         }
+        logger.info(TAG, "scan started (can=${gate.can})")
         viewModelScope.launch {
             state.update { it.copy(scanning = true, error = null, selected = null, progress = UiText.Res(R.string.modules_discovering)) }
             try {
@@ -166,5 +185,6 @@ internal class VehicleModulesViewModel(
 
     internal companion object {
         const val OWNER = "modules"
+        const val TAG = "EcuObd"
     }
 }

@@ -57,10 +57,12 @@ internal fun VehicleModulesScreen(state: ModulesUiState, onScan: () -> Unit, onO
                 Text(stringResource(R.string.modules_intro), style = MaterialTheme.typography.bodyMedium)
                 Button(onClick = onScan, enabled = state.canScan) { Text(stringResource(R.string.modules_scan)) }
                 val muted = MaterialTheme.colorScheme.onSurfaceVariant
-                when {
-                    !state.connected -> Text(stringResource(R.string.modules_need_connection), color = muted)
-                    state.speed == SpeedGate.MOVING && !state.scanning -> Text(stringResource(R.string.modules_stop_car), color = MaterialTheme.colorScheme.error)
-                    !state.canScan && !state.scanning && state.speedSupported -> Text(stringResource(R.string.modules_waiting_speed), color = muted)
+                // The reason of a disabled button is always visible: a silent disabled button reads as «the tap did nothing».
+                when (state.scanBlock) {
+                    ScanBlock.NOT_CONNECTED -> Text(stringResource(R.string.modules_need_connection), color = muted)
+                    ScanBlock.MOVING -> Text(stringResource(R.string.modules_stop_car), color = MaterialTheme.colorScheme.error)
+                    ScanBlock.WAITING_SPEED -> Text(stringResource(R.string.modules_waiting_speed), color = muted)
+                    ScanBlock.SCANNING, null -> Unit
                 }
                 if (state.scanning) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())

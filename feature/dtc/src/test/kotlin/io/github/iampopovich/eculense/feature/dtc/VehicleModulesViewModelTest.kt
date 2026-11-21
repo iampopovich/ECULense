@@ -140,6 +140,24 @@ class VehicleModulesViewModelTest {
     }
 
     @Test
+    fun `a refused tap and a started scan are logged with the gate state, the disabled reason is always set`() = runTest {
+        val session = ChannelSession(ScriptedChannel(replies))
+        val controller = connected().apply { this.session = session }
+        val logger = io.github.iampopovich.eculense.core.model.RecordingLogger()
+        val vm = VehicleModulesViewModel(controller, describer, FakeScans(), now = { 1_000L }, ticks = flowOf(Unit), logger = logger)
+        assertEquals(ScanBlock.WAITING_SPEED, vm.uiState.value.scanBlock)
+        vm.scan()
+        assertEquals(0, session.scans)
+        assertTrue(logger.entries.single().message.startsWith("scan refused: WAITING_SPEED"))
+        controller.readingsFlow.emit(SensorReading("01.0D", 0.0, "km/h", 1_000L))
+        assertNull(vm.uiState.value.scanBlock)
+        vm.scan()
+        assertEquals(1, session.scans)
+        assertTrue(logger.entries.any { it.tag == "EcuObd" && it.message.startsWith("scan started") })
+        assertEquals(ScanBlock.NOT_CONNECTED, ModulesUiState().scanBlock)
+    }
+
+    @Test
     fun `not connected - no scan, the last stored scan is shown`() = runTest {
         val stored = StoredModuleScan(
             500L, '6',

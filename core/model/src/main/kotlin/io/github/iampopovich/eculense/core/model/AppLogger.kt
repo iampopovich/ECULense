@@ -10,6 +10,9 @@ interface AppLogger {
 
     fun error(tag: String, message: String, error: Throwable? = null)
 
+    /** Diagnostic breadcrumb (logcat info level); no-op by default. */
+    fun info(tag: String, message: String) = Unit
+
     companion object {
         /** Fallback for code paths and tests without the app's implementation. */
         val NONE: AppLogger = object : AppLogger {
@@ -42,5 +45,9 @@ class RecordingLogger : AppLogger {
 
     override fun error(tag: String, message: String, error: Throwable?) {
         synchronized(_entries) { _entries += Entry('E', tag, message, error) }
+    }
+
+    override fun info(tag: String, message: String) {
+        synchronized(_entries) { _entries += Entry('I', tag, message, null) }
     }
 }

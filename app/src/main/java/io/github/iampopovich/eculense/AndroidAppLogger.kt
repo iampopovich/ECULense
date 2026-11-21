@@ -13,6 +13,10 @@ internal object AndroidAppLogger : AppLogger {
     override fun error(tag: String, message: String, error: Throwable?) {
         Log.e(tag, message, error)
     }
+
+    override fun info(tag: String, message: String) {
+        Log.i(tag, message)
+    }
 }
 
 val appLoggerModule = module {
