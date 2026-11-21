@@ -85,6 +85,15 @@ sealed interface ObdError {
     /** The ECU refused to clear DTCs with negative response 7F 04 [nrc] (0x22: conditions not correct). */
     data class ClearRefused(val nrc: Int) : ObdError
 
+    /**
+     * R-D: the module scan cannot run on this link: [reason] = «protocol» (J1850/J1939/unknown), «headers» (the adapter
+     * answered '?' to ATH1/ATSH) — shown as «module scan not supported by this adapter».
+     */
+    data class ModuleScanUnsupported(val reason: String) : ObdError
+
+    /** R-D: [EcuSafetyPolicy] refused [command] to [target] ([reason] = DenyReason name); nothing was sent. */
+    data class RequestDenied(val command: String, val target: String?, val reason: String) : ObdError
+
     /** Any other failure; [detail] is the technical message, shown as is. */
     data class Other(val detail: String) : ObdError
 
@@ -115,6 +124,8 @@ sealed interface ObdError {
             BleDisconnected -> "BLE device disconnected"
             is LinkLost -> "link to the adapter lost: ${cause.technicalMessage}"
             is ClearRefused -> "ECU refused to clear DTCs (7F 04 %02X)".format(nrc)
+            is ModuleScanUnsupported -> "module scan not supported by this adapter ($reason)"
+            is RequestDenied -> "request '$command' to ${target ?: "functional"} denied by the safety policy ($reason)"
             is Other -> detail
         }
 

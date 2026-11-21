@@ -17,6 +17,8 @@
     <string name="obd_error_link_lost">Connection to the adapter lost: %1$s</string>
     <string name="obd_error_clear_refused_conditions">The ECU did not let the codes be cleared: switch the engine off, keep the ignition on</string>
     <string name="obd_error_clear_refused">The ECU refused to clear the codes (negative reply 7F 04 %1$s)</string>
+    <string name="obd_error_module_scan_unsupported">Module scan is not supported by this adapter or protocol</string>
+    <string name="obd_error_request_denied">ECULense does not send this request (%1$s): only reading requests are allowed</string>
     <string name="obd_adapter_version_unknown">unknown</string>
     <string name="obd_error_adapter_not_responding">The adapter does not respond</string>
     <string name="obd_error_adapter_no_power">The adapter has no power (%1$.1f V). Is it plugged into the OBD port?</string>

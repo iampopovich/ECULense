@@ -4,7 +4,14 @@ import io.github.iampopovich.eculense.core.model.AdapterInfo
 import io.github.iampopovich.eculense.core.model.Dtc
 import io.github.iampopovich.eculense.core.model.DtcKind
 import io.github.iampopovich.eculense.core.model.SensorReading
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 
 /** One PID of a polling cycle: the reading (null = no value), whether the adapter failed, time spent on it. */
 data class PidResult(val pid: Pid, val reading: SensorReading?, val failed: Boolean, val elapsedMs: Long)
@@ -50,6 +57,15 @@ interface ObdSession {
 
     /** CAN framing (count bytes, ISO-TP) vs K-Line/J1850 (numbered lines); known after [initialize]. */
     val isCanBus: Boolean get() = true
+
+    /**
+     * R-D: runs [block] in the scoped header mode (ATH1, ATS0 kept) and always restores ATH0, the default header,
+     * ATCRA without argument (CAN) and the protocol afterwards — also on failure and cancellation. Nothing else uses
+     * the adapter meanwhile. Every request of the channel passes [policy] before it is written. Throws
+     * [ObdException] with [ObdError.ModuleScanUnsupported] when the protocol or adapter cannot do it.
+     */
+    suspend fun <T> withHeaders(policy: EcuSafetyPolicy = EcuSafetyPolicy(), block: suspend (HeaderedChannel) -> T): T =
+        throw ObdException(ObdError.ModuleScanUnsupported("session"))
 }
 
 /** Settings and learned adapter facts handed to a new session; [onProfile] persists what the session learned. */
@@ -80,7 +96,9 @@ internal class Elm327Session(
     override var capabilities: AdapterCapabilities = AdapterCapabilities.NONE
         private set
 
-    override suspend fun initialize(): AdapterInfo {
+    override suspend fun initialize(): AdapterInfo = op { initializeLocked() }
+
+    private suspend fun initializeLocked(): AdapterInfo {
         protocol = null
         val reset = try {
             link.send("ATZ", timeoutMs = 5_000, idle = false)
@@ -246,7 +264,9 @@ internal class Elm327Session(
         throw ObdException(ObdError.NoProtocol("ATDPN $dpn"))
     }
 
-    override suspend fun supportedPids(): Set<Int> {
+    override suspend fun supportedPids(): Set<Int> = op { supportedPidsLocked() }
+
+    private suspend fun supportedPidsLocked(): Set<Int> {
         val result = mutableSetOf<Int>()
         var base = 0x00
         while (base <= 0xC0) {
@@ -260,7 +280,9 @@ internal class Elm327Session(
         return result
     }
 
-    override suspend fun read(pid: Pid): SensorReading? {
+    override suspend fun read(pid: Pid): SensorReading? = op { readLocked(pid) }
+
+    private suspend fun readLocked(pid: Pid): SensorReading? {
         val messages = if (countSuffix) {
             try {
                 query(pid.command + "1", matchAs = pid.command)
@@ -281,7 +303,9 @@ internal class Elm327Session(
         return SensorReading(pid.sensorId, value, pid.unit, clock())
     }
 
-    override suspend fun readAll(pids: List<Pid>): List<PidResult> {
+    override suspend fun readAll(pids: List<Pid>): List<PidResult> = op { readAllLocked(pids) }
+
+    private suspend fun readAllLocked(pids: List<Pid>): List<PidResult> {
         if (!isCan || !multiPid || pids.size < 2) return pids.map { single(it) }
         val results = mutableListOf<PidResult>()
         for (group in pids.chunked(MAX_MULTI_PIDS)) {
@@ -368,7 +392,9 @@ internal class Elm327Session(
         multiPid = false
     }
 
-    override suspend fun readDtcs(kind: DtcKind): List<Dtc> {
+    override suspend fun readDtcs(kind: DtcKind): List<Dtc> = op { readDtcsLocked(kind) }
+
+    private suspend fun readDtcsLocked(kind: DtcKind): List<Dtc> {
         val (request, responseSid) = when (kind) {
             DtcKind.STORED -> "03" to 0x43
             DtcKind.PENDING -> "07" to 0x47
@@ -378,7 +404,9 @@ internal class Elm327Session(
         return DtcDecoder.parse(messages, responseSid, isCan, kind)
     }
 
-    override suspend fun clearDtcs(): Boolean {
+    override suspend fun clearDtcs(): Boolean = op { clearDtcsLocked() }
+
+    private suspend fun clearDtcsLocked(): Boolean {
         val result = exchange("04", timeoutMs = 5_000)
         if (result !is ElmResult.Data) return false
         val messages = elmMessages(result.lines).map { it.toUnsigned() }
@@ -389,22 +417,158 @@ internal class Elm327Session(
 
     override val isCanBus: Boolean get() = isCan
 
-    override suspend fun request(command: String, timeoutMs: Long): List<ByteArray>? = query(command, timeoutMs)
+    // R-D: one operation at a time on this session (reentrant for nested calls of the same operation), so a scoped
+    // header block owns the adapter from ATH1 to the restored ATH0: no poll, keepalive or DTC read slips in between.
+    private val opLock = Mutex()
+
+    private class OpOwner(val session: Elm327Session) : AbstractCoroutineContextElement(OpOwner) {
+        companion object Key : CoroutineContext.Key<OpOwner>
+    }
+
+    private suspend fun <T> op(block: suspend () -> T): T {
+        if (currentCoroutineContext()[OpOwner]?.session === this) return block()
+        return opLock.withLock { withContext(OpOwner(this)) { block() } }
+    }
+
+    override suspend fun <T> withHeaders(policy: EcuSafetyPolicy, block: suspend (HeaderedChannel) -> T): T = op {
+        val p = protocol ?: throw ObdException(ObdError.ModuleScanUnsupported("not initialized"))
+        val format = HeaderFormat.of(p) ?: throw ObdException(ObdError.ModuleScanUnsupported("protocol $p"))
+        if ("ATH1" in unsupported) throw ObdException(ObdError.ModuleScanUnsupported("headers"))
+        val channel = ElmHeaderedChannel(p, format, policy)
+        try {
+            channel.enable()
+            block(channel)
+        } finally {
+            withContext(NonCancellable) { channel.restore() }
+        }
+    }
+
+    /**
+     * The ATH1 channel of [withHeaders]. Header commands are sent without the recovery path of [exchange] (a warm
+     * start inside the scope would silently switch headers off); a failed command just fails the request.
+     */
+    private inner class ElmHeaderedChannel(
+        override val protocol: Char,
+        override val format: HeaderFormat,
+        private val policy: EcuSafetyPolicy,
+    ) : HeaderedChannel {
+        private val defaultHeader = DEFAULT_HEADERS.getValue(format)
+        private var header = defaultHeader
+        private var receiveFilter: String? = null
+
+        suspend fun enable() {
+            if (!at("ATH1")) {
+                unsupported += "ATH1"
+                capabilities = capabilities.copy(unsupported = unsupported.toSet())
+                throw ObdException(ObdError.ModuleScanUnsupported("headers"))
+            }
+        }
+
+        /** ATH0, the default (or user) header, ATCRA without argument on CAN; errors are only logged. */
+        suspend fun restore() {
+            for (command in restoreCommands()) {
+                try {
+                    link.send(command, timeoutMs = AT_TIMEOUT_MS)
+                } catch (e: Exception) {
+                    link.note("restore '$command' failed: ${ObdError.of(e).technicalMessage}")
+                }
+            }
+        }
+
+        private fun restoreCommands(): List<String> {
+            val user = setup.settings.extraInit.filter { InitCommands.problem(it) == null }
+            fun userOr(prefix: String, fallback: String) = user.lastOrNull { it.startsWith(prefix) } ?: fallback
+            return buildList {
+                add("ATH0")
+                add(userOr("ATSH", "ATSH$defaultHeader"))
+                if (format.isCan) add(userOr("ATCRA", "ATCRA"))
+                // The scope never changes the protocol; should a future caller do so, ATSP<p> belongs here.
+            }
+        }
+
+        override suspend fun functional(command: String, timeoutMs: Long): HeaderedReply? {
+            policy.require(EcuTarget.FUNCTIONAL, command)
+            if (header != defaultHeader) setHeader(defaultHeader)
+            if (receiveFilter != null) {
+                at("ATCRA")
+                receiveFilter = null
+            }
+            return send(command, timeoutMs)
+        }
+
+        override suspend fun physical(target: EcuTarget, command: String, timeoutMs: Long): List<ByteArray>? {
+            val address = target.address ?: return functional(command, timeoutMs)?.byEcu?.values?.flatten()
+            policy.require(target, command) // before any header command
+            if (!format.isCan) throw ObdException(ObdError.ModuleScanUnsupported("physical addressing on K-Line"))
+            if ("ATCRA" in unsupported) throw ObdException(ObdError.ModuleScanUnsupported("ATCRA"))
+            val tx = if (format == HeaderFormat.CAN_29) address.tx.drop(2) else address.tx
+            if (header != tx) setHeader(tx)
+            if (receiveFilter != address.rx) {
+                if (!at("ATCRA${address.rx}")) {
+                    unsupported += "ATCRA"
+                    capabilities = capabilities.copy(unsupported = unsupported.toSet())
+                    throw ObdException(ObdError.ModuleScanUnsupported("ATCRA"))
+                }
+                receiveFilter = address.rx
+            }
+            var reply = send(command, timeoutMs)?.byEcu?.get(address.rx)
+            // 7F xx 78 = response pending (ISO 14229-1 NRC 0x78): the real answer follows; wait for it twice at most.
+            repeat(2) {
+                val sid = command.take(2).toInt(16)
+                if (reply == null || negativeCode(reply!!, sid) != 0x78) return reply
+                val next = link.awaitNextReply(command, timeoutMs * 2) ?: return reply
+                reply = parsed(ElmResponseParser.parse(next, command))?.byEcu?.get(address.rx) ?: reply
+            }
+            return reply
+        }
+
+        private suspend fun setHeader(value: String) {
+            if (!at("ATSH$value")) throw ObdException(ObdError.ModuleScanUnsupported("ATSH"))
+            header = value
+        }
+
+        /** An AT command; false when the adapter answered '?' or an error. */
+        private suspend fun at(command: String): Boolean = try {
+            ElmResponseParser.parse(link.send(command, timeoutMs = AT_TIMEOUT_MS), command) is ElmResult.Data
+        } catch (e: ElmTimeoutException) {
+            false
+        }
+
+        private suspend fun send(command: String, timeoutMs: Long): HeaderedReply? =
+            parsed(ElmResponseParser.parse(link.send(command, timeoutMs, idle = false), command))
+
+        private fun parsed(result: ElmResult): HeaderedReply? = when (result) {
+            is ElmResult.Data -> HeaderedResponseParser.parse(result.lines, format).also {
+                if (it.rejected.isNotEmpty()) link.note("headered reply: rejected ${it.rejected.size} line(s)")
+            }
+            ElmResult.NoData -> null
+            ElmResult.BusInitFailed -> throw ObdException(ObdError.BusInitFailed)
+            is ElmResult.Error -> throw ObdException(ObdError.CommandFailed("headered", result.message))
+        }
+    }
+
+    override suspend fun request(command: String, timeoutMs: Long): List<ByteArray>? = op { query(command, timeoutMs) }
 
     /** VIN from mode 09 PID 02: one ISO-TP message on CAN, numbered lines on K-Line (B7). */
-    override suspend fun readVin(): String? {
+    override suspend fun readVin(): String? = op { readVinLocked() }
+
+    private suspend fun readVinLocked(): String? {
         val messages = query("0902", timeoutMs = 5_000) ?: return null
         return VehicleInfoDecoder.vin(messages, isCan)
     }
 
-    override suspend fun batteryVoltage(): Double? = try {
+    override suspend fun batteryVoltage(): Double? = op { batteryVoltageLocked() }
+
+    private suspend fun batteryVoltageLocked(): Double? = try {
         (ElmResponseParser.parse(link.send("ATRV", timeoutMs = 1_500), "ATRV") as? ElmResult.Data)
             ?.lines?.lastOrNull()?.removeSuffix("V")?.toDoubleOrNull()
     } catch (e: ElmTimeoutException) {
         null
     }
 
-    override suspend fun ecuResponds(): Boolean = try {
+    override suspend fun ecuResponds(): Boolean = op { ecuRespondsLocked() }
+
+    private suspend fun ecuRespondsLocked(): Boolean = try {
         val result = ElmResponseParser.parse(link.send("0100", timeoutMs = SEARCH_TIMEOUT_MS, idle = false), "0100")
         result is ElmResult.Data && elmMessages(result.lines).any { replyMatches("0100", it) }
     } catch (e: ElmTimeoutException) {
@@ -415,7 +579,9 @@ internal class Elm327Session(
      * K-Line keepalive (A10): clones do not keep the bus awake themselves, so after [idleMs] without traffic a
      * request is sent. KWP gets tester present (3E) when the ECU accepts it, otherwise 0100. Never on CAN.
      */
-    override suspend fun keepAlive(idleMs: Long): Boolean {
+    override suspend fun keepAlive(idleMs: Long): Boolean = op { keepAliveLocked(idleMs) }
+
+    private suspend fun keepAliveLocked(idleMs: Long): Boolean {
         val p = protocol ?: return false
         if (!ObdProtocols.isKLine(p)) return false
         if (clock() - link.lastActivityMs < idleMs) return false
@@ -534,6 +700,19 @@ internal class Elm327Session(
         private const val SEARCH_TIMEOUT_MS = 15_000L
         private const val TRY_PROTOCOL_TIMEOUT_MS = 10_000L
         private const val OPTIONAL_TIMEOUT_MS = 1_000L
+        private const val AT_TIMEOUT_MS = 1_000L
+
+        /**
+         * R-D: the header the ELM327 uses by default per protocol family (ELM327DSJ «Setting the Headers»: 7DF on CAN
+         * 11 bit, 18 DB 33 F1 on 29 bit (ATSH sets the low 3 bytes, priority 18 stays), C1 33 F1 on KWP (the ELM adds
+         * the length: C2 33 F1 for a 2-byte request, as in the Sorento log), 68 6A F1 on ISO 9141).
+         */
+        internal val DEFAULT_HEADERS: Map<HeaderFormat, String> = mapOf(
+            HeaderFormat.CAN_11 to "7DF",
+            HeaderFormat.CAN_29 to "DB33F1",
+            HeaderFormat.KWP to "C133F1",
+            HeaderFormat.ISO_9141 to "686AF1",
+        )
         private const val FALLBACK_ORDER = "681792345A"
         internal const val MAX_MULTI_PIDS = 6
         private const val MULTI_PID_MISS_LIMIT = 3

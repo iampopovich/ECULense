@@ -16,6 +16,8 @@
     <string name="obd_error_link_lost">Связь с адаптером потеряна: %1$s</string>
     <string name="obd_error_clear_refused_conditions">Блок не дал стереть коды: заглушите двигатель, зажигание оставьте включённым</string>
     <string name="obd_error_clear_refused">Блок отказался стирать коды (отрицательный ответ 7F 04 %1$s)</string>
+    <string name="obd_error_module_scan_unsupported">Этот адаптер или протокол не поддерживает поиск блоков</string>
+    <string name="obd_error_request_denied">ECULense не отправляет этот запрос (%1$s): разрешены только читающие запросы</string>
     <string name="obd_adapter_version_unknown">неизвестно</string>
     <string name="obd_error_adapter_not_responding">Адаптер не отвечает</string>
     <string name="obd_error_adapter_no_power">У адаптера нет питания (%1$.1f В). Он вставлен в разъём OBD?</string>

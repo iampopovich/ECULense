@@ -60,6 +60,8 @@ object ObdText {
         is ObdError.LinkLost -> UiText.Res(R.string.obd_error_link_lost, listOf(error(e.cause)))
         is ObdError.ClearRefused ->
             if (e.nrc == 0x22) UiText.Res(R.string.obd_error_clear_refused_conditions) else UiText.Res(R.string.obd_error_clear_refused, listOf("%02X".format(e.nrc)))
+        is ObdError.ModuleScanUnsupported -> UiText.Res(R.string.obd_error_module_scan_unsupported)
+        is ObdError.RequestDenied -> UiText.Res(R.string.obd_error_request_denied, listOf(e.command))
         is ObdError.Other -> UiText.Raw(e.detail)
     }
 

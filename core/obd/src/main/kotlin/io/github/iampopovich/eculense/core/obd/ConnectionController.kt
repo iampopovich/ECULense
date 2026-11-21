@@ -94,6 +94,12 @@ interface ConnectionController {
 
     /** One-off operations (DTCs, VIN). null — if not connected. */
     suspend fun <T> withSession(block: suspend (ObdSession) -> T): T?
+
+    /**
+     * R-D: like [withSession], but live polling is paused while [block] runs (a module scan switches headers on) and
+     * resumes afterwards. null — if not connected.
+     */
+    suspend fun <T> withExclusiveSession(block: suspend (ObdSession) -> T): T? = withSession(block)
 }
 
 const val DEFAULT_OWNER = "default"
@@ -148,6 +154,9 @@ class ObdConnectionManager internal constructor(
     private val polledPids = MutableStateFlow<List<Pid>>(emptyList())
     private val background = MutableStateFlow(false)
     private val pollEpoch = MutableStateFlow(0)
+
+    /** R-D: number of running exclusive operations (module scans); polling stops while > 0. */
+    private val exclusive = MutableStateFlow(0)
     private val disabled = MutableStateFlow<Set<Int>>(emptySet())
     override val disabledPids: StateFlow<Set<Int>> = disabled.asStateFlow()
     private val stats = MutableStateFlow<PollStats?>(null)
@@ -159,10 +168,10 @@ class ObdConnectionManager internal constructor(
     private var keepAliveJob: Job? = null
 
     override val readings: SharedFlow<SensorReading> =
-        combine(state, polledPids, pollEpoch) { s, pids, _ -> s to pids }
-            .flatMapLatest { (s, pids) ->
+        combine(state, polledPids, pollEpoch, exclusive) { s, pids, _, paused -> Triple(s, pids, paused > 0) }
+            .flatMapLatest { (s, pids, paused) ->
                 val current = active
-                if (s is ConnectionState.Connected && current != null && pids.isNotEmpty()) {
+                if (!paused && s is ConnectionState.Connected && current != null && pids.isNotEmpty()) {
                     LivePoller(current.session, clock, disabled, stats, background = background).poll(pids)
                         .catch { e -> onPollingFailure(s, current, e) }
                 } else {
@@ -220,6 +229,19 @@ class ObdConnectionManager internal constructor(
         val current = active ?: return null
         if (state.value !is ConnectionState.Connected) return null
         return block(current.session)
+    }
+
+    override suspend fun <T> withExclusiveSession(block: suspend (ObdSession) -> T): T? {
+        val current = active ?: return null
+        if (state.value !is ConnectionState.Connected) return null
+        exclusive.update { it + 1 }
+        try {
+            traffic?.note("live polling paused for an exclusive operation")
+            return block(current.session)
+        } finally {
+            exclusive.update { it - 1 }
+            traffic?.note("live polling resumes")
+        }
     }
 
     /** Opens the transport, initializes the adapter and publishes Connected. Throws on failure. */
