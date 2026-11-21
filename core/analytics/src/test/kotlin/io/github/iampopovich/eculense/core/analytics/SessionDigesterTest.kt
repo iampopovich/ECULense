@@ -19,6 +19,13 @@ class SessionDigesterTest {
     private fun digest(readings: List<SensorReading>) = SessionDigester.digest(1, 0, readings.sortedBy { it.timestampMs })
 
     @Test
+    fun `extended OBDb sensor ids in a recording are ignored safely`() {
+        val plain = (0..4).map { r(COOLANT, 112.0, it * 10L) }
+        val mixed = plain + (0..4).map { r("obdb:NIROEV_HVBAT_SOC", 24.0 + it, it * 10L + 1) } + r("obdb:", 1.0, 3) + r("obdb:X:Y", -1.0, 4)
+        assertEquals(digest(plain).copy(), digest(mixed))
+    }
+
+    @Test
     fun `coolant at 112 for 40 s is a long critical run`() {
         val d = digest((0..4).map { r(COOLANT, 112.0, it * 10L) })
         assertEquals(40_000, d.overheatCritMs)

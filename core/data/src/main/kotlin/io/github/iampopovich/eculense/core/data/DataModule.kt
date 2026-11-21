@@ -144,6 +144,21 @@ val dataModule = module {
         EngineTraitsRecorder(get(), get(), activeCarId = { cars.activeCarId() }, repository = get(), scope = get(AppScope), logger = logger()).also { it.start() }
     }
     single<AlertPrefs> { DataStoreAlertPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("alerts") }) }
+    // R-E: extended OBDb sensors of the active car (off by default); the signalset loader lives in :core:obdb.
+    single<ExtendedSensorsPrefs> { DataStoreExtendedSensorsPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("extended_sensors") }) }
+    single(createdAtStart = true) {
+        val koin = getKoin()
+        val cars = get<CarRepository>()
+        ExtendedSensors(
+            get(),
+            cars.observeActiveCar(),
+            load = { make, model -> koin.getOrNull<io.github.iampopovich.eculense.core.obdb.ObdbSignalsets>()?.storedSignalset(make, model) },
+            prefs = get(),
+            simulated = getAll(),
+            scope = get(AppScope),
+            logger = logger(),
+        ).also { it.start() }
+    }
     single(createdAtStart = true) {
         val koin = getKoin()
         LiveAlertMonitor(get(), get(), get(AppScope), notifier = { koin.getOrNull<TripAlertNotifier>() }, logger = logger()).also { it.start() }

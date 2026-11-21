@@ -11,6 +11,19 @@ import java.security.MessageDigest
 /** Car profile fields the OBDb lookup needs. */
 enum class ProfileField { MAKE, MODEL, YEAR }
 
+/** R-E: a downloaded OBDb signalset ([repo] «OBDb/Kia-Niro-EV», [version] = content hash prefix). */
+data class StoredSignalset(val repo: String, val version: String, val signalset: Signalset)
+
+/**
+ * R-E (debug builds only): a simulated endpoint that brings its own signalset (the «Demo: Niro EV (OBDb)» adapter), so
+ * no demo car profile is needed. Release builds register none.
+ */
+interface SimulatedSignalset {
+    val endpointKind: String
+    val year: Int
+    fun signalset(): StoredSignalset
+}
+
 /** Result of the OBDb check for the user's car. */
 sealed interface SignalsetResult {
     /** The profile has no make/model/year: nothing to look up. */
@@ -83,6 +96,13 @@ class ObdbSignalsets(
         val signalset = SignalsetParser.parse(installed.file(DEFAULT_JSON).readText())
         val generation = installed.file(GENERATIONS).takeIf { it.isFile }?.readText()?.let(GenerationsParser::parse)?.firstOrNull { it.contains(year) }
         SignalsetResult.Covered(repo, year, generation, installed.version, signalset.ecus, signalset.forYear(year))
+    }
+
+    /** R-E: the whole downloaded signalset of a model (unfiltered: the year filter is applied by the caller), or null. */
+    suspend fun storedSignalset(make: String, model: String): StoredSignalset? = withContext(Dispatchers.IO) {
+        val repo = repoName(make, model)
+        val installed = store.installed(packId(repo)) ?: return@withContext null
+        StoredSignalset(repo, installed.version, SignalsetParser.parse(installed.file(DEFAULT_JSON).readText()))
     }
 
     private fun save(repo: String, version: String, json: String, generations: String?) {
