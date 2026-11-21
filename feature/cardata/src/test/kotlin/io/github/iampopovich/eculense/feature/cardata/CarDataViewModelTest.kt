@@ -97,7 +97,7 @@ class CarDataViewModelTest {
             override val enabled = MutableStateFlow(false)
             override suspend fun setEnabled(on: Boolean) { enabled.value = on }
         }
-        val sensors = ExtendedSensors(controller, MutableStateFlow(null), { _, _ -> null }, prefs, listOf(sim), backgroundScope)
+        val sensors = ExtendedSensors(controller, MutableStateFlow(null), { _, _, _ -> null }, prefs, listOf(sim), backgroundScope)
         sensors.start()
         val vm = CarDataViewModel(controller, InMemoryDashboardPrefs(), Units(), sensors)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
