@@ -11,12 +11,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -32,7 +36,12 @@ import kotlin.math.abs
  * R-E: the «Extended sensors (OBDb)» switch with an honest status line, the EV battery card and the values of the
  * extended sensors. Signal names come from OBDb as they are (reference data is shown in its source language).
  */
-internal fun LazyListScope.extendedSection(ext: ExtendedUi, onExtended: (Boolean) -> Unit) {
+internal fun LazyListScope.extendedSection(
+    ext: ExtendedUi,
+    onExtended: (Boolean) -> Unit,
+    onPanel: (String) -> Unit = {},
+    onCheckYear: () -> Unit = {},
+) {
     val units = ext.units
     item(key = "ext-switch") {
         HorizontalDivider(Modifier.padding(top = 12.dp))
@@ -52,11 +61,19 @@ internal fun LazyListScope.extendedSection(ext: ExtendedUi, onExtended: (Boolean
             val line = when {
                 ext.status is ExtendedStatus.NeedsProfile -> stringResource(R.string.cardata_ext_no_profile)
                 ext.status is ExtendedStatus.NoSignalset -> stringResource(R.string.cardata_ext_no_signalset)
+                ext.status is ExtendedStatus.NeedsYearCheck -> stringResource(R.string.cardata_ext_check_year)
+                ext.status is ExtendedStatus.CheckingYear -> stringResource(R.string.cardata_ext_checking_year)
                 ready?.protocolMismatch == true -> stringResource(R.string.cardata_ext_kline)
                 ready != null -> stringResource(R.string.cardata_ext_counts, ready.signals.size, ready.commands)
                 else -> stringResource(R.string.cardata_ext_hint)
             }
             Text(line, style = MaterialTheme.typography.bodyMedium, color = muted)
+            if (ext.status is ExtendedStatus.NeedsYearCheck || ext.status is ExtendedStatus.CheckingYear) {
+                // One tap, never automatic: the check goes to raw.githubusercontent.com.
+                OutlinedButton(onClick = onCheckYear, enabled = ext.status is ExtendedStatus.NeedsYearCheck) {
+                    Text(stringResource(R.string.cardata_ext_check_year_action))
+                }
+            }
             if (ready != null) {
                 Text(stringResource(R.string.cardata_ext_source, ready.repo.substringAfter('/')), style = MaterialTheme.typography.bodySmall, color = muted)
                 if (ready.yearUnknown) Text(stringResource(R.string.cardata_ext_unverified_year), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
@@ -73,6 +90,13 @@ internal fun LazyListScope.extendedSection(ext: ExtendedUi, onExtended: (Boolean
                 note?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             Text(row.value?.let { valueText(it, row.unit) } ?: "—", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 8.dp))
+            IconToggleButton(checked = row.onPanel, onCheckedChange = { onPanel(row.signal.sensorId) }) {
+                Icon(
+                    painterResource(if (row.onPanel) R.drawable.ic_star else R.drawable.ic_star_outline),
+                    contentDescription = stringResource(if (row.onPanel) R.string.cardata_remove_from_panel else R.string.cardata_add_to_panel),
+                    tint = if (row.onPanel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
     if (ext.waiting > 0) {

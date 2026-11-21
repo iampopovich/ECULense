@@ -9,6 +9,7 @@
     <string name="dash_status">%1$s · protocol %2$s</string>
     <string name="dash_status_voltage">%1$s · protocol %2$s · %3$.1f V</string>
     <string name="dash_not_answering">not answering</string>
+    <string name="dash_extended_off">extended sensors off</string>
     <string name="dash_open_loop_hint">open loop, trim not used</string>
     <string name="dash_estimated_hint">estimated from MAF</string>
     <string name="dash_range">range ~ %1$s km</string>

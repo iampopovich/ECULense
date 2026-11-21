@@ -56,6 +56,8 @@ internal fun CarDataRoute(viewModel: CarDataViewModel = koinViewModel()) {
         onEditing = viewModel::setEditing,
         onKeepScreenOn = viewModel::setKeepScreenOn,
         onExtended = viewModel::setExtended,
+        onExtendedPanel = viewModel::toggleExtendedPanel,
+        onCheckYear = viewModel::checkModelYear,
     )
 }
 
@@ -69,6 +71,8 @@ internal fun CarDataScreen(
     onEditing: (Boolean) -> Unit,
     onKeepScreenOn: (Boolean) -> Unit,
     onExtended: (Boolean) -> Unit = {},
+    onExtendedPanel: (String) -> Unit = {},
+    onCheckYear: () -> Unit = {},
 ) {
     if (!state.connected) {
         Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -88,7 +92,7 @@ internal fun CarDataScreen(
             }
         }
         if (state.editing) {
-            panelEditor(state.panel, onTogglePanel, onMoveUp, onMoveDown, state.keepScreenOn, onKeepScreenOn)
+            panelEditor(state.panel, onTogglePanel, onMoveUp, onMoveDown, state.keepScreenOn, onKeepScreenOn, state.extended.panel, onExtendedPanel)
         } else {
             for (group in state.groups) {
                 item(key = "g-${group.system}") {
@@ -124,7 +128,7 @@ internal fun CarDataScreen(
                 }
             }
             // R-E: extended OBDb sensors (off by default) and the EV battery card.
-            extendedSection(state.extended, onExtended)
+            extendedSection(state.extended, onExtended, onExtendedPanel, onCheckYear)
         }
     }
 }
@@ -168,6 +172,8 @@ private fun LazyListScope.panelEditor(
     onMoveDown: (Int) -> Unit,
     keepScreenOn: Boolean,
     onKeepScreenOn: (Boolean) -> Unit,
+    extendedPanel: List<io.github.iampopovich.eculense.core.data.ExtendedSignal> = emptyList(),
+    onExtendedPanel: (String) -> Unit = {},
 ) {
     item(key = "keep") {
         Row(
@@ -188,7 +194,7 @@ private fun LazyListScope.panelEditor(
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
         )
     }
-    if (panel.isEmpty()) {
+    if (panel.isEmpty() && extendedPanel.isEmpty()) {
         item(key = "panel-empty") { Text(stringResource(R.string.cardata_panel_empty), Modifier.padding(16.dp)) }
     }
     items(panel, key = { "p-${it.code}" }) { pid ->
@@ -201,6 +207,18 @@ private fun LazyListScope.panelEditor(
                 Icon(painterResource(R.drawable.ic_arrow_down), contentDescription = stringResource(R.string.cardata_move_down))
             }
             IconButton(onClick = { onTogglePanel(pid.code) }) {
+                Icon(painterResource(R.drawable.ic_star), contentDescription = stringResource(R.string.cardata_remove_from_panel), tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+    // R-E follow-up: extended (OBDb) tiles come after the standard ones; only removal here (order = starring order).
+    items(extendedPanel, key = { "pe-${it.sensorId}" }) { signal ->
+        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(signal.name, style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.cardata_ext_badge), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(onClick = { onExtendedPanel(signal.sensorId) }) {
                 Icon(painterResource(R.drawable.ic_star), contentDescription = stringResource(R.string.cardata_remove_from_panel), tint = MaterialTheme.colorScheme.primary)
             }
         }

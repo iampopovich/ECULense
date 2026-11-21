@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -43,6 +44,8 @@ data class ExtendedSignal(
     val path: String?,
     val commandId: String,
     val role: EvRole? = null,
+    /** Decimals worth showing, from the OBDb scale (mul/div): 0 for steps >= 1, 1 for >= 0.1, else 2. */
+    val decimals: Int = 1,
 )
 
 /** Where the extended sensors of the current link stand. */
@@ -55,6 +58,15 @@ sealed interface ExtendedStatus {
 
     /** No OBDb signalset is downloaded for this car (e.g. a K-Line Kia Sorento BL: OBDb has none). */
     data class NoSignalset(val repo: String?) : ExtendedStatus
+
+    /**
+     * A signalset of this model was downloaded before R-E recorded the checked model years (no covered-years.txt):
+     * the user re-checks it with one tap («Check OBDb for the car's year»); nothing is re-checked automatically.
+     */
+    data object NeedsYearCheck : ExtendedStatus
+
+    /** The one-tap check is running. */
+    data object CheckingYear : ExtendedStatus
 
     /**
      * A signalset matched. [yearUnknown] = the car profile has no model year: only commands without a year filter are
@@ -110,6 +122,10 @@ class ExtendedSensors(
     private val simulated: List<SimulatedSignalset>,
     private val scope: CoroutineScope,
     private val logger: AppLogger = AppLogger.NONE,
+    /** True when a download of this model exists but has no record of the checked model years (pre-R-E). */
+    private val needsYearCheck: suspend (make: String, model: String) -> Boolean = { _, _ -> false },
+    /** The «Check OBDb» lookup for the car's year (network); it records the checked years on success. */
+    private val checkYear: suspend (make: String, model: String, year: Int) -> Unit = { _, _, _ -> },
 ) {
     private data class Link(val kind: String, val simulated: Boolean, val protocol: Char)
 
@@ -119,9 +135,14 @@ class ExtendedSensors(
 
     val enabled: StateFlow<Boolean> = prefs.enabled.stateIn(scope, SharingStarted.Eagerly, false)
 
-    val status: StateFlow<ExtendedStatus> = combine(link, activeCar) { l, car -> l to car }
+    /** Bumped after a one-tap year check so the status is resolved again; [checking] shows the running check. */
+    private val refresh = MutableStateFlow(0)
+    private val checking = MutableStateFlow(false)
+    private val checkedModels: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    val status: StateFlow<ExtendedStatus> = combine(link, activeCar, refresh) { l, car, r -> Triple(l, car, r) }
         .distinctUntilChanged()
-        .mapLatest { (l, car) ->
+        .mapLatest { (l, car, _) ->
             try {
                 resolve(l, car)
             } catch (e: CancellationException) {
@@ -131,7 +152,36 @@ class ExtendedSensors(
                 ExtendedStatus.NoSignalset(null)
             }
         }
+        .let { resolved -> combine(resolved, checking) { s, c -> if (c && s is ExtendedStatus.NeedsYearCheck) ExtendedStatus.CheckingYear else s } }
         .stateIn(scope, SharingStarted.Eagerly, ExtendedStatus.NotConnected)
+
+    /** R-E follow-up: one tap re-checks an old download for the car's model year (never automatic). */
+    fun checkModelYear(car: CarProfile?) {
+        val make = car?.brand?.takeIf { it.isNotBlank() } ?: return
+        val model = car.model?.takeIf { it.isNotBlank() } ?: return
+        val year = car.year ?: return
+        if (checking.value) return
+        scope.launch {
+            checking.value = true
+            try {
+                checkYear(make, model, year)
+                // The check answered (covered or not): the hint is not shown again in this process.
+                checkedModels += "$make|$model"
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.warn(TAG, "extended sensors: year check failed: ${e::class.java.simpleName}", e)
+            } finally {
+                checking.value = false
+                refresh.value++
+            }
+        }
+    }
+
+    /** Same as [checkModelYear] for the current active car. */
+    fun checkModelYear() {
+        scope.launch { checkModelYear(activeCar.first()) }
+    }
 
     /** The link is battery-electric (EV signalset or profile fuel «electric»): the EV card is shown. */
     val electric: StateFlow<Boolean> = status.map { (it as? ExtendedStatus.Ready)?.ev == true }.stateIn(scope, SharingStarted.Eagerly, false)
@@ -161,7 +211,12 @@ class ExtendedSensors(
         val make = car?.brand?.takeIf { it.isNotBlank() }
         val model = car?.model?.takeIf { it.isNotBlank() }
         if (make == null || model == null) return ExtendedStatus.NeedsProfile
-        val stored = load(make, model, car.year) ?: return ExtendedStatus.NoSignalset(null)
+        val stored = load(make, model, car.year)
+            ?: return if (car.year != null && "$make|$model" !in checkedModels && needsYearCheck(make, model)) {
+                ExtendedStatus.NeedsYearCheck
+            } else {
+                ExtendedStatus.NoSignalset(null)
+            }
         return ready(stored, car.year, l, simulated = false, profileElectric = car.fuelType == FuelType.ELECTRIC)
     }
 
@@ -174,7 +229,7 @@ class ExtendedSensors(
         val planned = plan.groups.flatMap { it.commands }
         val signals = planned.flatMap { p ->
             p.source.signals.filter { !it.hidden && it.fmt != null }.map { s ->
-                ExtendedSignal(SENSOR_PREFIX + s.id, s.name, ObdbUnits.symbol(s.fmt?.unit), s.path, p.command.id, roles[s.id])
+                ExtendedSignal(SENSOR_PREFIX + s.id, s.name, ObdbUnits.symbol(s.fmt?.unit), s.path, p.command.id, roles[s.id], decimalsOf(s.fmt))
             }
         }.distinctBy { it.sensorId }
         val groups = plan.groups.map { g ->
@@ -210,5 +265,17 @@ class ExtendedSensors(
         private const val TAG = "EcuObdb"
 
         fun isExtended(sensorId: String): Boolean = sensorId.startsWith(SENSOR_PREFIX)
+
+        /** Display decimals from the signal's resolution (mul/div); enumerations get 0, unknown formats 1. */
+        internal fun decimalsOf(fmt: io.github.iampopovich.eculense.core.obdb.SignalFormat?): Int {
+            if (fmt == null) return 1
+            if (fmt.map.isNotEmpty()) return 0
+            val step = kotlin.math.abs(fmt.mul / fmt.div)
+            return when {
+                step >= 1.0 -> 0
+                step >= 0.1 -> 1
+                else -> 2
+            }
+        }
     }
 }

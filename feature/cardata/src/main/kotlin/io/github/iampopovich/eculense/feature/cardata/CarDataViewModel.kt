@@ -108,7 +108,13 @@ internal class CarDataViewModel(
     }
 
     private val extendedUi: Flow<ExtendedUi> = extended?.let { x ->
-        combine(x.enabled, x.status, latest, controller.disabledExtended, units.units) { on, status, values, off, u -> ExtendedUi.of(on, status, values, off, u) }
+        combine(
+            combine(x.enabled, x.status) { on, status -> on to status },
+            latest,
+            controller.disabledExtended,
+            units.units,
+            prefs.extendedSelection,
+        ) { (on, status), values, off, u, panel -> ExtendedUi.of(on, status, values, off, u, panel) }
     } ?: flowOf(ExtendedUi())
 
     val uiState: StateFlow<CarDataUiState> = combine(baseState, extendedUi) { s, e -> s.copy(extended = e) }
@@ -138,6 +144,14 @@ internal class CarDataViewModel(
 
     /** R-E: «Extended sensors (OBDb)» on/off (off by default). */
     fun setExtended(on: Boolean) { extended?.setEnabled(on) }
+
+    /** R-E follow-up: star an extended (OBDb) sensor for the dashboard of the active car (shown after the PID tiles). */
+    fun toggleExtendedPanel(sensorId: String) {
+        viewModelScope.launch { prefs.setExtendedSelection(DashboardSelection.toggleExtended(prefs.extendedSelection.first(), sensorId)) }
+    }
+
+    /** R-E follow-up (b): one-tap OBDb check for the car's model year of a download that predates the record. */
+    fun checkModelYear() { extended?.checkModelYear() }
 
     private fun edit(change: (List<Int>) -> List<Int>) {
         viewModelScope.launch {

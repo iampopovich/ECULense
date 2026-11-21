@@ -25,6 +25,7 @@ val dashboardModule = module {
             get(), get(), get(), get(),
             alerts = getOrNull<LiveAlerts>(), marker = getOrNull<EventMarker>(), cars = getOrNull<CarRepository>(), automation = getOrNull<AutomationPrefs>(),
             rangeBasis = rangeBasisOf(this),
+            extended = getOrNull<io.github.iampopovich.eculense.core.data.ExtendedSensors>(),
         )
     }
     viewModel { AlertSettingsViewModel(getOrNull<AlertPrefs>() ?: InMemoryAlertPrefs(), saveScope = getOrNull<kotlinx.coroutines.CoroutineScope>(io.github.iampopovich.eculense.core.obd.AppScope)) }

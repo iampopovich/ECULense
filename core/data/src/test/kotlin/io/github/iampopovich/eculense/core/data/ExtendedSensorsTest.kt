@@ -64,6 +64,49 @@ class ExtendedSensorsTest {
     }
 
     @Test
+    fun `an old download without the checked years asks for one tap check, then resolves`() = runTest {
+        val controller = FakeConnectionController(initial = connected("bt", '6'))
+        val prefs = MemoryPrefs()
+        val car = MutableStateFlow<CarProfile?>(CarProfile(name = "Test car", brand = "Kia", model = "Niro EV", year = 2020))
+        var covered = false
+        var checks = 0
+        val sensors = ExtendedSensors(
+            controller, car, load = { _, _, _ -> if (covered) niro else null }, prefs, emptyList(), backgroundScope,
+            needsYearCheck = { _, _ -> !covered },
+            checkYear = { _, _, year -> checks++; assertEquals(2020, year); covered = true },
+        )
+        assertEquals(ExtendedStatus.NeedsYearCheck, sensors.status.first { it !is ExtendedStatus.NotConnected })
+        assertEquals(0, checks) // never automatic
+        sensors.checkModelYear()
+        val ready = sensors.status.first { it is ExtendedStatus.Ready } as ExtendedStatus.Ready
+        assertEquals(1, checks)
+        assertEquals(2020, ready.year)
+    }
+
+    @Test
+    fun `a year check that finds no data ends the hint for this process`() = runTest {
+        val controller = FakeConnectionController(initial = connected("bt", '6'))
+        val car = MutableStateFlow<CarProfile?>(CarProfile(name = "Test car", brand = "Kia", model = "Niro EV", year = 2020))
+        val sensors = ExtendedSensors(
+            controller, car, load = { _, _, _ -> null }, MemoryPrefs(), emptyList(), backgroundScope,
+            needsYearCheck = { _, _ -> true },
+            checkYear = { _, _, _ -> },
+        )
+        assertEquals(ExtendedStatus.NeedsYearCheck, sensors.status.first { it !is ExtendedStatus.NotConnected })
+        sensors.checkModelYear()
+        assertEquals(ExtendedStatus.NoSignalset(null), sensors.status.first { it is ExtendedStatus.NoSignalset })
+    }
+
+    @Test
+    fun `display decimals follow the OBDb scale`() {
+        val f = io.github.iampopovich.eculense.core.obdb.SignalFormat(len = 8)
+        assertEquals(0, ExtendedSensors.decimalsOf(f))
+        assertEquals(1, ExtendedSensors.decimalsOf(f.copy(div = 2.0)))
+        assertEquals(2, ExtendedSensors.decimalsOf(f.copy(mul = 0.02)))
+        assertEquals(1, ExtendedSensors.decimalsOf(null))
+    }
+
+    @Test
     fun `a K-Line car without a downloaded signalset gets an honest status and no extended polling`() = runTest {
         val controller = FakeConnectionController(initial = connected("bt", '5'))
         val prefs = MemoryPrefs().apply { enabled.value = true }

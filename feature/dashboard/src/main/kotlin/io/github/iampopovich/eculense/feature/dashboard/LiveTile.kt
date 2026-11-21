@@ -19,9 +19,9 @@ import java.util.Locale
 /** Big number of a tile: «—» without data, «○» in open loop, «~» before estimates. PID 03 is shown in words. */
 @Composable
 internal fun tileValueText(tile: TileState): String = when {
-    tile.value == null || tile.status == ValueStatus.NO_DATA || tile.status == ValueStatus.NOT_ANSWERING -> "—"
+    tile.value == null || tile.status == ValueStatus.NO_DATA || tile.status == ValueStatus.NOT_ANSWERING || tile.status == ValueStatus.EXTENDED_OFF -> "—"
     tile.status == ValueStatus.OPEN_LOOP -> "○"
-    tile.pid.code == 0x03 -> ObdText.fuelSystemStatus(tile.value).asString()
+    tile.pid?.code == 0x03 -> ObdText.fuelSystemStatus(tile.value).asString()
     else -> (if (tile.estimated) "~" else "") + formatNumber(tile.value, tile.decimals)
 }
 
@@ -29,6 +29,7 @@ internal fun tileValueText(tile: TileState): String = when {
 @Composable
 internal fun tileNote(tile: TileState): String? = when (tile.status) {
     ValueStatus.NOT_ANSWERING -> stringResource(R.string.dash_not_answering)
+    ValueStatus.EXTENDED_OFF -> stringResource(R.string.dash_extended_off)
     ValueStatus.OPEN_LOOP -> stringResource(R.string.dash_open_loop_hint)
     ValueStatus.STALE -> tile.ageSec?.let { age ->
         if (age < 120) stringResource(R.string.dash_age_seconds, age.toInt()) else stringResource(R.string.dash_age_minutes, (age / 60).toInt())
@@ -40,9 +41,11 @@ internal fun tileNote(tile: TileState): String? = when (tile.status) {
     }
 }
 
+/** PID tiles use the localized PID name; OBDb tiles show the signalset name as it is (reference data, source language). */
 @Composable
-internal fun tileName(tile: TileState): String =
-    ObdText.pidNameRes(tile.pid.code)?.let { stringResource(it) } ?: tile.pid.sensorId
+internal fun tileName(tile: TileState): String = tile.extended?.name
+    ?: tile.pid?.let { pid -> ObdText.pidNameRes(pid.code)?.let { stringResource(it) } ?: pid.sensorId }
+    ?: tile.sensorId
 
 /** Plain helper: number formatting outside composables (lint NonObservableLocale). */
 internal fun formatNumber(value: Double, decimals: Int): String = String.format(Locale.getDefault(), "%.${decimals}f", value)

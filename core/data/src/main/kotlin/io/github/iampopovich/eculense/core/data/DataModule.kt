@@ -157,6 +157,8 @@ val dataModule = module {
             simulated = getAll(),
             scope = get(AppScope),
             logger = logger(),
+            needsYearCheck = { make, model -> koin.getOrNull<io.github.iampopovich.eculense.core.obdb.ObdbSignalsets>()?.needsYearCheck(make, model) ?: false },
+            checkYear = { make, model, year -> koin.getOrNull<io.github.iampopovich.eculense.core.obdb.ObdbSignalsets>()?.check(make, model, year) },
         ).also { it.start() }
     }
     single(createdAtStart = true) {

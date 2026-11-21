@@ -2,9 +2,12 @@ package io.github.iampopovich.eculense.feature.dashboard
 
 import io.github.iampopovich.eculense.core.analytics.TripCalculator
 import io.github.iampopovich.eculense.core.data.DashboardSelection
+import io.github.iampopovich.eculense.core.data.ExtendedSensors
+import io.github.iampopovich.eculense.core.data.ExtendedSignal
 import io.github.iampopovich.eculense.core.model.SensorReading
 import io.github.iampopovich.eculense.core.obd.ConnectionState
 import io.github.iampopovich.eculense.core.obd.Pid
+import io.github.iampopovich.eculense.core.obd.PollTier
 import io.github.iampopovich.eculense.core.obd.PollTiers
 import io.github.iampopovich.eculense.core.obd.StandardPids
 
@@ -24,10 +27,14 @@ internal enum class ValueStatus {
 
     /** «○»: fuel trim while the fuel system runs in open loop (PID 03) — the trim is not used now. */
     OPEN_LOOP,
+
+    /** «—» + «extended sensors off»: an OBDb tile while the «Extended sensors (OBDb)» switch is off or unmatched. */
+    EXTENDED_OFF,
 }
 
 internal data class TileState(
-    val pid: Pid,
+    /** Standard PID tile; null for an extended (OBDb) tile, see [extended]. */
+    val pid: Pid?,
     /** Display units (converted); null when [status] has no number to show. */
     val value: Double?,
     val unit: String,
@@ -38,12 +45,16 @@ internal data class TileState(
     val ageSec: Long? = null,
     /** Last 60 s, oldest first, in stored (metric) units; only the shape matters. */
     val spark: List<Float> = emptyList(),
-    val decimals: Int = decimalsOf(pid),
+    val decimals: Int = pid?.let(::decimalsOf) ?: 1,
     /** C4: a live alert is active for this sensor (error color). */
     val alert: Boolean = false,
     /** D3: «~230 km» left, only on the fuel-level tile when the tank capacity and a learned consumption are known. */
     val rangeKm: Double? = null,
-)
+    /** R-E follow-up: the OBDb signal of an extended tile (name and unit from the signalset). */
+    val extended: ExtendedSignal? = null,
+) {
+    val sensorId: String get() = pid?.sensorId ?: extended?.sensorId.orEmpty()
+}
 
 internal data class Stamped(val value: Double, val atMs: Long)
 
@@ -156,6 +167,53 @@ internal object TileModel {
                         estimated = estimate,
                         ageSec = if (status == ValueStatus.STALE) maxOf(1, age / 1_000) else null,
                         spark = buffer.spark(sparkId, nowMs),
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * R-E follow-up: tiles for the extended (OBDb) sensors starred in Car data, after the PID tiles. [ready] = the
+     * matched signalset of this link (null = none); [on] = the «Extended sensors (OBDb)» switch. Off/unmatched → «—»
+     * with a note, never a stale number. Extended commands run at most once per SLOW-tier cycle, so a value is stale
+     * after 3 SLOW periods (same rule as the PID tiles).
+     */
+    fun buildExtended(
+        ids: List<String>,
+        ready: List<ExtendedSignal>?,
+        on: Boolean,
+        disabledCommands: Set<String>,
+        buffer: LiveBuffer,
+        state: ConnectionState,
+        cycleMs: Long?,
+        nowMs: Long,
+        convert: (Double, String) -> Pair<Double, String>,
+    ): List<TileState> {
+        val paused = state is ConnectionState.Reconnecting || state is ConnectionState.EngineOff
+        val byId = ready.orEmpty().associateBy { it.sensorId }
+        val staleMs = maxOf(MIN_STALE_MS, 3 * PollTier.SLOW.everyCycles * (cycleMs?.takeIf { it > 0 } ?: FALLBACK_CYCLE_MS))
+        return ids.map { id ->
+            val signal = byId[id] ?: ExtendedSignal(id, id.removePrefix(ExtendedSensors.SENSOR_PREFIX), "", null, "")
+            val unit = convert(0.0, signal.unit).second
+            val sample = buffer.latest(id)
+            when {
+                !on || ready == null || id !in byId -> TileState(null, null, unit, ValueStatus.EXTENDED_OFF, decimals = signal.decimals, extended = signal)
+                signal.commandId in disabledCommands && sample == null ->
+                    TileState(null, null, unit, ValueStatus.NOT_ANSWERING, decimals = signal.decimals, extended = signal)
+                sample == null -> TileState(null, null, unit, ValueStatus.NO_DATA, decimals = signal.decimals, extended = signal)
+                else -> {
+                    val age = nowMs - sample.atMs
+                    val stale = paused || age > staleMs
+                    TileState(
+                        pid = null,
+                        value = convert(sample.value, signal.unit).first,
+                        unit = unit,
+                        status = if (stale) ValueStatus.STALE else ValueStatus.LIVE,
+                        ageSec = if (stale) maxOf(1, age / 1_000) else null,
+                        spark = buffer.spark(id, nowMs),
+                        decimals = signal.decimals,
+                        extended = signal,
                     )
                 }
             }

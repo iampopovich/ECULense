@@ -10,6 +10,9 @@ import io.github.iampopovich.eculense.core.data.CarRepository
 import io.github.iampopovich.eculense.core.data.DashboardPrefs
 import io.github.iampopovich.eculense.core.data.DashboardSelection
 import io.github.iampopovich.eculense.core.data.EventMarker
+import io.github.iampopovich.eculense.core.data.ExtendedSensors
+import io.github.iampopovich.eculense.core.data.ExtendedSignal
+import io.github.iampopovich.eculense.core.data.ExtendedStatus
 import io.github.iampopovich.eculense.core.data.LiveAlerts
 import io.github.iampopovich.eculense.core.data.MarkResult
 import io.github.iampopovich.eculense.core.data.RangeBasis
@@ -35,6 +38,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
@@ -104,6 +108,8 @@ internal class DashboardViewModel(
     private val automation: AutomationPrefs? = null,
     /** D3: tank capacity and learned consumption of the active car; the fuel-level tile then shows «~230 km left». */
     rangeBasis: Flow<RangeBasis?> = flowOf(null),
+    /** R-E follow-up: extended OBDb sensors starred for the dashboard (null when the build has none). */
+    private val extended: ExtendedSensors? = null,
 ) : ViewModel() {
     private val range: StateFlow<RangeBasis?> = rangeBasis.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     private val buffer = LiveBuffer()
@@ -137,6 +143,14 @@ internal class DashboardViewModel(
 
     private val display = combine(prefs.keepScreenOn, prefs.hudMirror, prefs.drivingTiles) { a, b, c -> Triple(a, b, c) }
 
+    private data class ExtendedFacts(val ids: List<String>, val signals: List<ExtendedSignal>?, val on: Boolean, val disabled: Set<String>)
+
+    private val extendedFacts: Flow<ExtendedFacts> = extended?.let { x ->
+        combine(prefs.extendedSelection, x.status, x.enabled, controller.disabledExtended) { ids, status, on, off ->
+            ExtendedFacts(ids, (status as? ExtendedStatus.Ready)?.signals, on, off)
+        }
+    } ?: prefs.extendedSelection.map { ExtendedFacts(it, null, false, emptySet()) }
+
     private val facts = combine(controller.state, controller.disabledPids, controller.pollStats, recorder.activeSessionId) { s, d, p, r ->
         Facts(s, d, p?.cycleMsP50, r != null)
     }
@@ -144,12 +158,19 @@ internal class DashboardViewModel(
     /** Values are stored in metric; km/h → mph, °C → °F etc. only at display time. */
     val uiState: StateFlow<DashboardUiState> =
         combine(
-            combine(facts, selected, combine(version, ticks) { v, _ -> v }, units.units, display) { f, pids, _, u, d ->
+            combine(facts, combine(selected, extendedFacts) { p, x -> p to x }, combine(version, ticks) { v, _ -> v }, units.units, display) { f, (pids, x), _, u, d ->
                 val t = now()
+                val convert: (Double, String) -> Pair<Double, String> = { v, unit -> u.display(v, unit) }
+                // Like the PID tiles: shown while the last state is Connected (reconnecting / engine off keep them, dimmed).
+                val extTiles = if (lastConnected.value is ConnectionState.Connected) {
+                    TileModel.buildExtended(x.ids, x.signals, x.on, x.disabled, buffer, f.state, f.cycleMs, t, convert)
+                } else {
+                    emptyList()
+                }
                 DashboardUiState(
                     connected = f.state.isSessionAlive,
                     banner = ObdText.sessionState(f.state),
-                    tiles = TileModel.build(pids, buffer, f.state, f.disabled, f.cycleMs, t, fuelEstimate.value) { v, unit -> u.display(v, unit) },
+                    tiles = TileModel.build(pids, buffer, f.state, f.disabled, f.cycleMs, t, fuelEstimate.value, convert) + extTiles,
                     recording = f.recording,
                     status = f.state.statusLine(buffer.latest(PollTiers.ADAPTER_VOLTAGE_ID)?.value),
                     keepScreenOn = d.first,
@@ -163,9 +184,9 @@ internal class DashboardViewModel(
             val alerting = x.alerts.flatMap { it.kind.sensorIds() }.toSet()
             base.copy(
                 tiles = base.tiles.map { tile ->
-                    val withAlert = if (tile.pid.sensorId in alerting) tile.copy(alert = true) else tile
-                    if (basis != null && tile.pid.code == FUEL_LEVEL && tile.status == ValueStatus.LIVE) {
-                        withAlert.copy(rangeKm = basis.km(buffer.latest(tile.pid.sensorId)?.value))
+                    val withAlert = if (tile.sensorId in alerting) tile.copy(alert = true) else tile
+                    if (basis != null && tile.pid?.code == FUEL_LEVEL && tile.status == ValueStatus.LIVE) {
+                        withAlert.copy(rangeKm = basis.km(buffer.latest(tile.sensorId)?.value))
                     } else withAlert
                 },
                 alerts = x.alerts,

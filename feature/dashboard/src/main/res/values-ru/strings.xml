@@ -9,6 +9,7 @@
     <string name="dash_status">%1$s · протокол %2$s</string>
     <string name="dash_status_voltage">%1$s · протокол %2$s · %3$.1f В</string>
     <string name="dash_not_answering">не отвечает</string>
+    <string name="dash_extended_off">расширенные датчики выключены</string>
     <string name="dash_open_loop_hint">разомкнутый контур, коррекция не работает</string>
     <string name="dash_estimated_hint">оценка по MAF</string>
     <string name="dash_range">запас хода ~ %1$s км</string>

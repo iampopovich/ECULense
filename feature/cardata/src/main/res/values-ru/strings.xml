@@ -27,6 +27,10 @@
     <string name="cardata_ext_source">Описание сигналов: OBDb %1$s (CC BY-SA 4.0)</string>
     <string name="cardata_ext_unverified_year">Данные OBDb, не проверено для вашего модельного года (в профиле машины нет года).</string>
     <string name="cardata_ext_waiting">Пока без значения: %1$d</string>
+    <string name="cardata_ext_check_year">Проверьте OBDb для года машины: этот набор сигналов скачан до того, как приложение стало запоминать годы.</string>
+    <string name="cardata_ext_checking_year">Проверяем OBDb для года машины…</string>
+    <string name="cardata_ext_check_year_action">Проверить OBDb</string>
+    <string name="cardata_ext_badge">Расширенный датчик (OBDb)</string>
     <string name="cardata_ev_title">Батарея (EV)</string>
     <string name="cardata_ev_soc">Заряд (SOC)</string>
     <string name="cardata_ev_soh">Здоровье (SOH)</string>

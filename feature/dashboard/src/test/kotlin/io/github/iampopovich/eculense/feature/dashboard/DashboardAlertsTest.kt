@@ -78,8 +78,8 @@ class DashboardAlertsTest {
         alerts.active.value = listOf(ActiveAlert(LiveAlertKind.OVERHEAT, 112.0))
         val s = vm.uiState.value
         assertEquals(LiveAlertKind.OVERHEAT, s.alerts.single().kind)
-        assertTrue(s.tiles.first { it.pid.code == 0x05 }.alert)
-        assertFalse(s.tiles.first { it.pid.code == 0x42 }.alert)
+        assertTrue(s.tiles.first { it.pid?.code == 0x05 }.alert)
+        assertFalse(s.tiles.first { it.pid?.code == 0x42 }.alert)
         alerts.newCodes.value = listOf("P0171")
         assertEquals(listOf("P0171"), vm.uiState.value.newCodes)
         vm.dismissNewCodes()

@@ -27,6 +27,10 @@
     <string name="cardata_ext_source">Signal definitions: OBDb %1$s (CC BY-SA 4.0)</string>
     <string name="cardata_ext_unverified_year">Data from OBDb, not verified for your model year (the car profile has no year).</string>
     <string name="cardata_ext_waiting">Without a value yet: %1$d</string>
+    <string name="cardata_ext_check_year">Check OBDb for the car\'s model year: this signalset was downloaded before the model years were recorded.</string>
+    <string name="cardata_ext_checking_year">Checking OBDb for the car\'s model year…</string>
+    <string name="cardata_ext_check_year_action">Check OBDb</string>
+    <string name="cardata_ext_badge">Extended sensor (OBDb)</string>
     <string name="cardata_ev_title">Battery (EV)</string>
     <string name="cardata_ev_soc">Charge (SOC)</string>
     <string name="cardata_ev_soh">Health (SOH)</string>

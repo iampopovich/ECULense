@@ -117,6 +117,12 @@ class ObdbSignalsets(
         StoredSignalset(repo, installed.version, SignalsetParser.parse(installed.file(DEFAULT_JSON).readText()))
     }
 
+    /** R-E follow-up: a download of this model exists but predates the covered-years record (needs one «Check OBDb»). */
+    suspend fun needsYearCheck(make: String, model: String): Boolean = withContext(Dispatchers.IO) {
+        val installed = store.installed(packId(repoName(make, model))) ?: return@withContext false
+        !installed.file(COVERED).isFile
+    }
+
     private fun parseRange(text: String): IntRange? {
         val parts = text.trim().split('-').mapNotNull { it.trim().toIntOrNull() }
         return if (parts.size == 2) parts[0]..parts[1] else null

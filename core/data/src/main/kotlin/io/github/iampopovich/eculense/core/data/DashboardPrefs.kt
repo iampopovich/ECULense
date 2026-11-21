@@ -42,6 +42,13 @@ interface DashboardPrefs {
      * for diesel cars. An unknown fuel type counts as petrol.
      */
     val fuelEstimate: Flow<Boolean> get() = flowOf(true)
+
+    /**
+     * R-E follow-up: extended OBDb sensors on the dashboard (sensor ids «obdb:<id>», display order), per car like
+     * [selection]; shown after the standard PID tiles. Empty = none.
+     */
+    val extendedSelection: Flow<List<String>> get() = flowOf(emptyList())
+    suspend fun setExtendedSelection(ids: List<String>) {}
 }
 
 /** Pure edits of the dashboard selection (no text input: star toggles, up/down moves). */
@@ -82,6 +89,14 @@ object DashboardSelection {
     fun encode(codes: List<Int>): String = codes.joinToString(",") { "%02X".format(it) }
 
     fun decode(text: String): List<Int> = text.split(',').mapNotNull { it.trim().toIntOrNull(16) }
+
+    /** Extended sensor ids, one per line (no id character is special then). */
+    fun encodeExtended(ids: List<String>): String = ids.distinct().joinToString("\n")
+
+    fun decodeExtended(text: String): List<String> =
+        text.split('\n').map { it.trim() }.filter { ExtendedSensors.isExtended(it) }.distinct()
+
+    fun toggleExtended(current: List<String>, id: String): List<String> = if (id in current) current - id else current + id
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -121,7 +136,17 @@ internal class DataStoreDashboardPrefs(
         }
     }
 
+    override val extendedSelection: Flow<List<String>> = activeCarId.flatMapLatest { id ->
+        store.data.map { p -> p[extendedKey(id)]?.let(DashboardSelection::decodeExtended).orEmpty() }
+    }
+
+    override suspend fun setExtendedSelection(ids: List<String>) {
+        val key = extendedKey(activeCarId.first())
+        store.edit { if (ids.isEmpty()) it.remove(key) else it[key] = DashboardSelection.encodeExtended(ids) }
+    }
+
     private fun selectionKey(carId: Long?) = stringPreferencesKey("pids|car=${carId ?: 0}")
+    private fun extendedKey(carId: Long?) = stringPreferencesKey("obdb|car=${carId ?: 0}")
 
     private companion object {
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
@@ -137,8 +162,11 @@ class InMemoryDashboardPrefs(
     hudMirror: Boolean = false,
     drivingTiles: Int = DashboardSelection.DEFAULT_DRIVING_TILES,
     fuelEstimate: Boolean = true,
+    extended: List<String> = emptyList(),
 ) : DashboardPrefs {
     override val fuelEstimate = MutableStateFlow(fuelEstimate)
+    override val extendedSelection = MutableStateFlow(extended)
+    override suspend fun setExtendedSelection(ids: List<String>) { extendedSelection.value = ids }
     override val selection = MutableStateFlow(selection)
     override val keepScreenOn = MutableStateFlow(keepScreenOn)
     override val hudMirror = MutableStateFlow(hudMirror)

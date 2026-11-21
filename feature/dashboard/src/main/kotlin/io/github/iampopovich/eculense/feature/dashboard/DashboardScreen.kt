@@ -202,7 +202,7 @@ internal fun DashboardScreen(
             Text(stringResource(R.string.dash_no_pids), style = MaterialTheme.typography.bodyLarge)
         }
         LazyVerticalGrid(columns = GridCells.Adaptive(160.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(state.tiles, key = { it.pid.sensorId }) { tile -> DashboardTile(tile) }
+            items(state.tiles, key = { it.sensorId }) { tile -> DashboardTile(tile) }
         }
     }
 }

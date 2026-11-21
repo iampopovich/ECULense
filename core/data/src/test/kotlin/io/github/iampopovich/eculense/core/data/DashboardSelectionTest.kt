@@ -42,6 +42,18 @@ class DashboardSelectionTest {
     }
 
     @Test
+    fun `extended selection round-trips, ignores foreign ids and toggles`() = runTest {
+        val ids = listOf("obdb:A_1", "obdb:B_2")
+        assertEquals(ids, DashboardSelection.decodeExtended(DashboardSelection.encodeExtended(ids + "obdb:A_1")))
+        assertEquals(listOf("obdb:A_1"), DashboardSelection.decodeExtended("obdb:A_1\n01.0C\n"))
+        assertEquals(listOf("obdb:A_1"), DashboardSelection.toggleExtended(ids, "obdb:B_2"))
+        val prefs = InMemoryDashboardPrefs()
+        assertEquals(emptyList<String>(), prefs.extendedSelection.first())
+        prefs.setExtendedSelection(ids)
+        assertEquals(ids, prefs.extendedSelection.first())
+    }
+
+    @Test
     fun `driving tile count is clamped`() = runTest {
         val prefs = InMemoryDashboardPrefs()
         assertNull(prefs.selection.first())

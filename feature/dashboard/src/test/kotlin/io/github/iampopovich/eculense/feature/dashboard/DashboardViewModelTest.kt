@@ -54,7 +54,7 @@ class DashboardViewModelTest {
         return vm
     }
 
-    private fun DashboardViewModel.tile(code: Int) = uiState.value.tiles.first { it.pid.code == code }
+    private fun DashboardViewModel.tile(code: Int) = uiState.value.tiles.first { it.pid?.code == code }
 
     @Test
     fun `fuel level tile shows the range when the tank and a learned consumption are known`() = runTest {
@@ -89,7 +89,7 @@ class DashboardViewModelTest {
         val prefs = InMemoryDashboardPrefs(selection = listOf(0x2F, 0x0C, 0x46))
         val vm = vm(controller, prefs)
         // 0x46 is not supported by this car: hidden, not shown as an empty tile.
-        assertEquals(listOf(0x2F, 0x0C), vm.uiState.value.tiles.map { it.pid.code })
+        assertEquals(listOf(0x2F, 0x0C), vm.uiState.value.tiles.map { it.pid?.code })
         assertEquals(listOf(0x2F, 0x0C), controller.polled.value.map { it.code })
         prefs.selection.value = listOf(0x0D)
         assertEquals(listOf(0x0D), controller.polled.value.map { it.code })
@@ -174,7 +174,7 @@ class DashboardViewModelTest {
         // No fuel-rate tile at all, and MAF is not polled for it.
         assertEquals(listOf(0x0C), controller.polled.value.map { it.code })
         controller.readingsFlow.emit(SensorReading("01.10", 10.0, "g/s", 0))
-        assertTrue(vm.uiState.value.tiles.none { it.pid.code == 0x5E })
+        assertTrue(vm.uiState.value.tiles.none { it.pid?.code == 0x5E })
     }
 
     @Test
