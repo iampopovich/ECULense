@@ -31,7 +31,7 @@ data class BuildCapabilities(
 )
 
 /** Hub tabs: the tab screen is a list of items registered by features. */
-enum class Hub { PITSTOP, SETTINGS }
+enum class Hub(val tab: NavKey) { PITSTOP(PitstopDestination), SETTINGS(SettingsDestination) }
 
 /**
  * Hub item. A feature registers it itself; the hub knows nothing about it:

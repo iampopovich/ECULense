@@ -24,7 +24,6 @@ import io.github.iampopovich.eculense.core.navigation.FullScreenDestination
 import io.github.iampopovich.eculense.core.navigation.HubEntry
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import io.github.iampopovich.eculense.core.navigation.Navigator
-import io.github.iampopovich.eculense.core.navigation.PitstopDestination
 import io.github.iampopovich.eculense.core.navigation.TopLevelEntry
 import org.koin.compose.getKoin
 import org.koin.compose.navigation3.koinEntryProvider
@@ -41,12 +40,10 @@ fun EcuLenseApp(deepLink: String? = null, onDeepLinkHandled: () -> Unit = {}) {
     // Notification tap: screen on top of «Пит-стоп» if that feature is wired in (otherwise just open the app).
     LaunchedEffect(deepLink) {
         val target = DeepLinks.destination(deepLink) ?: return@LaunchedEffect
-        val hubs = koin.getAll<HubEntry>()
-        val pitstop = entries.firstOrNull { it.destination == PitstopDestination }
-        if (pitstop != null && hubs.any { it.destination == target }) {
+        val stack = DeepLinks.backStack(target, koin.getAll<HubEntry>(), entries.map { it.destination })
+        if (stack != null) {
             backStack.clear()
-            backStack.add(pitstop.destination)
-            backStack.add(target)
+            backStack.addAll(stack)
         }
         onDeepLinkHandled()
     }

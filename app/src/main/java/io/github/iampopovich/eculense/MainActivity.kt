@@ -14,6 +14,14 @@ import io.github.iampopovich.eculense.core.ui.theme.ECULenseTheme
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
+/**
+ * C9/R1.5: the widget's «Connect» reconnects the remembered adapter; without one it opens the adapter screen
+ * ([DeepLinks.CONNECT]) instead of doing nothing.
+ */
+internal suspend fun widgetConnect(connectLast: suspend () -> Boolean, openScreen: (String) -> Unit) {
+    if (!connectLast()) openScreen(DeepLinks.CONNECT)
+}
+
 /** AppCompatActivity: needed for AppCompatDelegate.setApplicationLocales (in-app language on API < 33). */
 class MainActivity : AppCompatActivity() {
     /** Screen from a notification (DeepLinks); reset after navigation. */
@@ -55,7 +63,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         if (connectLastPending) {
             connectLastPending = false
-            lifecycleScope.launch { autoConnect.connectLast() }
+            lifecycleScope.launch { widgetConnect(autoConnect::connectLast) { deepLink.value = it } }
         }
     }
 

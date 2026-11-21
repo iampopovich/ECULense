@@ -57,12 +57,24 @@ object DeepLinks {
     const val MAINTENANCE = "maintenance"
     /** C4: «new code during the trip» opens the DTC screen. */
     const val DTC = "dtc"
+    /** R1.5: the widget's «Connect» without a remembered adapter opens the adapter screen (Settings hub). */
+    const val CONNECT = "connect"
 
     fun destination(screen: String?): NavKey? = when (screen) {
         ANALYSIS -> AnalysisDestination
         MAINTENANCE -> MaintenanceDestination
         DTC -> DtcDestination
+        CONNECT -> ConnectDestination
         else -> null
+    }
+
+    /**
+     * Back stack for a deep link: the tab of the hub that lists [target], then [target]. null when no included
+     * feature registers [target] in a hub or that hub's tab is not part of the app (then the app just opens).
+     */
+    fun backStack(target: NavKey, hubs: List<HubEntry>, tabs: List<NavKey>): List<NavKey>? {
+        val tab = hubs.firstOrNull { it.destination == target }?.hub?.tab ?: return null
+        return if (tab in tabs) listOf(tab, target) else null
     }
 }
 
