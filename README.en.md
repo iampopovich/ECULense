@@ -37,7 +37,7 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
 **Diagnostics**
 - Live standard PIDs: RPM, speed, coolant temperature, MAF, fuel trims, O2 sensors, voltage and more.
 - Read and clear trouble codes with descriptions. A manufacturer-specific code is only described for your car's make: the same code means something else on another brand.
-- Bluetooth, Wi-Fi and USB OTG adapters. Debug (developer) builds also have a demo mode with no adapter at all (including a "flaky clone" and an "engine stops" mode); regular builds don't.
+- Bluetooth, Bluetooth LE, Wi-Fi and USB OTG adapters. Bluetooth LE (OBDLink CX, Vgate, Viecar 4.0 and clones with FFF0/FFE0/Nordic UART) and binding the socket to the adapter's Wi-Fi (the AI and downloads keep using mobile data) are implemented but not yet tested on a real adapter. Debug (developer) builds also have a demo mode with no adapter at all (including a "flaky clone" and an "engine stops" mode); regular builds don't.
 - CAN and K-Line (ISO 9141 / KWP2000), so early-2000s cars work too, not just modern CAN ones. The car profile tells you when the car may predate mandatory OBD-II.
 - Robust with cheap ELM327 clones: reconnect after a dropout, "engine off" instead of an error, priority polling (RPM and speed more often, slow sensors less often), a shareable adapter traffic log.
 - Readiness monitors, a used-car "codes cleared recently?" check, freeze frame on the code card, safe clear with a before/after comparison, mode 06.
@@ -126,14 +126,14 @@ Kotlin, Jetpack Compose (Material 3), Navigation 3, Koin, Room, DataStore, WorkM
 The architecture rests on three rules:
 
 1. **Features don't know about each other.** Each `feature:*` module registers its screens in Koin (`navigation<Key>`) and declares where it appears: as a tab (`TopLevelEntry`) or as an entry in the "Pit stop" or "Settings" hub (`HubEntry`). Cross-feature navigation goes only through keys in `:core:navigation`. Any feature, including all AI modules at once, can be removed from `settings.gradle.kts` and the app still builds.
-2. **The protocol is pure JVM.** `:core:obd` has no Android dependencies: ELM327, response parsing, CAN and K-Line, multi-frame responses, trouble codes. Its tests run in seconds against a fake transport from `testFixtures`. Bluetooth, TCP and USB are thin adapters over one transport interface.
+2. **The protocol is pure JVM.** `:core:obd` has no Android dependencies: ELM327, response parsing, CAN and K-Line, multi-frame responses, trouble codes. Its tests run in seconds against a fake transport from `testFixtures`. Bluetooth, TCP, USB and BLE (through the pure `GattLink` interface) are thin adapters over one transport interface.
 3. **Code computes, the model explains.** Analysis (`:core:analytics`) is deterministic and tested. The AI sees data only through read-only tools (`:core:aitools`) and doesn't invent numbers.
 
 ```
 app                       navigation root, cloud / local flavors
 core/
   obd                     ELM327 / OBD-II protocol (pure JVM)
-  bluetooth, usb          transports
+  bluetooth, ble, wifi, usb  transports (wifi: socket on the adapter network)
   service                 foreground service for connection and polling
   database, data          Room and repositories
   analytics               statistics, rules, maintenance
