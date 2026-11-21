@@ -63,6 +63,8 @@ internal class ToolContext(
     /** R1.6: readiness snapshots and quick health checks; null = not wired in. */
     val dtc: io.github.iampopovich.eculense.core.data.DtcRepository? = null,
     val health: io.github.iampopovich.eculense.core.data.HealthRepository? = null,
+    /** R-D: the latest module scan; null = not wired in. */
+    val moduleScans: io.github.iampopovich.eculense.core.data.ModuleScanRepository? = null,
 )
 
 /** B10: events of one recording for the model (English, no location): type, local time, seconds from the start. */

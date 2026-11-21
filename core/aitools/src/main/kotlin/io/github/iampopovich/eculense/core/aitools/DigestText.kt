@@ -20,6 +20,7 @@ internal object DigestText {
         "trends" to "Trends",
         "tripStats" to "Trips",
         "dtcHistory" to "Trouble codes",
+        "moduleDtcs" to "Trouble codes of other modules",
         "findings" to "Analysis findings",
         "maintenanceDue" to "Maintenance",
         "listSessions" to "Latest recording",

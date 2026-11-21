@@ -157,7 +157,7 @@ class DiagnosticHistoryToolsTest {
     }
 }
 
-private fun noAnalytics(): AnalyticsRepository = object : AnalyticsRepository {
+internal fun noAnalytics(): AnalyticsRepository = object : AnalyticsRepository {
     override val state = MutableStateFlow<AnalysisState>(AnalysisState.Idle)
     override fun observeFindings(carId: Long) = error("unused")
     override suspend fun findings(carId: Long) = error("unused")

@@ -12,6 +12,7 @@ import io.github.iampopovich.eculense.core.data.ExpenseRepository
 import io.github.iampopovich.eculense.core.data.FuelPrefs
 import io.github.iampopovich.eculense.core.data.FuelRepository
 import io.github.iampopovich.eculense.core.data.MaintenanceRepository
+import io.github.iampopovich.eculense.core.data.ModuleScanRepository
 import io.github.iampopovich.eculense.core.data.SessionRepository
 import io.github.iampopovich.eculense.core.data.TripEventRepository
 import io.github.iampopovich.eculense.core.data.TripRepository
@@ -35,11 +36,12 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
         calibrations: AccelCalibrations? = null,
         dtcHistory: DtcRepository? = null,
         health: HealthRepository? = null,
+        moduleScans: ModuleScanRepository? = null,
     ) : this(
         ToolContext(
             analytics, cars, trips, describeDtc = { codes, make -> dtc?.describeAll(codes, make).orEmpty() }, maintenance = maintenance, events = events,
             fuel = fuel, fuelPrefs = fuelPrefs, expenses = expenses, sessions = sessions,
-            stylePrefs = stylePrefs, calibrations = calibrations, dtc = dtcHistory, health = health,
+            stylePrefs = stylePrefs, calibrations = calibrations, dtc = dtcHistory, health = health, moduleScans = moduleScans,
         ),
     )
 
@@ -59,6 +61,7 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
         tool(DrivingStyleTool(ctx))
         tool(ReadinessHistoryTool(ctx))
         tool(HealthChecksTool(ctx))
+        tool(ModuleDtcsTool(ctx))
     }
 
     /** The on-device model does not call tools: the same information as plain text (no JSON — it used to just paraphrase it). */
@@ -83,6 +86,7 @@ internal class VehicleDataToolbox(private val ctx: ToolContext) : VehicleToolbox
                     "listSessions" -> DigestText.section(name, ListSessionsTool(ctx).json(ListSessionsArgs(limit = 1)))
                     ReadinessHistoryTool.NAME -> DigestText.section(name, ReadinessHistoryTool(ctx).json(LimitArgs(3)))
                     HealthChecksTool.NAME -> DigestText.section(name, HealthChecksTool(ctx).json(LimitArgs(1)))
+                    ModuleDtcsTool.NAME -> DigestText.section(name, ModuleDtcsTool(ctx).json(NoArgs()))
                     else -> null
                 }
             }.getOrNull()
@@ -102,7 +106,7 @@ val aiToolsModule = module {
     single<VehicleToolbox> {
         VehicleDataToolbox(
             get(), get(), get(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull(),
-            dtcHistory = getOrNull(), health = getOrNull(),
+            dtcHistory = getOrNull(), health = getOrNull(), moduleScans = getOrNull(),
         )
     }
 }
