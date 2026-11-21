@@ -6,7 +6,9 @@ import androidx.glance.appwidget.testing.unit.runGlanceAppWidgetUnitTest
 import androidx.glance.testing.unit.hasText
 import org.robolectric.RuntimeEnvironment
 import io.github.iampopovich.eculense.core.data.LastSeen
+import io.github.iampopovich.eculense.core.model.DistanceUnit
 import io.github.iampopovich.eculense.core.model.Trip
+import io.github.iampopovich.eculense.core.model.UnitsSettings
 import io.github.iampopovich.eculense.core.model.TripSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -72,11 +74,11 @@ class WidgetTest {
         setAppWidgetSize(DpSize(250.dp, 110.dp))
         setContext(RuntimeEnvironment.getApplication())
         provideComposable {
-            WidgetContent(WidgetModel.Idle(voltage = 12.4, voltageAgeMs = 5 * min, dtcCount = 0, dtcAgeMs = 3 * 60 * min, tripKm = 12.3, tripAgeMs = 72 * 60 * min))
+            WidgetContent(WidgetModel.Idle(voltage = 12.4, voltageAgeMs = 5 * min, dtcCount = 0, dtcAgeMs = 3 * 60 * min, tripDistance = 12.3, tripAgeMs = 72 * 60 * min))
         }
         onNode(hasText("Battery 12.4 V · 5 min ago")).assertExists()
         onNode(hasText("No codes · 3 h ago")).assertExists()
-        onNode(hasText("Trip 12.3 km · 3 d ago")).assertExists()
+        onNode(hasText("Trip 12.3 km · 3 days ago")).assertExists()
         onNode(hasText("Connect")).assertExists()
     }
 
@@ -101,5 +103,40 @@ class WidgetTest {
         onNode(hasText("2150 rpm")).assertExists()
         onNode(hasText("63 km/h")).assertExists()
         onNode(hasText("— °C")).assertExists()
+    }
+
+    @Test
+    fun `live values and the last trip follow the user's units`() {
+        val us = UnitsSettings(metricDistance = false, celsius = false)
+        val m = WidgetModels.live(listOf(0x0D, 0x05), emptySet(), mapOf("01.0D" to 100.0, "01.05" to 90.0), simulated = false, units = us)
+        assertEquals("mph", m.values[0].unit)
+        assertEquals(100.0 / UnitsSettings.KM_PER_MILE, m.values[0].value!!, 1e-9)
+        assertEquals("°F", m.values[1].unit)
+        assertEquals(194.0, m.values[1].value!!, 1e-9)
+        val trip = Trip(carId = 1, startedAtMs = 0, endedAtMs = 1_000, distanceKm = 16.09344, fuelL = 1.0, fuelPricePerL = null,
+            drivingMs = 1_000, standingMs = 0, source = TripSource.LIVE)
+        val idle = WidgetModels.idle(LastSeen(), trip, nowMs = 1_000, units = us)
+        assertEquals(DistanceUnit.MI, idle.distanceUnit)
+        assertEquals(10.0, idle.tripDistance!!, 1e-9)
+    }
+
+    @Test
+    fun `mph and fahrenheit are rendered with their units`() = runGlanceAppWidgetUnitTest {
+        setAppWidgetSize(DpSize(250.dp, 110.dp))
+        setContext(RuntimeEnvironment.getApplication())
+        val us = UnitsSettings(metricDistance = false, celsius = false)
+        provideComposable {
+            WidgetContent(WidgetModels.live(listOf(0x0D, 0x05), emptySet(), mapOf("01.0D" to 100.0, "01.05" to 90.0), simulated = false, units = us))
+        }
+        onNode(hasText("62 mph")).assertExists()
+        onNode(hasText("194 °F")).assertExists()
+    }
+
+    @Test
+    fun `idle trip line in miles`() = runGlanceAppWidgetUnitTest {
+        setAppWidgetSize(DpSize(250.dp, 110.dp))
+        setContext(RuntimeEnvironment.getApplication())
+        provideComposable { WidgetContent(WidgetModel.Idle(voltage = 12.4, voltageAgeMs = 0, tripDistance = 10.0, distanceUnit = DistanceUnit.MI, tripAgeMs = 0)) }
+        onNode(hasText("Trip 10.0 mi · just now")).assertExists()
     }
 }

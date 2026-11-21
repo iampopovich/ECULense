@@ -16,6 +16,8 @@ import io.github.iampopovich.eculense.core.data.DashboardPrefs
 import io.github.iampopovich.eculense.core.data.LastSeen
 import io.github.iampopovich.eculense.core.data.LastSeenStore
 import io.github.iampopovich.eculense.core.data.TripRepository
+import io.github.iampopovich.eculense.core.data.UnitsRepository
+import io.github.iampopovich.eculense.core.model.UnitsSettings
 import io.github.iampopovich.eculense.core.obd.ConnectionController
 import io.github.iampopovich.eculense.core.obd.ConnectionState
 import io.github.iampopovich.eculense.core.obd.isSimulated
@@ -58,6 +60,7 @@ internal class WidgetRepository(
     private val lastSeen: LastSeenStore,
     private val trips: TripRepository,
     private val scope: CoroutineScope,
+    private val units: UnitsRepository? = null,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val latest = HashMap<String, Double>()
@@ -99,12 +102,13 @@ internal class WidgetRepository(
 
     suspend fun current(): WidgetModel {
         val s = controller.state.value
+        val u = units?.let { runCatching { it.units.first() }.getOrNull() } ?: UnitsSettings()
         if (s is ConnectionState.Connected) {
-            return WidgetModels.live(dashboard.selection.first(), s.supportedPids, HashMap(latest), s.isSimulated)
+            return WidgetModels.live(dashboard.selection.first(), s.supportedPids, HashMap(latest), s.isSimulated, u)
         }
         val car = cars.activeCarId() ?: return WidgetModel.Idle()
         val seen = runCatching { lastSeen.observe(car).first() }.getOrDefault(LastSeen())
         val trip = runCatching { trips.trips(car).maxByOrNull { it.endedAtMs } }.getOrNull()
-        return WidgetModels.idle(seen, trip, clock())
+        return WidgetModels.idle(seen, trip, clock(), u)
     }
 }

@@ -1,10 +1,12 @@
 package io.github.iampopovich.eculense.feature.widget
 
 import io.github.iampopovich.eculense.core.data.LastSeen
+import io.github.iampopovich.eculense.core.model.DistanceUnit
 import io.github.iampopovich.eculense.core.model.Trip
+import io.github.iampopovich.eculense.core.model.UnitsSettings
 import io.github.iampopovich.eculense.core.obd.StandardPids
 
-/** One live value on the widget (stored units, as the dashboard default). */
+/** One live value on the widget, already in the user's units ([UnitsSettings.display]). */
 internal data class WidgetValue(val code: Int, val value: Double?, val unit: String)
 
 /** What the widget shows; pure data, rendered by [WidgetContent]. */
@@ -18,10 +20,12 @@ internal sealed interface WidgetModel {
         val voltageAgeMs: Long? = null,
         val dtcCount: Int? = null,
         val dtcAgeMs: Long? = null,
-        val tripKm: Double? = null,
+        /** Last trip distance in [distanceUnit]. */
+        val tripDistance: Double? = null,
+        val distanceUnit: DistanceUnit = DistanceUnit.KM,
         val tripAgeMs: Long? = null,
     ) : WidgetModel {
-        val empty: Boolean get() = voltage == null && dtcCount == null && tripKm == null
+        val empty: Boolean get() = voltage == null && dtcCount == null && tripDistance == null
     }
 }
 
@@ -32,22 +36,26 @@ internal object WidgetModels {
     /** While connected the widget is redrawn at most this often (connection changes are immediate). */
     const val LIVE_EVERY_MS = 10_000L
 
-    fun live(selection: List<Int>?, supported: Set<Int>, latest: Map<String, Double>, simulated: Boolean): WidgetModel.Live {
+    fun live(selection: List<Int>?, supported: Set<Int>, latest: Map<String, Double>, simulated: Boolean, units: UnitsSettings = UnitsSettings()): WidgetModel.Live {
         val codes = (selection ?: StandardPids.dashboardDefaults)
             .filter { supported.isEmpty() || it in supported }
             .take(MAX_VALUES)
         val values = codes.mapNotNull { code ->
-            StandardPids.byCode(code)?.let { pid -> WidgetValue(code, latest[pid.sensorId], pid.unit) }
+            StandardPids.byCode(code)?.let { pid ->
+                val value = latest[pid.sensorId]
+                WidgetValue(code, value?.let { units.display(it, pid.unit).first }, units.display(0.0, pid.unit).second)
+            }
         }
         return WidgetModel.Live(values, simulated)
     }
 
-    fun idle(seen: LastSeen, lastTrip: Trip?, nowMs: Long): WidgetModel.Idle = WidgetModel.Idle(
+    fun idle(seen: LastSeen, lastTrip: Trip?, nowMs: Long, units: UnitsSettings = UnitsSettings()): WidgetModel.Idle = WidgetModel.Idle(
         voltage = seen.voltage,
         voltageAgeMs = seen.voltageAtMs?.let { (nowMs - it).coerceAtLeast(0) },
         dtcCount = seen.dtcCount,
         dtcAgeMs = seen.dtcCheckedAtMs?.let { (nowMs - it).coerceAtLeast(0) },
-        tripKm = lastTrip?.distanceKm,
+        tripDistance = lastTrip?.distanceKm?.let { units.distance(it).value },
+        distanceUnit = units.distance(0.0).unit,
         tripAgeMs = lastTrip?.let { (nowMs - it.endedAtMs).coerceAtLeast(0) },
     )
 }

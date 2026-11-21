@@ -28,6 +28,8 @@ import androidx.glance.semantics.semantics
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import io.github.iampopovich.eculense.core.model.DistanceUnit
+import io.github.iampopovich.eculense.core.ui.R as CoreUiR
 import io.github.iampopovich.eculense.core.navigation.DeepLinks
 import io.github.iampopovich.eculense.core.obdtext.ObdText
 import java.util.Locale
@@ -114,7 +116,10 @@ internal fun idleLines(context: Context, m: WidgetModel.Idle): List<String> = li
         val age = ageText(context, m.dtcAgeMs ?: 0)
         if (n == 0) context.getString(R.string.widget_dtc_none, age) else context.getString(R.string.widget_dtc_some, n, age)
     },
-    m.tripKm?.let { context.getString(R.string.widget_trip, String.format(Locale.getDefault(), "%.1f", it), ageText(context, m.tripAgeMs ?: 0)) },
+    m.tripDistance?.let {
+        val unit = context.getString(if (m.distanceUnit == DistanceUnit.MI) CoreUiR.string.common_unit_mi else CoreUiR.string.common_unit_km)
+        context.getString(R.string.widget_trip, String.format(Locale.getDefault(), "%.1f", it), unit, ageText(context, m.tripAgeMs ?: 0))
+    },
 )
 
 internal fun ageText(context: Context, ms: Long): String = when (val a = Age.of(ms)) {
