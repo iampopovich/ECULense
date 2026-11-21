@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense.core.data
 
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
@@ -60,6 +61,17 @@ val dataModule = module {
         RoomSessionRepository(get(), activeCarId = { cars.activeCarId() }, onDeleted = { accel.delete(it) }, logger = logger())
     }
     single<StylePrefs> { DataStoreStylePrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("style") }) }
+    single<TripFactsStore> { DataStoreTripFactsStore(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("trip_facts") }) }
+    single {
+        val analyticsDao = get<AnalyticsDao>()
+        val style = get<StylePrefs>()
+        TripFactsService(
+            get(),
+            points = { id, sensors -> analyticsDao.points(id, sensors).map { Triple(it.sensorId, it.value, it.timestampMs) } },
+            store = get(),
+            harshMs2 = { car -> style.harshMs2(car).first() },
+        )
+    }
     single {
         val analyticsDao = get<AnalyticsDao>()
         val trips = get<TripRepository>()

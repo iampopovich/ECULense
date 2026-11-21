@@ -8,6 +8,7 @@ import org.koin.android.ext.koin.androidContext
 import io.github.iampopovich.eculense.core.data.FuelRepository
 import io.github.iampopovich.eculense.core.data.SessionRepository
 import io.github.iampopovich.eculense.core.data.TripEventRepository
+import io.github.iampopovich.eculense.core.data.TripFactsService
 import io.github.iampopovich.eculense.core.navigation.StatsDestination
 import io.github.iampopovich.eculense.core.navigation.TopLevelEntry
 import io.github.iampopovich.eculense.core.navigation.TripDetailDestination
@@ -20,7 +21,7 @@ import org.koin.dsl.navigation3.navigation
 /** «Статистика» is a separate tab (user's decision): between «Панелью» (0) and «Пит-стопом» (10). Trip pages open on top. */
 @OptIn(KoinExperimentalAPI::class)
 val statsModule = module {
-    viewModel { StatsViewModel(get(), get(), get(), fuel = getOrNull<FuelRepository>(), fuelPrefs = getOrNull<FuelPrefs>()) }
+    viewModel { StatsViewModel(get(), get(), get(), fuel = getOrNull<FuelRepository>(), fuelPrefs = getOrNull<FuelPrefs>(), facts = getOrNull<TripFactsService>()) }
     viewModel { (tripId: Long) ->
         TripDetailViewModel(
             tripId, get(), get(), get(), getOrNull<SessionRepository>(), getOrNull<TripEventRepository>(),

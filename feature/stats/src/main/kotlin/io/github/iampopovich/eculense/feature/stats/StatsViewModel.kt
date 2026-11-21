@@ -15,7 +15,18 @@ import io.github.iampopovich.eculense.core.model.Trip
 import io.github.iampopovich.eculense.core.model.TripStatistics
 import io.github.iampopovich.eculense.core.model.TripStats
 import io.github.iampopovich.eculense.core.model.UnitsSettings
+import io.github.iampopovich.eculense.core.analytics.StatsTrends
+import io.github.iampopovich.eculense.core.analytics.StyleTrendPoint
+import io.github.iampopovich.eculense.core.analytics.TemperatureBucket
+import io.github.iampopovich.eculense.core.analytics.TrendBucket
+import io.github.iampopovich.eculense.core.analytics.TripFacts
+import io.github.iampopovich.eculense.core.data.TripFactsService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
+import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -52,6 +63,11 @@ internal data class StatsUiState(
     /** Fuel money of the period and where it comes from. */
     val fuelCost: Double = 0.0,
     val costSource: FuelSource = FuelSource.TRIPS,
+    /** R2.8: median style score per week (month/quarter period) or month (longer); empty = card hidden. */
+    val styleTrend: List<StyleTrendPoint> = emptyList(),
+    val styleBucket: TrendBucket = TrendBucket.MONTH,
+    /** R2.8: consumption per 5 °C of outside temperature; empty = card hidden. */
+    val temperature: List<TemperatureBucket> = emptyList(),
 )
 
 /** Stats for the active car. Data comes only from :core:data (trips, cars, units, fuel log). */
@@ -63,8 +79,13 @@ internal class StatsViewModel(
     private val clock: () -> Long = System::currentTimeMillis,
     fuel: FuelRepository? = null,
     fuelPrefs: FuelPrefs? = null,
+    private val facts: TripFactsService? = null,
+    private val zone: () -> ZoneId = ZoneId::systemDefault,
 ) : ViewModel() {
     private val period = MutableStateFlow(StatsPeriod.ALL)
+
+    /** Cached per-trip facts; filled in the background from the recordings once per trip. */
+    private val factsMap = MutableStateFlow<Map<Long, TripFacts>>(emptyMap())
 
     private data class CarData(val car: CarProfile?, val trips: List<Trip>, val insights: FuelInsights?)
 
@@ -79,10 +100,22 @@ internal class StatsViewModel(
     }
 
     val uiState: StateFlow<StatsUiState> =
-        combine(active, period, units.units) { d, p, u -> build(d, p, u) }
+        combine(active.onEach(::refreshFacts), period, units.units, factsMap) { d, p, u, f -> build(d, p, u, f) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatsUiState())
 
-    private fun build(d: CarData, p: StatsPeriod, u: UnitsSettings): StatsUiState {
+    private var factsJob: Job? = null
+
+    /** Shows the cached facts at once, then computes the missing ones off the main thread (progressively). */
+    private fun refreshFacts(d: CarData) {
+        val service = facts ?: return
+        factsJob?.cancel()
+        factsJob = viewModelScope.launch(Dispatchers.IO) {
+            factsMap.value = runCatching { service.cached() }.getOrDefault(emptyMap())
+            runCatching { service.ensure(d.trips) { factsMap.value = it } }
+        }
+    }
+
+    private fun build(d: CarData, p: StatsPeriod, u: UnitsSettings, f: Map<Long, TripFacts> = emptyMap()): StatsUiState {
         val now = clock()
         val insights = d.insights
         val corrected = insights?.corrected(d.trips) ?: d.trips
@@ -105,8 +138,17 @@ internal class StatsViewModel(
             consumptionSource = if (fromLog != null) FuelSource.FILL_UPS else estimateSource,
             fuelCost = logSpend ?: stats.fuelCost,
             costSource = if (logSpend != null) FuelSource.FILL_UPS else estimateSource,
+            styleTrend = StatsTrends.styleTrend(inPeriod.mapNotNull { t -> f[t.id]?.styleScore?.let { t.startedAtMs to it } }, bucketOf(p), zone()),
+            styleBucket = bucketOf(p),
+            temperature = StatsTrends.consumptionByTemperature(
+                inPeriod.filter { it.fuelKnown && it.fuelL > 0 && it.distanceKm >= StatsTrends.MIN_TRIP_KM }
+                    .mapNotNull { t -> f[t.id]?.ambientC?.let { c -> t.fuelL / t.distanceKm * 100 to c } },
+            ),
         )
     }
+
+    /** Weeks inside a month or quarter, months for longer periods. */
+    private fun bucketOf(p: StatsPeriod): TrendBucket = if ((p.days ?: Long.MAX_VALUE) <= 92L) TrendBucket.WEEK else TrendBucket.MONTH
 
     fun selectPeriod(p: StatsPeriod) {
         period.value = p

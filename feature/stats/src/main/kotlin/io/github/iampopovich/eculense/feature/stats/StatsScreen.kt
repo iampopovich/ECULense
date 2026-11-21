@@ -92,6 +92,8 @@ internal fun StatsScreen(
         }
         LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { Summary(state) }
+            if (state.styleTrend.isNotEmpty()) item(key = "style_trend") { StyleTrendCard(state.styleTrend, state.styleBucket) }
+            if (state.temperature.isNotEmpty()) item(key = "temperature") { TemperatureCard(state.temperature, state.units) }
             item { Text(stringResource(R.string.stats_trips), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
             items(state.trips, key = { it.id.takeIf { id -> id != 0L } ?: it.startedAtMs }) { TripRow(it, state.units, onTrip) }
             item { Text(" ", Modifier.padding(bottom = 8.dp)) }

@@ -87,4 +87,15 @@
     <string name="calib_gap_few_events">events with OBD speed: %1$d, at least %2$d needed</string>
     <string name="calib_gap_sign">the sensor and OBD disagree on the direction</string>
     <string name="calib_gap_no_gravity">the file has no gravity samples, the horizontal plane is unknown</string>
+    <string name="stats_style_trend_week">Driving style by week</string>
+    <string name="stats_style_trend_month">Driving style by month</string>
+    <string name="stats_style_trend_note">Median score of the trips whose recording could be scored (speed sampled at least every 2 s).</string>
+    <string name="stats_week_of">Week of %1$s</string>
+    <string name="stats_temp_title">Consumption and outside temperature</string>
+    <string name="stats_temp_range" translatable="false">%1$s…%2$s %3$s</string>
+    <string name="stats_temp_note">Outside air sensor (PID 46); without it, intake air at over 30 km/h on a warm engine, which reads a few degrees high. Trips of 2 km or longer per row, at least: %1$d.</string>
+    <plurals name="stats_trend_trips">
+        <item quantity="one">%1$d trip</item>
+        <item quantity="other">%1$d trips</item>
+    </plurals>
 </resources>

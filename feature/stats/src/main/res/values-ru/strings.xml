@@ -91,4 +91,16 @@
     <string name="calib_gap_few_events">событий со скоростью OBD: %1$d, нужно не меньше %2$d</string>
     <string name="calib_gap_sign">датчик и OBD расходятся в направлении</string>
     <string name="calib_gap_no_gravity">в файле нет вектора гравитации, горизонталь не найти</string>
+    <string name="stats_style_trend_week">Стиль вождения по неделям</string>
+    <string name="stats_style_trend_month">Стиль вождения по месяцам</string>
+    <string name="stats_style_trend_note">Медиана оценок поездок, запись которых можно оценить (скорость не реже раза в 2 с).</string>
+    <string name="stats_week_of">Неделя с %1$s</string>
+    <string name="stats_temp_title">Расход и температура воздуха</string>
+    <string name="stats_temp_note">Датчик наружного воздуха (PID 46); без него — воздух на впуске при скорости больше 30 км/ч на прогретом двигателе, он завышает на несколько градусов. Поездок от 2 км в строке, не меньше: %1$d.</string>
+    <plurals name="stats_trend_trips">
+        <item quantity="one">%1$d поездка</item>
+        <item quantity="few">%1$d поездки</item>
+        <item quantity="many">%1$d поездок</item>
+        <item quantity="other">%1$d поездки</item>
+    </plurals>
 </resources>
