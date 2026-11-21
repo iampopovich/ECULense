@@ -168,4 +168,5 @@ internal fun FindingKey.resId(): Int? = when (this) {
     FindingKey.IDLE_RPM_LOW -> R.string.finding_idle_rpm_low
     FindingKey.IDLE_RPM_HIGH -> R.string.finding_idle_rpm_high
     FindingKey.IDLE_RPM_OK -> R.string.finding_idle_rpm_ok
+    FindingKey.VOLTAGE_DIFFERS_NORM -> R.string.finding_voltage_differs_norm
 }

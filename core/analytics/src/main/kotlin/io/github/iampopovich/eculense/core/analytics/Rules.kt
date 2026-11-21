@@ -200,6 +200,15 @@ object VoltageRule : AnalyticsRule {
             idle?.takeIf { idleNorm?.above(it.first) == true }?.let { Triple(t(K.VOLTAGE_AT_IDLE, num(it.first)), idleNorm!!, it.second) },
             driving?.takeIf { drivingNorm?.above(it.first) == true }?.let { Triple(t(K.VOLTAGE_WHILE_DRIVING, num(it.first)), drivingNorm!!, it.second) },
         )
+        // A drift from the car's own baseline that stays inside the standard regulator window (13.2–14.8 V, the generic
+        // band) is worth watching (INFO), not a fault: 14.3 V at idle is a healthy set point even if this car usually
+        // sits at 13.9 V (cold days raise the set point by ~10 mV/K). Outside the window, or against the user's own
+        // band, it is a WARNING.
+        val window = GenericNorms.of(NormKey.CHARGING_IDLE_V, input.car, input.traits)!!
+        fun drift(parts: List<Triple<FindingText, Norm, List<SessionDigest>>>, values: List<Double>) =
+            parts.all { it.second.source == NormSource.BASELINE } && values.none { window.outside(it) }
+        val lowValues = listOfNotNull(idle?.first?.takeIf { idleNorm?.below(it) == true }, driving?.first?.takeIf { drivingNorm?.below(it) == true })
+        val highValues = listOfNotNull(idle?.first?.takeIf { idleNorm?.above(it) == true }, driving?.first?.takeIf { drivingNorm?.above(it) == true })
         val low = when {
             dead.isNotEmpty() -> Finding(
                 LOW, Severity.WARNING, TITLE_LOW,
@@ -208,9 +217,10 @@ object VoltageRule : AnalyticsRule {
             )
             lowParts.isNotEmpty() -> {
                 val sessions = lowParts.flatMap { it.third }.distinctBy { it.sessionId }
+                val mild = drift(lowParts, lowValues)
                 Finding(
-                    LOW, Severity.WARNING, TITLE_LOW,
-                    listOfNotNull(t(K.VOLTAGE_LOW_NORM, FindingArg.Join(lowParts.map { it.first })), adapterNote),
+                    LOW, if (mild) Severity.INFO else Severity.WARNING, TITLE_LOW,
+                    listOfNotNull(t(if (mild) K.VOLTAGE_DIFFERS_NORM else K.VOLTAGE_LOW_NORM, FindingArg.Join(lowParts.map { it.first })), adapterNote),
                     evidence, sessions.map { it.sessionId }, span(sessions).first, span(sessions).second, norms = lowParts.map { it.second },
                 )
             }
@@ -223,8 +233,10 @@ object VoltageRule : AnalyticsRule {
             )
             highParts.isNotEmpty() -> {
                 val sessions = highParts.flatMap { it.third }.distinctBy { it.sessionId }
+                val mild = drift(highParts, highValues)
                 Finding(
-                    HIGH, Severity.WARNING, TITLE_HIGH, t(K.VOLTAGE_HIGH_NORM, FindingArg.Join(highParts.map { it.first })),
+                    HIGH, if (mild) Severity.INFO else Severity.WARNING, TITLE_HIGH,
+                    t(if (mild) K.VOLTAGE_DIFFERS_NORM else K.VOLTAGE_HIGH_NORM, FindingArg.Join(highParts.map { it.first })),
                     evidence, sessions.map { it.sessionId }, span(sessions).first, span(sessions).second, norms = highParts.map { it.second },
                 )
             }

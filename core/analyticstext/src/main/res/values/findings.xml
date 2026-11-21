@@ -179,4 +179,5 @@
     <string name="finding_idle_rpm_low">Warm idle speed of recent recordings, %1$s rpm, is below the norm — risk of stalling (idle air control, vacuum leak, throttle body).</string>
     <string name="finding_idle_rpm_high">Warm idle speed of recent recordings, %1$s rpm, is above the norm (vacuum leak, idle control, load).</string>
     <string name="finding_idle_rpm_ok">Warm idle speed, %1$s rpm, is within the norm.</string>
+    <string name="finding_voltage_differs_norm">Charging voltage of recent recordings differs from this car’s usual level: %1$s. It is still inside the usual regulator range (13.2–14.8 V) — watch the trend.</string>
 </resources>

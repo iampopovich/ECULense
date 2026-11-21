@@ -152,6 +152,7 @@ enum class FindingKey(val en: String, val enOne: String? = null) {
     VOLTAGE_WHILE_DRIVING("while driving %1\$s V"),
     VOLTAGE_LOW_NORM("Charging voltage of recent recordings is below the norm: %1\$s. Check the alternator, belt and terminals."),
     VOLTAGE_HIGH_NORM("Charging voltage of recent recordings is above the norm: %1\$s — the voltage regulator may be faulty."),
+    VOLTAGE_DIFFERS_NORM("Charging voltage of recent recordings differs from this car’s usual level: %1\$s. It is still inside the usual regulator range (13.2–14.8 V) — watch the trend."),
     VOLTAGE_NORM_OK("Charging voltage is within the norm."),
     EVIDENCE_VOLTAGE_IDLE("Voltage at idle (recent median)"),
     EVIDENCE_VOLTAGE_DRIVING("Voltage while driving (recent median)"),

@@ -67,6 +67,16 @@ class CarNormsTest {
     }
 
     @Test
+    fun `a healthy 14_3 V above a 13_9 V baseline is only INFO, a drift out of the regulator window is a WARNING`() {
+        val norms = CarNorms(listOf(Norm(NormKey.CHARGING_IDLE_V, 13.53, 14.27, NormSource.BASELINE, center = 13.9, sampleCount = 30)))
+        fun at(v: Double) = (1L..3L).map { digest(it).copy(runningVoltage = agg(20, v), runningVoltageHist = hist(20, v), idleVoltageHist = hist(20, v)) }
+        val mild = AnalyticsEngine.evaluate(input(at(14.3), norms)).first { it.ruleId == "voltage-high" }
+        assertEquals(Severity.INFO, mild.severity)
+        assertEquals(FindingKey.VOLTAGE_DIFFERS_NORM, mild.message.first().key)
+        assertEquals(Severity.WARNING, AnalyticsEngine.evaluate(input(at(14.95), norms)).first { it.ruleId == "voltage-high" }.severity)
+    }
+
+    @Test
     fun `a dead alternator is never learned as the norm`() {
         val sessions = (1L..8L).map { digest(it).copy(runningVoltage = agg(20, 11.8), runningVoltageHist = hist(20, 11.8), drivingVoltageHist = hist(20, 11.8)) }
         val (findings, norms) = recompute(sessions, CarNorms())
