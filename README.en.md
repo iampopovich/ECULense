@@ -41,6 +41,7 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
 - CAN and K-Line (ISO 9141 / KWP2000), so early-2000s cars work too, not just modern CAN ones. The car profile tells you when the car may predate mandatory OBD-II.
 - Robust with cheap ELM327 clones: reconnect after a dropout, "engine off" instead of an error, priority polling (RPM and speed more often, slow sensors less often), a shareable adapter traffic log.
 - Readiness monitors, a used-car "codes cleared recently?" check, freeze frame on the code card, safe clear with a before/after comparison, mode 06.
+- "Vehicle modules": trouble codes of the transmission, ABS/ESC and other modules (CAN and K-Line KWP2000), reading requests only, airbags are never queried. Implemented, not yet tested on a real car.
 - A one-minute health check with traffic lights and an HTML/PDF report.
 
 **Dashboard**
