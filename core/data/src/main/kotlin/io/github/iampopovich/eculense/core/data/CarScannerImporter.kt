@@ -2,6 +2,7 @@ package io.github.iampopovich.eculense.core.data
 
 import android.content.Context
 import android.net.Uri
+import io.github.iampopovich.eculense.core.obd.AdapterPrefs
 import io.github.iampopovich.eculense.core.carscanner.BrcReader
 import io.github.iampopovich.eculense.core.carscanner.BrcRecord
 import io.github.iampopovich.eculense.core.carscanner.CarScannerBackupMeta
@@ -91,6 +92,8 @@ class CarScannerImporter internal constructor(
     private val sqlite: SqliteOpener,
     private val tempDir: File,
     private val ledger: ImportLedger = InMemoryImportLedger(),
+    /** R2.7: the Wi-Fi adapter address of the backup becomes a ready entry on the Connect screen. */
+    private val adapterPrefs: AdapterPrefs? = null,
     /** After import (analytics recompute); does not block the result. */
     private val afterImport: (ImportReport) -> Unit = {},
 ) {
@@ -102,10 +105,11 @@ class CarScannerImporter internal constructor(
         trips: TripRepository,
         units: UnitsRepository,
         ledger: ImportLedger,
+        adapterPrefs: AdapterPrefs? = null,
         afterImport: (ImportReport) -> Unit = {},
     ) : this(
         { uri: Uri -> context.contentResolver.openInputStream(uri) },
-        sessions, dtcHistory, cars, trips, units, AndroidSqlite, context.cacheDir, ledger, afterImport,
+        sessions, dtcHistory, cars, trips, units, AndroidSqlite, context.cacheDir, ledger, adapterPrefs, afterImport,
     )
 
     private val dtcCode = Regex("\"Code\":\"([A-Z0-9]{5})\"")
@@ -152,6 +156,8 @@ class CarScannerImporter internal constructor(
             }
             val carMapping = meta?.let { importCars(it) } ?: CarMapping.EMPTY
             val unitsImported = meta?.settings?.takeIf { it.hasUnits }?.let { mergeUnits(it.toUnits()) } ?: false
+            // The address itself is never logged or reported (it identifies the user's network).
+            meta?.settings?.wifiEndpoint?.let { address -> adapterPrefs?.setSuggestedWifi(address) }
             val total = cbz.recordings.size
             var imported = 0
             var duplicates = 0

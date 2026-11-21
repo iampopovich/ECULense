@@ -67,6 +67,7 @@ object ObdText {
         EndpointLabel.DEMO_ENGINE_OFF -> UiText.Res(R.string.obd_endpoint_demo_engine_off)
         EndpointLabel.PC_EMULATOR -> UiText.Res(R.string.obd_endpoint_pc_emulator)
         EndpointLabel.REPLAY -> UiText.Res(R.string.obd_endpoint_replay)
+        EndpointLabel.WIFI_CAR_SCANNER -> UiText.Res(R.string.obd_endpoint_wifi_car_scanner, listOf(endpoint.address))
         null -> UiText.Raw(endpoint.label)
     }
 
@@ -76,6 +77,7 @@ object ObdText {
         EndpointLabel.DEMO_FLAKY -> UiText.Res(R.string.obd_endpoint_demo_flaky_detail)
         EndpointLabel.DEMO_ENGINE_OFF -> UiText.Res(R.string.obd_endpoint_demo_engine_off_detail)
         EndpointLabel.REPLAY -> UiText.Res(R.string.obd_endpoint_replay_detail)
+        EndpointLabel.WIFI_CAR_SCANNER -> UiText.Res(R.string.obd_endpoint_wifi_car_scanner_detail)
         EndpointLabel.PC_EMULATOR, null -> UiText.Raw(endpoint.address)
     }
 

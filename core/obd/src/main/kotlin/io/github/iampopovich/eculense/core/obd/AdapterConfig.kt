@@ -3,6 +3,7 @@ package io.github.iampopovich.eculense.core.obd
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
 
 /** ELM327 protocol numbers (ATSP/ATDPN). Names are rendered by :core:obdtext. */
 object ObdProtocols {
@@ -49,6 +50,10 @@ interface AdapterPrefs {
     suspend fun setSettings(settings: AdapterSettings)
     suspend fun profile(adapterKey: String): AdapterProfile?
     suspend fun saveProfile(adapterKey: String, profile: AdapterProfile)
+
+    /** R2.7: «host:port» of the Wi-Fi adapter found in an imported Car Scanner backup; null = none. */
+    val suggestedWifi: Flow<String?> get() = flowOf(null)
+    suspend fun setSuggestedWifi(address: String?) {}
 }
 
 /** In-memory prefs: the default without Android storage and in tests. */
@@ -62,6 +67,12 @@ class InMemoryAdapterPrefs(initial: AdapterSettings = AdapterSettings()) : Adapt
     override suspend fun profile(adapterKey: String): AdapterProfile? = profiles[adapterKey]
     override suspend fun saveProfile(adapterKey: String, profile: AdapterProfile) {
         profiles[adapterKey] = profile
+    }
+
+    private val wifi = MutableStateFlow<String?>(null)
+    override val suggestedWifi: Flow<String?> = wifi.asStateFlow()
+    override suspend fun setSuggestedWifi(address: String?) {
+        wifi.value = address
     }
 }
 

@@ -29,6 +29,8 @@
     <string name="obd_endpoint_demo_engine_off">Демо: двигатель глохнет</string>
     <string name="obd_endpoint_demo_engine_off_detail">Виртуальная машина · двигатель глохнет через 30 с и заводится через 30 с</string>
     <string name="obd_endpoint_replay">Воспроизвести журнал</string>
+    <string name="obd_endpoint_wifi_car_scanner">Wi-Fi из Car Scanner: %1$s</string>
+    <string name="obd_endpoint_wifi_car_scanner_detail">Адрес адаптера из импортированной копии Car Scanner</string>
     <string name="obd_endpoint_replay_detail">Проигрывает выгруженный журнал обмена как адаптер</string>
     <string name="obd_protocol_auto">Авто</string>
     <string name="obd_protocol_1">SAE J1850 PWM (41,6 кбод, Ford)</string>

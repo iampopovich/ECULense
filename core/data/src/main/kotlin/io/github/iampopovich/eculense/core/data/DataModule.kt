@@ -137,7 +137,7 @@ val dataModule = module {
         val trips = get<RecordingTrips>()
         val logger = logger()
         // New recordings and codes → trips for recordings without a Car Scanner trip, then findings (in background, for all cars).
-        CarScannerImporter(androidContext(), get(), get(), get(), get(), get(), get()) { report ->
+        CarScannerImporter(androidContext(), get(), get(), get(), get(), get(), get(), getOrNull<AdapterPrefs>()) { report ->
             if (report.imported > 0 || report.tripsImported > 0 || report.tripsUpdated > 0 || report.dtcEventsAdded > 0) {
                 scope.launch {
                     logger.attempt(TAG, "trip backfill after import") { trips.backfill() }

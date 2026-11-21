@@ -30,6 +30,8 @@
     <string name="obd_endpoint_demo_engine_off">Demo: engine stops</string>
     <string name="obd_endpoint_demo_engine_off_detail">Virtual car · engine off after 30 s, on again 30 s later</string>
     <string name="obd_endpoint_replay">Replay a traffic log</string>
+    <string name="obd_endpoint_wifi_car_scanner">Wi-Fi from Car Scanner: %1$s</string>
+    <string name="obd_endpoint_wifi_car_scanner_detail">Adapter address from the imported Car Scanner backup</string>
     <string name="obd_endpoint_replay_detail">Plays an exported adapter log back as an adapter</string>
     <string name="obd_protocol_auto">Automatic</string>
     <string name="obd_protocol_1">SAE J1850 PWM (41.6 kbaud, Ford)</string>

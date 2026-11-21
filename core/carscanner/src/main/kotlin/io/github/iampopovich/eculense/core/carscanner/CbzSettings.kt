@@ -26,10 +26,30 @@ data class CarScannerSettings(
     val flowGramsPerSecond: Boolean? = null,
     val accelerationG: Boolean? = null,
     val fuelConsumptionUnit: Int? = null,
+    /** Host of the Wi-Fi adapter set up in Car Scanner (key WiFiServer). */
+    val wifiServer: String? = null,
     val wifiPort: Int? = null,
+    /** Car Scanner IOTimeout / SendDelay: no counterpart in our adapter settings (ELM327 ATST/adaptive timing), not imported. */
     val ioTimeout: Int? = null,
     val sendDelay: Int? = null,
 ) {
+    /**
+     * «host:port» of the Wi-Fi adapter for the Connect screen; null when the host is missing or not a plain IPv4/host
+     * name, or the port is out of range. Without a stored port the ELM327 Wi-Fi default 35000 is used (the address our
+     * Wi-Fi factory lists by default and the factory setting of common ELM327 Wi-Fi clones).
+     */
+    val wifiEndpoint: String?
+        get() {
+            val host = wifiServer?.trim()?.takeIf { HOST.matches(it) } ?: return null
+            val port = (wifiPort ?: DEFAULT_WIFI_PORT).takeIf { it in 1..65_535 } ?: return null
+            return "$host:$port"
+        }
+
+    private companion object {
+        const val DEFAULT_WIFI_PORT = 35_000
+        val HOST = Regex("[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?")
+    }
+
     /** Whether the backup has at least one unit-of-measure flag. */
     val hasUnits: Boolean
         get() = listOf(useKm, useCelsius, useL100, useLiters, useUsGallon, pressureKpa, horsePower, torqueNm, flowGramsPerSecond, accelerationG)
@@ -108,6 +128,7 @@ object CbzSettingsReader {
             flowGramsPerSecond = bool("Flow_use_grams_sec"),
             accelerationG = bool("AccelerationUseG"),
             fuelConsumptionUnit = int("FuelConsumptionUnit"),
+            wifiServer = str("WiFiServer"),
             wifiPort = str("WiFiPort")?.toIntOrNull(),
             ioTimeout = int("IOTimeout"),
             sendDelay = int("SendDelay"),

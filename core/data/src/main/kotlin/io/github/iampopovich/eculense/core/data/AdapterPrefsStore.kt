@@ -47,6 +47,12 @@ internal class DataStoreAdapterPrefs(
         store.edit { it[key] = encode(profile) }
     }
 
+    override val suggestedWifi: Flow<String?> = store.data.map { it[SUGGESTED_WIFI] }
+
+    override suspend fun setSuggestedWifi(address: String?) {
+        store.edit { p -> address?.let { p[SUGGESTED_WIFI] = it } ?: p.remove(SUGGESTED_WIFI) }
+    }
+
     private suspend fun profileKey(adapterKey: String) =
         stringPreferencesKey("profile|$adapterKey|car=${runCatching { activeCarId() }.getOrNull() ?: 0}")
 
@@ -54,6 +60,7 @@ internal class DataStoreAdapterPrefs(
         private val PROTOCOL = stringPreferencesKey("protocol")
         private val EXTRA_INIT = stringPreferencesKey("extra_init")
         private val TIMING = stringPreferencesKey("adaptive_timing")
+        private val SUGGESTED_WIFI = stringPreferencesKey("suggested_wifi")
 
         /** "<protocol or ->;<suffix 1/0/->;<unsupported, comma separated>". */
         fun encode(p: AdapterProfile): String = listOf(

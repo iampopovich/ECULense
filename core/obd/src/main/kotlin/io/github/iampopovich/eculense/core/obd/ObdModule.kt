@@ -1,6 +1,7 @@
 package io.github.iampopovich.eculense.core.obd
 
 import io.github.iampopovich.eculense.core.model.AppLogger
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +29,10 @@ fun obdModule(includeEmulator: Boolean) = module {
     single<ConnectionController> {
         ObdConnectionManager(getAll(), get(AppScope), trafficLog = get(), prefs = getOrNull<AdapterPrefs>() ?: InMemoryAdapterPrefs())
     }
-    single(named(WifiTransportFactory.KIND)) { WifiTransportFactory(includeEmulator) } bind TransportFactory::class
+    single(named(WifiTransportFactory.KIND)) {
+        val scope = this
+        WifiTransportFactory(includeEmulator) { scope.getOrNull<AdapterPrefs>()?.suggestedWifi?.first() }
+    } bind TransportFactory::class
     single { ReplayLogHolder() }
     single(named(ReplayTransportFactory.KIND)) {
         val holder = get<ReplayLogHolder>()
