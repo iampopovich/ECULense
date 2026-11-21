@@ -82,12 +82,16 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
 - Detailed trouble-code descriptions with causes and symptoms.
 - Everything is downloaded separately, so the APK stays small.
 
+**Smart home (MQTT / Home Assistant, optional)**
+- Live values published to your own MQTT broker (Settings → "Smart home (MQTT)", off by default): dashboard values, battery voltage, connection state, the trouble-code count of the last check; the car shows up in Home Assistant by itself (MQTT discovery), availability via Last Will. Own MQTT 3.1.1 client without dependencies, TLS for addresses outside the home network. Publishes only while a real adapter is connected. Implemented and tested against a fake broker, not yet with a real Home Assistant.
+
 ## Privacy
 
 - Your data stays on the phone. No accounts, no analytics.
 - Only what you send to the AI assistant goes to the cloud, and only after explicit consent. VIN and GPS are never included in model requests.
 - API keys are encrypted with Android Keystore and never end up in backups.
 - Without the AI assistant the app works fully offline (the network is only used to download reference data).
+- MQTT (optional, off by default): data goes only to the broker you entered; no VIN, GPS, adapter address or car name (Home Assistant sees make, model and year). The broker password is encrypted with Android Keystore and never ends up in backups.
 - The demo adapter and log replay (debug builds only) never write into your car's history. The VIN is hidden by default.
 - "Report a problem" opens a GitHub form only after showing the exact text; it has no VIN, car name, location or traffic log, and nothing is sent automatically.
 
