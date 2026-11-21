@@ -11,4 +11,6 @@
     <string name="obd_endpoint_demo_engine_off_detail">Виртуальная машина · двигатель глохнет через 30 с и заводится через 30 с</string>
     <string name="obd_endpoint_replay">Воспроизвести журнал</string>
     <string name="obd_endpoint_replay_detail">Проигрывает выгруженный журнал обмена как адаптер</string>
+    <string name="obd_endpoint_demo_ble">Демо BLE (симуляция)</string>
+    <string name="obd_endpoint_demo_ble_detail">Виртуальный ELM327 через имитацию Bluetooth LE · FFF0 · уведомления по 20 байт</string>
 </resources>

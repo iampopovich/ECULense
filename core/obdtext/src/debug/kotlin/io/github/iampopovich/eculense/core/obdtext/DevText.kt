@@ -15,6 +15,7 @@ internal object DevText {
         EndpointLabel.DEMO_ENGINE_OFF -> UiText.Res(R.string.obd_endpoint_demo_engine_off)
         EndpointLabel.PC_EMULATOR -> UiText.Res(R.string.obd_endpoint_pc_emulator)
         EndpointLabel.REPLAY -> UiText.Res(R.string.obd_endpoint_replay)
+        EndpointLabel.DEMO_BLE -> UiText.Res(R.string.obd_endpoint_demo_ble)
         else -> UiText.Raw(endpoint.label)
     }
 
@@ -23,6 +24,7 @@ internal object DevText {
         EndpointLabel.DEMO_FLAKY -> UiText.Res(R.string.obd_endpoint_demo_flaky_detail)
         EndpointLabel.DEMO_ENGINE_OFF -> UiText.Res(R.string.obd_endpoint_demo_engine_off_detail)
         EndpointLabel.REPLAY -> UiText.Res(R.string.obd_endpoint_replay_detail)
+        EndpointLabel.DEMO_BLE -> UiText.Res(R.string.obd_endpoint_demo_ble_detail)
         else -> UiText.Raw(endpoint.address)
     }
 

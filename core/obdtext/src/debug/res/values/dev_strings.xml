@@ -11,4 +11,6 @@
     <string name="obd_endpoint_demo_engine_off_detail">Virtual car · engine off after 30 s, on again 30 s later</string>
     <string name="obd_endpoint_replay">Replay a traffic log</string>
     <string name="obd_endpoint_replay_detail">Plays an exported adapter log back as an adapter</string>
+    <string name="obd_endpoint_demo_ble">Demo BLE (simulation)</string>
+    <string name="obd_endpoint_demo_ble_detail">Virtual ELM327 over a simulated Bluetooth LE link · FFF0 · 20-byte notifications</string>
 </resources>
