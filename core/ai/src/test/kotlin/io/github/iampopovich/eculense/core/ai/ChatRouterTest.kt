@@ -182,4 +182,33 @@ class ChatRouterTest {
         assertTrue("healthChecks" in ExpertRoles.ELECTRICAL.tools)
         assertTrue("readinessHistory" in ExpertRoles.DIAGNOSTICIAN.digestSections)
     }
+
+    @Test
+    fun `explicit health check phrasings select the health check topic`() {
+        val cases = listOf(
+            "последняя проверка", "что показала проверка", "что показала последняя проверка", "проверка за минуту",
+            "быстрая проверка что нашла", "результат последней проверки", "health check", "last check results",
+            "what did the quick check find",
+        )
+        val failures = cases.mapNotNull { q ->
+            val r = route(q)
+            if ("healthChecks" in r.topicSections && r.roles.firstOrNull() == ExpertRoles.DIAGNOSTICIAN) null
+            else "«$q»: ${r.intent}/${r.roles.map { it.id }}/${r.topicSections}"
+        }
+        assertTrue(failures.joinToString("\n"), failures.isEmpty())
+    }
+
+    @Test
+    fun `maintenance phrasings with a check word stay maintenance and get no health check section`() {
+        val cases = listOf(
+            "проверка масла", "проверка тормозов", "когда проверить фильтр", "проверка уровня масла", "когда менять масло",
+            "check the oil level", "when to check the brakes",
+        )
+        val failures = cases.mapNotNull { q ->
+            val r = route(q)
+            if (r.intent == ChatIntent.MAINTENANCE && "healthChecks" !in r.topicSections) null
+            else "«$q»: ${r.intent}/${r.roles.map { it.id }}/${r.topicSections}"
+        }
+        assertTrue(failures.joinToString("\n"), failures.isEmpty())
+    }
 }

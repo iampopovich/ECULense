@@ -169,7 +169,8 @@ internal object RouterKeywords {
     val SERVICE = listOf(
         "(пройти|пройду|следующее|очередное|плановое|ближайшее) то\\b", "то-?\\d", "техобслуж", "обслуж", "масл", "замен", "менять",
         "фильтр", "свеч", "ремен", "грм", "регламент", "интервал", "пора ",
-        "maintenance", "service", "oil", "replace", "filter", "spark plug", "timing belt",
+        "тормоз(а|ов|ам|ах|ные|ная|ную|ной|ных)?\\b", "колодк",
+        "maintenance", "service", "oil", "replace", "filter", "spark plug", "timing belt", "brakes\\b", "brake (pads?|fluid|discs?)",
     )
 
     /** «Готова ли к техосмотру», «стирали ли ошибки», «сколько прогревов после сброса». */
@@ -179,9 +180,15 @@ internal object RouterKeywords {
         "inspection", "emissions? test", "smog", "mot\\b", "monitors?\\b", "cleared", "erased", "reset (the )?codes", "since (the )?clear",
     )
 
-    /** «Что показала проверка», «результат последней проверки». */
+    /**
+     * Explicit references to the in-app quick health check only («последняя проверка», «что показала проверка»,
+     * «проверка за минуту», «быстрая проверка»). A bare «проверка» is not enough: «проверка масла», «когда проверить
+     * фильтр» are maintenance questions.
+     */
     val HEALTH_CHECK = listOf(
-        "проверк", "что показал", "health check", "quick check", "last check", "check result", "(the )?check show",
+        "последн(яя|ей|юю|ее|ие|их) проверк", "что показал(а|и)? (последн(яя|ие) )?проверк", "проверк(а|у|и|ой)? за (одну )?минуту",
+        "быстр(ая|ую|ой|ые|ых) проверк", "результат(ы|а|ов)? (последней |быстрой )?проверк", "проверк(а|и|у)? (здоровья|состояния)",
+        "health check", "quick check", "last check", "check results?", "(the )?check show",
     )
 
     val MODEL_EXPERT = listOf(
