@@ -111,6 +111,11 @@ internal class FuelLogViewModel(
         }
     }
 
+    /** The picked file is over [CsvImportLimit.MAX_MB] MB: not read, clear message instead. */
+    fun importTooLarge() {
+        message.value = UiText.Res(R.string.fuel_import_too_large, listOf(CsvImportLimit.MAX_MB))
+    }
+
     fun messageShown() {
         message.value = null
     }

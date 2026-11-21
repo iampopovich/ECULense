@@ -7,6 +7,7 @@
     <string name="fuel_edit">Edit fill-up</string>
     <string name="fuel_import">Import CSV</string>
     <string name="fuel_import_failed">Could not read the file.</string>
+    <string name="fuel_import_too_large">The file is larger than %1$d MB, a fuel log export is much smaller. Check that the right file was picked.</string>
     <string name="fuel_import_unknown">Unknown file layout: a Fuelio export or a CSV with date, odometer and litres columns is needed.</string>
     <string name="fuel_import_done">Imported: %1$d, already there: %2$d, unreadable rows: %3$d.</string>
     <string name="fuel_empty">No fill-ups yet. Log every fill-up and mark full tanks: consumption is computed from full to full.</string>

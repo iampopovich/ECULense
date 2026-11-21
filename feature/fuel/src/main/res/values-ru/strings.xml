@@ -6,6 +6,7 @@
     <string name="fuel_add">Добавить заправку</string>
     <string name="fuel_edit">Изменить заправку</string>
     <string name="fuel_import">Импорт CSV</string>
+    <string name="fuel_import_too_large">Файл больше %1$d МБ, а выгрузка журнала заправок намного меньше. Проверьте, тот ли файл выбран.</string>
     <string name="fuel_import_failed">Не удалось прочитать файл.</string>
     <string name="fuel_import_unknown">Неизвестный формат: нужен экспорт Fuelio или CSV со столбцами даты, пробега и литров.</string>
     <string name="fuel_import_done">Импортировано: %1$d, уже было: %2$d, нечитаемых строк: %3$d.</string>

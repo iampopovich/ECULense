@@ -61,10 +61,14 @@ internal fun FuelLogRoute(viewModel: FuelLogViewModel = koinViewModel()) {
     val scope = rememberCoroutineScope()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
-            val text = withContext(Dispatchers.IO) {
-                runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } }.getOrNull()
+            val read = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openInputStream(uri)?.use { CsvImportLimit.read(it) } }.getOrNull()
             }
-            viewModel.importCsv(text)
+            when (read) {
+                CsvRead.TooLarge -> viewModel.importTooLarge()
+                is CsvRead.Text -> viewModel.importCsv(read.text)
+                null -> viewModel.importCsv(null)
+            }
         }
     }
     FuelLogScreen(
