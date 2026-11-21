@@ -91,7 +91,8 @@ class ReplayTransportFactory(
 
     companion object {
         const val KIND = "replay"
-        val ENDPOINT = AdapterEndpoint(KIND, "traffic log", "Replay a traffic log", EndpointLabel.REPLAY)
+        // The visible label comes from the factory (only debug builds register one) or from :core:obdtext.
+        val ENDPOINT = AdapterEndpoint(KIND, "traffic log", KIND, EndpointLabel.REPLAY)
     }
 }
 

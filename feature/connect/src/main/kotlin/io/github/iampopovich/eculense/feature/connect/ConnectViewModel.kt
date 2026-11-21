@@ -10,6 +10,7 @@ import io.github.iampopovich.eculense.core.obd.PollStats
 import io.github.iampopovich.eculense.core.obd.ReplayLogHolder
 import io.github.iampopovich.eculense.core.obd.ReplayTransportFactory
 import io.github.iampopovich.eculense.core.obd.VehicleInfo
+import io.github.iampopovich.eculense.core.obd.isSimulated
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,17 +46,13 @@ internal class ConnectViewModel(
     }
 
     fun refresh() {
-        // Paired BT first, then Wi-Fi/USB, demo mode always last (Koin getAll() order is not guaranteed).
-        viewModelScope.launch { _endpoints.value = controller.discover().sortedBy { kindRank(it.kind) } }
-    }
-
-    private fun kindRank(kind: String): Int = when (kind) {
-        "bt" -> 0
-        "demo" -> 2
-        "demo-flaky" -> 3
-        "demo-engine-off" -> 4
-        "replay" -> 5
-        else -> 1
+        // Paired BT first, then Wi-Fi/USB; simulated endpoints (debug builds only) last, in EndpointLabel order
+        // (Koin getAll() order is not guaranteed).
+        viewModelScope.launch {
+            _endpoints.value = controller.discover().sortedWith(
+                compareBy<AdapterEndpoint>({ it.isSimulated }, { if (it.kind == "bt") 0 else 1 }, { if (it.isSimulated) it.labelKey?.ordinal ?: 0 else 0 }),
+            )
+        }
     }
 
     fun connect(endpoint: AdapterEndpoint) = controller.connect(endpoint)

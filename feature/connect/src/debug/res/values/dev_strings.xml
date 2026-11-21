@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- R-I: developer-only text, packed only into debug builds. -->
+<resources>
+    <string name="connect_dev_section">For development</string>
+    <string name="connect_dev_expanded">Expanded</string>
+    <string name="connect_dev_collapsed">Collapsed</string>
+</resources>

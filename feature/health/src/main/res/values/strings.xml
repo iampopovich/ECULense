@@ -10,7 +10,6 @@
     <string name="health_reading_codes">Reading codes and readiness…</string>
     <string name="health_live">Reading live data: %1$d s left</string>
     <string name="health_failed">The check failed: %1$s</string>
-    <string name="health_not_stored">Demo mode: the result is shown but not saved</string>
     <string name="health_share">Share report</string>
     <string name="health_print">Print / PDF</string>
     <string name="health_ask_ai">Ask the AI about this check</string>

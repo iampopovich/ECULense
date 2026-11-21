@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- R-I: developer-only text, packed only into debug builds. -->
+<resources>
+    <string name="connect_dev_section">Для разработки</string>
+    <string name="connect_dev_expanded">Развёрнуто</string>
+    <string name="connect_dev_collapsed">Свёрнуто</string>
+</resources>

@@ -46,7 +46,7 @@ object ObdText {
         ObdError.AdapterClosed -> UiText.Res(R.string.obd_error_adapter_closed)
         ObdError.NotOpen -> UiText.Res(R.string.obd_error_not_open)
         is ObdError.NoBaudRate -> UiText.Res(R.string.obd_error_no_baud_rate, listOf(e.tried.joinToString()))
-        ObdError.DemoDisconnected -> UiText.Res(R.string.obd_error_demo_disconnected)
+        ObdError.DemoDisconnected -> DevText.demoDisconnected()
         ObdError.NoBluetooth -> UiText.Res(R.string.obd_error_no_bluetooth)
         ObdError.UsbNoAccess -> UiText.Res(R.string.obd_error_usb_no_access)
         ObdError.UsbPermissionDenied -> UiText.Res(R.string.obd_error_usb_permission_denied)
@@ -62,23 +62,18 @@ object ObdText {
     fun error(e: Throwable): UiText = error(ObdError.of(e))
 
     fun endpointLabel(endpoint: AdapterEndpoint): UiText = when (endpoint.labelKey) {
-        EndpointLabel.DEMO -> UiText.Res(R.string.obd_endpoint_demo)
-        EndpointLabel.DEMO_FLAKY -> UiText.Res(R.string.obd_endpoint_demo_flaky)
-        EndpointLabel.DEMO_ENGINE_OFF -> UiText.Res(R.string.obd_endpoint_demo_engine_off)
-        EndpointLabel.PC_EMULATOR -> UiText.Res(R.string.obd_endpoint_pc_emulator)
-        EndpointLabel.REPLAY -> UiText.Res(R.string.obd_endpoint_replay)
+        EndpointLabel.DEMO, EndpointLabel.DEMO_FLAKY, EndpointLabel.DEMO_ENGINE_OFF, EndpointLabel.PC_EMULATOR,
+        EndpointLabel.REPLAY -> DevText.label(endpoint)
         EndpointLabel.WIFI_CAR_SCANNER -> UiText.Res(R.string.obd_endpoint_wifi_car_scanner, listOf(endpoint.address))
         null -> UiText.Raw(endpoint.label)
     }
 
     /** Second line of an adapter row: the address, or a description for built-in endpoints. */
     fun endpointDetail(endpoint: AdapterEndpoint): UiText = when (endpoint.labelKey) {
-        EndpointLabel.DEMO -> UiText.Res(R.string.obd_endpoint_demo_detail)
-        EndpointLabel.DEMO_FLAKY -> UiText.Res(R.string.obd_endpoint_demo_flaky_detail)
-        EndpointLabel.DEMO_ENGINE_OFF -> UiText.Res(R.string.obd_endpoint_demo_engine_off_detail)
-        EndpointLabel.REPLAY -> UiText.Res(R.string.obd_endpoint_replay_detail)
+        EndpointLabel.DEMO, EndpointLabel.DEMO_FLAKY, EndpointLabel.DEMO_ENGINE_OFF, EndpointLabel.PC_EMULATOR,
+        EndpointLabel.REPLAY -> DevText.detail(endpoint)
         EndpointLabel.WIFI_CAR_SCANNER -> UiText.Res(R.string.obd_endpoint_wifi_car_scanner_detail)
-        EndpointLabel.PC_EMULATOR, null -> UiText.Raw(endpoint.address)
+        null -> UiText.Raw(endpoint.address)
     }
 
     /** Protocol in plain words, e.g. "ISO 15765-4 CAN (11 bit, 500 kbaud)"; null = automatic. */

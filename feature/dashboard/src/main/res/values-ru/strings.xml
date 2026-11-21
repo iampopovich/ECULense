@@ -26,7 +26,6 @@
     <string name="dash_mark_event">Отметить событие</string>
     <string name="dash_mark_saved">Событие отмечено в записи</string>
     <string name="dash_mark_not_recording">Запись не идёт: отмечать нечего</string>
-    <string name="dash_mark_demo">Демо-режим: отметки не сохраняются</string>
     <string name="dash_which_car">Для какой машины?</string>
     <string name="dash_dont_ask">Больше не спрашивать</string>
     <string name="dash_alert_banner">%1$s · %2$s</string>

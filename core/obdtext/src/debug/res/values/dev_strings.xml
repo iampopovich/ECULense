@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- R-I: developer-only text (demo adapters etc.), packed only into debug builds. -->
+<resources>
+    <string name="obd_error_demo_disconnected">Demo adapter disconnected</string>
+    <string name="obd_endpoint_demo">Demo mode (simulation)</string>
+    <string name="obd_endpoint_demo_detail">Virtual ELM327 · CAN 11/500 · no car</string>
+    <string name="obd_endpoint_demo_flaky">Demo: flaky clone</string>
+    <string name="obd_endpoint_demo_flaky_detail">Simulated cheap clone · late replies and garbage · tests recovery</string>
+    <string name="obd_endpoint_pc_emulator">ELM327 emulator on PC (10.0.2.2)</string>
+    <string name="obd_endpoint_demo_engine_off">Demo: engine stops</string>
+    <string name="obd_endpoint_demo_engine_off_detail">Virtual car · engine off after 30 s, on again 30 s later</string>
+    <string name="obd_endpoint_replay">Replay a traffic log</string>
+    <string name="obd_endpoint_replay_detail">Plays an exported adapter log back as an adapter</string>
+</resources>

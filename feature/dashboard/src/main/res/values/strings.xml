@@ -26,7 +26,6 @@
     <string name="dash_mark_event">Mark event</string>
     <string name="dash_mark_saved">Event marked in the recording</string>
     <string name="dash_mark_not_recording">No recording running: nothing to mark</string>
-    <string name="dash_mark_demo">Demo mode: marks are not saved</string>
     <string name="dash_which_car">For which car?</string>
     <string name="dash_dont_ask">Don\'t ask again</string>
     <string name="dash_alert_banner">%1$s · %2$s</string>

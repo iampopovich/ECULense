@@ -122,7 +122,8 @@ dependencies {
     implementation(project(":core:sensors"))
     implementation(project(":core:database"))
     implementation(project(":core:data"))
-    implementation(project(":core:demo"))
+    // R-I: demo adapters only in debug builds (wired in app/src/debug/.../DevModules.kt); release ships no demo classes.
+    debugImplementation(project(":core:demo"))
     implementation(project(":core:ai"))
     implementation(project(":core:aitools"))
     implementation(project(":core:datapacks"))

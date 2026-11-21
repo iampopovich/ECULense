@@ -3,7 +3,6 @@
     <string name="widget_label">ECULense</string>
     <string name="widget_description">Живые значения при подключении, иначе последнее напряжение, проверка кодов и поездка</string>
     <string name="widget_connect">Подключиться</string>
-    <string name="widget_demo">Демо</string>
     <string name="widget_no_data">Данных пока нет: подключитесь к машине</string>
     <string name="widget_voltage">АКБ %1$s В · %2$s</string>
     <string name="widget_dtc_none">Ошибок нет · %1$s</string>

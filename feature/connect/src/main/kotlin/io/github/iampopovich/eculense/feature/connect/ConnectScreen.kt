@@ -41,6 +41,7 @@ import io.github.iampopovich.eculense.core.obd.PollStats
 import io.github.iampopovich.eculense.core.obd.ReplayTransportFactory
 import io.github.iampopovich.eculense.core.obd.VehicleInfo
 import io.github.iampopovich.eculense.core.obd.isSessionAlive
+import io.github.iampopovich.eculense.core.obd.isSimulated
 import io.github.iampopovich.eculense.core.ui.HiddenVin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -146,14 +147,22 @@ internal fun ConnectScreen(
                 }
             }
         }
-        items(endpoints, key = { it.kind + it.address }) { endpoint ->
-            ListItem(
-                headlineContent = { Text(ObdText.endpointLabel(endpoint).asString()) },
-                supportingContent = { Text(ObdText.endpointDetail(endpoint).asString()) },
-                modifier = Modifier.clickable(enabled = state !is ConnectionState.Connecting) { onConnect(endpoint) },
-            )
-        }
+        // R-I: real adapters only; simulated endpoints (debug builds) go into the collapsed «For development» section.
+        val (real, simulated) = endpoints.partition { !it.isSimulated }
+        val enabled = state !is ConnectionState.Connecting
+        items(real, key = { it.kind + it.address }) { endpoint -> EndpointRow(endpoint, enabled, onConnect) }
+        devEndpoints(simulated, enabled, onConnect)
     }
+}
+
+/** One adapter row (label + address/description); tap connects. */
+@Composable
+internal fun EndpointRow(endpoint: AdapterEndpoint, enabled: Boolean, onConnect: (AdapterEndpoint) -> Unit) {
+    ListItem(
+        headlineContent = { Text(ObdText.endpointLabel(endpoint).asString()) },
+        supportingContent = { Text(ObdText.endpointDetail(endpoint).asString()) },
+        modifier = Modifier.clickable(enabled = enabled) { onConnect(endpoint) },
+    )
 }
 
 /** A6 + B5: what the adapter is, how it talks to the car, what the ECU offers and how fast polling really is. */

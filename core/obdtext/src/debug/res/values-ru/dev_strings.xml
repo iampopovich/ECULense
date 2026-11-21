@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- R-I: developer-only text (demo adapters etc.), packed only into debug builds. -->
+<resources>
+    <string name="obd_error_demo_disconnected">Демо-адаптер отключён</string>
+    <string name="obd_endpoint_demo">Демо-режим (симуляция)</string>
+    <string name="obd_endpoint_demo_detail">Виртуальный ELM327 · CAN 11/500 · без машины</string>
+    <string name="obd_endpoint_demo_flaky">Демо: капризный клон</string>
+    <string name="obd_endpoint_demo_flaky_detail">Имитация дешёвого клона · опоздания и мусор · проверка восстановления</string>
+    <string name="obd_endpoint_pc_emulator">Эмулятор ELM327 на ПК (10.0.2.2)</string>
+    <string name="obd_endpoint_demo_engine_off">Демо: двигатель глохнет</string>
+    <string name="obd_endpoint_demo_engine_off_detail">Виртуальная машина · двигатель глохнет через 30 с и заводится через 30 с</string>
+    <string name="obd_endpoint_replay">Воспроизвести журнал</string>
+    <string name="obd_endpoint_replay_detail">Проигрывает выгруженный журнал обмена как адаптер</string>
+</resources>

@@ -28,16 +28,14 @@ class TcpTransport(
 
 /**
  * Wi-Fi adapters: the ELM327 Wi-Fi default address, the address from an imported Car Scanner backup ([suggested],
- * listed first when it differs from the default) and optionally the PC emulator.
+ * listed first when it differs from the default) and [extra] endpoints (debug builds add the PC emulator here; release
+ * builds pass none, so no developer endpoint text ships in them).
  */
 class WifiTransportFactory(
-    includeEmulator: Boolean = false,
+    extra: List<AdapterEndpoint> = emptyList(),
     private val suggested: suspend () -> String? = { null },
 ) : TransportFactory {
-    private val endpoints = buildList {
-        add(AdapterEndpoint(KIND, DEFAULT_ADDRESS, "Wi-Fi ELM327 (192.168.0.10)"))
-        if (includeEmulator) add(AdapterEndpoint(KIND, "10.0.2.2:35000", "ELM327 emulator on PC (10.0.2.2)", EndpointLabel.PC_EMULATOR))
-    }
+    private val endpoints = listOf(AdapterEndpoint(KIND, DEFAULT_ADDRESS, "Wi-Fi ELM327 (192.168.0.10)")) + extra
 
     override val kind = KIND
     override suspend fun discover(): List<AdapterEndpoint> {

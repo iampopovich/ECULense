@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- R-I: developer-only text (demo adapters etc.), packed only into debug builds. -->
+<resources>
+    <string name="dash_mark_demo">Demo mode: marks are not saved</string>
+</resources>

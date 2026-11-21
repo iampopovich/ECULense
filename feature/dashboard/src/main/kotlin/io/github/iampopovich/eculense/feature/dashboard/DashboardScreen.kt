@@ -96,7 +96,7 @@ internal fun MarkResultEffect(result: MarkResult?, onShown: () -> Unit) {
         val text = when (r) {
             MarkResult.SAVED -> R.string.dash_mark_saved
             MarkResult.NOT_RECORDING -> R.string.dash_mark_not_recording
-            MarkResult.SIMULATED -> R.string.dash_mark_demo
+            MarkResult.SIMULATED -> DevText.markSimulated
         }
         Toast.makeText(context, resources.getString(text), Toast.LENGTH_SHORT).show()
         onShown()

@@ -23,7 +23,12 @@ fun appScope(logger: AppLogger): CoroutineScope = CoroutineScope(
     },
 )
 
-fun obdModule(includeEmulator: Boolean) = module {
+/**
+ * Connection core and the real Wi-Fi factory. [extraWifiEndpoints] = developer endpoints listed by the Wi-Fi factory
+ * (debug builds: the PC emulator). The replay adapter is not registered here: debug builds add it together with the
+ * demo adapters (app/src/debug DevModules.kt); the traffic log itself records in every build.
+ */
+fun obdModule(extraWifiEndpoints: List<AdapterEndpoint> = emptyList()) = module {
     single<CoroutineScope>(AppScope) { appScope(getOrNull<AppLogger>() ?: AppLogger.NONE) }
     single<ObdTrafficLog> { RingTrafficLog() }
     single<ConnectionController> {
@@ -31,11 +36,6 @@ fun obdModule(includeEmulator: Boolean) = module {
     }
     single(named(WifiTransportFactory.KIND)) {
         val scope = this
-        WifiTransportFactory(includeEmulator) { scope.getOrNull<AdapterPrefs>()?.suggestedWifi?.first() }
-    } bind TransportFactory::class
-    single { ReplayLogHolder() }
-    single(named(ReplayTransportFactory.KIND)) {
-        val holder = get<ReplayLogHolder>()
-        ReplayTransportFactory("Replay a traffic log", listedWithoutLog = true) { holder.text }
+        WifiTransportFactory(extraWifiEndpoints) { scope.getOrNull<AdapterPrefs>()?.suggestedWifi?.first() }
     } bind TransportFactory::class
 }

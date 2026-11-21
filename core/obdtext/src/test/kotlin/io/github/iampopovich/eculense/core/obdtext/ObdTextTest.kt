@@ -68,9 +68,6 @@ class ObdTextTest {
 
     @Test
     fun `built-in endpoints are localized, devices are shown as is`() {
-        val demo = AdapterEndpoint("demo", "Virtual", "Demo", EndpointLabel.DEMO)
-        assertEquals(UiText.Res(R.string.obd_endpoint_demo), ObdText.endpointLabel(demo))
-        assertEquals(UiText.Res(R.string.obd_endpoint_demo_detail), ObdText.endpointDetail(demo))
         val bt = AdapterEndpoint("bt", "AA:BB", "OBDII")
         assertEquals(UiText.Raw("OBDII"), ObdText.endpointLabel(bt))
         assertEquals(UiText.Raw("AA:BB"), ObdText.endpointDetail(bt))

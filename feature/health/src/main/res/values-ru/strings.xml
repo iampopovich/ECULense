@@ -10,7 +10,6 @@
     <string name="health_reading_codes">Читаю коды и готовность…</string>
     <string name="health_live">Читаю живые данные: осталось %1$d с</string>
     <string name="health_failed">Проверка не удалась: %1$s</string>
-    <string name="health_not_stored">Демо-режим: результат показан, но не сохранён</string>
     <string name="health_share">Поделиться отчётом</string>
     <string name="health_print">Печать / PDF</string>
     <string name="health_ask_ai">Спросить ИИ об этой проверке</string>

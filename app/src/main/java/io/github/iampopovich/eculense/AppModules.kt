@@ -11,7 +11,6 @@ import io.github.iampopovich.eculense.core.datapacks.dataPacksModule
 import io.github.iampopovich.eculense.core.vehicledb.vehicleDbModule
 import io.github.iampopovich.eculense.core.dtcdb.dtcDbModule
 import io.github.iampopovich.eculense.core.database.databaseModule
-import io.github.iampopovich.eculense.core.demo.demoModule
 import io.github.iampopovich.eculense.core.obd.obdModule
 import io.github.iampopovich.eculense.core.service.serviceModule
 import io.github.iampopovich.eculense.core.sensors.sensorsModule
@@ -46,7 +45,8 @@ val appModules: List<Module> = listOf(
     appLanguageModule,
     // Logcat implementation of the injectable AppLogger (R3.1).
     appLoggerModule,
-    obdModule(includeEmulator = BuildConfig.DEBUG),
+    // Developer Wi-Fi endpoints (PC emulator) only in debug builds (DevModules.kt per build type).
+    obdModule(extraWifiEndpoints = devWifiEndpoints),
     bluetoothModule,
     usbModule,
     serviceModule,
@@ -83,8 +83,6 @@ val appModules: List<Module> = listOf(
     healthModule,
     // C9 home-screen widget: live values or the last voltage, code check and trip; without it no widget.
     widgetModule,
-    // Demo mode (virtual ELM327) — last in the transport list, in all builds.
-    demoModule,
     // AI (stage 2): remove these lines + the modules in settings.gradle.kts/app → the app works without AI.
     aiModule,
     // Car data tools for AI (stage 3): without them chat works, but without data.
@@ -92,4 +90,5 @@ val appModules: List<Module> = listOf(
     aiSettingsModule,
     aiChatModule,
     // On-phone model (3.10): «На устройстве» provider, model downloads, speed test — see OnDeviceModules.kt.
-) + onDeviceModules
+    // R-I: demo adapters and replay — debug builds only (DevModules.kt in app/src/debug; empty in app/src/release).
+) + onDeviceModules + devModules

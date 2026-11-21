@@ -139,7 +139,7 @@ internal fun HealthScreen(
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(stringResource(record.result.verdict.verdictRes()), style = MaterialTheme.typography.titleLarge, color = c)
                         Text(dateFormat.format(Date(record.takenAtMs)), style = MaterialTheme.typography.bodySmall)
-                        if (!state.shownStored) Text(stringResource(R.string.health_not_stored), style = MaterialTheme.typography.bodySmall)
+                        if (!state.shownStored) NotStoredNotice()
                     }
                 }
             }

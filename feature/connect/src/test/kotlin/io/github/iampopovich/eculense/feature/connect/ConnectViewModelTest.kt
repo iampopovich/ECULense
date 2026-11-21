@@ -58,6 +58,18 @@ class ConnectViewModelTest {
     }
 
     @Test
+    fun `simulated endpoints follow every real one, in label order`() = runTest {
+        val replay = AdapterEndpoint("replay", "traffic log", "replay", EndpointLabel.REPLAY)
+        val emulator = AdapterEndpoint("wifi", "10.0.2.2:35000", "emu", EndpointLabel.PC_EMULATOR)
+        val flaky = AdapterEndpoint("demo-flaky", "flaky", "flaky", EndpointLabel.DEMO_FLAKY)
+        val demo = AdapterEndpoint("demo", "demo", "demo", EndpointLabel.DEMO)
+        val wifi = AdapterEndpoint("wifi", "192.168.0.10:35000", "Wi-Fi ELM327")
+        val vm = ConnectViewModel(FakeConnectionController(endpoints = listOf(replay, emulator, flaky, wifi, demo, obd)))
+        vm.refresh()
+        assertEquals(listOf(obd, wifi, demo, flaky, emulator, replay), vm.endpoints.value)
+    }
+
+    @Test
     fun `connect is delegated to controller`() = runTest {
         val controller = FakeConnectionController()
         ConnectViewModel(controller).connect(obd)

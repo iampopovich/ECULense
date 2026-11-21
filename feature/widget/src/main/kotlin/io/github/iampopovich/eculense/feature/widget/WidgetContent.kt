@@ -79,9 +79,7 @@ internal fun WidgetContent(model: WidgetModel) {
 private fun LiveValues(model: WidgetModel.Live, count: Int) {
     val context = LocalContext.current
     val onSurface = GlanceTheme.colors.onSurface
-    if (model.simulated) {
-        Text(context.getString(R.string.widget_demo), style = TextStyle(fontSize = 11.sp, color = GlanceTheme.colors.primary))
-    }
+    if (model.simulated) SimulatedBadge()
     Row(verticalAlignment = Alignment.CenterVertically) {
         model.values.take(count).forEachIndexed { i, v ->
             if (i > 0) Spacer(GlanceModifier.width(12.dp))

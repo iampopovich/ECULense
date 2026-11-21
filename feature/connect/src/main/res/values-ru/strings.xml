@@ -44,11 +44,11 @@
     <string name="connect_row_adapter_version">Адаптер: %1$s</string>
     <string name="automation_title">Автоматика</string>
     <string name="automation_remember">Запоминать последний адаптер</string>
-    <string name="automation_remember_hint">Последний реальный адаптер, к которому удалось подключиться; демо-режим не запоминается</string>
+    <string name="automation_remember_hint">Последний адаптер, к которому удалось подключиться</string>
     <string name="automation_connect">Подключаться автоматически</string>
     <string name="automation_connect_hint">При открытии приложения подключиться к последнему адаптеру</string>
     <string name="automation_record">Записывать поездки самостоятельно</string>
-    <string name="automation_record_hint">Запись начинается после 5 с быстрее 10 км/ч и заканчивается через 3 мин после выключения двигателя. В демо-режиме не работает</string>
+    <string name="automation_record_hint">Запись начинается после 5 с быстрее 10 км/ч и заканчивается через 3 мин после выключения двигателя</string>
     <string name="automation_ask_car">Спрашивать машину при начале записи</string>
     <string name="automation_ask_car_hint">Только если машин больше одной; автозапись идёт на активную машину</string>
     <string name="automation_accel">Записывать акселерометр телефона (для калибровки)</string>

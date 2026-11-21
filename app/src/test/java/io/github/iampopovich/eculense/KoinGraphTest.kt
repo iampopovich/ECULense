@@ -33,6 +33,14 @@ class KoinGraphTest {
         module { includes(withoutAi) }.verify(extraTypes = KoinExtraTypes.all)
     }
 
+    @Test
+    fun `release graph without developer modules verifies`() {
+        // R-I: release builds have no demo/replay modules (DevModules.kt is empty there).
+        val release = appModules.filterNot { it in devModules }
+        assertEquals(appModules.size - devModules.size, release.size)
+        module { includes(release) }.verify(extraTypes = KoinExtraTypes.all)
+    }
+
     @Test(expected = MissingKoinDefinitionException::class)
     fun `a missing module is detected`() {
         // Negative check: without the database module the DAOs are missing.
