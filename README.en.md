@@ -42,6 +42,7 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
 - Robust with cheap ELM327 clones: reconnect after a dropout, "engine off" instead of an error, priority polling (RPM and speed more often, slow sensors less often), a shareable adapter traffic log.
 - Readiness monitors, a used-car "codes cleared recently?" check, freeze frame on the code card, safe clear with a before/after comparison, mode 06.
 - "Vehicle modules": trouble codes of the transmission, ABS/ESC and other modules (CAN and K-Line KWP2000), reading requests only, airbags are never queried. Implemented, not yet tested on a real car.
+- OBDb extended sensors for CAN cars (the "Extended sensors (OBDb)" switch in Car data, off by default): factory signals from the downloaded OBDb signalset are read between the standard PIDs, with read-only requests under the same safety policy; electric cars get a battery card (charge, health, HV voltage, current and power, cell spread, temperature) and the combustion-engine rules (idle, MAF, trims, warm-up) are switched off for them. Implemented and tested on the OBDb test cases and in demo mode, not yet on a real car. OBDb has no signals for K-Line cars (e.g. a Kia Sorento BL), and the screen says so.
 - A one-minute health check with traffic lights and an HTML/PDF report.
 
 **Dashboard**
