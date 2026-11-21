@@ -49,8 +49,9 @@ class TcpTransport(
  */
 class WifiTransportFactory(
     extra: List<AdapterEndpoint> = emptyList(),
-    private val suggested: suspend () -> String? = { null },
+    // Before [suggested]: a fun-interface parameter in last place would take callers' trailing lambda.
     private val binder: AdapterNetworkBinder? = null,
+    private val suggested: suspend () -> String? = { null },
 ) : TransportFactory {
     private val endpoints = listOf(AdapterEndpoint(KIND, DEFAULT_ADDRESS, "Wi-Fi ELM327 (192.168.0.10)")) + extra
 

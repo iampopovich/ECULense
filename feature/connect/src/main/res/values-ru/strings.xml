@@ -55,4 +55,18 @@
     <string name="automation_accel_hint">Только во время записи поездки. Телефон должен стоять в жёстком держателе. Около 2 МБ в час. Результат — на странице поездки, «Калибровка порогов»</string>
     <string name="automation_accel_no_gravity">Недоступно: у телефона нет датчика гравитации</string>
     <string name="automation_accel_no_sensor">Недоступно: у телефона нет акселерометра</string>
+    <string name="connect_ble_section">Bluetooth LE</string>
+    <string name="connect_ble_scanning">Поиск адаптеров Bluetooth LE…</string>
+    <string name="connect_ble_none">Адаптеры Bluetooth LE не найдены</string>
+    <string name="connect_ble_found">Найдено адаптеров Bluetooth LE: %1$d</string>
+    <string name="connect_ble_rescan">Искать снова</string>
+    <string name="connect_ble_bt_off">Bluetooth выключен</string>
+    <string name="connect_ble_unsupported">Телефон не поддерживает Bluetooth LE</string>
+    <string name="connect_ble_permission_nearby">Чтобы искать адаптеры Bluetooth LE, разрешите доступ к «Устройствам поблизости». ECULense не определяет по нему ваше местоположение.</string>
+    <string name="connect_ble_permission_location">На Android 11 и более ранних версиях поиск адаптеров Bluetooth LE требует доступа к местоположению (правило Android; ECULense не использует ваше местоположение). Геолокация также должна быть включена.</string>
+    <string name="connect_ble_allow">Разрешить</string>
+    <string name="connect_ble_show_others">Показать другие устройства: %1$d</string>
+    <string name="connect_ble_hide_others">Скрыть другие устройства</string>
+    <string name="connect_ble_not_obd">Не похоже на OBD-адаптер</string>
+    <string name="connect_ble_dual_hint">Этот же адаптер сопряжён и по обычному Bluetooth: подключайтесь одним из двух способов, не обоими сразу.</string>
 </resources>

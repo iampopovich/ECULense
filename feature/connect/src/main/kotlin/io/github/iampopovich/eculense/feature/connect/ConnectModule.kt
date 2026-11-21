@@ -8,6 +8,7 @@ import io.github.iampopovich.eculense.core.navigation.Hub
 import io.github.iampopovich.eculense.core.navigation.HubEntry
 import org.koin.core.annotation.KoinExperimentalAPI
 import io.github.iampopovich.eculense.core.obd.AdapterPrefs
+import io.github.iampopovich.eculense.core.obd.AdapterScanner
 import io.github.iampopovich.eculense.core.obd.InMemoryAdapterPrefs
 import io.github.iampopovich.eculense.core.obd.ReplayLogHolder
 import org.koin.core.module.dsl.viewModel
@@ -18,7 +19,7 @@ import org.koin.dsl.navigation3.navigation
 /** Connection screen: an item of the Settings hub (and the target of the Connect button on the dashboard), not a tab. */
 @OptIn(KoinExperimentalAPI::class)
 val connectModule = module {
-    viewModel { ConnectViewModel(get(), getOrNull<ReplayLogHolder>()) }
+    viewModel { ConnectViewModel(get(), getOrNull<ReplayLogHolder>(), getOrNull<AdapterScanner>()) }
     viewModel { AdapterSettingsViewModel(getOrNull<AdapterPrefs>() ?: InMemoryAdapterPrefs(), get(), getOrNull<AutomationPrefs>(), getOrNull<PhoneSensors>()?.accelSupport) }
     navigation<ConnectDestination> { ConnectRoute() }
     navigation<AdapterSettingsDestination> { AdapterSettingsRoute() }

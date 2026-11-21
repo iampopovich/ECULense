@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.navigation.AdapterSettingsDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
@@ -74,15 +75,29 @@ internal fun ConnectRoute(viewModel: ConnectViewModel = koinViewModel()) {
             }
         }
     }
+    val ble by viewModel.ble.collectAsStateWithLifecycle()
+    val hasBle = ble != null
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         viewModel.refresh()
+        viewModel.startScan()
     }
     LaunchedEffect(Unit) {
         val needed = buildList {
             if (Build.VERSION.SDK_INT >= 31) add(Manifest.permission.BLUETOOTH_CONNECT)
+            // A: «Nearby devices» scan (neverForLocation). On API <= 30 location is asked only from the BLE section.
+            if (Build.VERSION.SDK_INT >= 31 && hasBle) add(Manifest.permission.BLUETOOTH_SCAN)
             if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
         }
         if (needed.isEmpty()) viewModel.refresh() else permissions.launch(needed.toTypedArray())
+    }
+    // A: BLE scans run only while this screen is visible (~10 s each); leaving the screen stops them.
+    LifecycleStartEffect(Unit) {
+        viewModel.startScan()
+        onStopOrDispose { viewModel.stopScan() }
+    }
+    val askScanPermission = {
+        val permission = if (Build.VERSION.SDK_INT >= 31) Manifest.permission.BLUETOOTH_SCAN else Manifest.permission.ACCESS_FINE_LOCATION
+        permissions.launch(arrayOf(permission))
     }
     ConnectScreen(
         state,
@@ -100,6 +115,10 @@ internal fun ConnectRoute(viewModel: ConnectViewModel = koinViewModel()) {
         onSettings = { navigator.navigate(AdapterSettingsDestination) },
         pollStats = pollStats,
         vehicleInfo = vehicleInfo,
+        ble = ble,
+        onBleScan = viewModel::startScan,
+        onBleAllow = askScanPermission,
+        onBleShowAll = viewModel::setShowAll,
     )
 }
 
@@ -116,6 +135,10 @@ internal fun ConnectScreen(
     onSettings: () -> Unit = {},
     pollStats: PollStats? = null,
     vehicleInfo: VehicleInfo? = null,
+    ble: BleSection? = null,
+    onBleScan: () -> Unit = {},
+    onBleAllow: () -> Unit = {},
+    onBleShowAll: (Boolean) -> Unit = {},
 ) {
     // One scrolling list: with a large font the adapter card alone fills the screen, and a fixed Column cut off
     // the buttons and the adapter list below it (C13 screenshot).
@@ -151,6 +174,7 @@ internal fun ConnectScreen(
         val (real, simulated) = endpoints.partition { !it.isSimulated }
         val enabled = state !is ConnectionState.Connecting
         items(real, key = { it.kind + it.address }) { endpoint -> EndpointRow(endpoint, enabled, onConnect) }
+        if (ble != null) bleSection(ble, enabled, onConnect, onBleScan, onBleAllow, onBleShowAll)
         devEndpoints(simulated, enabled, onConnect)
     }
 }

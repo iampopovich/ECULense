@@ -55,4 +55,18 @@
     <string name="automation_accel_hint">Only during a trip recording. The phone must sit in a rigid holder. About 2 MB per hour. The result is on the trip page, «Threshold calibration»</string>
     <string name="automation_accel_no_gravity">Unavailable: this phone has no gravity sensor</string>
     <string name="automation_accel_no_sensor">Unavailable: this phone has no accelerometer</string>
+    <string name="connect_ble_section">Bluetooth LE</string>
+    <string name="connect_ble_scanning">Searching for Bluetooth LE adapters…</string>
+    <string name="connect_ble_none">No Bluetooth LE adapters found</string>
+    <string name="connect_ble_found">Bluetooth LE adapters found: %1$d</string>
+    <string name="connect_ble_rescan">Search again</string>
+    <string name="connect_ble_bt_off">Bluetooth is off</string>
+    <string name="connect_ble_unsupported">This phone has no Bluetooth LE</string>
+    <string name="connect_ble_permission_nearby">To search for Bluetooth LE adapters, allow «Nearby devices». ECULense does not use it to find your location.</string>
+    <string name="connect_ble_permission_location">On Android 11 and older, searching for Bluetooth LE adapters needs location access (an Android rule; ECULense does not use your location). Location must also be turned on.</string>
+    <string name="connect_ble_allow">Allow</string>
+    <string name="connect_ble_show_others">Show other devices: %1$d</string>
+    <string name="connect_ble_hide_others">Hide other devices</string>
+    <string name="connect_ble_not_obd">Not recognised as an OBD adapter</string>
+    <string name="connect_ble_dual_hint">The same adapter is also paired over classic Bluetooth: connect through one of the two, not both at once.</string>
 </resources>
