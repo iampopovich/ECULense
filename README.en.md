@@ -26,7 +26,7 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
   <img src="docs/screenshots/04-stats.webp" width="200" alt="Trip statistics">
   <img src="docs/screenshots/06-local-models.webp" width="200" alt="Choosing an on-device model">
 </p>
-<p align="center"><sub>Screenshots taken in demo mode with test data.</sub></p>
+<p align="center"><sub>Screenshots taken with a debug build in demo mode with test data.</sub></p>
 
 > **Status:** early version (0.1.0 plus the changes in the [CHANGELOG](CHANGELOG.md)). The protocol, connection recovery, diagnostics and the fuel log are covered by tests, the demo adapter and emulated misbehaving clones; field testing with a real adapter in a car is still ahead.
 >
@@ -37,7 +37,7 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
 **Diagnostics**
 - Live standard PIDs: RPM, speed, coolant temperature, MAF, fuel trims, O2 sensors, voltage and more.
 - Read and clear trouble codes with descriptions. A manufacturer-specific code is only described for your car's make: the same code means something else on another brand.
-- Bluetooth, Wi-Fi and USB OTG adapters, plus a demo mode with no adapter at all (including a "flaky clone" and an "engine stops" mode).
+- Bluetooth, Wi-Fi and USB OTG adapters. Debug (developer) builds also have a demo mode with no adapter at all (including a "flaky clone" and an "engine stops" mode); regular builds don't.
 - CAN and K-Line (ISO 9141 / KWP2000), so early-2000s cars work too, not just modern CAN ones. The car profile tells you when the car may predate mandatory OBD-II.
 - Robust with cheap ELM327 clones: reconnect after a dropout, "engine off" instead of an error, priority polling (RPM and speed more often, slow sensors less often), a shareable adapter traffic log.
 - Readiness monitors, a used-car "codes cleared recently?" check, freeze frame on the code card, safe clear with a before/after comparison, mode 06.
@@ -86,7 +86,7 @@ Plug in an inexpensive ELM327 adapter, watch live data, read and clear trouble c
 - Only what you send to the AI assistant goes to the cloud, and only after explicit consent. VIN and GPS are never included in model requests.
 - API keys are encrypted with Android Keystore and never end up in backups.
 - Without the AI assistant the app works fully offline (the network is only used to download reference data).
-- The demo adapter and log replay never write into your car's history. The VIN is hidden by default.
+- The demo adapter and log replay (debug builds only) never write into your car's history. The VIN is hidden by default.
 - "Report a problem" opens a GitHub form only after showing the exact text; it has no VIN, car name, location or traffic log, and nothing is sent automatically.
 
 ## Installation
@@ -146,7 +146,7 @@ core/
   analyticstext, obdtext  localized texts for findings, OBD errors and PID names
   background              background analysis and notifications
   sensors                 phone accelerometer during recordings (threshold calibration)
-  demo                    adapter emulator for working without a car
+  demo                    adapter emulator for working without a car (debug builds only)
   navigation, ui, model   shared navigation keys, theme, models
 feature/                  screens: dashboard, connect, obdlog, cardata, dtc, health,
                           sessions, stats, fuel, analysis, maintenance, car, pitstop,
@@ -166,7 +166,7 @@ You shouldn't need to import other features' classes. If you do, `core` is missi
 
 ### Working without a car
 
-The adapter list has a "Demo" entry: an ELM327 emulator with CAN, 23 PIDs and a few trouble codes. For the Car Scanner import, tests have `BrcWriter`, which builds synthetic `.brc` and `.cbz` files. Real backups are never committed: they contain GPS tracks.
+In a debug build (`installLocalDebug`/`installCloudDebug`) the bottom of the adapter list has a collapsed "For development" section: "Demo mode" (an ELM327 emulator with CAN, 23 PIDs and a few trouble codes), "flaky clone", "engine stops", the PC emulator and log replay. Release builds contain neither `:core:demo` nor these entries. For the Car Scanner import, tests have `BrcWriter`, which builds synthetic `.brc` and `.cbz` files. Real backups are never committed: they contain GPS tracks.
 
 ### Data and licences
 
