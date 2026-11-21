@@ -151,6 +151,9 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.junit)
+    // R1.4: Koin graph verification (verify()) of the full module list and of the list without AI.
+    testImplementation(platform(libs.koin.bom))
+    testImplementation(libs.koin.test)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
