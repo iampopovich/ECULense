@@ -90,6 +90,8 @@ object ObdbUnits {
         "kilowattHours" -> "kWh"
         "ampereHours" -> "Ah"
         "kilometersPerHour" -> "km/h"
+        "milesPerHour" -> "mph"
+        "miles" -> "mi"
         "kilometers" -> "km"
         "rpm" -> "rpm"
         "kilopascal" -> "kPa"
