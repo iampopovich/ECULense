@@ -64,10 +64,15 @@ internal fun StyleTrendCard(points: List<StyleTrendPoint>, bucket: TrendBucket) 
 
 /** R2.8 (b): consumption per 5 °C of outside temperature; hidden by the caller without enough data. */
 @Composable
-internal fun TemperatureCard(buckets: List<TemperatureBucket>, units: UnitsSettings) {
+internal fun TemperatureCard(buckets: List<TemperatureBucket>, units: UnitsSettings, source: TemperatureSource = TemperatureSource.OUTSIDE) {
     Card {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.stats_temp_title), style = MaterialTheme.typography.titleMedium)
+            val title = when (source) {
+                TemperatureSource.OUTSIDE -> R.string.stats_temp_title
+                TemperatureSource.INTAKE_ESTIMATE -> R.string.stats_temp_title_intake
+                TemperatureSource.MIXED -> R.string.stats_temp_title_mixed
+            }
+            Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
             buckets.forEach { b ->
                 val (lo, hi, unit) = temperatureRange(b.fromC, units)
                 TrendRow(

@@ -96,6 +96,8 @@
     <string name="stats_style_trend_note">Медиана оценок поездок, запись которых можно оценить (скорость не реже раза в 2 с).</string>
     <string name="stats_week_of">Неделя с %1$s</string>
     <string name="stats_temp_title">Расход и температура воздуха</string>
+    <string name="stats_temp_title_intake">Расход по температуре воздуха на впуске (оценка)</string>
+    <string name="stats_temp_title_mixed">Расход по температуре наружного воздуха или на впуске (частично оценка)</string>
     <string name="stats_temp_note">Датчик наружного воздуха (PID 46); без него — воздух на впуске при скорости больше 30 км/ч на прогретом двигателе, он завышает на несколько градусов. Поездок от 2 км в строке, не меньше: %1$d.</string>
     <plurals name="stats_trend_trips">
         <item quantity="one">%1$d поездка</item>

@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
+import com.patrykandpatrick.vico.compose.cartesian.layer.CartesianLayerPadding
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProducer
@@ -182,6 +183,8 @@ private fun SessionChart(modelProducer: CartesianChartModelProducer, sensorId: S
             bottomAxis = HorizontalAxis.rememberBottom(),
             marker = marker,
             getXStep = { _, minX, maxX -> niceXStepSeconds(maxX - minX) },
+            // The last x label is centred on the last tick: room after the plot keeps it from being clipped.
+            layerPadding = { CartesianLayerPadding(unscalableEnd = 24.dp) },
         ),
         modelProducer = modelProducer,
         modifier = Modifier.fillMaxWidth().height(260.dp),

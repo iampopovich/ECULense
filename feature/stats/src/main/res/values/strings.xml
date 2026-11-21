@@ -92,6 +92,8 @@
     <string name="stats_style_trend_note">Median score of the trips whose recording could be scored (speed sampled at least every 2 s).</string>
     <string name="stats_week_of">Week of %1$s</string>
     <string name="stats_temp_title">Consumption and outside temperature</string>
+    <string name="stats_temp_title_intake">Consumption by intake air temperature (estimate)</string>
+    <string name="stats_temp_title_mixed">Consumption by outside or intake air temperature (partly estimated)</string>
     <string name="stats_temp_range" translatable="false">%1$s…%2$s %3$s</string>
     <string name="stats_temp_note">Outside air sensor (PID 46); without it, intake air at over 30 km/h on a warm engine, which reads a few degrees high. Trips of 2 km or longer per row, at least: %1$d.</string>
     <plurals name="stats_trend_trips">

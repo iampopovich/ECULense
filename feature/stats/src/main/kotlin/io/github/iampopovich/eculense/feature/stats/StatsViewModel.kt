@@ -17,6 +17,7 @@ import io.github.iampopovich.eculense.core.model.TripStats
 import io.github.iampopovich.eculense.core.model.UnitsSettings
 import io.github.iampopovich.eculense.core.analytics.StatsTrends
 import io.github.iampopovich.eculense.core.analytics.StyleTrendPoint
+import io.github.iampopovich.eculense.core.analytics.AmbientSource
 import io.github.iampopovich.eculense.core.analytics.TemperatureBucket
 import io.github.iampopovich.eculense.core.analytics.TrendBucket
 import io.github.iampopovich.eculense.core.analytics.TripFacts
@@ -68,7 +69,12 @@ internal data class StatsUiState(
     val styleBucket: TrendBucket = TrendBucket.MONTH,
     /** R2.8: consumption per 5 °C of outside temperature; empty = card hidden. */
     val temperature: List<TemperatureBucket> = emptyList(),
+    /** Where the card's temperatures come from: PID 46 for every trip, intake air for every trip, or both. */
+    val temperatureSource: TemperatureSource = TemperatureSource.OUTSIDE,
 )
+
+/** Source of the consumption-vs-temperature card: the title says honestly what was measured. */
+internal enum class TemperatureSource { OUTSIDE, INTAKE_ESTIMATE, MIXED }
 
 /** Stats for the active car. Data comes only from :core:data (trips, cars, units, fuel log). */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -126,6 +132,8 @@ internal class StatsViewModel(
         val estimateSource = if (insights != null && insights.appliedFactor != 1.0) FuelSource.TRIPS_CORRECTED else FuelSource.TRIPS
         val fromLog = log?.lPer100Km
         val logSpend = log?.takeIf { it.fillUps > 0 }?.spend
+        val tempTrips = inPeriod.filter { it.fuelKnown && it.fuelL > 0 && it.distanceKm >= StatsTrends.MIN_TRIP_KM }
+            .mapNotNull { t -> f[t.id]?.let { fact -> fact.ambientC?.let { c -> (t.fuelL / t.distanceKm * 100 to c) to fact.ambientSource } } }
         return StatsUiState(
             loading = false,
             car = d.car,
@@ -140,11 +148,18 @@ internal class StatsViewModel(
             costSource = if (logSpend != null) FuelSource.FILL_UPS else estimateSource,
             styleTrend = StatsTrends.styleTrend(inPeriod.mapNotNull { t -> f[t.id]?.styleScore?.let { t.startedAtMs to it } }, bucketOf(p), zone()),
             styleBucket = bucketOf(p),
-            temperature = StatsTrends.consumptionByTemperature(
-                inPeriod.filter { it.fuelKnown && it.fuelL > 0 && it.distanceKm >= StatsTrends.MIN_TRIP_KM }
-                    .mapNotNull { t -> f[t.id]?.ambientC?.let { c -> t.fuelL / t.distanceKm * 100 to c } },
-            ),
+            temperature = StatsTrends.consumptionByTemperature(tempTrips.map { it.first }),
+            temperatureSource = temperatureSource(tempTrips.map { it.second }),
         )
+    }
+
+    private fun temperatureSource(sources: List<AmbientSource?>): TemperatureSource {
+        val intake = sources.count { it == AmbientSource.INTAKE_AIR }
+        return when {
+            intake == 0 -> TemperatureSource.OUTSIDE
+            intake == sources.size -> TemperatureSource.INTAKE_ESTIMATE
+            else -> TemperatureSource.MIXED
+        }
     }
 
     /** Weeks inside a month or quarter, months for longer periods. */
