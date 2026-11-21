@@ -34,11 +34,15 @@ data class SessionEntity(
     @ColumnInfo(index = true) val carId: Long? = null,
 )
 
-/** "Long" format: one row = one value of one sensor. Car Scanner CSVs are laid out the same way. */
+/**
+ * "Long" format: one row = one value of one sensor. Car Scanner CSVs are laid out the same way. The index
+ * (sessionId, sensorId, timestampMs) serves every hot query: per-session aggregates (prefix sessionId), one sensor of
+ * a session in time order (samples, warm start, charts) and the foreign key.
+ */
 @Entity(
     tableName = "readings",
     foreignKeys = [ForeignKey(SessionEntity::class, ["id"], ["sessionId"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index("sessionId")],
+    indices = [Index("sessionId", "sensorId", "timestampMs")],
 )
 data class ReadingEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -215,8 +219,10 @@ data class SessionSummaryRow(
 
 /**
  * Analytics queries (stage 3). Aggregates are done in SQL without loading 1.3M values into memory; percentiles
- * use a thinned sample (`id % step = 0`). "Warmed up" = after the first coolant reading ≥ 80 °C in this session.
- * There's already an index on sessionId; a full pass over readings on the phone takes 0.2–2.5 s, no extra index needed.
+ * use a sample thinned by position within the sensor ([Decimator], [sessionSample]/[sensorSample] in Sampling.kt).
+ * "Warmed up" = after the first coolant reading ≥ 80 °C in this session. Every readings query filters by sessionId
+ * (+ sensorId) so it runs on the (sessionId, sensorId, timestampMs) index; the warm CTE is restricted to the car's
+ * sessions in the period instead of scanning all coolant readings of the table.
  */
 @Dao
 interface AnalyticsDao {
@@ -240,8 +246,16 @@ interface AnalyticsDao {
     )
     suspend fun sessionAggregates(sessionId: Long): List<SensorAggregateRow>
 
-    @Query("SELECT value FROM readings WHERE sessionId = :sessionId AND sensorId = :sensorId AND id % :step = 0")
-    suspend fun sessionSample(sessionId: Long, sensorId: String, step: Int): List<Double>
+    /** One page of a sensor's values in (timestampMs, id) order after the keyset ([afterTs], [afterId]). */
+    @Query(
+        "SELECT id, value, timestampMs FROM readings WHERE sessionId = :sessionId AND sensorId = :sensorId " +
+            "AND timestampMs >= :afterTs AND (timestampMs > :afterTs OR id > :afterId) ORDER BY timestampMs, id LIMIT :limit",
+    )
+    suspend fun valuesPage(sessionId: Long, sensorId: String, afterTs: Long, afterId: Long, limit: Int): List<ValueRow>
+
+    /** Time of the first coolant reading >= 80 °C in the session; null = never warmed up. */
+    @Query("SELECT MIN(timestampMs) FROM readings WHERE sessionId = :sessionId AND sensorId = '01.05' AND value >= 80")
+    suspend fun warmStart(sessionId: Long): Long?
 
     @Query(
         "SELECT r.sensorId, MIN(r.unit) AS unit, COUNT(*) AS count, MIN(r.value) AS min, MAX(r.value) AS max, " +
@@ -253,7 +267,9 @@ interface AnalyticsDao {
     suspend fun sensorAggregate(carId: Long, sensorId: String, fromMs: Long, toMs: Long): SensorAggregateRow?
 
     @Query(
-        "WITH warm AS (SELECT sessionId, MIN(timestampMs) AS t FROM readings WHERE sensorId = '01.05' AND value >= 80 GROUP BY sessionId) " +
+        "WITH warm AS (SELECT r.sessionId, MIN(r.timestampMs) AS t FROM sessions s JOIN readings r ON r.sessionId = s.id " +
+            "WHERE s.carId = :carId AND s.startedAtMs BETWEEN :fromMs AND :toMs AND r.sensorId = '01.05' AND r.value >= 80 " +
+            "GROUP BY r.sessionId) " +
             "SELECT r.sensorId, MIN(r.unit) AS unit, COUNT(*) AS count, MIN(r.value) AS min, MAX(r.value) AS max, " +
             "AVG(r.value) AS mean, COUNT(DISTINCT r.sessionId) AS sessions " +
             "FROM readings r JOIN sessions s ON s.id = r.sessionId JOIN warm w ON w.sessionId = r.sessionId " +
@@ -262,24 +278,12 @@ interface AnalyticsDao {
     )
     suspend fun warmSensorAggregate(carId: Long, sensorId: String, fromMs: Long, toMs: Long): SensorAggregateRow?
 
-    @Query(
-        "SELECT r.value FROM readings r JOIN sessions s ON s.id = r.sessionId " +
-            "WHERE s.carId = :carId AND s.startedAtMs BETWEEN :fromMs AND :toMs AND r.sensorId = :sensorId AND r.id % :step = 0",
-    )
-    suspend fun sensorSample(carId: Long, sensorId: String, fromMs: Long, toMs: Long, step: Int): List<Double>
-
-    @Query(
-        "WITH warm AS (SELECT sessionId, MIN(timestampMs) AS t FROM readings WHERE sensorId = '01.05' AND value >= 80 GROUP BY sessionId) " +
-            "SELECT r.value FROM readings r JOIN sessions s ON s.id = r.sessionId JOIN warm w ON w.sessionId = r.sessionId " +
-            "WHERE s.carId = :carId AND s.startedAtMs BETWEEN :fromMs AND :toMs AND r.sensorId = :sensorId " +
-            "AND r.timestampMs >= w.t AND r.id % :step = 0",
-    )
-    suspend fun warmSensorSample(carId: Long, sensorId: String, fromMs: Long, toMs: Long, step: Int): List<Double>
-
     /** Only the sensors the rules need for one session, ordered by time: input for the single-pass digest. */
     @Query("SELECT sensorId, value, timestampMs FROM readings WHERE sessionId = :sessionId AND sensorId IN (:sensorIds) ORDER BY timestampMs")
     suspend fun points(sessionId: Long, sensorIds: Collection<String>): List<ReadingPoint>
 }
+
+data class ValueRow(val id: Long, val value: Double, val timestampMs: Long)
 
 data class SessionStartRow(val id: Long, val startedAtMs: Long, val endedAtMs: Long? = null)
 
@@ -528,9 +532,9 @@ abstract class EcuDatabase : RoomDatabase() {
 
     companion object {
         /** Schema version; an ECULense backup with a newer version is not restored. */
-        const val VERSION = 10
+        const val VERSION = 11
         const val FILE_NAME = "ecu.db"
-        val MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+        val MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
 
         const val DEFAULT_CAR_ID = 1L
         /** Blank: the UI shows the localized default name (older DBs keep their Russian literal, see LegacyValues). */
@@ -720,6 +724,23 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
                 "`takenAtMs` INTEGER NOT NULL, `reason` TEXT NOT NULL, `milOn` INTEGER, `dtcCount` INTEGER, `monitors` TEXT, `counters` TEXT)",
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_readiness_snapshots_carId` ON `readiness_snapshots` (`carId`)")
+    }
+}
+
+/**
+ * 10 → 11 (R2.1): readings get the (sessionId, sensorId, timestampMs) index instead of the single sessionId one. Only
+ * CREATE/DROP INDEX: no row is touched. The build time is logged (tag EcuDb): about a second per million readings.
+ */
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        val started = System.nanoTime()
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_readings_sessionId_sensorId_timestampMs` " +
+                "ON `readings` (`sessionId`, `sensorId`, `timestampMs`)",
+        )
+        db.execSQL("DROP INDEX IF EXISTS `index_readings_sessionId`")
+        val ms = (System.nanoTime() - started) / 1_000_000
+        runCatching { android.util.Log.i("EcuDb", "migration 10->11: readings index built in $ms ms") }
     }
 }
 

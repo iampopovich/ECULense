@@ -396,4 +396,88 @@ class MigrationTest {
             room.close()
         }
     }
+    @Test
+    fun v10ReadingsGetTheCompositeIndexKeepingRows() = runTest {
+        helper.createDatabase(dbName, 10).use { db ->
+            db.execSQL("INSERT INTO cars (id, name) VALUES (1, 'Test car')")
+            db.execSQL("INSERT INTO sessions (id, name, startedAtMs, endedAtMs, source, vin, externalId, carId) VALUES (1, 'live', 30, 40, 'LIVE', NULL, NULL, 1)")
+            for (i in 0 until 50) {
+                db.execSQL("INSERT INTO readings (sessionId, sensorId, value, unit, timestampMs) VALUES (1, '01.0${i % 5}', $i, 'u', ${100 + i})")
+            }
+        }
+        helper.runMigrationsAndValidate(dbName, 11, true, MIGRATION_10_11).use { db ->
+            fun count(sql: String) = db.query(sql).use { c -> c.moveToFirst(); c.getInt(0) }
+            assertEquals(50, count("SELECT COUNT(*) FROM readings"))
+            assertEquals(1, count("SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'index_readings_sessionId_sensorId_timestampMs'"))
+            assertEquals(0, count("SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'index_readings_sessionId'"))
+            // The cascade still works through the composite index (sessionId is its first column).
+            db.execSQL("PRAGMA foreign_keys = ON")
+            db.execSQL("DELETE FROM sessions WHERE id = 1")
+            assertEquals(0, count("SELECT COUNT(*) FROM readings"))
+        }
+    }
+
+    /** R2.2: a v7 database with realistic synthetic content goes through every migration to the current version. */
+    @Test
+    fun v7RealisticDataSurvivesTheWholeChain() = runTest {
+        val sessions = 3
+        val perSession = 1_200
+        helper.createDatabase(dbName, 7).use { db ->
+            db.execSQL("INSERT INTO cars (id, name, brand, model, year, engineVolumeL, tankVolumeL) VALUES (1, 'Тестовая', 'Kia', 'Sorento', 2005, 3.5, 80.0)")
+            db.execSQL("INSERT INTO cars (id, name) VALUES (2, 'Test car')")
+            for (s in 1..sessions) {
+                val start = 1_000_000L * s
+                val source = if (s == 1) "LIVE" else "IMPORT_CARSCANNER"
+                val ext = if (s == 1) "NULL" else "'carscanner:$s.brc'"
+                db.execSQL("INSERT INTO sessions (id, name, startedAtMs, endedAtMs, source, vin, externalId, carId) VALUES ($s, 's$s', $start, ${start + perSession * 100}, '$source', NULL, $ext, ${if (s == 3) 2 else 1})")
+                db.beginTransaction()
+                try {
+                    for (i in 0 until perSession) {
+                        val sensor = listOf("01.05", "01.0C", "01.0D", "01.06", "01.42", "elm.voltage")[i % 6]
+                        db.execSQL("INSERT INTO readings (sessionId, sensorId, value, unit, timestampMs) VALUES ($s, '$sensor', ${i % 97}.5, 'u', ${start + i * 100})")
+                    }
+                    db.setTransactionSuccessful()
+                } finally {
+                    db.endTransaction()
+                }
+                db.execSQL(
+                    "INSERT INTO trips (carId, startedAtMs, endedAtMs, distanceMm, fuelUl, fuelPricePerL, drivingMs, standingMs, source, externalId, fuelMethod) " +
+                        "VALUES (${if (s == 3) 2 else 1}, $start, ${start + 60_000}, 12000000, 900000, 50.0, 50000, 10000, '$source', 'trip:$s', NULL)",
+                )
+            }
+            db.execSQL("INSERT INTO dtc_snapshots (takenAtMs, vin, code, kind, carId) VALUES (2000000, NULL, 'P0133', 'STORED', 1)")
+            db.execSQL("INSERT INTO dtc_snapshots (takenAtMs, vin, code, kind, carId) VALUES (2000000, NULL, 'P0171', 'PENDING', 1)")
+            db.execSQL("INSERT INTO maintenance_items (carId, title, intervalKm, intervalMonths, kind) VALUES (1, '', 10000, 12, 'OIL')")
+            db.execSQL("INSERT INTO odometer_log (carId, km, atMs, source) VALUES (1, 150000, 1000, 'MANUAL')")
+            db.execSQL(
+                "INSERT INTO findings (carId, ruleId, severity, title, message, evidenceJson, periodFromMs, periodToMs, createdAtMs) " +
+                    "VALUES (1, 'ltft', 'INFO', 't', 'm', '{}', NULL, NULL, 5)",
+            )
+        }
+        val target = EcuDatabase.VERSION
+        helper.runMigrationsAndValidate(dbName, target, true, *EcuDatabase.MIGRATIONS).use { db ->
+            fun count(sql: String) = db.query(sql).use { c -> c.moveToFirst(); c.getInt(0) }
+            assertEquals(2, count("SELECT COUNT(*) FROM cars"))
+            assertEquals(sessions, count("SELECT COUNT(*) FROM sessions"))
+            assertEquals(sessions * perSession, count("SELECT COUNT(*) FROM readings"))
+            assertEquals(perSession, count("SELECT COUNT(*) FROM readings WHERE sessionId = 2"))
+            assertEquals(sessions, count("SELECT COUNT(*) FROM trips"))
+            assertEquals(2, count("SELECT COUNT(*) FROM dtc_snapshots"))
+            assertEquals(1, count("SELECT COUNT(*) FROM maintenance_items"))
+            assertEquals(1, count("SELECT COUNT(*) FROM odometer_log"))
+            assertEquals(1, count("SELECT COUNT(*) FROM findings"))
+            assertEquals(0, count("SELECT COUNT(*) FROM readiness_snapshots"))
+            assertEquals(0, count("SELECT COUNT(*) FROM health_checks"))
+            assertEquals(0, count("SELECT COUNT(*) FROM fuel_fillups"))
+            assertEquals(1, count("SELECT COUNT(*) FROM cars WHERE name = 'Тестовая' AND year = 2005"))
+        }
+        val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), EcuDatabase::class.java, dbName)
+            .addMigrations(*EcuDatabase.MIGRATIONS).build()
+        try {
+            assertEquals(perSession, room.sessionDao().readings(1).size)
+            assertEquals(perSession / 6, room.analyticsDao().sessionSample(1, "01.0C", 1).size)
+        } finally {
+            room.close()
+        }
+    }
 }

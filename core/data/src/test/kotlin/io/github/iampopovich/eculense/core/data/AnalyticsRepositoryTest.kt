@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense.core.data
 
+import io.github.iampopovich.eculense.core.database.ValueRow
 import io.github.iampopovich.eculense.core.analytics.Evidence
 import io.github.iampopovich.eculense.core.analytics.Finding
 import io.github.iampopovich.eculense.core.analytics.FindingArg
@@ -53,12 +54,13 @@ private class FakeAnalyticsDao : AnalyticsDao {
     override suspend fun sessionStarts(carId: Long) = sessions.filter { carOf[it.id] == carId }.sortedBy { it.startedAtMs }.map { SessionStartRow(it.id, it.startedAtMs, it.endedAtMs) }
     override suspend fun session(carId: Long, sessionId: Long) = sessions.firstOrNull { it.id == sessionId && carOf[it.id] == carId }
     override suspend fun sessionAggregates(sessionId: Long) = rows.filter { it.sessionId == sessionId }.groupBy { it.sensorId }.toSortedMap().mapNotNull { (id, l) -> agg(id, l) }
-    override suspend fun sessionSample(sessionId: Long, sensorId: String, step: Int) = rows.filter { it.sessionId == sessionId && it.sensorId == sensorId && it.id % step == 0L }.map { it.value }
+    override suspend fun valuesPage(sessionId: Long, sensorId: String, afterTs: Long, afterId: Long, limit: Int) =
+        rows.filter { it.sessionId == sessionId && it.sensorId == sensorId && (it.t > afterTs || (it.t == afterTs && it.id > afterId)) }
+            .sortedWith(compareBy({ it.t }, { it.id })).take(limit).map { ValueRow(it.id, it.value, it.t) }
+    override suspend fun warmStart(sessionId: Long) = rows.filter { it.sessionId == sessionId && it.sensorId == "01.05" && it.value >= 80 }.minOfOrNull { it.t }
     override suspend fun sensorAggregate(carId: Long, sensorId: String, fromMs: Long, toMs: Long) = agg(sensorId, rows.filter { it.sessionId in inCar(carId, fromMs, toMs) && it.sensorId == sensorId })
     private fun warm(list: List<Row>) = list.filter { r -> rows.filter { it.sessionId == r.sessionId && it.sensorId == "01.05" && it.value >= 80 }.minOfOrNull { it.t }?.let { r.t >= it } == true }
     override suspend fun warmSensorAggregate(carId: Long, sensorId: String, fromMs: Long, toMs: Long) = agg(sensorId, warm(rows.filter { it.sessionId in inCar(carId, fromMs, toMs) && it.sensorId == sensorId }))
-    override suspend fun sensorSample(carId: Long, sensorId: String, fromMs: Long, toMs: Long, step: Int) = rows.filter { it.sessionId in inCar(carId, fromMs, toMs) && it.sensorId == sensorId && it.id % step == 0L }.map { it.value }
-    override suspend fun warmSensorSample(carId: Long, sensorId: String, fromMs: Long, toMs: Long, step: Int) = warm(rows.filter { it.sessionId in inCar(carId, fromMs, toMs) && it.sensorId == sensorId }).map { it.value }
     override suspend fun points(sessionId: Long, sensorIds: Collection<String>) = rows.filter { it.sessionId == sessionId && it.sensorId in sensorIds }.sortedBy { it.t }.map { ReadingPoint(it.sensorId, it.value, it.t) }
 }
 

@@ -61,7 +61,7 @@ class AnalyticsDaoTest {
         val warm = dao.warmSensorAggregate(EcuDatabase.DEFAULT_CAR_ID, "01.07", 0, Long.MAX_VALUE)!!
         assertEquals(2, warm.count)
         assertEquals(12.5, warm.min, 1e-9)
-        assertEquals(listOf(12.5, 12.5), dao.warmSensorSample(EcuDatabase.DEFAULT_CAR_ID, "01.07", 0, Long.MAX_VALUE, 1))
+        assertEquals(listOf(12.5, 12.5), dao.sensorSample(EcuDatabase.DEFAULT_CAR_ID, "01.07", 0, Long.MAX_VALUE, 1, warmOnly = true))
     }
 
     @Test

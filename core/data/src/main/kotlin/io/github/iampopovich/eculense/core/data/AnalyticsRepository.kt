@@ -1,5 +1,7 @@
 package io.github.iampopovich.eculense.core.data
 
+import io.github.iampopovich.eculense.core.database.sensorSample
+import io.github.iampopovich.eculense.core.database.sessionSample
 import android.util.Log
 import io.github.iampopovich.eculense.core.analytics.AnalysisInput
 import io.github.iampopovich.eculense.core.analytics.AnalyticsEngine
@@ -238,7 +240,7 @@ internal class RoomAnalyticsRepository(
         val agg = (if (warmOnly) dao.warmSensorAggregate(carId, sensorId, fromMs, toMs) else dao.sensorAggregate(carId, sensorId, fromMs, toMs))
             ?: return null
         val step = Percentiles.step(agg.count)
-        val sample = if (warmOnly) dao.warmSensorSample(carId, sensorId, fromMs, toMs, step) else dao.sensorSample(carId, sensorId, fromMs, toMs, step)
+        val sample = dao.sensorSample(carId, sensorId, fromMs, toMs, step, warmOnly)
         return agg.toSummary(sample)
     }
 
