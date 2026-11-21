@@ -60,6 +60,9 @@ interface DtcRepository {
     /** Whether an event with this code already exists in the time window — repeat import does not duplicate events. */
     suspend fun hasEvent(code: String, fromMs: Long, toMs: Long): Boolean = false
 
+    /** R1.6: stored readiness snapshots of [carId] (taken around a clear in the app), newest first. */
+    suspend fun readinessHistory(carId: Long, limit: Int = 10): List<ReadinessSnapshot> = emptyList()
+
     companion object {
         /** Pressing «Read codes» again and the snapshot before clearing do not create duplicate events. */
         const val DEDUP_WINDOW_MS = 5 * 60_000L
@@ -150,6 +153,16 @@ internal class RoomDtcRepository(
         return true
     }
 
+    override suspend fun readinessHistory(carId: Long, limit: Int): List<ReadinessSnapshot> =
+        dao.readinessForCar(carId, limit).map { e ->
+            ReadinessSnapshot(
+                takenAtMs = e.takenAtMs,
+                reason = ReadinessReason.entries.firstOrNull { it.name == e.reason },
+                readiness = DiagCodec.decodeReadiness(e.monitors, e.milOn, e.dtcCount),
+                counters = DiagCodec.decodeCounters(e.counters),
+            )
+        }
+
     override suspend fun saveReadiness(reason: ReadinessReason, readiness: Readiness?, counters: ClearedCounters?) {
         if (readiness == null && counters == null) return
         if (!liveWrites.allowed()) return
@@ -164,3 +177,11 @@ internal class RoomDtcRepository(
 
 /** Why a readiness snapshot was stored. */
 enum class ReadinessReason { BEFORE_CLEAR, AFTER_CLEAR }
+
+/** One stored readiness snapshot ([reason] null = unknown stored value). Real links only (gated on write). */
+data class ReadinessSnapshot(
+    val takenAtMs: Long,
+    val reason: ReadinessReason?,
+    val readiness: Readiness?,
+    val counters: ClearedCounters?,
+)

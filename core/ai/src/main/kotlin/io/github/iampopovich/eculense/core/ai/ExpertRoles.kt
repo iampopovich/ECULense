@@ -38,11 +38,13 @@ object ExpertRoles {
         focus = "trouble codes, how they relate to each other, urgency, Check Engine",
         prompt = """
             You are the Diagnostician. You look at diagnostic trouble codes (DTC): which ones occurred, how many times, when first and last seen,
-            how the codes relate to each other and to the analysis findings, how urgent it is, whether Check Engine is on. You do not touch
-            fuel consumption, trips or the maintenance schedule (see Economist, Operations analyst, Service advisor).
+            how the codes relate to each other and to the analysis findings, how urgent it is, whether Check Engine is on. You also read the
+            OBD readiness (monitors complete/incomplete, counters since the codes were last cleared — few warm-ups or km since clear mean a recent
+            clear) and the results of the quick health checks. You do not touch fuel consumption, trips or the maintenance schedule
+            (see Economist, Operations analyst, Service advisor).
         """.trimIndent(),
-        tools = setOf("dtcHistory", "findings", "carProfile"),
-        digestSections = listOf("dtcHistory", "findings"),
+        tools = setOf("dtcHistory", "findings", "carProfile", "readinessHistory", "healthChecks"),
+        digestSections = listOf("dtcHistory", "findings", "readinessHistory"),
         keywords = RouterKeywords.DIAGNOSTICIAN,
     )
 
@@ -82,9 +84,10 @@ object ExpertRoles {
         prompt = """
             You are the Electrician. You look at the vehicle voltage with the engine running (median, minimums, dips) and how it changes by
             month: whether the alternator charges, whether the battery is running down. Remember: the adapter voltage (ATRV) is usually 0.2–0.3 V
-            below the real one. You do not touch the mixture, cooling or fuel consumption (see Engine specialist, Cooling specialist, Economist).
+            below the real one. The quick health checks hold a voltage item (resting or charging) measured at the time of the check. You do not
+            touch the mixture, cooling or fuel consumption (see Engine specialist, Cooling specialist, Economist).
         """.trimIndent(),
-        tools = setOf("sensorSummary", "trends", "findings"),
+        tools = setOf("sensorSummary", "trends", "findings", "healthChecks"),
         digestSections = listOf("trends", "findings"),
         keywords = RouterKeywords.ELECTRICAL,
     )

@@ -25,6 +25,8 @@ internal object DigestText {
         "listSessions" to "Latest recording",
         "fuelLog" to "Fuel log",
         "expenses" to "Expenses",
+        "readinessHistory" to "OBD readiness",
+        "healthChecks" to "Quick health checks",
     )
 
     /** Leading field of a list item: written first, without a label. */
@@ -50,6 +52,8 @@ internal object DigestText {
         "fuel_l" to "fuel, l", "l_per_100km" to "consumption, l/100 km",
         "driving_h" to "driving, h", "standing_h" to "standing, h", "fuel_cost" to "fuel spending",
         "last_trip" to "last trip", "recent_months" to "by month",
+        "latest_date" to "latest reading", "stored_emission_dtcs" to "stored emission codes", "obd_inspection_ready" to "OBD inspection ready",
+        "hours_since_clear" to "hours since clear", "km_with_mil_on" to "km with the lamp on", "hours_with_mil_on" to "hours with the lamp on",
     )
 
     private val VALUES = mapOf(
@@ -114,8 +118,12 @@ internal object DigestText {
 
     private fun value(p: JsonElement): String {
         val s = (p as? JsonPrimitive)?.content ?: p.toString()
-        return clean(VALUES[s] ?: LABELS[s] ?: s)
+        // Enum-like tokens (before_clear, health_check) read as words.
+        val mapped = VALUES[s] ?: LABELS[s] ?: if (ENUM_TOKEN.matches(s)) s.replace('_', ' ') else s
+        return clean(mapped)
     }
+
+    private val ENUM_TOKEN = Regex("[a-z]+(_[a-z0-9]+)+")
 
     private fun noDataText(reason: String): String = NO_DATA[reason]
         ?: when {

@@ -65,4 +65,18 @@ class DiagnosticHistoryTest {
         assertEquals(r.monitors, DiagCodec.decodeReadiness(saved.monitors, saved.milOn, saved.dtcCount)!!.monitors)
         assertEquals("warmUps=12", saved.counters)
     }
+
+    @Test
+    fun `readiness history decodes the stored snapshots newest first`() = runTest {
+        val r = ReadinessDecoder.status(intArrayOf(0x82, 0x07, 0x65, 0x00))
+        repository.saveReadiness(ReadinessReason.BEFORE_CLEAR, r, ClearedCounters(warmUpsSinceClear = 12, kmSinceClear = 340))
+        now += 60_000
+        repository.saveReadiness(ReadinessReason.AFTER_CLEAR, r.copy(milOn = false, dtcCount = 0), ClearedCounters(warmUpsSinceClear = 0))
+        val history = repository.readinessHistory(3L, 5)
+        assertEquals(listOf(ReadinessReason.AFTER_CLEAR, ReadinessReason.BEFORE_CLEAR), history.map { it.reason })
+        assertEquals(true, history[1].readiness!!.milOn)
+        assertEquals(340, history[1].counters!!.kmSinceClear)
+        assertEquals(r.monitors, history[0].readiness!!.monitors)
+        assertEquals(emptyList<ReadinessSnapshot>(), repository.readinessHistory(99L, 5))
+    }
 }

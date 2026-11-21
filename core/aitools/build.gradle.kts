@@ -7,6 +7,8 @@ plugins {
 dependencies {
     implementation(project(":core:ai"))
     implementation(project(":core:data"))
+    // Readiness and cleared-codes counters inside the stored snapshots/health checks (pure JVM).
+    implementation(project(":core:obd"))
     implementation(project(":core:dtcdb"))
     implementation(libs.koog.agents)
     implementation(libs.kotlinx.serialization.json)

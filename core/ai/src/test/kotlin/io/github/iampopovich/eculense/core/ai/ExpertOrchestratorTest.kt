@@ -62,7 +62,7 @@ class ExpertOrchestratorTest {
     /** All :core:aitools tools by name; calls are recorded (name, days). */
     private class Toolbox : VehicleToolbox {
         val calls: MutableList<Pair<String, Int?>> = Collections.synchronizedList(mutableListOf())
-        val names = listOf("carProfile", "tripStats", "listSessions", "sessionStats", "sensorSummary", "findings", "dtcHistory", "maintenanceDue", "trends", "fuelLog", "expenses", "engineMap", "drivingStyle")
+        val names = listOf("carProfile", "tripStats", "listSessions", "sessionStats", "sensorSummary", "findings", "dtcHistory", "maintenanceDue", "trends", "fuelLog", "expenses", "engineMap", "drivingStyle", "readinessHistory", "healthChecks")
         override fun registry() = ToolRegistry {
             names.forEach { n ->
                 tool(object : SimpleTool<Args>(typeToken<Args>(), n, "tool $n") {

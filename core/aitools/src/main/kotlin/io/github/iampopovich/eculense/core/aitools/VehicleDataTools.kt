@@ -60,6 +60,9 @@ internal class ToolContext(
     /** E5-lite: per-car harsh threshold and the phone-accelerometer calibration summary; null = not wired in. */
     val stylePrefs: io.github.iampopovich.eculense.core.data.StylePrefs? = null,
     val calibrations: io.github.iampopovich.eculense.core.data.AccelCalibrations? = null,
+    /** R1.6: readiness snapshots and quick health checks; null = not wired in. */
+    val dtc: io.github.iampopovich.eculense.core.data.DtcRepository? = null,
+    val health: io.github.iampopovich.eculense.core.data.HealthRepository? = null,
 )
 
 /** B10: events of one recording for the model (English, no location): type, local time, seconds from the start. */
