@@ -546,7 +546,7 @@ interface ImportDao {
         SessionEntity::class, ReadingEntity::class, DtcSnapshotEntity::class, CarEntity::class, TripEntity::class, FindingEntity::class,
         MaintenanceItemEntity::class, OdometerEntity::class, ImportHistoryEntity::class, ImportedFileEntity::class, ImportSnapshotEntity::class,
         ReadinessSnapshotEntity::class, TripEventEntity::class, HealthCheckEntity::class, FuelFillUpEntity::class, ExpenseEntity::class,
-        CarNormEntity::class,
+        CarNormEntity::class, ModuleScanEntity::class,
     ],
     version = EcuDatabase.VERSION,
 )
@@ -567,12 +567,13 @@ abstract class EcuDatabase : RoomDatabase() {
     abstract fun expenseDao(): ExpenseDao
     abstract fun odometerSyncDao(): OdometerSyncDao
     abstract fun carNormDao(): CarNormDao
+    abstract fun moduleScanDao(): ModuleScanDao
 
     companion object {
         /** Schema version; an ECULense backup with a newer version is not restored. */
-        const val VERSION = 12
+        const val VERSION = 13
         const val FILE_NAME = "ecu.db"
-        val MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+        val MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
 
         const val DEFAULT_CAR_ID = 1L
         /** Blank: the UI shows the localized default name (older DBs keep their Russian literal, see LegacyValues). */
@@ -805,4 +806,5 @@ val databaseModule = module {
     single { get<EcuDatabase>().expenseDao() }
     single { get<EcuDatabase>().odometerSyncDao() }
     single { get<EcuDatabase>().carNormDao() }
+    single { get<EcuDatabase>().moduleScanDao() }
 }

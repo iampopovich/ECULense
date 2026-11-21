@@ -444,6 +444,32 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun v12GetsTheModuleScansTableKeepingDataAndCascadesWithTheCar() = runTest {
+        helper.createDatabase(dbName, 12).use { db ->
+            db.execSQL("INSERT INTO cars (id, name) VALUES (1, 'Test car')")
+            db.execSQL("INSERT INTO cars (id, name) VALUES (2, 'Second test car')")
+            db.execSQL("INSERT INTO sessions (id, name, startedAtMs, endedAtMs, source, vin, externalId, carId) VALUES (1, 'live', 30, 40, 'LIVE', NULL, NULL, 1)")
+            for (i in 0 until 10) {
+                db.execSQL("INSERT INTO readings (sessionId, sensorId, value, unit, timestampMs) VALUES (1, '01.0C', $i, 'rpm', ${100 + i})")
+            }
+            db.execSQL("INSERT INTO dtc_snapshots (takenAtMs, vin, code, kind, carId) VALUES (35, NULL, 'P0113', 'STORED', 1)")
+            db.execSQL("INSERT INTO car_norms (carId, key, source, low, high, center, mad, sampleCount, confidence, updatedAtMs) VALUES (1, 'IDLE_RPM', 'BASELINE', 600, 800, 700, 20, 12, 0.4, 9)")
+        }
+        helper.runMigrationsAndValidate(dbName, 13, true, MIGRATION_12_13).use { db ->
+            fun count(sql: String) = db.query(sql).use { c -> c.moveToFirst(); c.getInt(0) }
+            assertEquals(10, count("SELECT COUNT(*) FROM readings"))
+            assertEquals(1, count("SELECT COUNT(*) FROM dtc_snapshots"))
+            assertEquals(1, count("SELECT COUNT(*) FROM car_norms"))
+            assertEquals(0, count("SELECT COUNT(*) FROM module_scans"))
+            db.execSQL("INSERT INTO module_scans (carId, scanAtMs, protocol, address, moduleKind, result, detail, dtcs) VALUES (1, 50, '6', '7D1/7D9', 'ABS_ESC', 'CODES', 'UDS_19_02', 'C0035:TC')")
+            db.execSQL("INSERT INTO module_scans (carId, scanAtMs, protocol, address, moduleKind, result, detail, dtcs) VALUES (2, 50, '5', '0x10', 'ENGINE', 'NO_REPLY', NULL, '')")
+            db.execSQL("PRAGMA foreign_keys = ON")
+            db.execSQL("DELETE FROM cars WHERE id = 2")
+            assertEquals(1, count("SELECT COUNT(*) FROM module_scans"))
+        }
+    }
+
     /** R2.2: a v7 database with realistic synthetic content goes through every migration to the current version. */
     @Test
     fun v7RealisticDataSurvivesTheWholeChain() = runTest {

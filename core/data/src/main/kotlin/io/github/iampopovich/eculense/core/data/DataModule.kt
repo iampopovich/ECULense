@@ -95,6 +95,11 @@ val dataModule = module {
             onCheck = { count, at -> cars.activeCarId()?.let { lastSeen.saveDtcCheck(it, count, at) } },
         )
     }
+    // R-D: module scans per car; simulated links are gated like every other live writer.
+    single<ModuleScanRepository> {
+        val cars = get<CarRepository>()
+        RoomModuleScanRepository(get(), activeCarId = { cars.activeCarId() }, liveWrites = get())
+    }
     // C9: last voltage and code check per car for the home-screen widget (real links only).
     single<LastSeenStore> { DataStoreLastSeen(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("last_seen") }) }
     single(createdAtStart = true) {
