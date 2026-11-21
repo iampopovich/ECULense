@@ -30,7 +30,7 @@ object SpeedWindows {
         val out = mutableListOf<SpeedWindow>()
         val recent = ArrayDeque<SpeedSample>()
         var last: SpeedSample? = null
-        for (s in speed) {
+        for (s in SpeedSpikes.filter(speed)) {
             val p = last
             if (p != null && (s.tMs - p.tMs) !in 1..t.MAX_GAP_MS) recent.clear()
             while (recent.size >= 2 && s.tMs - recent[1].tMs >= t.MIN_WINDOW_MS) recent.removeFirst()

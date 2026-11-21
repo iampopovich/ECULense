@@ -41,7 +41,7 @@ internal class DataStoreTripFactsStore(private val store: DataStore<Preferences>
     }
 
     internal companion object {
-        const val VERSION = 1
+        const val VERSION = 2 // 2: speed spikes filtered before the style score
         private val KEY = stringPreferencesKey("facts_v$VERSION")
 
         fun encode(m: Map<Long, TripFacts>): String = m.entries.sortedBy { it.key }.joinToString("\n") { (id, f) ->

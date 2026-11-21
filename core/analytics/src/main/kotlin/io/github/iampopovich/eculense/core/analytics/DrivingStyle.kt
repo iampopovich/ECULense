@@ -99,6 +99,19 @@ sealed interface DrivingStyle {
  * D6: a 0–100 score per trip from harsh accelerations/brakings (speed derivative), the share of high rpm and the idle
  * share. Single pass over (sensorId, value, timestamp) in time order.
  */
+/** Single-sample speed spikes (adapter dropouts read as 0, one garbled byte) are not driving. */
+object SpeedSpikes {
+    fun median3(a: Double, b: Double, c: Double): Double = maxOf(minOf(a, b), minOf(maxOf(a, b), c))
+
+    /** Running median of 3 over samples whose neighbours are within [StyleThresholds.MAX_GAP_MS]; ends stay raw. */
+    fun filter(speed: List<SpeedSample>): List<SpeedSample> = speed.mapIndexed { i, s ->
+        val p = speed.getOrNull(i - 1)
+        val n = speed.getOrNull(i + 1)
+        if (p == null || n == null || (s.tMs - p.tMs) !in 1..StyleThresholds.MAX_GAP_MS || (n.tMs - s.tMs) !in 1..StyleThresholds.MAX_GAP_MS) s
+        else s.copy(kmh = median3(p.kmh, s.kmh, n.kmh))
+    }
+}
+
 object DrivingStyleRules {
     /**
      * [harshMs2] = harsh level for both acceleration and braking; the default is the sourced Geotab 0.3 g, a per-car
@@ -121,6 +134,46 @@ object DrivingStyleRules {
         var inBrake = false
         var rpmSamples = 0
         var rpmHigh = 0
+        var pending: Pair<Long, Double>? = null
+        var prevRaw: Pair<Long, Double>? = null
+        fun onSpeed(ts: Long, v: Double) {
+            val pv = lastV
+            if (pv != null) {
+                val dt = ts - lastT
+                if (dt in 1..t.MAX_GAP_MS) {
+                    intervals += dt
+                    val avg = (pv + v) / 2
+                    distanceKm += avg * dt / 3_600_000.0
+                    if (avg > t.MOVING_KMH) drivingMs += dt else standingMs += dt
+                } else {
+                    recent.clear()
+                    inAccel = false
+                    inBrake = false
+                }
+            }
+            // Reference = the latest sample at least MIN_WINDOW_MS back; older samples are dropped.
+            while (recent.size >= 2 && ts - recent[1].first >= t.MIN_WINDOW_MS) recent.removeFirst()
+            val ref = recent.firstOrNull()?.takeIf { ts - it.first >= t.MIN_WINDOW_MS }
+            if (ref != null) {
+                val window = ts - ref.first
+                windows += window
+                if (window <= t.MAX_WINDOW_MS) {
+                    val a = (v - ref.second) / 3.6 / (window / 1000.0)
+                    val isAccel = a > harshMs2
+                    val isBrake = -a > harshMs2
+                    if (isAccel && !inAccel) accel++
+                    if (isBrake && !inBrake) brake++
+                    inAccel = isAccel
+                    inBrake = isBrake
+                } else {
+                    inAccel = false
+                    inBrake = false
+                }
+            }
+            recent.addLast(ts to v)
+            lastV = v
+            lastT = ts
+        }
         for ((id, v, ts) in points) {
             when (id) {
                 SensorIds.RPM -> {
@@ -128,45 +181,23 @@ object DrivingStyleRules {
                     if (v > t.HIGH_RPM) rpmHigh++
                 }
                 SensorIds.SPEED -> {
-                    val pv = lastV
-                    if (pv != null) {
-                        val dt = ts - lastT
-                        if (dt in 1..t.MAX_GAP_MS) {
-                            intervals += dt
-                            val avg = (pv + v) / 2
-                            distanceKm += avg * dt / 3_600_000.0
-                            if (avg > t.MOVING_KMH) drivingMs += dt else standingMs += dt
-                        } else {
-                            recent.clear()
-                            inAccel = false
-                            inBrake = false
-                        }
+                    // R-B follow-up: one-sample spikes (a dropout read as 0 km/h between two 60s) are removed by a running
+                    // median of 3 before the derivative; monotone speed changes pass unchanged (Tukey's median filter).
+                    val pend = pending
+                    if (pend != null) {
+                        val prev = prevRaw
+                        val near = { a: Long, b: Long -> (b - a) in 1..t.MAX_GAP_MS }
+                        val filtered = if (prev != null && near(prev.first, pend.first) && near(pend.first, ts)) {
+                            SpeedSpikes.median3(prev.second, pend.second, v)
+                        } else pend.second
+                        onSpeed(pend.first, filtered)
+                        prevRaw = pend
                     }
-                    // Reference = the latest sample at least MIN_WINDOW_MS back; older samples are dropped.
-                    while (recent.size >= 2 && ts - recent[1].first >= t.MIN_WINDOW_MS) recent.removeFirst()
-                    val ref = recent.firstOrNull()?.takeIf { ts - it.first >= t.MIN_WINDOW_MS }
-                    if (ref != null) {
-                        val window = ts - ref.first
-                        windows += window
-                        if (window <= t.MAX_WINDOW_MS) {
-                            val a = (v - ref.second) / 3.6 / (window / 1000.0)
-                            val isAccel = a > harshMs2
-                            val isBrake = -a > harshMs2
-                            if (isAccel && !inAccel) accel++
-                            if (isBrake && !inBrake) brake++
-                            inAccel = isAccel
-                            inBrake = isBrake
-                        } else {
-                            inAccel = false
-                            inBrake = false
-                        }
-                    }
-                    recent.addLast(ts to v)
-                    lastV = v
-                    lastT = ts
+                    pending = ts to v
                 }
             }
         }
+        pending?.let { onSpeed(it.first, it.second) }
         if (intervals.isEmpty()) return DrivingStyle.NotScored(StyleSkipReason.NO_SPEED)
         // The median counts the derivative window, not the raw sample interval.
         val basis = windows.ifEmpty { intervals }

@@ -190,8 +190,8 @@ class AccelCalibrationTest {
 
     @Test
     fun `per-driver threshold is mean plus two sigma of the windowed derivative magnitude`() {
-        // Alternating ±1 m/s² windows: |a| = 1 everywhere → μ = 1, σ = 0.
-        val pts = (0..200).map { i -> SpeedSample(i * 1_000L, 50.0 + if (i % 2 == 0) 0.0 else 3.6) }
+        // A steady +1 m/s² ramp: |a| = 1 everywhere → μ = 1, σ = 0 (a zigzag would be removed as one-sample spikes).
+        val pts = (0..200).map { i -> SpeedSample(i * 1_000L, 50.0 + i * 3.6) }
         val d = DriverThresholds.of(listOf(pts))!!
         assertEquals(1.0, d.meanMs2, 1e-9)
         assertEquals(0.0, d.sdMs2, 1e-9)
