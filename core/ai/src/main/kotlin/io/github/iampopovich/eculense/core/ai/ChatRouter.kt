@@ -4,13 +4,19 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 /** Dispatcher decision: question type, experts (lead first, 0–4) and period in days (null: question without a period). */
-data class ChatRoute(val intent: ChatIntent, val roles: List<ExpertRole>, val days: Int?) {
+data class ChatRoute(
+    val intent: ChatIntent,
+    val roles: List<ExpertRole>,
+    val days: Int?,
+    /** Sections the question itself asks for (readiness, last health check), on top of the roles' ones. */
+    val topicSections: List<String> = emptyList(),
+) {
     /** Period for trends and trips: from the question, or half a year. */
     val periodDays: Int get() = days ?: ChatRouter.DEFAULT_DAYS
 
-    /** Summary sections for the on-phone model: by role, no duplicates; car profile first. */
+    /** Summary sections for the on-phone model: car profile first, then the question's topics, then by role; no duplicates. */
     val digestSections: List<String>
-        get() = if (roles.isEmpty()) emptyList() else (listOf("carProfile") + roles.flatMap { it.digestSections }).distinct()
+        get() = if (roles.isEmpty()) emptyList() else (listOf("carProfile") + topicSections + roles.flatMap { it.digestSections }).distinct()
 }
 
 /**
@@ -34,6 +40,12 @@ object ChatRouter {
 
     private val roleKeywords: Map<ExpertRole, List<Regex>> = ExpertRoles.ALL.associateWith { r -> r.keywords.map(::rx) }
 
+    /** Question topics → digest section (tool name); every topic is a Diagnostician question. */
+    private val topics: List<Pair<String, List<Regex>>> = listOf(
+        "readinessHistory" to RouterKeywords.READINESS.map(::rx),
+        "healthChecks" to RouterKeywords.HEALTH_CHECK.map(::rx),
+    )
+
     private val greeting = rx("привет|здравств|добр(ый|ое|ой) (день|утро|вечер)|хай|hi\\b|hello|hey|спасибо|благодар|thanks|thank you|кто ты|как дела|who are you")
 
     /** Words like «что не так / почему» mean a question about a fault, not about condition. */
@@ -43,7 +55,10 @@ object ChatRouter {
 
     fun route(question: String, today: LocalDate = LocalDate.now()): ChatRoute {
         val q = question.lowercase().replace('ё', 'е').trim()
-        val scores = roleKeywords.mapValues { (_, list) -> list.count { it.containsMatchIn(q) } }.filterValues { it > 0 }
+        val topicSections = topics.filter { (_, list) -> list.any { it.containsMatchIn(q) } }.map { it.first }
+        val scores = roleKeywords.mapValues { (role, list) ->
+            list.count { it.containsMatchIn(q) } + if (role == ExpertRoles.DIAGNOSTICIAN) topicSections.size * TOPIC_WEIGHT else 0
+        }.filterValues { it > 0 }
         val days = days(q, today)
         if (scores.isEmpty() && greeting.containsMatchIn(q)) return ChatRoute(ChatIntent.SMALLTALK, emptyList(), null)
         // role order in the registry breaks ties on equal scores
@@ -67,8 +82,11 @@ object ChatRouter {
             else -> hit
         }.distinct().take(MAX_ROLES)
         val periodDays = days ?: if (intent == ChatIntent.OVERVIEW || intent == ChatIntent.TREND) DEFAULT_DAYS else null
-        return ChatRoute(intent, roles, periodDays)
+        return ChatRoute(intent, roles, periodDays, topicSections)
     }
+
+    /** A readiness / health-check topic outweighs incidental keywords («техосмотр» is not a maintenance question). */
+    private const val TOPIC_WEIGHT = 2
 
     private val halfYear = rx("полгода|пол года|полугод|half a year|half-year|six months|шесть месяц")
     private val nUnits = Regex(portable("(?<!\\d)(\\d{1,3})\\s*-?\\s*(дн|день|дня|дней|сут|days?|недел|нед\\b|weeks?|месяц|мес\\b|months?|год|года|лет|years?)"), RegexOption.IGNORE_CASE)
@@ -152,6 +170,18 @@ internal object RouterKeywords {
         "(пройти|пройду|следующее|очередное|плановое|ближайшее) то\\b", "то-?\\d", "техобслуж", "обслуж", "масл", "замен", "менять",
         "фильтр", "свеч", "ремен", "грм", "регламент", "интервал", "пора ",
         "maintenance", "service", "oil", "replace", "filter", "spark plug", "timing belt",
+    )
+
+    /** «Готова ли к техосмотру», «стирали ли ошибки», «сколько прогревов после сброса». */
+    val READINESS = listOf(
+        "техосмотр", "готов(а|о|ы)? (ли )?к (то|осмотр)\\b", "мониторы? готовност", "готовност", "readiness", "монитор",
+        "стира", "стёр", "стер(ли|ла|л)\\b", "сбрасыва", "сброс(или|ила|ил)? (ли )?(ошибк|код)", "удаля(ли|л) (ли )?(ошибк|код)", "после сброса",
+        "inspection", "emissions? test", "smog", "mot\\b", "monitors?\\b", "cleared", "erased", "reset (the )?codes", "since (the )?clear",
+    )
+
+    /** «Что показала проверка», «результат последней проверки». */
+    val HEALTH_CHECK = listOf(
+        "проверк", "что показал", "health check", "quick check", "last check", "check result", "(the )?check show",
     )
 
     val MODEL_EXPERT = listOf(

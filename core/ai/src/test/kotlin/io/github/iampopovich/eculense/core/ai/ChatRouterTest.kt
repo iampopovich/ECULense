@@ -110,7 +110,7 @@ class ChatRouterTest {
         assertEquals("carProfile", sections.first())
         assertEquals("trends", sections[1])
         assertTrue(sections.indexOf("trends") < sections.indexOf("dtcHistory"))
-        assertEquals(listOf("carProfile", "dtcHistory", "findings"), route("объясни мои ошибки").digestSections)
+        assertEquals(listOf("carProfile", "dtcHistory", "findings", "readinessHistory"), route("объясни мои ошибки").digestSections)
     }
 
     @Test
@@ -129,7 +129,7 @@ class ChatRouterTest {
             }
             assertTrue(r.id, SystemPrompts.expert(r, trend, "en").contains("days=180"))
         }
-        assertEquals(setOf("dtcHistory", "findings", "carProfile"), ExpertRoles.DIAGNOSTICIAN.tools)
+        assertEquals(setOf("dtcHistory", "findings", "carProfile", "readinessHistory", "healthChecks"), ExpertRoles.DIAGNOSTICIAN.tools)
         assertEquals(setOf("trends", "tripStats", "listSessions", "drivingStyle"), ExpertRoles.USAGE.tools)
         assertEquals(setOf("carProfile"), ExpertRoles.MODEL_EXPERT.tools)
         // the old template lives on only in the answer format for fault questions
@@ -148,5 +148,38 @@ class ChatRouterTest {
         assertEquals("a week", ExpertRoles.periodText(7))
         assertEquals("2 months", ExpertRoles.periodText(60))
         assertEquals("45 days", ExpertRoles.periodText(45))
+    }
+
+    @Test
+    fun `readiness and health check questions go to the diagnostician with their digest sections`() {
+        val cases = listOf(
+            "готова ли к техосмотру" to "readinessHistory",
+            "Готова ли машина к техосмотру?" to "readinessHistory",
+            "стирали ли ошибки" to "readinessHistory",
+            "сбрасывали ли коды до покупки" to "readinessHistory",
+            "is my car ready for the emissions test" to "readinessHistory",
+            "were the codes cleared recently" to "readinessHistory",
+            "что показала проверка" to "healthChecks",
+            "результат последней проверки" to "healthChecks",
+            "what did the last check show" to "healthChecks",
+        )
+        val failures = cases.mapNotNull { (q, section) ->
+            val r = route(q)
+            val ok = r.intent == ChatIntent.DIAGNOSE && r.roles.firstOrNull() == ExpertRoles.DIAGNOSTICIAN &&
+                section in r.topicSections && r.digestSections.indexOf(section) == 1
+            if (ok) null else "«$q»: ${r.intent}/${r.roles.map { it.id }}/${r.topicSections}/${r.digestSections}"
+        }
+        assertTrue(failures.joinToString("\n"), failures.isEmpty())
+        // Ordinary questions get no topic sections.
+        assertEquals(emptyList<String>(), route("объясни мои ошибки").topicSections)
+        assertEquals(emptyList<String>(), route("когда менять масло").topicSections)
+        assertEquals(ChatIntent.MAINTENANCE, route("когда менять масло").intent)
+    }
+
+    @Test
+    fun `readiness and health check tools belong to the diagnostician and the electrician`() {
+        assertTrue(ExpertRoles.DIAGNOSTICIAN.tools.containsAll(listOf("readinessHistory", "healthChecks")))
+        assertTrue("healthChecks" in ExpertRoles.ELECTRICAL.tools)
+        assertTrue("readinessHistory" in ExpertRoles.DIAGNOSTICIAN.digestSections)
     }
 }
