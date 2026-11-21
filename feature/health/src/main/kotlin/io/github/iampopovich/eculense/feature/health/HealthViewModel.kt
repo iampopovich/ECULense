@@ -34,20 +34,31 @@ internal data class HealthUiState(
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
-internal class HealthViewModel(
-    private val runner: HealthCheckRunner,
+internal class HealthViewModel internal constructor(
+    progress: StateFlow<HealthProgress>,
+    private val runCheck: suspend () -> Unit,
     private val repository: HealthRepository,
     controller: ConnectionController,
     cars: CarRepository,
     private val aiAvailable: Boolean,
     openCheckId: Long? = null,
 ) : ViewModel() {
+    /** Koin: the runner's progress and run(). The internal constructor above is the JVM-test seam. */
+    constructor(
+        runner: HealthCheckRunner,
+        repository: HealthRepository,
+        controller: ConnectionController,
+        cars: CarRepository,
+        aiAvailable: Boolean,
+        openCheckId: Long? = null,
+    ) : this(runner.progress, { runner.run() }, repository, controller, cars, aiAvailable, openCheckId)
+
     private val opened = MutableStateFlow<Pair<HealthCheckRecord, Boolean>?>(null)
     private var job: Job? = null
 
     private val history = cars.observeActiveCar().flatMapLatest { car -> car?.let { repository.observe(it.id) } ?: flowOf(emptyList()) }
 
-    val uiState: StateFlow<HealthUiState> = combine(controller.state, runner.progress, opened, history) { state, progress, open, list ->
+    val uiState: StateFlow<HealthUiState> = combine(controller.state, progress, opened, history) { state, progress, open, list ->
         val done = progress as? HealthProgress.Done
         val shown = open ?: done?.let { it.record to it.stored }
         HealthUiState(
@@ -67,7 +78,7 @@ internal class HealthViewModel(
     fun run() {
         if (job?.isActive == true) return
         opened.value = null
-        job = viewModelScope.launch { runner.run() }
+        job = viewModelScope.launch { runCheck() }
     }
 
     fun open(record: HealthCheckRecord) {

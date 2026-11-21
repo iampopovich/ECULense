@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense.feature.health
 
+import io.github.iampopovich.eculense.core.data.HealthCheckRunner
 import io.github.iampopovich.eculense.core.navigation.AiChatDestination
 import io.github.iampopovich.eculense.core.navigation.HealthCheckDestination
 import io.github.iampopovich.eculense.core.navigation.HealthReportDestination
@@ -21,7 +22,7 @@ val healthModule = module {
     single { HealthReportExport(get(), getOrNull()) }
     viewModel { params ->
         val ai = getKoin().getAll<RouteHandler>().any { it.routeClass == AiChatDestination::class }
-        HealthViewModel(get(), get(), get(), get(), aiAvailable = ai, openCheckId = params.getOrNull<Long>())
+        HealthViewModel(get<HealthCheckRunner>(), get(), get(), get(), aiAvailable = ai, openCheckId = params.getOrNull<Long>())
     }
     navigation<HealthCheckDestination> { HealthRoute() }
     navigation<HealthReportDestination> { key -> HealthRoute(checkId = key.checkId) }
