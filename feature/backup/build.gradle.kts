@@ -8,4 +8,7 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:backup"))
     testImplementation(libs.kotlinx.coroutines.test)
+    // BackupViewModel takes android.net.Uri; BackupPrefs wraps a DataStore
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.datastore.preferences)
 }

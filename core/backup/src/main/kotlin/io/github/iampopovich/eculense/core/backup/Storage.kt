@@ -2,7 +2,9 @@ package io.github.iampopovich.eculense.core.backup
 
 import android.content.Context
 import androidx.work.CoroutineWorker
+import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ListenableWorker
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -62,13 +64,8 @@ internal class AndroidStorageService(private val context: Context, private val r
     override val recording: Flow<Boolean> = recorder?.activeSessionId?.map { it != null } ?: flowOf(false)
 
     override val compaction: Flow<CompactState> = work.getWorkInfosForUniqueWorkFlow(UNIQUE).map { infos ->
-        val info = infos.firstOrNull() ?: return@map CompactState.Idle
-        when (info.state) {
-            WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING, WorkInfo.State.BLOCKED -> CompactState.Running
-            WorkInfo.State.SUCCEEDED -> CompactState.Done(info.outputData.getLong(KEY_BEFORE, 0), info.outputData.getLong(KEY_AFTER, 0))
-            WorkInfo.State.FAILED -> if (info.outputData.getBoolean(KEY_RECORDING, false)) CompactState.Recording else CompactState.Failed
-            WorkInfo.State.CANCELLED -> CompactState.Idle
-        }
+        val info = infos.firstOrNull()
+        compactStateOf(info?.state, info?.outputData ?: Data.EMPTY)
     }
 
     override fun compact() {
@@ -80,6 +77,41 @@ internal class AndroidStorageService(private val context: Context, private val r
         const val KEY_BEFORE = "before"
         const val KEY_AFTER = "after"
         const val KEY_RECORDING = "recording"
+
+        /** The unique vacuum job's last state → what the Backup screen shows (null = never started). */
+        fun compactStateOf(state: WorkInfo.State?, output: Data): CompactState = when (state) {
+            null, WorkInfo.State.CANCELLED -> CompactState.Idle
+            WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING, WorkInfo.State.BLOCKED -> CompactState.Running
+            WorkInfo.State.SUCCEEDED -> CompactState.Done(output.getLong(KEY_BEFORE, 0), output.getLong(KEY_AFTER, 0))
+            WorkInfo.State.FAILED -> if (output.getBoolean(KEY_RECORDING, false)) CompactState.Recording else CompactState.Failed
+        }
+    }
+}
+
+/** Outcome of one compaction attempt (pure part of [DbVacuumWorker], JVM-tested). */
+internal sealed interface VacuumOutcome {
+    data object Recording : VacuumOutcome
+    data class Done(val beforeBytes: Long, val afterBytes: Long) : VacuumOutcome
+    data class Failed(val error: Exception) : VacuumOutcome
+
+    fun toResult(): ListenableWorker.Result = when (this) {
+        Recording -> ListenableWorker.Result.failure(workDataOf(AndroidStorageService.KEY_RECORDING to true))
+        is Done -> ListenableWorker.Result.success(workDataOf(AndroidStorageService.KEY_BEFORE to beforeBytes, AndroidStorageService.KEY_AFTER to afterBytes))
+        is Failed -> ListenableWorker.Result.failure()
+    }
+
+    companion object {
+        /** Refuses while a recording is running (VACUUM holds the write lock for the whole rebuild); sizes around [vacuum]. */
+        fun run(recording: Boolean, size: () -> Long, vacuum: () -> Unit): VacuumOutcome {
+            if (recording) return Recording
+            val before = size()
+            return try {
+                vacuum()
+                Done(before, size())
+            } catch (e: Exception) {
+                Failed(e)
+            }
+        }
     }
 }
 
@@ -91,22 +123,20 @@ internal class AndroidStorageService(private val context: Context, private val r
 class DbVacuumWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params), KoinComponent {
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val recording = getKoin().getOrNull<SessionRecorder>()?.activeSessionId?.value != null
-        if (recording) return@withContext Result.failure(workDataOf(AndroidStorageService.KEY_RECORDING to true))
         val file = applicationContext.getDatabasePath(EcuDatabase.FILE_NAME)
-        val before = StorageFiles.databaseBytes(file)
         val logger = getKoin().getOrNull<AppLogger>() ?: AppLogger.NONE
-        try {
+        val outcome = VacuumOutcome.run(recording, size = { StorageFiles.databaseBytes(file) }) {
             val db = get<EcuDatabase>().openHelper.writableDatabase
             db.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
             db.execSQL("VACUUM")
             db.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
-            val after = StorageFiles.databaseBytes(file)
-            runCatching { android.util.Log.i(TAG, "VACUUM done: $before -> $after bytes") }
-            Result.success(workDataOf(AndroidStorageService.KEY_BEFORE to before, AndroidStorageService.KEY_AFTER to after))
-        } catch (e: Exception) {
-            logger.error(TAG, "VACUUM failed: ${e::class.java.simpleName}", e)
-            Result.failure()
         }
+        when (outcome) {
+            is VacuumOutcome.Done -> runCatching { android.util.Log.i(TAG, "VACUUM done: ${outcome.beforeBytes} -> ${outcome.afterBytes} bytes") }
+            is VacuumOutcome.Failed -> logger.error(TAG, "VACUUM failed: ${outcome.error::class.java.simpleName}", outcome.error)
+            VacuumOutcome.Recording -> Unit
+        }
+        outcome.toResult()
     }
 
     private companion object {
