@@ -50,6 +50,8 @@ class ObdTextTest {
             ObdError.DemoDisconnected, ObdError.NoBluetooth, ObdError.UsbNoAccess, ObdError.UsbPermissionDenied,
             ObdError.UsbNotOpen, ObdError.UsbDetached, ObdError.LinkLost(ObdError.NotOpen), ObdError.BusInitFailed,
             ObdError.AdapterNotResponding, ObdError.AdapterNoPower(4.0), ObdError.IgnitionOff(12.1),
+            ObdError.NotOnAdapterWifi("192.168.0.10"), ObdError.AdapterWifiLost, ObdError.BleNoUartService,
+            ObdError.BleGattError("connect", 133), ObdError.BleDisconnected,
         )
         typed.forEach { assertTrue(it.toString(), ObdText.error(it) is UiText.Res) }
     }
@@ -62,6 +64,10 @@ class ObdTextTest {
         assertEquals(UiText.Res(R.string.obd_hint_ignition), ObdText.hint(ObdError.LinkLost(ObdError.EcuSilent), "wifi"))
         assertEquals(UiText.Res(R.string.obd_hint_no_power), ObdText.hint(ObdError.AdapterNoPower(3.9), "bt"))
         assertEquals(null, ObdText.hint(ObdError.DemoDisconnected, "demo"))
+        assertEquals(UiText.Res(R.string.obd_hint_wifi), ObdText.hint(ObdError.NotOnAdapterWifi("192.168.0.10"), "wifi"))
+        assertEquals(UiText.Res(R.string.obd_hint_wifi), ObdText.hint(ObdError.LinkLost(ObdError.AdapterWifiLost), "wifi"))
+        assertEquals(UiText.Res(R.string.obd_hint_ble), ObdText.hint(ObdError.AdapterNotResponding, "ble"))
+        assertEquals(UiText.Res(R.string.obd_hint_ble), ObdText.hint(ObdError.BleGattError("connect", 133), "ble"))
         assertEquals(UiText.Res(R.string.obd_protocol_5), ObdText.protocolName('5'))
         assertEquals(UiText.Res(R.string.obd_protocol_auto), ObdText.protocolName(null))
     }

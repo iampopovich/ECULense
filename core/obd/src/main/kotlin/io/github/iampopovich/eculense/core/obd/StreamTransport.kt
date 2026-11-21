@@ -20,6 +20,10 @@ abstract class StreamTransport : ObdTransport {
     @Volatile
     private var output: OutputStream? = null
 
+    /** Set by [abort]: the reason the reader reports instead of the socket's own "socket closed". */
+    @Volatile
+    private var abortedWith: ObdError? = null
+
     /** Blocking connection open; called on Dispatchers.IO. */
     protected abstract fun openStreams(): Pair<InputStream, OutputStream>
 
@@ -39,7 +43,7 @@ abstract class StreamTransport : ObdTransport {
                 }
                 chunks.close(ObdIoException(ObdError.AdapterClosed))
             } catch (e: IOException) {
-                chunks.close(e)
+                chunks.close(abortedWith?.let { ObdIoException(it, e) } ?: e)
             }
         }
     }
@@ -55,6 +59,16 @@ abstract class StreamTransport : ObdTransport {
     override suspend fun read(): ByteArray = chunks.receive()
 
     override suspend fun readAvailable(): ByteArray? = chunks.tryReceive().getOrNull()
+
+    /**
+     * Kills the connection from outside (e.g. its network went away): the pending and every further read fails with an
+     * [ObdIoException] carrying [reason], so the connection manager reconnects instead of waiting on a dead socket.
+     */
+    fun abort(reason: ObdError) {
+        abortedWith = reason
+        runCatching { closeStreams() }
+        chunks.close(ObdIoException(reason))
+    }
 
     override suspend fun close() {
         withContext(Dispatchers.IO) { runCatching { closeStreams() } }

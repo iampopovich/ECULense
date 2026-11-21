@@ -101,4 +101,10 @@
     <string name="obd_monitor_exhaust_sensor">Exhaust gas sensor</string>
     <string name="obd_monitor_pm_filter">Particulate filter</string>
     <string name="obd_monitor_egr_vvt">EGR / VVT</string>
+    <string name="obd_error_not_on_adapter_wifi">The phone is not connected to the adapter\'s Wi-Fi (%1$s)</string>
+    <string name="obd_error_adapter_wifi_lost">The adapter\'s Wi-Fi network was lost</string>
+    <string name="obd_error_ble_no_uart">This Bluetooth LE device is not an OBD adapter (no serial characteristics)</string>
+    <string name="obd_error_ble_gatt">Bluetooth LE error: %1$s failed (status %2$d)</string>
+    <string name="obd_error_ble_disconnected">The Bluetooth LE adapter disconnected</string>
+    <string name="obd_hint_ble">Check: the adapter is plugged in and its light is on; Bluetooth is on; the adapter is not connected to another app (Car Scanner, another phone). Pairing in Android settings is not needed for Bluetooth LE.</string>
 </resources>

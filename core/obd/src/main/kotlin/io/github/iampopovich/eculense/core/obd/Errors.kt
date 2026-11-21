@@ -61,6 +61,24 @@ sealed interface ObdError {
     /** The USB adapter is no longer attached. */
     data object UsbDetached : ObdError
 
+    /**
+     * B: no Wi-Fi network the adapter at [host] could be on showed up in time (phone not connected to the adapter's
+     * Wi-Fi, or a Wi-Fi of another subnet).
+     */
+    data class NotOnAdapterWifi(val host: String) : ObdError
+
+    /** B: the adapter's Wi-Fi network went away during the session (sockets bound to it are dead). */
+    data object AdapterWifiLost : ObdError
+
+    /** A (BLE): the device has no writable + notifiable characteristic pair, so it is not a BLE serial adapter. */
+    data object BleNoUartService : ObdError
+
+    /** A (BLE): a GATT operation failed with Android status [status] ([operation] = connect, discover, write...). */
+    data class BleGattError(val operation: String, val status: Int) : ObdError
+
+    /** A (BLE): the BLE device disconnected. */
+    data object BleDisconnected : ObdError
+
     /** The link dropped while connected; [cause] is what the transport reported. */
     data class LinkLost(val cause: ObdError) : ObdError
 
@@ -90,6 +108,11 @@ sealed interface ObdError {
             UsbPermissionDenied -> "USB access not granted"
             UsbNotOpen -> "USB port is not open"
             UsbDetached -> "USB adapter detached"
+            is NotOnAdapterWifi -> "phone is not on the Wi-Fi of the adapter $host"
+            AdapterWifiLost -> "adapter Wi-Fi network lost"
+            BleNoUartService -> "no BLE serial (notify + write) characteristics on this device"
+            is BleGattError -> "BLE $operation failed (GATT status $status)"
+            BleDisconnected -> "BLE device disconnected"
             is LinkLost -> "link to the adapter lost: ${cause.technicalMessage}"
             is ClearRefused -> "ECU refused to clear DTCs (7F 04 %02X)".format(nrc)
             is Other -> detail

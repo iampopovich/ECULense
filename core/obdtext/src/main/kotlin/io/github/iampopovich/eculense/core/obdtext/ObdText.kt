@@ -52,6 +52,11 @@ object ObdText {
         ObdError.UsbPermissionDenied -> UiText.Res(R.string.obd_error_usb_permission_denied)
         ObdError.UsbNotOpen -> UiText.Res(R.string.obd_error_usb_not_open)
         ObdError.UsbDetached -> UiText.Res(R.string.obd_error_usb_detached)
+        is ObdError.NotOnAdapterWifi -> UiText.Res(R.string.obd_error_not_on_adapter_wifi, listOf(e.host))
+        ObdError.AdapterWifiLost -> UiText.Res(R.string.obd_error_adapter_wifi_lost)
+        ObdError.BleNoUartService -> UiText.Res(R.string.obd_error_ble_no_uart)
+        is ObdError.BleGattError -> UiText.Res(R.string.obd_error_ble_gatt, listOf(e.operation, e.status))
+        ObdError.BleDisconnected -> UiText.Res(R.string.obd_error_ble_disconnected)
         is ObdError.LinkLost -> UiText.Res(R.string.obd_error_link_lost, listOf(error(e.cause)))
         is ObdError.ClearRefused ->
             if (e.nrc == 0x22) UiText.Res(R.string.obd_error_clear_refused_conditions) else UiText.Res(R.string.obd_error_clear_refused, listOf("%02X".format(e.nrc)))
@@ -132,7 +137,7 @@ object ObdText {
 
     /**
      * C10: what to check for a failed connection, by the error and the adapter type (kind of the endpoint:
-     * "bt", "wifi", "usb"). null when there is nothing concrete to suggest.
+     * "bt", "wifi", "ble", "usb"). null when there is nothing concrete to suggest.
      */
     fun hint(error: ObdError, endpointKind: String): UiText? {
         val cause = (error as? ObdError.LinkLost)?.cause ?: error
@@ -141,12 +146,15 @@ object ObdText {
                 when (endpointKind) {
                     "bt" -> UiText.Res(R.string.obd_hint_bt)
                     "wifi" -> UiText.Res(R.string.obd_hint_wifi)
+                    "ble" -> UiText.Res(R.string.obd_hint_ble)
                     "usb" -> UiText.Res(R.string.obd_hint_usb)
                     else -> null
                 }
             is ObdError.NoBaudRate -> UiText.Res(R.string.obd_hint_usb)
             ObdError.EcuSilent, ObdError.BusInitFailed, is ObdError.IgnitionOff, is ObdError.NoProtocol -> UiText.Res(R.string.obd_hint_ignition)
             is ObdError.AdapterNoPower -> UiText.Res(R.string.obd_hint_no_power)
+            is ObdError.NotOnAdapterWifi, ObdError.AdapterWifiLost -> UiText.Res(R.string.obd_hint_wifi)
+            is ObdError.BleGattError, ObdError.BleDisconnected, ObdError.BleNoUartService -> UiText.Res(R.string.obd_hint_ble)
             else -> null
         }
     }

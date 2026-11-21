@@ -118,6 +118,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:bluetooth"))
     implementation(project(":core:usb"))
+    implementation(project(":core:wifi"))
     implementation(project(":core:service"))
     implementation(project(":core:sensors"))
     implementation(project(":core:database"))

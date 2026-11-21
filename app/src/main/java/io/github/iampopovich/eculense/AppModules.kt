@@ -15,6 +15,7 @@ import io.github.iampopovich.eculense.core.obd.obdModule
 import io.github.iampopovich.eculense.core.service.serviceModule
 import io.github.iampopovich.eculense.core.sensors.sensorsModule
 import io.github.iampopovich.eculense.core.usb.usbModule
+import io.github.iampopovich.eculense.core.wifi.wifiModule
 import io.github.iampopovich.eculense.feature.aichat.aiChatModule
 import io.github.iampopovich.eculense.feature.aisettings.aiSettingsModule
 import io.github.iampopovich.eculense.feature.analysis.analysisModule
@@ -49,6 +50,8 @@ val appModules: List<Module> = listOf(
     obdModule(extraWifiEndpoints = devWifiEndpoints),
     bluetoothModule,
     usbModule,
+    // B: Wi-Fi adapter sockets bound to the adapter's Wi-Fi network; without it they use the default network.
+    wifiModule,
     serviceModule,
     databaseModule,
     dataModule,

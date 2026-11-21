@@ -36,6 +36,6 @@ fun obdModule(extraWifiEndpoints: List<AdapterEndpoint> = emptyList()) = module 
     }
     single(named(WifiTransportFactory.KIND)) {
         val scope = this
-        WifiTransportFactory(extraWifiEndpoints) { scope.getOrNull<AdapterPrefs>()?.suggestedWifi?.first() }
+        WifiTransportFactory(extraWifiEndpoints, { scope.getOrNull<AdapterPrefs>()?.suggestedWifi?.first() }, binder = getOrNull<AdapterNetworkBinder>())
     } bind TransportFactory::class
 }

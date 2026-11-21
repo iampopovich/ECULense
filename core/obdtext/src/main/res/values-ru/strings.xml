@@ -100,4 +100,10 @@
     <string name="obd_monitor_exhaust_sensor">Датчик отработавших газов</string>
     <string name="obd_monitor_pm_filter">Сажевый фильтр</string>
     <string name="obd_monitor_egr_vvt">EGR / VVT</string>
+    <string name="obd_error_not_on_adapter_wifi">Телефон не подключён к Wi-Fi адаптера (%1$s)</string>
+    <string name="obd_error_adapter_wifi_lost">Wi-Fi сеть адаптера пропала</string>
+    <string name="obd_error_ble_no_uart">Это устройство Bluetooth LE не похоже на OBD-адаптер (нет последовательных характеристик)</string>
+    <string name="obd_error_ble_gatt">Ошибка Bluetooth LE: %1$s не удалось (статус %2$d)</string>
+    <string name="obd_error_ble_disconnected">Адаптер Bluetooth LE отключился</string>
+    <string name="obd_hint_ble">Проверьте: адаптер вставлен и светится; Bluetooth включён; адаптер не занят другим приложением (Car Scanner, другой телефон). Для Bluetooth LE сопрягать адаптер в настройках Android не нужно.</string>
 </resources>
