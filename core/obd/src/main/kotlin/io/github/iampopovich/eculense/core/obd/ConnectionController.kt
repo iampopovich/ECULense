@@ -227,10 +227,13 @@ class ObdConnectionManager internal constructor(
         val factory = factories.firstOrNull { it.kind == endpoint.kind }
             ?: throw ObdException(ObdError.NoTransport(endpoint.kind))
         val key = adapterKey(endpoint)
-        // A replayed log must meet the same commands it recorded: no learned profile for it.
-        val learn = endpoint.kind != ReplayTransportFactory.KIND
+        // A replayed log must meet the same commands it recorded: no user settings and no learned profile for it.
+        val useSettings = endpoint.kind != ReplayTransportFactory.KIND
+        // Simulated links (demo kinds, replay, PC emulator) never store a learned profile: the profile store is keyed
+        // by the active car, and nothing simulated may persist into it (round 1 lesson, LiveWriteGate).
+        val learn = !endpoint.isSimulated
         val setup = SessionSetup(
-            settings = runCatching { prefs.settings.first() }.getOrDefault(AdapterSettings()).takeIf { learn } ?: AdapterSettings(),
+            settings = runCatching { prefs.settings.first() }.getOrDefault(AdapterSettings()).takeIf { useSettings } ?: AdapterSettings(),
             profile = (if (learn) runCatching { prefs.profile(key) }.getOrNull() else null) ?: AdapterProfile(),
             onProfile = { if (learn) prefs.saveProfile(key, it) },
         )
