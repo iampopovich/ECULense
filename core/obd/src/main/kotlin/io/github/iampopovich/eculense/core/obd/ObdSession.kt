@@ -450,11 +450,14 @@ internal class Elm327Session(
     private inner class ElmHeaderedChannel(
         override val protocol: Char,
         override val format: HeaderFormat,
-        private val policy: EcuSafetyPolicy,
+        override val policy: EcuSafetyPolicy,
     ) : HeaderedChannel {
         private val defaultHeader = DEFAULT_HEADERS.getValue(format)
         private var header = defaultHeader
         private var receiveFilter: String? = null
+
+        /** R-E: settings changed by [setting] (family → last command), restored at the end of the scope. */
+        private val changed = LinkedHashMap<String, String>()
 
         suspend fun enable() {
             if (!at("ATH1")) {
@@ -479,11 +482,69 @@ internal class Elm327Session(
             val user = setup.settings.extraInit.filter { InitCommands.problem(it) == null }
             fun userOr(prefix: String, fallback: String) = user.lastOrNull { it.startsWith(prefix) } ?: fallback
             return buildList {
+                // R-E settings first (flow control, priority, extended address, tester, timeout, receive address,
+                // baud), each family once; then headers off, the default header and the receive filter.
+                changed.keys.mapNotNull { ExtendedSettings.restoreOf(it) }.distinct().forEach { r ->
+                    val family = ExtendedSettings.keyOf(r)
+                    add(family?.let { f -> user.lastOrNull { it.startsWith(f) } } ?: r)
+                }
                 add("ATH0")
                 add(userOr("ATSH", "ATSH$defaultHeader"))
                 if (format.isCan) add(userOr("ATCRA", "ATCRA"))
-                // The scope never changes the protocol; should a future caller do so, ATSP<p> belongs here.
+                // The scope never changes the protocol (ATSP is accepted only for the protocol in use).
             }
+        }
+
+        override suspend fun setting(command: String): Boolean {
+            val c = command.replace(" ", "").uppercase()
+            val key = ExtendedSettings.keyOf(c) ?: throw ObdException(ObdError.ModuleScanUnsupported("setting '$c'"))
+            val arg = c.removePrefix(key)
+            when (key) {
+                "ATSP" -> {
+                    if (arg.removePrefix("A") != protocol.toString()) throw ObdException(ObdError.ModuleScanUnsupported("protocol switch to '$arg'"))
+                    return true
+                }
+                "ATSH" -> {
+                    if (header == arg) return true
+                    if (!at(c)) return false
+                    header = arg
+                    return true
+                }
+                "ATCRA" -> {
+                    if (!format.isCan) return false
+                    if (receiveFilter == arg.ifEmpty { null }) return true
+                    if (!at(c)) {
+                        unsupported += "ATCRA"
+                        capabilities = capabilities.copy(unsupported = unsupported.toSet())
+                        return false
+                    }
+                    receiveFilter = arg.ifEmpty { null }
+                    return true
+                }
+            }
+            if (changed[key] == c) return true
+            if (!at(c)) return false
+            changed[key] = c
+            return true
+        }
+
+        override suspend fun request(target: EcuTarget, command: String, timeoutMs: Long): List<ByteArray>? {
+            policy.require(target, command) // before anything is written
+            return answer(command, target.address?.rx?.takeIf { receiveFilter != null || format.isCan }, timeoutMs)
+        }
+
+        /** Sends [command]; the messages of [rx] (all ECUs when null), waiting out 7F xx 78 «response pending» twice. */
+        private suspend fun answer(command: String, rx: String?, timeoutMs: Long): List<ByteArray>? {
+            fun pick(reply: HeaderedReply?): List<ByteArray>? = reply?.let { if (rx == null) it.byEcu.values.flatten().ifEmpty { null } else it.byEcu[rx] }
+            var reply = pick(send(command, timeoutMs))
+            // 7F xx 78 = response pending (ISO 14229-1 NRC 0x78): the real answer follows; wait for it twice at most.
+            repeat(2) {
+                val sid = command.take(2).toInt(16)
+                if (reply == null || negativeCode(reply!!, sid) != 0x78) return reply
+                val next = link.awaitNextReply(command, timeoutMs * 2) ?: return reply
+                reply = pick(parsed(ElmResponseParser.parse(next, command))) ?: reply
+            }
+            return reply
         }
 
         override suspend fun functional(command: String, timeoutMs: Long): HeaderedReply? {

@@ -39,6 +39,11 @@ class FakeConnectionController(
     override fun setBackground(background: Boolean) {
         this.background.value = background
     }
+    val extendedBy = MutableStateFlow<Map<String, List<ExtendedPollGroup>>>(emptyMap())
+    override val disabledExtended = MutableStateFlow<Set<String>>(emptySet())
+    override fun setExtendedPoll(owner: String, groups: List<ExtendedPollGroup>) {
+        extendedBy.value = if (groups.isEmpty()) extendedBy.value - owner else LinkedHashMap(extendedBy.value).apply { put(owner, groups) }
+    }
     override suspend fun <T> withSession(block: suspend (ObdSession) -> T): T? = session?.let { block(it) }
 
     companion object {

@@ -10,6 +10,9 @@ interface HeaderedChannel {
     val protocol: Char
     val format: HeaderFormat
 
+    /** The scope's safety policy (R-E: extended reads check all their requests with it before the first step). */
+    val policy: EcuSafetyPolicy get() = EcuSafetyPolicy()
+
     /** The functional OBD request (default header); replies grouped per ECU. null = NO DATA. */
     suspend fun functional(command: String, timeoutMs: Long = DEFAULT_TIMEOUT_MS): HeaderedReply?
 
@@ -19,6 +22,22 @@ interface HeaderedChannel {
      * [ObdError.RequestDenied] when the policy refuses (nothing written then).
      */
     suspend fun physical(target: EcuTarget, command: String, timeoutMs: Long = PROBE_TIMEOUT_MS): List<ByteArray>?
+
+    /**
+     * R-E: one adapter setting of an extended read ([ExtendedSettings.ALLOWED] only; ATSH/ATCRA also become the
+     * channel's current header/filter). A setting equal to the current one is not sent again. false = the adapter
+     * answered '?'. Throws [ObdException] with [ObdError.ModuleScanUnsupported] for commands outside the list and for
+     * an ATSP naming another protocol. Every changed setting is put back when the scope ends.
+     */
+    suspend fun setting(command: String): Boolean = throw ObdException(ObdError.ModuleScanUnsupported("settings"))
+
+    /**
+     * R-E: a request under the header and filter set by [setting] (no implicit ATSH/ATCRA); checked against [target]
+     * by the scope's policy before it is written. The messages of [target]'s reply ID (any ECU when the filter is
+     * off), null = NO DATA. A 7F xx 78 «response pending» is waited for like in [physical].
+     */
+    suspend fun request(target: EcuTarget, command: String, timeoutMs: Long = DEFAULT_TIMEOUT_MS): List<ByteArray>? =
+        throw ObdException(ObdError.ModuleScanUnsupported("requests"))
 
     companion object {
         const val DEFAULT_TIMEOUT_MS = 2_000L

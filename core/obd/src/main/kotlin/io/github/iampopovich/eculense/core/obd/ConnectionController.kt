@@ -92,6 +92,15 @@ interface ConnectionController {
     /** C2: the app is in background / the screen is off; slower tiers are read half as often. */
     fun setBackground(background: Boolean) {}
 
+    /**
+     * R-E: extended (manufacturer) reads polled between the J1979 cycles, per owner like [setPolledPids]; an empty
+     * list removes the owner. Off unless an owner asks (the OBDb extended sensors toggle).
+     */
+    fun setExtendedPoll(owner: String, groups: List<ExtendedPollGroup>) {}
+
+    /** R-E: extended command ids switched off for this connection (NAK storm protection, missing capability). */
+    val disabledExtended: StateFlow<Set<String>> get() = NO_IDS
+
     /** One-off operations (DTCs, VIN). null — if not connected. */
     suspend fun <T> withSession(block: suspend (ObdSession) -> T): T?
 
@@ -109,6 +118,7 @@ fun mergePolled(byOwner: Map<String, List<Pid>>): List<Pid> =
     byOwner.values.flatten().distinctBy { it.code }
 
 private val NO_PIDS: StateFlow<Set<Int>> = MutableStateFlow(emptySet())
+private val NO_IDS: StateFlow<Set<String>> = MutableStateFlow(emptySet())
 private val NO_STATS: StateFlow<PollStats?> = MutableStateFlow(null)
 
 /**
@@ -161,18 +171,29 @@ class ObdConnectionManager internal constructor(
     override val disabledPids: StateFlow<Set<Int>> = disabled.asStateFlow()
     private val stats = MutableStateFlow<PollStats?>(null)
     override val pollStats: StateFlow<PollStats?> = stats.asStateFlow()
+    private val extendedByOwner = MutableStateFlow<Map<String, List<ExtendedPollGroup>>>(emptyMap())
+    private val extendedGroups = MutableStateFlow<List<ExtendedPollGroup>>(emptyList())
+    private val extendedOff = MutableStateFlow<Set<String>>(emptySet())
+    override val disabledExtended: StateFlow<Set<String>> = extendedOff.asStateFlow()
+
+    /** R-E: one NAK guard per connection (a reconnect gives every extended command a fresh start). */
+    @Volatile
+    private var guard = CommandGuard(clock)
 
     @Volatile
     private var active: Active? = null
     private var connectJob: Job? = null
     private var keepAliveJob: Job? = null
 
+    private data class PollInput(val state: ConnectionState, val pids: List<Pid>, val extended: List<ExtendedPollGroup>, val paused: Boolean)
+
     override val readings: SharedFlow<SensorReading> =
-        combine(state, polledPids, pollEpoch, exclusive) { s, pids, _, paused -> Triple(s, pids, paused > 0) }
-            .flatMapLatest { (s, pids, paused) ->
+        combine(state, polledPids, extendedGroups, pollEpoch, exclusive) { s, pids, ext, _, paused -> PollInput(s, pids, ext, paused > 0) }
+            .flatMapLatest { (s, pids, ext, paused) ->
                 val current = active
-                if (!paused && s is ConnectionState.Connected && current != null && pids.isNotEmpty()) {
-                    LivePoller(current.session, clock, disabled, stats, background = background).poll(pids)
+                if (!paused && s is ConnectionState.Connected && current != null && (pids.isNotEmpty() || ext.isNotEmpty())) {
+                    LivePoller(current.session, clock, disabled, stats, background = background, guard = guard, extendedDisabled = extendedOff)
+                        .poll(pids, ext)
                         .catch { e -> onPollingFailure(s, current, e) }
                 } else {
                     emptyFlow()
@@ -225,6 +246,14 @@ class ObdConnectionManager internal constructor(
         this.background.value = background
     }
 
+    override fun setExtendedPoll(owner: String, groups: List<ExtendedPollGroup>) {
+        val updated = extendedByOwner.updateAndGet { current ->
+            if (groups.isEmpty()) current - owner else LinkedHashMap(current).apply { put(owner, groups) }
+        }
+        val merged = updated.values.flatten()
+        if (merged != extendedGroups.value) extendedGroups.value = merged
+    }
+
     override suspend fun <T> withSession(block: suspend (ObdSession) -> T): T? {
         val current = active ?: return null
         if (state.value !is ConnectionState.Connected) return null
@@ -268,6 +297,8 @@ class ObdConnectionManager internal constructor(
         val pids = session.supportedPids()
         disabled.value = emptySet()
         stats.value = null
+        guard = CommandGuard(clock)
+        extendedOff.value = emptySet()
         _state.value = ConnectionState.Connected(endpoint, info, pids, session.capabilities)
         startKeepAlive(current)
     }
