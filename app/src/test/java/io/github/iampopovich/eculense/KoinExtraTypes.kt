@@ -28,5 +28,8 @@ object KoinExtraTypes {
         Map::class,
         java.io.File::class,
         io.github.iampopovich.eculense.core.backup.DbSource::class,
+        // R-E: ExtendedSensors gets the active-car flow and the debug-only simulated signalsets (getAll, empty in release).
+        kotlinx.coroutines.flow.Flow::class,
+        io.github.iampopovich.eculense.core.obdb.SimulatedSignalset::class,
     )
 }

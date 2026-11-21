@@ -8,7 +8,7 @@
     <string name="datapacks_checking">Checking…</string>
     <string name="datapacks_check_updates">Check for updates</string>
     <string name="datapacks_obdb_title">Extended PIDs (OBDb)</string>
-    <string name="datapacks_obdb_text">Factory ECU signals for the active car\'s make, model and year. View only for now: polling extended PIDs comes later.</string>
+    <string name="datapacks_obdb_text">Factory ECU signals for the active car\'s make, model and year. Read live on CAN cars when «Extended sensors (OBDb)» is on in Car data.</string>
     <string name="datapacks_license">License: %1$s</string>
     <string name="datapacks_open_for_my_car">Open for my car</string>
     <string name="datapacks_about_link">About the app and data sources</string>
@@ -36,7 +36,7 @@
     <string name="datapacks_obdb_offline">Can\'t reach OBDb: %1$s</string>
     <string name="datapacks_car">Car: %1$s</string>
     <string name="datapacks_car_none">not selected</string>
-    <string name="datapacks_signalset_note">Polling extended PIDs isn\'t supported yet: it needs ECU headers (ATH1/ATSH) and services 21/22. Here is what OBDb knows about your model.</string>
+    <string name="datapacks_signalset_note">Here is what OBDb knows about your model. With «Extended sensors (OBDb)» on in Car data, these signals are read on CAN cars (ECU headers ATH1/ATSH, services 21/22, read-only).</string>
     <string name="datapacks_year">Year</string>
     <string name="datapacks_check_obdb">Check OBDb</string>
     <string name="datapacks_field_make">make</string>
@@ -53,7 +53,7 @@
     <string name="datapacks_sources">Data sources</string>
     <string name="datapacks_vehicle_db_note">The vehicle database was collected by the gor3a project from autoevolution.com; your car profile doesn\'t depend on it.</string>
     <string name="datapacks_pinned_version">%1$s. Pinned version: %2$s.</string>
-    <string name="datapacks_obdb_note">Signalset data: OBDb (obdb.community), CC BY-SA 4.0. Downloaded by make and model, unmodified.</string>
+    <string name="datapacks_obdb_note">Signalset data and the definitions of the extended sensors (OBDb, obdb.community), CC BY-SA 4.0. Downloaded by make and model, unmodified.</string>
     <string name="datapacks_builtin_title">Built-in generic code database</string>
     <string name="datapacks_feedback">Feedback</string>
     <string name="datapacks_report_problem">Report a problem</string>

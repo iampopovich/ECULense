@@ -8,7 +8,7 @@
     <string name="datapacks_checking">Проверка…</string>
     <string name="datapacks_check_updates">Проверить обновления</string>
     <string name="datapacks_obdb_title">Расширенные PID (OBDb)</string>
-    <string name="datapacks_obdb_text">Сигналы заводских ЭБУ для марки, модели и года активной машины. Пока только просмотр: опрос расширенных PID появится позже.</string>
+    <string name="datapacks_obdb_text">Сигналы заводских ЭБУ для марки, модели и года активной машины. На машинах с CAN читаются вживую, если в «Данных машины» включены «Расширенные датчики (OBDb)».</string>
     <string name="datapacks_license">Лицензия: %1$s</string>
     <string name="datapacks_open_for_my_car">Открыть для моей машины</string>
     <string name="datapacks_about_link">О приложении и источниках данных</string>
@@ -36,7 +36,7 @@
     <string name="datapacks_obdb_offline">Нет связи с OBDb: %1$s</string>
     <string name="datapacks_car">Машина: %1$s</string>
     <string name="datapacks_car_none">не выбрана</string>
-    <string name="datapacks_signalset_note">Опрос расширенных PID пока не поддерживается: нужны заголовки ЭБУ (ATH1/ATSH) и сервисы 21/22. Здесь — что известно OBDb о вашей модели.</string>
+    <string name="datapacks_signalset_note">Здесь — что известно OBDb о вашей модели. Если в «Данных машины» включены «Расширенные датчики (OBDb)», эти сигналы читаются на машинах с CAN (заголовки ЭБУ ATH1/ATSH, сервисы 21/22, только чтение).</string>
     <string name="datapacks_year">Год</string>
     <string name="datapacks_check_obdb">Проверить OBDb</string>
     <string name="datapacks_field_make">марка</string>
@@ -53,7 +53,7 @@
     <string name="datapacks_sources">Источники данных</string>
     <string name="datapacks_vehicle_db_note">Данные справочника моделей собраны проектом gor3a с autoevolution.com; профиль вашей машины от справочника не зависит.</string>
     <string name="datapacks_pinned_version">%1$s. Зафиксированная версия: %2$s.</string>
-    <string name="datapacks_obdb_note">Signalset data: OBDb (obdb.community), CC BY-SA 4.0. Скачивается по марке и модели без изменений.</string>
+    <string name="datapacks_obdb_note">Данные сигналсетов и описания расширенных датчиков: OBDb (obdb.community), CC BY-SA 4.0. Скачиваются по марке и модели без изменений.</string>
     <string name="datapacks_builtin_title">Встроенная база общих кодов</string>
     <string name="datapacks_feedback">Обратная связь</string>
     <string name="datapacks_report_problem">Сообщить о проблеме</string>
