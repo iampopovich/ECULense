@@ -6,9 +6,9 @@ enum class EvRole { SOC, SOH, HV_VOLTAGE, HV_CURRENT, CELL_V_MAX, CELL_V_MIN, BA
 /**
  * R-E (research H_EV): finds the battery signals of an OBDb signalset. OBDb `suggestedMetric` names SOC, SOH, traction
  * voltage and current; cell and temperature extremes have no metric, so they are matched by the signal names the
- * Kia/Hyundai signalsets use («Maximum cell voltage», «HV battery temperature, maximum»; Kia-Niro-EV, Kia-EV6,
- * Hyundai-IONIQ-5). Only signals of the battery ECU (type «battery», 7E4 on Kia/Hyundai) count when the signalset names
- * one, so a dashboard SOC copy of another module does not win.
+ * Kia/Hyundai signalsets use («HV battery voltage, DC», «Maximum cell voltage», «HV battery temperature, maximum»;
+ * Kia-Niro-EV, Kia-EV6, Hyundai-IONIQ-5). Signals of the battery ECU (type «battery», 7E4 on Kia/Hyundai) are looked at
+ * first, so a copy in another module (the Niro VCMS «tractionBatteryVoltage») does not win.
  */
 object EvSignals {
     fun roleOf(signal: Signal): EvRole? {
@@ -20,6 +20,7 @@ object EvSignals {
         }
         val n = signal.name.lowercase()
         return when {
+            n.startsWith("hv battery voltage") -> EvRole.HV_VOLTAGE
             n.startsWith("maximum cell voltage") && !n.contains(" id") -> EvRole.CELL_V_MAX
             n.startsWith("minimum cell voltage") && !n.contains(" id") -> EvRole.CELL_V_MIN
             n == "hv battery temperature, maximum" -> EvRole.BATT_T_MAX

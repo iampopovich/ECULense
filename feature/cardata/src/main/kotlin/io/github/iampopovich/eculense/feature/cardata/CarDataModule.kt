@@ -16,7 +16,7 @@ import org.koin.dsl.navigation3.navigation
  */
 @OptIn(KoinExperimentalAPI::class)
 val carDataModule = module {
-    viewModel { CarDataViewModel(get(), get(), get()) }
+    viewModel { CarDataViewModel(get(), get(), get(), extended = getOrNull()) }
     navigation<CarDataDestination> { CarDataRoute() }
     single(named("cardata-route")) { RouteHandler(CarDataDestination::class) }
     single(named("cardata-hub")) {

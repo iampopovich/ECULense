@@ -18,4 +18,23 @@
     <string name="cardata_estimated">estimated from MAF</string>
     <string name="cardata_panel_empty">The dashboard is empty. Mark values with the star.</string>
     <string name="cardata_panel_title">Dashboard order</string>
+    <string name="cardata_ext_title">Extended sensors (OBDb)</string>
+    <string name="cardata_ext_hint">Manufacturer sensors from the OBDb signalset of this car (CAN cars). They are read between the standard values; off by default.</string>
+    <string name="cardata_ext_no_profile">Fill in the make and model in the car profile to find its OBDb signalset.</string>
+    <string name="cardata_ext_no_signalset">No OBDb signalset for this car: only the standard OBD-II values are available.</string>
+    <string name="cardata_ext_kline">The OBDb signalset of this car is for CAN; this link is K-Line, nothing to read.</string>
+    <string name="cardata_ext_counts">Signals: %1$d · commands: %2$d</string>
+    <string name="cardata_ext_source">Signal definitions: OBDb %1$s (CC BY-SA 4.0)</string>
+    <string name="cardata_ext_unverified_year">Data from OBDb, not verified for your model year (the car profile has no year).</string>
+    <string name="cardata_ext_waiting">Without a value yet: %1$d</string>
+    <string name="cardata_ev_title">Battery (EV)</string>
+    <string name="cardata_ev_soc">Charge (SOC)</string>
+    <string name="cardata_ev_soh">Health (SOH)</string>
+    <string name="cardata_ev_voltage">HV voltage</string>
+    <string name="cardata_ev_current">HV current</string>
+    <string name="cardata_ev_power">HV power</string>
+    <string name="cardata_ev_cells">Cells min / max</string>
+    <string name="cardata_ev_spread">Cell spread</string>
+    <string name="cardata_ev_temp">Battery temperature min / max</string>
+    <string name="cardata_ev_range">%1$s / %2$s</string>
 </resources>

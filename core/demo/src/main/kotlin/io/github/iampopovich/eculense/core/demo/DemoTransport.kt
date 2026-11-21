@@ -183,6 +183,8 @@ class DemoTransport internal constructor(
         at == "DP" -> if (protocolFound) "AUTO, " + bus.protocolName else "AUTO"
         at == "RV" -> String.format(Locale.US, "%.1fV", if (engineIsOff()) ENGINE_OFF_VOLTAGE else engine.voltage(elapsed()))
         at.matches(Regex("ST[0-9A-F]{2}|AT[0-2]|M[01]|CAF[01]|AL|NL|R[01]|PC")) -> "OK"
+        // R-E: settings of extended reads (flow control, priority, extended address, tester, receive address, baud).
+        at.matches(Regex("FCS(H[0-9A-F]{3,8}|D[0-9A-F]{2,10}|M[0-2])|CP[0-9A-F]{2}|CEA([0-9A-F]{2})?|TA[0-9A-F]{2}|SR[0-9A-F]{2}|IB(10|48|96)")) -> "OK"
         else -> "?"
     }
 
@@ -322,6 +324,27 @@ class DemoTransport internal constructor(
         DemoBus.CAN_SINGLE -> null
         DemoBus.CAN_MULTI -> routedCan(command)
         DemoBus.KLINE_KWP -> routedKLine(command)
+        DemoBus.CAN_NIRO_EV -> routedNiro(command)
+    }
+
+    /**
+     * R-E: the Niro EV demo. Functional requests (7DF) are the classic demo engine (so J1979 values keep moving); the
+     * battery 7E4 and the vehicle control unit 7E2 answer the OBDb test-case requests with the recorded frames of
+     * Kia-Niro-EV 2020 (CC BY-SA 4.0, resources/obdb/NOTICE.md), one case after another every [NIRO_CASE_MS]; any
+     * other physical request gets NO DATA (the NAK guard switches those commands off).
+     */
+    private fun routedNiro(command: String): String? {
+        if (header == bus.defaultHeader) return null
+        val file = niroCases["$header|$command"] ?: return NO_DATA
+        if (file.cases.isEmpty()) return NO_DATA
+        val case = file.cases[((elapsed() / NIRO_CASE_MS) % file.cases.size).toInt()]
+        val rx = case.response.firstOrNull()?.take(3) ?: return NO_DATA
+        if (receiveFilter != null && receiveFilter != rx) return NO_DATA
+        return case.response.joinToString("\r") { line -> if (headers) format(line, firstHeaderLength = 3) else format(line.drop(3), 0) }
+    }
+
+    private val niroCases: Map<String, ObdbTestCaseFile> by lazy {
+        ObdbFixtures.testCases(ObdbFixtures.NIRO_EV).associateBy { "${it.header}|${it.request}" }
     }
 
     private fun routedCan(command: String): String? {
@@ -414,6 +437,9 @@ class DemoTransport internal constructor(
         private const val VERSION = "ELM327 v1.5"
         private const val NO_DATA = "NO DATA"
         private const val SEARCH_DELAY_MS = 400L
+
+        /** R-E: the Niro EV demo moves to the next recorded OBDb test case this often. */
+        internal const val NIRO_CASE_MS = 3_000L
 
         // R-D multi-ECU layouts: the transmission advertises only PID 01; codes as UDS 19 02 records / KWP 58 triples.
         private const val TCM_MASK = "410080000000"
@@ -546,7 +572,10 @@ enum class DemoBus(val protocol: Char, val protocolName: String, val defaultHead
     CAN_MULTI('6', "ISO 15765-4 (CAN 11/500)", "7DF", "7E8"),
 
     /** The owner's car shape: KWP2000 fast init (ATDPN 5), requests C2 33 F1, replies 8x F1 10 with checksum. */
-    KLINE_KWP('5', "ISO 14230-4 (KWP FAST)", "C133F1", "10");
+    KLINE_KWP('5', "ISO 14230-4 (KWP FAST)", "C133F1", "10"),
+
+    /** R-E: a Kia Niro EV on CAN 11/500: the demo engine on 7DF, OBDb test-case frames from 7E4 (battery) and 7E2. */
+    CAN_NIRO_EV('6', "ISO 15765-4 (CAN 11/500)", "7DF", "7E8");
 
     val isCan: Boolean get() = protocol in "6789ABC"
 }
@@ -578,5 +607,24 @@ class KLineDemoTransportFactory(
     companion object {
         const val KIND = "demo-kline"
         val ENDPOINT = AdapterEndpoint(KIND, "Virtual ELM327 · ISO 14230-4 KWP · C2 33 F1", "Demo K-Line KWP", EndpointLabel.DEMO_KLINE)
+    }
+}
+
+/**
+ * R-E (debug only): a Kia Niro EV 2020 whose battery module answers with the OBDb test-case frames, for the extended
+ * sensors and the EV card. Simulated, never persisted; no demo car profile (the signalset comes with the endpoint).
+ */
+class NiroEvDemoTransportFactory(
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val latencyMs: (String) -> Long = DemoTransport.Companion::defaultLatency,
+) : TransportFactory {
+    override val kind = KIND
+    override suspend fun discover() = listOf(ENDPOINT)
+    override fun create(endpoint: AdapterEndpoint): ObdTransport = DemoTransport(clock, latencyMs, bus = DemoBus.CAN_NIRO_EV)
+
+    companion object {
+        const val KIND = "demo-niro-ev"
+        const val YEAR = ObdbFixtures.NIRO_EV_YEAR
+        val ENDPOINT = AdapterEndpoint(KIND, "Virtual ELM327 · CAN 11/500 · Kia Niro EV 2020 (OBDb test cases)", "Demo: Niro EV (OBDb)", EndpointLabel.DEMO_NIRO_EV)
     }
 }

@@ -67,6 +67,20 @@ class ObdbTestVectorsTest {
     }
 
     @Test
+    fun `Niro EV 2020 - every EV card role is found on the battery module, the Sorento 2017 is not an EV`() {
+        val niro = SignalsetParser.parse(ObdbFixtures.signalset(ObdbFixtures.NIRO_EV))
+        val commands = niro.forYear(2020).filter { !it.isDebug(2020) }
+        val roles = EvSignals.roles(commands, niro.ecus)
+        assertEquals(EvRole.entries.toSet(), roles.keys)
+        assertEquals("NIROEV_HVBAT_SOC", roles[EvRole.SOC])
+        assertEquals("NIROEV_HVBAT_VDC", roles[EvRole.HV_VOLTAGE])
+        assertEquals("NIROEV_C_V_MIN", roles[EvRole.CELL_V_MIN])
+        assertTrue(EvSignals.isEv(commands, niro.ecus))
+        val sorento = SignalsetParser.parse(ObdbFixtures.signalset(ObdbFixtures.SORENTO))
+        assertTrue(!EvSignals.isEv(sorento.forYear(2017).filter { !it.isDebug(2017) }, sorento.ecus))
+    }
+
+    @Test
     fun `the YAML reader finds every case of a file`() {
         val f = ObdbFixtures.testCases(ObdbFixtures.NIRO_EV).first()
         assertEquals("7E4.7EC.220101|fc=1", f.commandId)

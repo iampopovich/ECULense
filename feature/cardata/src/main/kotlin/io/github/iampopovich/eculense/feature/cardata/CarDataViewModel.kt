@@ -5,7 +5,10 @@ import androidx.lifecycle.viewModelScope
 import io.github.iampopovich.eculense.core.analytics.TripCalculator
 import io.github.iampopovich.eculense.core.data.DashboardPrefs
 import io.github.iampopovich.eculense.core.data.DashboardSelection
+import io.github.iampopovich.eculense.core.data.ExtendedSensors
 import io.github.iampopovich.eculense.core.data.UnitsRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import io.github.iampopovich.eculense.core.obd.ConnectionController
 import io.github.iampopovich.eculense.core.obd.ConnectionState
 import io.github.iampopovich.eculense.core.obd.Pid
@@ -44,6 +47,8 @@ internal data class CarDataUiState(
     val panel: List<Pid> = emptyList(),
     val editing: Boolean = false,
     val keepScreenOn: Boolean = true,
+    /** R-E: extended OBDb sensors and the EV battery card. */
+    val extended: ExtendedUi = ExtendedUi(),
 )
 
 /**
@@ -54,6 +59,7 @@ internal class CarDataViewModel(
     private val controller: ConnectionController,
     private val prefs: DashboardPrefs,
     units: UnitsRepository,
+    private val extended: ExtendedSensors? = null,
 ) : ViewModel() {
     private val latest = MutableStateFlow<Map<String, Double>>(emptyMap())
     private val editing = MutableStateFlow(false)
@@ -66,7 +72,7 @@ internal class CarDataViewModel(
         DashboardSelection.resolve(saved, (s as? ConnectionState.Connected)?.supportedPids.orEmpty(), estimate)
     }
 
-    val uiState: StateFlow<CarDataUiState> = combine(
+    private val baseState = combine(
         combine(controller.state, lastConnected, controller.disabledPids) { s, c, d -> Triple(s, c, d) },
         panelCodes,
         latest,
@@ -99,7 +105,14 @@ internal class CarDataViewModel(
             editing = edit,
             keepScreenOn = keep,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CarDataUiState())
+    }
+
+    private val extendedUi: Flow<ExtendedUi> = extended?.let { x ->
+        combine(x.enabled, x.status, latest, controller.disabledExtended, units.units) { on, status, values, off, u -> ExtendedUi.of(on, status, values, off, u) }
+    } ?: flowOf(ExtendedUi())
+
+    val uiState: StateFlow<CarDataUiState> = combine(baseState, extendedUi) { s, e -> s.copy(extended = e) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CarDataUiState())
 
     init {
         viewModelScope.launch {
@@ -122,6 +135,9 @@ internal class CarDataViewModel(
     fun moveDown(code: Int) = edit { DashboardSelection.moveDown(it, code) }
     fun setEditing(on: Boolean) { editing.value = on }
     fun setKeepScreenOn(on: Boolean) { viewModelScope.launch { prefs.setKeepScreenOn(on) } }
+
+    /** R-E: «Extended sensors (OBDb)» on/off (off by default). */
+    fun setExtended(on: Boolean) { extended?.setEnabled(on) }
 
     private fun edit(change: (List<Int>) -> List<Int>) {
         viewModelScope.launch {

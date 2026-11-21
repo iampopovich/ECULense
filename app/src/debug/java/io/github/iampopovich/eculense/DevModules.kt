@@ -1,6 +1,11 @@
 package io.github.iampopovich.eculense
 
+import io.github.iampopovich.eculense.core.demo.NiroEvDemoTransportFactory
+import io.github.iampopovich.eculense.core.demo.ObdbFixtures
 import io.github.iampopovich.eculense.core.demo.demoModule
+import io.github.iampopovich.eculense.core.obdb.SignalsetParser
+import io.github.iampopovich.eculense.core.obdb.SimulatedSignalset
+import io.github.iampopovich.eculense.core.obdb.StoredSignalset
 import io.github.iampopovich.eculense.core.obd.AdapterEndpoint
 import io.github.iampopovich.eculense.core.obd.EndpointLabel
 import io.github.iampopovich.eculense.core.obd.ReplayLogHolder
@@ -25,8 +30,18 @@ val devModules: List<Module> = listOf(
             val holder = get<ReplayLogHolder>()
             ReplayTransportFactory("Replay a traffic log", listedWithoutLog = true) { holder.text }
         } bind TransportFactory::class
+        // R-E: the «Demo: Niro EV (OBDb)» adapter brings its signalset (bundled OBDb file, CC BY-SA 4.0): no demo car.
+        single<SimulatedSignalset> { NiroEvDemoSignalset }
     },
 )
+
+/** The Kia-Niro-EV signalset bundled with :core:demo for the Niro EV demo adapter (parsed once, on first use). */
+private object NiroEvDemoSignalset : SimulatedSignalset {
+    override val endpointKind = NiroEvDemoTransportFactory.KIND
+    override val year = NiroEvDemoTransportFactory.YEAR
+    private val parsed by lazy { StoredSignalset("OBDb/Kia-Niro-EV", "demo", SignalsetParser.parse(ObdbFixtures.signalset(ObdbFixtures.NIRO_EV))) }
+    override fun signalset() = parsed
+}
 
 /** The ELM327 emulator on the developer's PC, as seen from the Android emulator (10.0.2.2). */
 val devWifiEndpoints: List<AdapterEndpoint> = listOf(

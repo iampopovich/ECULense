@@ -17,4 +17,6 @@
     <string name="obd_endpoint_demo_multi_ecu_detail">Виртуальный ELM327 · CAN 11/500 · двигатель, коробка, ABS и блок подушек, который не опрашивается</string>
     <string name="obd_endpoint_demo_kline">Демо K-Line KWP (симуляция)</string>
     <string name="obd_endpoint_demo_kline_detail">Виртуальный ELM327 · ISO 14230-4 KWP · заголовки C2 33 F1 / 8x F1 10 с контрольной суммой</string>
+    <string name="obd_endpoint_demo_niro_ev">Демо: Niro EV (OBDb)</string>
+    <string name="obd_endpoint_demo_niro_ev_detail">Виртуальный ELM327 · CAN 11/500 · батарея 7E4 отвечает кадрами из тест-кейсов OBDb</string>
 </resources>

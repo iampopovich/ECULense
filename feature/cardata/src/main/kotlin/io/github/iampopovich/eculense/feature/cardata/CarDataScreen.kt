@@ -55,6 +55,7 @@ internal fun CarDataRoute(viewModel: CarDataViewModel = koinViewModel()) {
         onMoveDown = viewModel::moveDown,
         onEditing = viewModel::setEditing,
         onKeepScreenOn = viewModel::setKeepScreenOn,
+        onExtended = viewModel::setExtended,
     )
 }
 
@@ -67,6 +68,7 @@ internal fun CarDataScreen(
     onMoveDown: (Int) -> Unit,
     onEditing: (Boolean) -> Unit,
     onKeepScreenOn: (Boolean) -> Unit,
+    onExtended: (Boolean) -> Unit = {},
 ) {
     if (!state.connected) {
         Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -121,6 +123,8 @@ internal fun CarDataScreen(
                     }
                 }
             }
+            // R-E: extended OBDb sensors (off by default) and the EV battery card.
+            extendedSection(state.extended, onExtended)
         }
     }
 }

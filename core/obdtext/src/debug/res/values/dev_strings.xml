@@ -17,4 +17,6 @@
     <string name="obd_endpoint_demo_multi_ecu_detail">Virtual ELM327 · CAN 11/500 · engine, transmission, ABS and an airbag module that is never queried</string>
     <string name="obd_endpoint_demo_kline">Demo K-Line KWP (simulation)</string>
     <string name="obd_endpoint_demo_kline_detail">Virtual ELM327 · ISO 14230-4 KWP · headers C2 33 F1 / 8x F1 10 with checksum</string>
+    <string name="obd_endpoint_demo_niro_ev">Demo: Niro EV (OBDb)</string>
+    <string name="obd_endpoint_demo_niro_ev_detail">Virtual ELM327 · CAN 11/500 · battery 7E4 answers with OBDb test-case frames</string>
 </resources>

@@ -18,6 +18,7 @@ internal object DevText {
         EndpointLabel.DEMO_BLE -> UiText.Res(R.string.obd_endpoint_demo_ble)
         EndpointLabel.DEMO_MULTI_ECU -> UiText.Res(R.string.obd_endpoint_demo_multi_ecu)
         EndpointLabel.DEMO_KLINE -> UiText.Res(R.string.obd_endpoint_demo_kline)
+        EndpointLabel.DEMO_NIRO_EV -> UiText.Res(R.string.obd_endpoint_demo_niro_ev)
         else -> UiText.Raw(endpoint.label)
     }
 
@@ -29,6 +30,7 @@ internal object DevText {
         EndpointLabel.DEMO_BLE -> UiText.Res(R.string.obd_endpoint_demo_ble_detail)
         EndpointLabel.DEMO_MULTI_ECU -> UiText.Res(R.string.obd_endpoint_demo_multi_ecu_detail)
         EndpointLabel.DEMO_KLINE -> UiText.Res(R.string.obd_endpoint_demo_kline_detail)
+        EndpointLabel.DEMO_NIRO_EV -> UiText.Res(R.string.obd_endpoint_demo_niro_ev_detail)
         else -> UiText.Raw(endpoint.address)
     }
 

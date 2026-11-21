@@ -18,4 +18,23 @@
     <string name="cardata_estimated">оценка по MAF</string>
     <string name="cardata_panel_empty">Панель пуста. Отметьте значения звёздочкой.</string>
     <string name="cardata_panel_title">Порядок на панели</string>
+    <string name="cardata_ext_title">Расширенные датчики (OBDb)</string>
+    <string name="cardata_ext_hint">Заводские датчики из сигналсета OBDb этой машины (машины с CAN). Читаются между стандартными значениями; по умолчанию выключено.</string>
+    <string name="cardata_ext_no_profile">Укажите марку и модель в профиле машины, чтобы найти её сигналсет OBDb.</string>
+    <string name="cardata_ext_no_signalset">Для этой машины нет сигналсета OBDb: доступны только стандартные значения OBD-II.</string>
+    <string name="cardata_ext_kline">Сигналсет OBDb этой машины — для CAN, а связь идёт по K-Line: читать нечего.</string>
+    <string name="cardata_ext_counts">Сигналов: %1$d · команд: %2$d</string>
+    <string name="cardata_ext_source">Описание сигналов: OBDb %1$s (CC BY-SA 4.0)</string>
+    <string name="cardata_ext_unverified_year">Данные OBDb, не проверено для вашего модельного года (в профиле машины нет года).</string>
+    <string name="cardata_ext_waiting">Пока без значения: %1$d</string>
+    <string name="cardata_ev_title">Батарея (EV)</string>
+    <string name="cardata_ev_soc">Заряд (SOC)</string>
+    <string name="cardata_ev_soh">Здоровье (SOH)</string>
+    <string name="cardata_ev_voltage">Напряжение ВВБ</string>
+    <string name="cardata_ev_current">Ток ВВБ</string>
+    <string name="cardata_ev_power">Мощность ВВБ</string>
+    <string name="cardata_ev_cells">Ячейки мин. / макс.</string>
+    <string name="cardata_ev_spread">Разброс ячеек</string>
+    <string name="cardata_ev_temp">Температура батареи мин. / макс.</string>
+    <string name="cardata_ev_range">%1$s / %2$s</string>
 </resources>
