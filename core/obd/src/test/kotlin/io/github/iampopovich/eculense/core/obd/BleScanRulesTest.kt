@@ -28,10 +28,23 @@ class BleScanRulesTest {
             "ble",
             listOf(d("1", "Speaker", -40), d("2", "OBDII", -90), d("3", null, -50, 0x18F0), d("2", "OBDII", -80)),
         )
-        assertEquals(listOf("3", "2", "1"), rows.map { it.endpoint.address })
-        assertEquals("3", rows[0].endpoint.label) // no name: the address is shown
-        assertEquals(-80, rows[1].rssi)
+        // The OBD-like name comes before the stronger device that only advertises a tier UUID.
+        assertEquals(listOf("2", "3", "1"), rows.map { it.endpoint.address })
+        assertEquals("3", rows[1].endpoint.label) // no name: the address is shown
+        assertEquals(-80, rows[0].rssi)
         assertEquals(listOf(true, true, false), rows.map { it.likelyObd })
+        assertEquals(listOf(false, true, false), rows.map { it.serviceOnly })
+    }
+
+    @Test
+    fun `a tier UUID without an OBD-like name is service-only and sorted after name matches`() {
+        val rows = BleScanRules.toAdapters(
+            "ble",
+            listOf(d("u1", "Kettle", -30, 0xFFE0), d("n1", "OBDII", -95), d("n2", "Viecar", -70, 0xFFF0), d("x", "Watch", -20)),
+        )
+        assertEquals(listOf("n2", "n1", "u1", "x"), rows.map { it.endpoint.address })
+        assertEquals(listOf(false, false, true, false), rows.map { it.serviceOnly })
+        assertTrue(rows[2].likelyObd)
         assertTrue(rows.all { it.endpoint.kind == "ble" && !it.endpoint.isSimulated })
     }
 

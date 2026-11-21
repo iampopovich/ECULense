@@ -55,6 +55,7 @@ internal fun LazyListScope.bleSection(
                 Column {
                     Text(row.endpoint.address)
                     if (!row.likelyObd) Text(stringResource(R.string.connect_ble_not_obd), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (row.serviceOnly) Text(stringResource(R.string.connect_ble_maybe_not_obd), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (row.alsoClassic) Text(stringResource(R.string.connect_ble_dual_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },

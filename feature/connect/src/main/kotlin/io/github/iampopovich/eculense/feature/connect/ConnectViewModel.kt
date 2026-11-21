@@ -37,7 +37,7 @@ internal data class BleSection(
 )
 
 /** One BLE device row; [alsoClassic] = a paired classic adapter has the same name (dual-mode Viecar 4.0). */
-internal data class BleRow(val endpoint: AdapterEndpoint, val likelyObd: Boolean, val alsoClassic: Boolean)
+internal data class BleRow(val endpoint: AdapterEndpoint, val likelyObd: Boolean, val alsoClassic: Boolean, val serviceOnly: Boolean = false)
 
 internal class ConnectViewModel(
     private val controller: ConnectionController,
@@ -67,7 +67,7 @@ internal class ConnectViewModel(
             val classic = endpoints.filter { it.kind == "bt" }.map { it.label }
             val visible = if (all) found else found.filter { it.likelyObd }
             BleSection(
-                rows = visible.map { BleRow(it.endpoint, it.likelyObd, BleScanRules.alsoPairedAsClassic(it.endpoint.label, classic)) },
+                rows = visible.map { BleRow(it.endpoint, it.likelyObd, BleScanRules.alsoPairedAsClassic(it.endpoint.label, classic), it.serviceOnly) },
                 hidden = found.size - found.count { it.likelyObd },
                 scanning = scanning,
                 showAll = all,

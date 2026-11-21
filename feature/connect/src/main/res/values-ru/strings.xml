@@ -68,5 +68,6 @@
     <string name="connect_ble_show_others">Показать другие устройства: %1$d</string>
     <string name="connect_ble_hide_others">Скрыть другие устройства</string>
     <string name="connect_ble_not_obd">Не похоже на OBD-адаптер</string>
+    <string name="connect_ble_maybe_not_obd">Возможно, не OBD-адаптер</string>
     <string name="connect_ble_dual_hint">Этот же адаптер сопряжён и по обычному Bluetooth: подключайтесь одним из двух способов, не обоими сразу.</string>
 </resources>

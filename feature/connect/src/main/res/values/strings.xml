@@ -68,5 +68,6 @@
     <string name="connect_ble_show_others">Show other devices: %1$d</string>
     <string name="connect_ble_hide_others">Hide other devices</string>
     <string name="connect_ble_not_obd">Not recognised as an OBD adapter</string>
+    <string name="connect_ble_maybe_not_obd">Possibly not an OBD adapter</string>
     <string name="connect_ble_dual_hint">The same adapter is also paired over classic Bluetooth: connect through one of the two, not both at once.</string>
 </resources>

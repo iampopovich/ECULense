@@ -75,6 +75,17 @@ class ConnectBleTest {
     }
 
     @Test
+    fun `a device with only a tier UUID is listed after named adapters and flagged as possibly not OBD`() = runTest {
+        val scanner = FakeScanner()
+        val vm = ConnectViewModel(FakeConnectionController(), scanner = scanner)
+        vm.startScan()
+        scanner.found.value = BleScanRules.toAdapters("ble", devices + ScannedDevice("33:33", "Kettle", listOf(GattUuids.uuid16(0xFFE0)), -30))
+        val rows = vm.ble.value!!.rows
+        assertEquals(listOf("11:11", "33:33"), rows.map { it.endpoint.address })
+        assertEquals(listOf(false, true), rows.map { it.serviceOnly })
+    }
+
+    @Test
     fun `a scan that cannot start reports why`() = runTest {
         val scanner = FakeScanner(ScanStart.NO_PERMISSION)
         val vm = ConnectViewModel(FakeConnectionController(), scanner = scanner)

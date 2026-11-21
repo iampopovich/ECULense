@@ -6,8 +6,14 @@ import java.util.UUID
 /** One device seen by a BLE scan. [name] from the advertisement (may be null), [services] = advertised service UUIDs. */
 data class ScannedDevice(val address: String, val name: String?, val services: List<UUID>, val rssi: Int?)
 
-/** A scanned device as an adapter row: [likelyObd] = advertises a UART tier service or has an OBD-like name. */
-data class ScannedAdapter(val endpoint: AdapterEndpoint, val likelyObd: Boolean, val rssi: Int?)
+/**
+ * A scanned device as an adapter row: [likelyObd] = advertises a UART tier service or has an OBD-like name;
+ * [nameMatch] = the name itself looks like an OBD adapter. A tier UUID alone is weak evidence (on the Redmi two random
+ * non-OBD devices advertise FFF0/FFE0-like services), so such rows are [serviceOnly] and listed after name matches.
+ */
+data class ScannedAdapter(val endpoint: AdapterEndpoint, val likelyObd: Boolean, val rssi: Int?, val nameMatch: Boolean = likelyObd) {
+    val serviceOnly: Boolean get() = likelyObd && !nameMatch
+}
 
 enum class ScanStart { STARTED, ALREADY_RUNNING, BLUETOOTH_OFF, NO_PERMISSION, UNSUPPORTED, FAILED }
 
@@ -46,17 +52,28 @@ object BleScanRules {
      */
     private val NAME_HINTS = listOf("OBD", "ELM", "VLINK", "V-LINK", "VGATE", "ICAR", "VIECAR", "KONNWEI", "SCANX", "ROKODIL", "CX")
 
-    fun isLikelyObd(device: ScannedDevice): Boolean {
-        if (device.services.any { it in GattUuids.UART_SERVICES }) return true
+    fun isLikelyObd(device: ScannedDevice): Boolean = device.services.any { it in GattUuids.UART_SERVICES } || hasObdName(device)
+
+    /** The advertised name looks like an OBD adapter (independent of the services). */
+    fun hasObdName(device: ScannedDevice): Boolean {
         val name = device.name?.uppercase() ?: return false
         return NAME_HINTS.any { hint -> if (hint == "CX") name.startsWith("OBDLINK") || name == "CX" else name.contains(hint) }
     }
 
-    /** Rows for the UI: one per address (latest wins), likely adapters first, then strongest signal, then name. */
+    /**
+     * Rows for the UI: one per address (latest wins); OBD-like names first, then devices that only advertise a tier
+     * service, then the rest; inside each group strongest signal, then name.
+     */
     fun toAdapters(kind: String, devices: Collection<ScannedDevice>): List<ScannedAdapter> = devices
         .groupBy { it.address }.values.map { it.last() }
-        .map { d -> ScannedAdapter(AdapterEndpoint(kind, d.address, d.name?.takeIf { it.isNotBlank() } ?: d.address), isLikelyObd(d), d.rssi) }
-        .sortedWith(compareBy<ScannedAdapter>({ !it.likelyObd }, { -(it.rssi ?: -127) }, { it.endpoint.label }))
+        .map { d -> ScannedAdapter(AdapterEndpoint(kind, d.address, d.name?.takeIf { it.isNotBlank() } ?: d.address), isLikelyObd(d), d.rssi, hasObdName(d)) }
+        .sortedWith(compareBy<ScannedAdapter>({ rank(it) }, { -(it.rssi ?: -127) }, { it.endpoint.label }))
+
+    private fun rank(row: ScannedAdapter): Int = when {
+        row.nameMatch -> 0
+        row.likelyObd -> 1
+        else -> 2
+    }
 
     /**
      * Dual-mode adapters (Viecar 4.0: SPP + BLE) show up both as a paired classic device and as a BLE device. True
