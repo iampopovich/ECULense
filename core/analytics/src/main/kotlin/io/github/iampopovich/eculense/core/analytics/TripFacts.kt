@@ -31,10 +31,11 @@ data class TripFacts(val styleScore: Int?, val ambientC: Double?, val ambientSou
  * > 30 km/h with the ambient value; if the offset is large, raise [IAT_MIN_SPEED_KMH] or subtract the offset.
  */
 object AmbientThresholds {
+    /** Statistics threshold for using IAT as an outside-air estimate, not an engine norm. */
     const val IAT_MIN_SPEED_KMH = 30.0
     /** Speed sample older than this does not describe the IAT sample (K-Line cycles are ~1.7 s). */
     const val MAX_AGE_MS = 4_000L
-    /** At least this many temperature samples per trip. */
+    /** At least this many temperature samples per trip (statistics threshold, not an engine norm). */
     const val MIN_SAMPLES = 5
 }
 
@@ -90,22 +91,22 @@ data class TemperatureBucket(val fromC: Int, val medianLPer100Km: Double, val tr
  * needs before it is worth showing), not physical constants.
  */
 object StatsTrends {
-    /** Style trend card needs at least this many periods with a scored trip (one period is not a trend). */
+    /** Style trend card needs at least this many periods with a scored trip (display threshold, not an engine norm). */
     const val MIN_STYLE_PERIODS = 2
 
-    /** Width of a temperature bucket. */
+    /** Width of a temperature bucket (display threshold, not an engine norm). */
     const val BUCKET_C = 5
 
     /**
      * A temperature bucket is shown with at least this many trips; the card needs [MIN_TEMPERATURE_BUCKETS] of them.
-     * Display threshold, not a physics constant: a median of fewer trips is dominated by one trip's route.
+     * Display threshold, not an engine norm: a median of fewer trips is dominated by one trip's route.
      */
     const val MIN_TRIPS_PER_BUCKET = 3
     const val MIN_TEMPERATURE_BUCKETS = 2
 
     /**
      * Trips shorter than this are left out of the temperature comparison: their L/100 km is dominated by the warm-up
-     * and by the distance resolution. Display threshold (DOE fueleconomy.gov «Fuel Economy in Cold Weather»: the cold
+     * and by the distance resolution. Display threshold, not an engine norm (DOE fueleconomy.gov «Fuel Economy in Cold Weather»: the cold
      * penalty is largest on short trips, 3–4 miles, so trips of a few km still belong in the comparison).
      */
     const val MIN_TRIP_KM = 2.0
