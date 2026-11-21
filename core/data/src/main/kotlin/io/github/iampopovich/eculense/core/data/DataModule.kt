@@ -152,7 +152,7 @@ val dataModule = module {
         ExtendedSensors(
             get(),
             cars.observeActiveCar(),
-            load = { make, model -> koin.getOrNull<io.github.iampopovich.eculense.core.obdb.ObdbSignalsets>()?.storedSignalset(make, model) },
+            load = { make, model, year -> koin.getOrNull<io.github.iampopovich.eculense.core.obdb.ObdbSignalsets>()?.storedSignalset(make, model, year) },
             prefs = get(),
             simulated = getAll(),
             scope = get(AppScope),

@@ -105,7 +105,7 @@ internal class DataStoreExtendedSensorsPrefs(private val store: DataStore<Prefer
 class ExtendedSensors(
     private val controller: ConnectionController,
     private val activeCar: Flow<CarProfile?>,
-    private val load: suspend (make: String, model: String) -> StoredSignalset?,
+    private val load: suspend (make: String, model: String, year: Int?) -> StoredSignalset?,
     private val prefs: ExtendedSensorsPrefs,
     private val simulated: List<SimulatedSignalset>,
     private val scope: CoroutineScope,
@@ -161,7 +161,7 @@ class ExtendedSensors(
         val make = car?.brand?.takeIf { it.isNotBlank() }
         val model = car?.model?.takeIf { it.isNotBlank() }
         if (make == null || model == null) return ExtendedStatus.NeedsProfile
-        val stored = load(make, model) ?: return ExtendedStatus.NoSignalset(null)
+        val stored = load(make, model, car.year) ?: return ExtendedStatus.NoSignalset(null)
         return ready(stored, car.year, l, simulated = false, profileElectric = car.fuelType == FuelType.ELECTRIC)
     }
 

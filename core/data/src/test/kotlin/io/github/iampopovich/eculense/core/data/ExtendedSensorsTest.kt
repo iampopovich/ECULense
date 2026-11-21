@@ -43,7 +43,7 @@ class ExtendedSensorsTest {
         val controller = FakeConnectionController(initial = connected("demo-niro-ev", '6'))
         val prefs = MemoryPrefs()
         val car = MutableStateFlow<CarProfile?>(CarProfile(name = "Test car", brand = "Kia", model = "Sorento", year = 2005))
-        val sensors = ExtendedSensors(controller, car, load = { _, _ -> error("the user's car is never used for a demo link") }, prefs, listOf(demo), backgroundScope)
+        val sensors = ExtendedSensors(controller, car, load = { _, _, _ -> error("the user's car is never used for a demo link") }, prefs, listOf(demo), backgroundScope)
         sensors.start()
         val ready = sensors.status.first { it is ExtendedStatus.Ready } as ExtendedStatus.Ready
         assertTrue(ready.ev)
@@ -68,7 +68,7 @@ class ExtendedSensorsTest {
         val controller = FakeConnectionController(initial = connected("bt", '5'))
         val prefs = MemoryPrefs().apply { enabled.value = true }
         val car = MutableStateFlow<CarProfile?>(CarProfile(name = "Test car", brand = "Kia", model = "Sorento", year = 2005))
-        val sensors = ExtendedSensors(controller, car, load = { _, _ -> null }, prefs, listOf(demo), backgroundScope)
+        val sensors = ExtendedSensors(controller, car, load = { _, _, _ -> null }, prefs, listOf(demo), backgroundScope)
         sensors.start()
         assertEquals(ExtendedStatus.NoSignalset(null), sensors.status.first { it !is ExtendedStatus.NotConnected })
         assertFalse(sensors.electric.value)
@@ -80,7 +80,7 @@ class ExtendedSensorsTest {
         val controller = FakeConnectionController(initial = connected("bt", '5'))
         val prefs = MemoryPrefs().apply { enabled.value = true }
         val car = MutableStateFlow<CarProfile?>(CarProfile(name = "Test car", brand = "Kia", model = "Sorento", year = null))
-        val sensors = ExtendedSensors(controller, car, load = { _, _ -> sorento }, prefs, emptyList(), backgroundScope)
+        val sensors = ExtendedSensors(controller, car, load = { _, _, _ -> sorento }, prefs, emptyList(), backgroundScope)
         sensors.start()
         val r = sensors.status.first { it is ExtendedStatus.Ready } as ExtendedStatus.Ready
         assertTrue(r.protocolMismatch)

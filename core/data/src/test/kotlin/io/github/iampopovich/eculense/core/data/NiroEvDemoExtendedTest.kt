@@ -41,7 +41,7 @@ class NiroEvDemoExtendedTest {
             override val enabled = MutableStateFlow(true)
             override suspend fun setEnabled(on: Boolean) { enabled.value = on }
         }
-        val sensors = ExtendedSensors(manager, MutableStateFlow<CarProfile?>(null), { _, _ -> null }, prefs, listOf(sim), backgroundScope)
+        val sensors = ExtendedSensors(manager, MutableStateFlow<CarProfile?>(null), { _, _, _ -> null }, prefs, listOf(sim), backgroundScope)
         sensors.start()
         manager.connect(NiroEvDemoTransportFactory.ENDPOINT)
         manager.state.first { it is ConnectionState.Connected }

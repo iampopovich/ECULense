@@ -140,6 +140,11 @@ class ObdbSignalsetsTest {
         val offline = obdb.stored("Test", "Model", 2012)!!
         assertEquals(listOf("22 0101 → 7E0", "22 F010 → 7D4"), offline.commands.map { it.label })
         assertEquals(r.version, offline.version)
+        // R-E: the extended sensors only use the download for the checked generation (or without a year)
+        val generation = r.generation!!
+        assertNotNull(obdb.storedSignalset("Test", "Model", generation.startYear))
+        assertNotNull(obdb.storedSignalset("Test", "Model", null))
+        assertEquals(null, obdb.storedSignalset("Test", "Model", generation.startYear - 1))
     }
 
     @Test

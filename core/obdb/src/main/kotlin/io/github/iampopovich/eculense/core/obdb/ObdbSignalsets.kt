@@ -85,7 +85,10 @@ class ObdbSignalsets(
         val json = text(raw(repo, "signalsets/v3/default.json"))
         val signalset = SignalsetParser.parse(json)
         val version = sha(json).take(12)
-        save(repo, version, json, generationsYaml)
+        // R-E: remember which model years this download was checked for (the generation of the covered year), so
+        // the extended sensors never read a signalset for a generation OBDb has no real-car data of.
+        val covered = generation?.let { g -> g.startYear..(g.endYear ?: currentYear()) } ?: year!!..year
+        save(repo, version, json, generationsYaml, covered)
         SignalsetResult.Covered(repo, year!!, generation, version, signalset.ecus, signalset.forYear(year))
     }
 
@@ -98,18 +101,33 @@ class ObdbSignalsets(
         SignalsetResult.Covered(repo, year, generation, installed.version, signalset.ecus, signalset.forYear(year))
     }
 
-    /** R-E: the whole downloaded signalset of a model (unfiltered: the year filter is applied by the caller), or null. */
-    suspend fun storedSignalset(make: String, model: String): StoredSignalset? = withContext(Dispatchers.IO) {
+    /**
+     * R-E: the whole downloaded signalset of a model (unfiltered: the year filter is applied by the caller), or null.
+     * With a [year], only when that year lies in the years the download was checked for («Check OBDb» on the Signalset
+     * screen; downloads from before R-E have no record and need a new check). Without a year the caller warns that
+     * the data is not verified for the model year.
+     */
+    suspend fun storedSignalset(make: String, model: String, year: Int?): StoredSignalset? = withContext(Dispatchers.IO) {
         val repo = repoName(make, model)
         val installed = store.installed(packId(repo)) ?: return@withContext null
+        if (year != null) {
+            val covered = installed.file(COVERED).takeIf { it.isFile }?.readText()?.let(::parseRange) ?: return@withContext null
+            if (year !in covered) return@withContext null
+        }
         StoredSignalset(repo, installed.version, SignalsetParser.parse(installed.file(DEFAULT_JSON).readText()))
     }
 
-    private fun save(repo: String, version: String, json: String, generations: String?) {
+    private fun parseRange(text: String): IntRange? {
+        val parts = text.trim().split('-').mapNotNull { it.trim().toIntOrNull() }
+        return if (parts.size == 2) parts[0]..parts[1] else null
+    }
+
+    private fun save(repo: String, version: String, json: String, generations: String?, covered: IntRange) {
         val id = packId(repo)
         val staging = store.staging(id, version)
         File(staging, DEFAULT_JSON).writeText(json)
         generations?.let { File(staging, GENERATIONS).writeText(it) }
+        File(staging, COVERED).writeText("${covered.first}-${covered.last}")
         store.commit(id, version, staging)
     }
 
@@ -123,6 +141,9 @@ class ObdbSignalsets(
     companion object {
         const val DEFAULT_JSON = "default.json"
         const val GENERATIONS = "generations.yaml"
+
+        /** R-E: «2016-2026», the model years the download was checked for (our own file next to the OBDb ones). */
+        const val COVERED = "covered-years.txt"
         fun packId(repo: String) = "obdb-" + repo.substringAfter('/')
     }
 }
