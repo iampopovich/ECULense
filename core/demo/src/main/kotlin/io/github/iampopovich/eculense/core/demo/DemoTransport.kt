@@ -36,6 +36,8 @@ class DemoTransport internal constructor(
     private val engineOff: LongRange? = null,
     /** Elapsed-time window in which the engine has stalled: rpm and speed read 0, the ECU keeps answering (B10). */
     private val stall: LongRange? = null,
+    /** R-D: [DemoBus] layout — a single CAN engine (default), a CAN multi-ECU car, or a K-Line KWP2000 car. */
+    private val bus: DemoBus = DemoBus.CAN_SINGLE,
 ) : ObdTransport {
 
     constructor(
@@ -44,7 +46,22 @@ class DemoTransport internal constructor(
         flaky: Boolean = false,
         engineOff: LongRange? = null,
         stall: LongRange? = null,
-    ) : this(clock, latencyMs, DemoEngine(), flaky, engineOff = engineOff, stall = stall)
+        bus: DemoBus = DemoBus.CAN_SINGLE,
+    ) : this(clock, latencyMs, DemoEngine(), flaky, engineOff = engineOff, stall = stall, bus = bus)
+
+    /** Current request header (ATSH) and receive filter (ATCRA); functional by default. */
+    private var header = bus.defaultHeader
+    private var receiveFilter: String? = null
+
+    /**
+     * R-D test hook: OBD requests that arrived while the header addressed the airbag module (7D2) or the blocked
+     * 7D4. The safety policy must keep this at zero.
+     */
+    @Volatile var srsRequests = 0
+        private set
+
+    /** R-D test hook: every OBD request with the header it was sent under. */
+    val requests: MutableList<Pair<String, String>> = java.util.Collections.synchronizedList(mutableListOf())
 
     private val incoming = Channel<ByteArray>(Channel.UNLIMITED)
     private val inbox = StringBuilder()
@@ -143,21 +160,27 @@ class DemoTransport internal constructor(
     private fun handleAt(at: String): String = when {
         at == "Z" -> {
             echo = true; linefeeds = false; spaces = true; headers = false; protocolFound = false
+            header = bus.defaultHeader; receiveFilter = null
             VERSION
         }
         at == "I" || at == "WS" -> VERSION
         at == "@1" -> "OBDII to RS232 Interpreter"
         at == "D" -> {
             linefeeds = false; spaces = true; headers = false
+            header = bus.defaultHeader; receiveFilter = null
             "OK"
         }
+        at.startsWith("SH") && at.length > 2 && at.drop(2).all { it in HEX } -> { header = at.drop(2); "OK" }
+        at == "CRA" -> { receiveFilter = null; "OK" }
+        at.startsWith("CRA") && at.drop(3).all { it in HEX } -> if (bus.isCan) { receiveFilter = at.drop(3); "OK" } else "?"
+        at == "AR" -> "OK"
         at == "E0" || at == "E1" -> { echo = at == "E1"; "OK" }
         at == "L0" || at == "L1" -> { linefeeds = at == "L1"; "OK" }
         at == "S0" || at == "S1" -> { spaces = at == "S1"; "OK" }
         at == "H0" || at == "H1" -> { headers = at == "H1"; "OK" }
         at.matches(Regex("(SP|TP)A?[0-9A-C]")) -> { protocolFound = false; "OK" }
-        at == "DPN" -> if (flaky) "0" else if (protocolFound) "A6" else "A0"
-        at == "DP" -> if (protocolFound) "AUTO, ISO 15765-4 (CAN 11/500)" else "AUTO"
+        at == "DPN" -> if (flaky) "0" else if (protocolFound) "A" + bus.protocol else "A0"
+        at == "DP" -> if (protocolFound) "AUTO, " + bus.protocolName else "AUTO"
         at == "RV" -> String.format(Locale.US, "%.1fV", if (engineIsOff()) ENGINE_OFF_VOLTAGE else engine.voltage(elapsed()))
         at.matches(Regex("ST[0-9A-F]{2}|AT[0-2]|M[01]|CAF[01]|AL|NL|R[01]|PC")) -> "OK"
         else -> "?"
@@ -170,6 +193,9 @@ class DemoTransport internal constructor(
         if (command.length % 2 != 0) return "?"
         protocolFound = true
         if (engineIsOff()) return NO_DATA
+        requests += header to command
+        if (header in SRS_HEADERS) srsRequests++
+        if (bus != DemoBus.CAN_SINGLE) routed(command)?.let { return it }
         val mode = command.substring(0, 2).toInt(16)
         val pid = command.drop(2).take(2).takeIf { it.length == 2 }?.toInt(16)
         if (mode == 0x01 && command.length > 4) return multiPid(command.substring(2).chunked(2).map { it.toInt(16) })
@@ -273,20 +299,92 @@ class DemoTransport internal constructor(
     private fun elapsed(): Long = clock() - startMs
 
     /** Single CAN frame response. hex — message bytes without spaces. */
-    private fun singleFrame(hex: String): String {
-        val data = if (headers) "7E8%02X".format(hex.length / 2) + hex else hex
-        return format(data, firstHeaderLength = if (headers) 3 else 0)
+    private fun singleFrame(hex: String, id: String = bus.engineId): String {
+        if (!bus.isCan) return kLineFrame(hex, id)
+        val data = if (headers) id + "%02X".format(hex.length / 2) + hex else hex
+        return format(data, firstHeaderLength = if (headers) id.length else 0)
     }
 
+    /** R-D: one K-Line message; with headers «8L F1 <source> data checksum» (ISO 14230-2 format byte, sum mod 256). */
+    private fun kLineFrame(hex: String, source: String): String {
+        if (!headers) return format(hex, 0)
+        val data = hex.chunked(2).map { it.toInt(16) }
+        val bytes = listOf(0x80 or data.size, 0xF1, source.toInt(16)) + data
+        return format((bytes + (bytes.sum() and 0xFF)).joinToString("") { "%02X".format(it) }, 0)
+    }
+
+    /**
+     * R-D: replies of the multi-ECU layouts; null = the engine answers as in the single-ECU demo. CAN: engine 7E0/7E8,
+     * transmission 7E1/7E9 (one code via 19 02), ABS 7D1/7D9 (two codes), airbags 7D2/7DA (present, must never be
+     * asked). K-Line KWP: engine 10 and transmission 18 behind the functional header C1 33 F1 (C2 33 F1 on the bus).
+     */
+    private fun routed(command: String): String? = when (bus) {
+        DemoBus.CAN_SINGLE -> null
+        DemoBus.CAN_MULTI -> routedCan(command)
+        DemoBus.KLINE_KWP -> routedKLine(command)
+    }
+
+    private fun routedCan(command: String): String? {
+        fun reply(id: String, hex: String): String =
+            if (receiveFilter != null && receiveFilter != id) NO_DATA else if (hex.length / 2 <= 7) singleFrame(hex, id) else multiFrame(hex, id)
+        return when (header) {
+            bus.defaultHeader -> if (command == "0100") listOfNotNull(mode01(0x00)?.let { singleFrame(it) }, singleFrame(TCM_MASK, "7E9")).joinToString("\r") else null
+            "7E0" -> if (command.startsWith("19")) reply("7E8", "7F1911") else null
+            "7E1" -> when {
+                command == "3E00" -> reply("7E9", "7E00")
+                command == "0100" -> reply("7E9", TCM_MASK)
+                command.startsWith("1902") -> reply("7E9", "5902FF" + TCM_DTCS)
+                command == "03" -> reply("7E9", "4300")
+                command == "07" -> reply("7E9", "4700")
+                else -> NO_DATA
+            }
+            "7D1" -> when {
+                command == "3E00" -> reply("7D9", "7E00")
+                command.startsWith("1902") -> reply("7D9", "5902FF" + ABS_DTCS)
+                else -> NO_DATA
+            }
+            "7D2" -> if (command == "3E00") reply("7DA", "7E00") else reply("7DA", "5902FF" + SRS_DTCS)
+            "7D4" -> reply("7DC", "7E00")
+            else -> NO_DATA
+        }
+    }
+
+    private fun routedKLine(command: String): String? {
+        if (header != bus.defaultHeader) return NO_DATA // the demo K-Line car only listens functionally
+        val mode = command.take(2).toInt(16)
+        return when {
+            command == "0100" -> listOfNotNull(mode01(0x00)?.let { singleFrame(it) }, singleFrame(TCM_MASK, "18")).joinToString("\r")
+            mode == 0x01 && command.length > 4 -> NO_DATA // no multi-PID requests on K-Line
+            command == "1800FF00" -> listOf(singleFrame(kwpDtcs()), singleFrame("7F1812", "18")).joinToString("\r")
+            command == "1802FF00" -> singleFrame("7F1811", "18")
+            command == "03" -> (kLineCodes(0x43, stored) + singleFrame("43000000000000", "18")).joinToString("\r")
+            command == "07" -> kLineCodes(0x47, pending).joinToString("\r")
+            command == "3E" -> singleFrame("7E")
+            command == "3E00" -> singleFrame("7E00")
+            mode == 0x06 || mode == 0x09 || mode == 0x0A -> NO_DATA // the Sorento BL has no VIN or mode 06 over OBD
+            else -> null
+        }
+    }
+
+    /** KWP 58: the stored codes; the first one is present now with the lamp on (E0), the others stored (20). */
+    private fun kwpDtcs(): String = "58%02X".format(stored.size) +
+        stored.mapIndexed { i, c -> "%04X%02X".format(c, if (i == 0) 0xE0 else 0x20) }.joinToString("")
+
+    /** Mode 03/07 on K-Line: three codes per message, zero padded, no count byte (SAE J1979). */
+    private fun kLineCodes(sid: Int, codes: List<Int>): List<String> =
+        codes.ifEmpty { listOf(0, 0, 0) }.chunked(3).map { group ->
+            singleFrame("%02X".format(sid) + (group + List(3 - group.size) { 0 }).joinToString("") { "%04X".format(it) })
+        }
+
     /** ISO-TP: First Frame + Consecutive Frames. With ATH0 the ELM prints the length and «N:» before each frame. */
-    private fun multiFrame(hex: String): String {
+    private fun multiFrame(hex: String, id: String = bus.engineId): String {
         val bytes = hex.chunked(2)
         val first = bytes.take(6)
         val rest = bytes.drop(6).chunked(7).map { it + List(7 - it.size) { "00" } }
         return if (headers) {
-            val lines = mutableListOf("7E8" + "1%03X".format(bytes.size) + first.joinToString(""))
-            rest.forEachIndexed { i, frame -> lines += "7E8" + "%X".format(0x20 + ((i + 1) and 0x0F)) + frame.joinToString("") }
-            lines.joinToString("\r") { format(it, firstHeaderLength = 3) }
+            val lines = mutableListOf(id + "1%03X".format(bytes.size) + first.joinToString(""))
+            rest.forEachIndexed { i, frame -> lines += id + "%X".format(0x20 + ((i + 1) and 0x0F)) + frame.joinToString("") }
+            lines.joinToString("\r") { format(it, firstHeaderLength = id.length) }
         } else {
             val lines = mutableListOf("%03X".format(bytes.size), "0:" + format(first.joinToString(""), 0))
             rest.forEachIndexed { i, frame -> lines += "${"%X".format((i + 1) and 0x0F)}:" + format(frame.joinToString(""), 0) }
@@ -316,6 +414,13 @@ class DemoTransport internal constructor(
         private const val VERSION = "ELM327 v1.5"
         private const val NO_DATA = "NO DATA"
         private const val SEARCH_DELAY_MS = 400L
+
+        // R-D multi-ECU layouts: the transmission advertises only PID 01; codes as UDS 19 02 records / KWP 58 triples.
+        private const val TCM_MASK = "410080000000"
+        private const val TCM_DTCS = "07150009" // P0715, test failed + confirmed
+        private const val ABS_DTCS = "40350009" + "40400008" // C0035 (failed + confirmed), C0040 (confirmed)
+        private const val SRS_DTCS = "80010009" // B0001: shown only if the policy were broken
+        private val SRS_HEADERS = setOf("7D2", "7D4")
 
         // Flaky clone: bytes before the reset banner, every Nth live PID answers after the 2 s command timeout.
         private val GARBAGE = byteArrayOf(0xFC.toByte(), 0x00)
@@ -429,5 +534,49 @@ class FlakyDemoTransportFactory(
     companion object {
         const val KIND = "demo-flaky"
         val ENDPOINT = AdapterEndpoint(KIND, "Virtual ELM327 clone · late replies, garbage", "Demo: flaky clone", EndpointLabel.DEMO_FLAKY)
+    }
+}
+
+/** R-D: which car the demo adapter simulates. */
+enum class DemoBus(val protocol: Char, val protocolName: String, val defaultHeader: String, val engineId: String) {
+    /** One engine ECU on CAN 11/500 (the classic demo). */
+    CAN_SINGLE('6', "ISO 15765-4 (CAN 11/500)", "7DF", "7E8"),
+
+    /** Engine 7E8, transmission 7E9, ABS 7D9 and airbags 7DA (never asked) on CAN 11/500. */
+    CAN_MULTI('6', "ISO 15765-4 (CAN 11/500)", "7DF", "7E8"),
+
+    /** The owner's car shape: KWP2000 fast init (ATDPN 5), requests C2 33 F1, replies 8x F1 10 with checksum. */
+    KLINE_KWP('5', "ISO 14230-4 (KWP FAST)", "C133F1", "10");
+
+    val isCan: Boolean get() = protocol in "6789ABC"
+}
+
+/** R-D (debug only): a CAN car with several modules for the «Vehicle modules» screen. Simulated, never persisted. */
+class MultiEcuDemoTransportFactory(
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val latencyMs: (String) -> Long = DemoTransport.Companion::defaultLatency,
+) : TransportFactory {
+    override val kind = KIND
+    override suspend fun discover() = listOf(ENDPOINT)
+    override fun create(endpoint: AdapterEndpoint): ObdTransport = DemoTransport(clock, latencyMs, bus = DemoBus.CAN_MULTI)
+
+    companion object {
+        const val KIND = "demo-multi-ecu"
+        val ENDPOINT = AdapterEndpoint(KIND, "Virtual ELM327 · CAN 11/500 · engine, transmission, ABS", "Demo: several modules", EndpointLabel.DEMO_MULTI_ECU)
+    }
+}
+
+/** R-D (debug only): a K-Line KWP2000 car shaped like the owner's (C2 33 F1 / 8x F1 10). Simulated, never persisted. */
+class KLineDemoTransportFactory(
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val latencyMs: (String) -> Long = DemoTransport.Companion::defaultLatency,
+) : TransportFactory {
+    override val kind = KIND
+    override suspend fun discover() = listOf(ENDPOINT)
+    override fun create(endpoint: AdapterEndpoint): ObdTransport = DemoTransport(clock, latencyMs, bus = DemoBus.KLINE_KWP)
+
+    companion object {
+        const val KIND = "demo-kline"
+        val ENDPOINT = AdapterEndpoint(KIND, "Virtual ELM327 · ISO 14230-4 KWP · C2 33 F1", "Demo K-Line KWP", EndpointLabel.DEMO_KLINE)
     }
 }

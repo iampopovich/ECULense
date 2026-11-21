@@ -29,7 +29,7 @@ interface ObdTransport {
 data class AdapterEndpoint(val kind: String, val address: String, val label: String, val labelKey: EndpointLabel? = null)
 
 /** Built-in endpoints whose label and description are app text (localized in :core:obdtext). */
-enum class EndpointLabel { DEMO, DEMO_FLAKY, DEMO_ENGINE_OFF, PC_EMULATOR, REPLAY, WIFI_CAR_SCANNER, DEMO_BLE }
+enum class EndpointLabel { DEMO, DEMO_FLAKY, DEMO_ENGINE_OFF, PC_EMULATOR, REPLAY, WIFI_CAR_SCANNER, DEMO_BLE, DEMO_MULTI_ECU, DEMO_KLINE }
 
 /**
  * No real car behind this endpoint (demo kinds, a replayed log, the PC emulator): results are shown, but nothing is
@@ -40,7 +40,10 @@ val AdapterEndpoint.isSimulated: Boolean
         labelKey in SIMULATED_LABELS
 
 private const val SIMULATED_KIND_PREFIX = "demo"
-private val SIMULATED_LABELS = setOf(EndpointLabel.DEMO, EndpointLabel.DEMO_FLAKY, EndpointLabel.DEMO_ENGINE_OFF, EndpointLabel.PC_EMULATOR, EndpointLabel.REPLAY, EndpointLabel.DEMO_BLE)
+private val SIMULATED_LABELS = setOf(
+    EndpointLabel.DEMO, EndpointLabel.DEMO_FLAKY, EndpointLabel.DEMO_ENGINE_OFF, EndpointLabel.PC_EMULATOR, EndpointLabel.REPLAY, EndpointLabel.DEMO_BLE,
+    EndpointLabel.DEMO_MULTI_ECU, EndpointLabel.DEMO_KLINE,
+)
 
 /** Each link type (BT, Wi-Fi, BLE) is a separate factory, registered in Koin via bind TransportFactory::class. */
 interface TransportFactory {

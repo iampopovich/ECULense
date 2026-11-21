@@ -12,4 +12,7 @@ val demoModule = module {
     single(named(EngineStopDemoTransportFactory.KIND)) { EngineStopDemoTransportFactory() } bind TransportFactory::class
     // A: the demo car over the BLE code path (GattUartTransport + simulated GATT notifications).
     single(named(BleDemoTransportFactory.KIND)) { BleDemoTransportFactory() } bind TransportFactory::class
+    // R-D: several modules on CAN (engine, transmission, ABS, airbags never asked) and the owner's K-Line KWP shape.
+    single(named(MultiEcuDemoTransportFactory.KIND)) { MultiEcuDemoTransportFactory() } bind TransportFactory::class
+    single(named(KLineDemoTransportFactory.KIND)) { KLineDemoTransportFactory() } bind TransportFactory::class
 }

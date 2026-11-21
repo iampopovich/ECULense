@@ -13,4 +13,8 @@
     <string name="obd_endpoint_replay_detail">Plays an exported adapter log back as an adapter</string>
     <string name="obd_endpoint_demo_ble">Demo BLE (simulation)</string>
     <string name="obd_endpoint_demo_ble_detail">Virtual ELM327 over a simulated Bluetooth LE link · FFF0 · 20-byte notifications</string>
+    <string name="obd_endpoint_demo_multi_ecu">Demo: several modules (simulation)</string>
+    <string name="obd_endpoint_demo_multi_ecu_detail">Virtual ELM327 · CAN 11/500 · engine, transmission, ABS and an airbag module that is never queried</string>
+    <string name="obd_endpoint_demo_kline">Demo K-Line KWP (simulation)</string>
+    <string name="obd_endpoint_demo_kline_detail">Virtual ELM327 · ISO 14230-4 KWP · headers C2 33 F1 / 8x F1 10 with checksum</string>
 </resources>

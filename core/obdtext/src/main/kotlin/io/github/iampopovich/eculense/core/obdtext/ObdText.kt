@@ -70,7 +70,7 @@ object ObdText {
 
     fun endpointLabel(endpoint: AdapterEndpoint): UiText = when (endpoint.labelKey) {
         EndpointLabel.DEMO, EndpointLabel.DEMO_FLAKY, EndpointLabel.DEMO_ENGINE_OFF, EndpointLabel.PC_EMULATOR,
-        EndpointLabel.REPLAY, EndpointLabel.DEMO_BLE -> DevText.label(endpoint)
+        EndpointLabel.REPLAY, EndpointLabel.DEMO_BLE, EndpointLabel.DEMO_MULTI_ECU, EndpointLabel.DEMO_KLINE -> DevText.label(endpoint)
         EndpointLabel.WIFI_CAR_SCANNER -> UiText.Res(R.string.obd_endpoint_wifi_car_scanner, listOf(endpoint.address))
         null -> UiText.Raw(endpoint.label)
     }
@@ -78,7 +78,7 @@ object ObdText {
     /** Second line of an adapter row: the address, or a description for built-in endpoints. */
     fun endpointDetail(endpoint: AdapterEndpoint): UiText = when (endpoint.labelKey) {
         EndpointLabel.DEMO, EndpointLabel.DEMO_FLAKY, EndpointLabel.DEMO_ENGINE_OFF, EndpointLabel.PC_EMULATOR,
-        EndpointLabel.REPLAY, EndpointLabel.DEMO_BLE -> DevText.detail(endpoint)
+        EndpointLabel.REPLAY, EndpointLabel.DEMO_BLE, EndpointLabel.DEMO_MULTI_ECU, EndpointLabel.DEMO_KLINE -> DevText.detail(endpoint)
         EndpointLabel.WIFI_CAR_SCANNER -> UiText.Res(R.string.obd_endpoint_wifi_car_scanner_detail)
         null -> UiText.Raw(endpoint.address)
     }

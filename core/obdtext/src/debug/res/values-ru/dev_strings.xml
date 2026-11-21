@@ -13,4 +13,8 @@
     <string name="obd_endpoint_replay_detail">Проигрывает выгруженный журнал обмена как адаптер</string>
     <string name="obd_endpoint_demo_ble">Демо BLE (симуляция)</string>
     <string name="obd_endpoint_demo_ble_detail">Виртуальный ELM327 через имитацию Bluetooth LE · FFF0 · уведомления по 20 байт</string>
+    <string name="obd_endpoint_demo_multi_ecu">Демо: несколько блоков (симуляция)</string>
+    <string name="obd_endpoint_demo_multi_ecu_detail">Виртуальный ELM327 · CAN 11/500 · двигатель, коробка, ABS и блок подушек, который не опрашивается</string>
+    <string name="obd_endpoint_demo_kline">Демо K-Line KWP (симуляция)</string>
+    <string name="obd_endpoint_demo_kline_detail">Виртуальный ELM327 · ISO 14230-4 KWP · заголовки C2 33 F1 / 8x F1 10 с контрольной суммой</string>
 </resources>
