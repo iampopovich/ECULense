@@ -8,6 +8,7 @@
     <string name="sessions_source_carscanner">импорт из Car Scanner</string>
     <string name="sessions_loading">Загрузка записи…</string>
     <string name="sessions_too_few_points">Мало точек для графика</string>
+    <string name="sessions_axis_title">%1$s, %2$s</string>
     <string name="sessions_export_chooser">Экспорт CSV</string>
     <string name="sessions_share_csv">Поделиться CSV</string>
     <string name="sessions_events_title">События</string>

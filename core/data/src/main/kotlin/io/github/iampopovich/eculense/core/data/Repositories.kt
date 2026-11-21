@@ -33,6 +33,25 @@ interface SessionRepository {
     suspend fun append(sessionId: Long, readings: List<SensorReading>)
     suspend fun finish(sessionId: Long, endedAtMs: Long? = null)
     suspend fun readings(sessionId: Long): List<SensorReading>
+
+    /** Sensors of the recording without loading its readings. Defaults (for fakes) go through [readings]. */
+    suspend fun sensorIds(sessionId: Long): List<String> = readings(sessionId).map { it.sensorId }.distinct().sorted()
+
+    /** Time of the first reading of the recording. */
+    suspend fun firstTimestamp(sessionId: Long): Long? = readings(sessionId).minOfOrNull { it.timestampMs }
+
+    /** Time range, unit and count of one sensor in the recording; null without readings. */
+    suspend fun sensorRange(sessionId: Long, sensorId: String): SensorRange? =
+        readings(sessionId).filter { it.sensorId == sensorId }.takeIf { it.isNotEmpty() }
+            ?.let { l -> SensorRange(l.minOf { it.timestampMs }, l.maxOf { it.timestampMs }, l.first().unit, l.size) }
+
+    /** Readings of [sensorId] in [fromMs]..[toMs] in time order, page by page (bounded memory on 100k+ recordings). */
+    suspend fun forEachSensorReading(sessionId: Long, sensorId: String, fromMs: Long, toMs: Long, sink: (SensorReading) -> Unit) =
+        readings(sessionId).filter { it.sensorId == sensorId && it.timestampMs in fromMs..toMs }.sortedBy { it.timestampMs }.forEach(sink)
+
+    /** All readings of the recording in time order, page by page: streaming CSV export. */
+    suspend fun forEachReading(sessionId: Long, sink: (SensorReading) -> Unit) = readings(sessionId).sortedBy { it.timestampMs }.forEach(sink)
+
     suspend fun delete(sessionId: Long)
     suspend fun hasExternal(externalId: String): Boolean
     /** Repeat import: an already imported recording moves to the car from the backup. */
@@ -95,6 +114,37 @@ internal class RoomSessionRepository(
     override suspend fun readings(sessionId: Long): List<SensorReading> =
         dao.readings(sessionId).map { SensorReading(it.sensorId, it.value, it.unit, it.timestampMs) }
 
+    override suspend fun sensorIds(sessionId: Long): List<String> = dao.sensorIds(sessionId)
+
+    override suspend fun firstTimestamp(sessionId: Long): Long? = dao.firstTimestamp(sessionId)
+
+    override suspend fun sensorRange(sessionId: Long, sensorId: String): SensorRange? =
+        dao.sensorRange(sessionId, sensorId)?.let { SensorRange(it.fromMs, it.toMs, it.unit, it.count) }
+
+    override suspend fun forEachSensorReading(sessionId: Long, sensorId: String, fromMs: Long, toMs: Long, sink: (SensorReading) -> Unit) {
+        var afterTs = fromMs
+        var afterId = -1L
+        while (true) {
+            val page = dao.sensorPage(sessionId, sensorId, afterTs, afterId, toMs, PAGE)
+            page.forEach { sink(SensorReading(it.sensorId, it.value, it.unit, it.timestampMs)) }
+            if (page.size < PAGE) return
+            afterTs = page.last().timestampMs
+            afterId = page.last().id
+        }
+    }
+
+    override suspend fun forEachReading(sessionId: Long, sink: (SensorReading) -> Unit) {
+        var afterTs = Long.MIN_VALUE
+        var afterId = -1L
+        while (true) {
+            val page = dao.readingsPage(sessionId, afterTs, afterId, PAGE)
+            page.forEach { sink(SensorReading(it.sensorId, it.value, it.unit, it.timestampMs)) }
+            if (page.size < PAGE) return
+            afterTs = page.last().timestampMs
+            afterId = page.last().id
+        }
+    }
+
     /** Deleting a recording also deletes the trip derived from it; the stats follow the trips table. */
     override suspend fun delete(sessionId: Long) {
         dao.deleteWithDerivedTrips(sessionId)
@@ -106,7 +156,15 @@ internal class RoomSessionRepository(
     override suspend fun assignCar(externalId: String, carId: Long) = dao.assignCar(externalId, carId)
 
     private fun SessionEntity.toModel() = Session(id, name, startedAtMs, endedAtMs, SessionSource.valueOf(source))
+
+    private companion object {
+        /** Rows per keyset page: bounded memory on 100k+ reading recordings. */
+        const val PAGE = 4_096
+    }
 }
+
+/** Time range, unit and number of readings of one sensor in a recording. */
+data class SensorRange(val fromMs: Long, val toMs: Long, val unit: String, val count: Int)
 
 internal class RoomDtcRepository(
     private val dao: DtcDao,

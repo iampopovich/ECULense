@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense.feature.stats
 
+import io.github.iampopovich.eculense.core.data.ExportFiles
 import io.github.iampopovich.eculense.core.model.attempt
 import io.github.iampopovich.eculense.core.model.AppLogger
 import androidx.lifecycle.ViewModel
@@ -149,7 +150,7 @@ internal class TripDetailViewModel(
         val cal = calibrations ?: return null
         val dir = exportDir ?: return null
         return withContext(Dispatchers.IO) {
-            val f = File(dir, "ecu-accel-$id.csv")
+            val f = ExportFiles.fresh(dir, "ecu-accel-$id.csv")
             logger.attempt("EcuStats", "accelerometer CSV export of recording $id") { cal.writeCsv(id, f) }
                 .getOrNull()?.takeIf { it > 0 }?.let { f }
         }

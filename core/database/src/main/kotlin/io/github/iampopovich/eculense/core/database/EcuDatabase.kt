@@ -149,6 +149,35 @@ interface SessionDao {
     @Query("SELECT * FROM readings WHERE sessionId = :sessionId ORDER BY timestampMs")
     suspend fun readings(sessionId: Long): List<ReadingEntity>
 
+    /** Sensors recorded in the session (index-only scan of (sessionId, sensorId, timestampMs)). */
+    @Query("SELECT DISTINCT sensorId FROM readings WHERE sessionId = :sessionId ORDER BY sensorId")
+    suspend fun sensorIds(sessionId: Long): List<String>
+
+    /** First reading time of the session (chart start, event offsets). */
+    @Query("SELECT MIN(timestampMs) FROM readings WHERE sessionId = :sessionId")
+    suspend fun firstTimestamp(sessionId: Long): Long?
+
+    /** Time range and unit of one sensor in the session; null when the sensor has no readings. */
+    @Query(
+        "SELECT MIN(timestampMs) AS fromMs, MAX(timestampMs) AS toMs, MIN(unit) AS unit, COUNT(*) AS count " +
+            "FROM readings WHERE sessionId = :sessionId AND sensorId = :sensorId GROUP BY sensorId",
+    )
+    suspend fun sensorRange(sessionId: Long, sensorId: String): SensorRangeRow?
+
+    /** One page of a sensor's readings up to [toTs], (timestampMs, id) order after the keyset ([afterTs], [afterId]). */
+    @Query(
+        "SELECT * FROM readings WHERE sessionId = :sessionId AND sensorId = :sensorId AND timestampMs <= :toTs " +
+            "AND timestampMs >= :afterTs AND (timestampMs > :afterTs OR id > :afterId) ORDER BY timestampMs, id LIMIT :limit",
+    )
+    suspend fun sensorPage(sessionId: Long, sensorId: String, afterTs: Long, afterId: Long, toTs: Long, limit: Int): List<ReadingEntity>
+
+    /** One page of all readings of the session in (timestampMs, id) order after the keyset: streaming CSV export. */
+    @Query(
+        "SELECT * FROM readings WHERE sessionId = :sessionId AND timestampMs >= :afterTs " +
+            "AND (timestampMs > :afterTs OR id > :afterId) ORDER BY timestampMs, id LIMIT :limit",
+    )
+    suspend fun readingsPage(sessionId: Long, afterTs: Long, afterId: Long, limit: Int): List<ReadingEntity>
+
     @Query("DELETE FROM sessions WHERE id = :id")
     suspend fun delete(id: Long)
 
@@ -285,6 +314,8 @@ interface AnalyticsDao {
 }
 
 data class ValueRow(val id: Long, val value: Double, val timestampMs: Long)
+
+data class SensorRangeRow(val fromMs: Long, val toMs: Long, val unit: String, val count: Int)
 
 data class SessionStartRow(val id: Long, val startedAtMs: Long, val endedAtMs: Long? = null)
 

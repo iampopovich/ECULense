@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,7 +39,13 @@ import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.compose.cartesian.data.lineModel
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.marker.DefaultCartesianMarker
+import com.patrykandpatrick.vico.compose.cartesian.marker.rememberDefaultCartesianMarker
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.compose.common.Fill
+import com.patrykandpatrick.vico.compose.common.Insets
+import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
+import com.patrykandpatrick.vico.compose.common.component.rememberTextComponent
 import io.github.iampopovich.eculense.core.analytics.TripEventType
 import io.github.iampopovich.eculense.core.data.TripEvent
 import io.github.iampopovich.eculense.core.model.CarProfile
@@ -55,9 +62,12 @@ import java.time.format.DateTimeFormatter
 /** B10: events are shown with this window of data around them. */
 internal const val EVENT_WINDOW_MS = 2 * 60_000L
 
+/** Time range ±[EVENT_WINDOW_MS] around [atMs]; null (whole recording) when [atMs] is null. */
+internal fun eventRange(atMs: Long?): LongRange? = atMs?.let { (it - EVENT_WINDOW_MS)..(it + EVENT_WINDOW_MS) }
+
 /** Points within ±[EVENT_WINDOW_MS] of [atMs]; everything when [atMs] is null. */
 internal fun windowed(points: List<SensorReading>, atMs: Long?): List<SensorReading> =
-    if (atMs == null) points else points.filter { it.timestampMs in (atMs - EVENT_WINDOW_MS)..(atMs + EVENT_WINDOW_MS) }
+    eventRange(atMs)?.let { r -> points.filter { it.timestampMs in r } } ?: points
 
 /** «+3:12»: offset of an event from the recording start. */
 internal fun offsetLabel(atMs: Long, startMs: Long?): String {
@@ -67,28 +77,27 @@ internal fun offsetLabel(atMs: Long, startMs: Long?): String {
 
 @Composable
 internal fun SessionDetailRoute(sessionId: Long, viewModel: SessionDetailViewModel = koinViewModel { parametersOf(sessionId) }) {
-    val bySensor by viewModel.readingsBySensor.collectAsStateWithLifecycle()
+    val sensors by viewModel.sensors.collectAsStateWithLifecycle()
+    val sensor by viewModel.selected.collectAsStateWithLifecycle()
+    val focus by viewModel.focus.collectAsStateWithLifecycle()
+    val series by viewModel.series.collectAsStateWithLifecycle()
+    val startMs by viewModel.startMs.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
     val events by viewModel.events.collectAsStateWithLifecycle()
     val cars by viewModel.cars.collectAsStateWithLifecycle()
     val carId by viewModel.carId.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var selected by remember { mutableStateOf<String?>(null) }
-    var focus by remember { mutableStateOf<Long?>(null) }
     var picking by remember { mutableStateOf(false) }
     var moved by remember { mutableStateOf<String?>(null) }
-    val sensor = selected ?: defaultSensor(bySensor.keys.toList())
     val modelProducer = remember { CartesianChartModelProducer() }
-    val allPoints = sensor?.let { bySensor[it] }.orEmpty()
-    val points = windowed(allPoints, focus)
-    val startMs = bySensor.values.mapNotNull { it.firstOrNull()?.timestampMs }.minOrNull()
+    val points = series?.takeIf { it.sensorId == sensor }?.points.orEmpty()
 
     LaunchedEffect(points) {
         if (points.size >= 2) {
-            val t0 = points.first().timestampMs
+            val t0 = points.first().tMs
             modelProducer.runTransaction {
-                lineModel { series(x = points.map { (it.timestampMs - t0) / 1000.0 }, y = points.map { it.value }) }
+                lineModel { series(x = points.map { (it.tMs - t0) / 1000.0 }, y = points.map { it.value }) }
             }
         }
     }
@@ -96,33 +105,24 @@ internal fun SessionDetailRoute(sessionId: Long, viewModel: SessionDetailViewMod
     Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             // Default sensor goes first, otherwise the selected chip may end up off-screen.
-            bySensor.keys.sortedBy { it != defaultSensor(bySensor.keys.toList()) }.forEach { id ->
+            sensors.sortedBy { it != defaultSensor(sensors) }.forEach { id ->
                 val label = ObdText.sensorName(id).asString()
-                FilterChip(selected = id == sensor, onClick = { selected = id }, label = { Text(label) })
+                FilterChip(selected = id == sensor, onClick = { viewModel.select(id) }, label = { Text(label) })
             }
         }
         if (focus != null) {
             Text(stringResource(R.string.sessions_event_window), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         }
         if (points.size >= 2) {
-            CartesianChartHost(
-                chart = rememberCartesianChart(
-                    rememberLineCartesianLayer(),
-                    startAxis = VerticalAxis.rememberStart(),
-                    bottomAxis = HorizontalAxis.rememberBottom(),
-                    getXStep = { _, minX, maxX -> niceXStepSeconds(maxX - minX) },
-                ),
-                modelProducer = modelProducer,
-                modifier = Modifier.fillMaxWidth().height(260.dp),
-            )
+            SessionChart(modelProducer, sensor, series?.unit.orEmpty())
         } else if (loading) {
             Text(stringResource(R.string.sessions_loading))
         } else {
             Text(stringResource(R.string.sessions_too_few_points))
         }
-        if (events.isNotEmpty()) EventList(events, startMs, focus) { focus = if (focus == it) null else it }
+        if (events.isNotEmpty()) EventList(events, startMs, focus) { viewModel.toggleFocus(it) }
         val navigator = io.github.iampopovich.eculense.core.navigation.LocalNavigator.current
-        if (bySensor.keys.any { it == "01.06" || it == "01.08" }) {
+        if (sensors.any { it == "01.06" || it == "01.08" }) {
             OutlinedButton(onClick = { navigator.navigate(io.github.iampopovich.eculense.core.navigation.EngineMapDestination(sessionId)) }) {
                 Text(stringResource(R.string.sessions_engine_map))
             }
@@ -152,6 +152,40 @@ internal fun SessionDetailRoute(sessionId: Long, viewModel: SessionDetailViewMod
             moved = movedText.format(name)
         }
     }
+}
+
+/**
+ * Line chart of the decimated series: a tap or drag shows the value at the point (Vico default marker, value with the
+ * user's unit), the vertical axis is titled «sensor, unit».
+ */
+@Composable
+private fun SessionChart(modelProducer: CartesianChartModelProducer, sensorId: String?, unit: String) {
+    val name = sensorId?.let { ObdText.sensorName(it).asString() }.orEmpty()
+    val axisTitle = if (unit.isBlank()) name else stringResource(R.string.sessions_axis_title, name, unit)
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val labelStyle = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurface)
+    val marker = rememberDefaultCartesianMarker(
+        label = rememberTextComponent(
+            style = labelStyle,
+            padding = Insets(6.dp, 3.dp),
+            background = rememberShapeComponent(fill = Fill(MaterialTheme.colorScheme.surfaceContainerHighest), shape = RoundedCornerShape(6.dp)),
+        ),
+        valueFormatter = DefaultCartesianMarker.ValueFormatter.default(decimalCount = 1, suffix = if (unit.isBlank()) "" else " $unit"),
+    )
+    CartesianChartHost(
+        chart = rememberCartesianChart(
+            rememberLineCartesianLayer(),
+            startAxis = VerticalAxis.rememberStart(
+                titleComponent = rememberTextComponent(style = MaterialTheme.typography.labelMedium.copy(color = textColor)),
+                title = { axisTitle },
+            ),
+            bottomAxis = HorizontalAxis.rememberBottom(),
+            marker = marker,
+            getXStep = { _, minX, maxX -> niceXStepSeconds(maxX - minX) },
+        ),
+        modelProducer = modelProducer,
+        modifier = Modifier.fillMaxWidth().height(260.dp),
+    )
 }
 
 @Composable

@@ -8,6 +8,7 @@ import android.print.PrintManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.content.FileProvider
+import io.github.iampopovich.eculense.core.data.ExportFiles
 import io.github.iampopovich.eculense.core.analytics.Severity
 import io.github.iampopovich.eculense.core.analyticstext.AnalyticsText
 import io.github.iampopovich.eculense.core.data.AnalyticsRepository
@@ -51,10 +52,9 @@ internal class HealthReportExport(
         )
     }
 
-    /** Writes cache/reports/health-<time>.html and returns its content:// Uri. */
+    /** Writes cache/reports/health-<time>.html (previous reports deleted) and returns its content:// Uri. */
     suspend fun file(context: Context, record: HealthCheckRecord): Uri = withContext(Dispatchers.IO) {
-        val dir = File(context.cacheDir, "reports").apply { mkdirs() }
-        val file = File(dir, "health-${record.takenAtMs}.html")
+        val file = ExportFiles.fresh(File(context.cacheDir, "reports"), "health-${record.takenAtMs}.html")
         file.writeText(html(context, record))
         FileProvider.getUriForFile(context, "${context.packageName}.health.files", file)
     }

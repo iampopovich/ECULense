@@ -8,6 +8,7 @@
     <string name="sessions_source_carscanner">imported from Car Scanner</string>
     <string name="sessions_loading">Loading recording…</string>
     <string name="sessions_too_few_points">Not enough points for a chart</string>
+    <string name="sessions_axis_title">%1$s, %2$s</string>
     <string name="sessions_export_chooser">Export CSV</string>
     <string name="sessions_share_csv">Share CSV</string>
     <string name="sessions_events_title">Events</string>
