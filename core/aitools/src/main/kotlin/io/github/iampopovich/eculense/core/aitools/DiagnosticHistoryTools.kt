@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -133,6 +134,7 @@ internal class HealthChecksTool(ctx: ToolContext) : VehicleTool<LimitArgs>(
                         i.status.name.lowercase().replace('_', ' '),
                         i.value?.let { Compact.num(it, 2).content },
                         i.note.takeIf { it.name != "NONE" }?.name?.lowercase()?.replace('_', ' '),
+                        i.norm?.let { n -> "compared with " + normJson(n).let { j -> "${j["value"]?.jsonPrimitive?.content} (${j["source"]?.jsonPrimitive?.content}, sessions ${n.sampleCount})" } },
                     )
                     JsonPrimitive(i.id.name.lowercase().replace('_', ' ') + ": " + parts.joinToString(", "))
                 }))

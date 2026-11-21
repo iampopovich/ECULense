@@ -169,7 +169,7 @@
     <string name="finding_total_trim_out_norm">STFT+LTFT outside the norm: %1$s — the ECU is near the limit of mixture control.</string>
     <string name="finding_total_trim_ok_norm">STFT+LTFT within the norm.</string>
     <string name="finding_maf_not_supported">The ECU reports no MAF sensor (PID 10 not supported): idle air flow is not judged.</string>
-    <string name="finding_maf_learning">No general idle-air norm fits this engine (diesel or unknown displacement): the own norm is learned after %1$d recordings with a warm idle.</string>
+    <string name="finding_maf_learning">No general idle-air norm fits this engine (diesel or unknown displacement): the own norm is learned from recordings with a warm idle (needed: %1$d).</string>
     <string name="finding_maf_low_norm">Idle air flow, %1$s g/s, is below the norm. The MAF sensor may be dirty or air may leak in after it.</string>
     <string name="finding_maf_high_norm">Idle air flow, %1$s g/s, is above the norm (high idle speed, load, sensor).</string>
     <string name="finding_maf_ok_norm">Idle air flow, %1$s g/s, is within the norm.</string>

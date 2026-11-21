@@ -51,6 +51,7 @@ private class FakeAnalyticsDao : AnalyticsDao {
     override suspend fun sessions(carId: Long, fromMs: Long, toMs: Long, limit: Int) =
         sessions.filter { it.id in inCar(carId, fromMs, toMs) }.sortedByDescending { it.startedAtMs }.take(limit)
             .map { s -> s.copy(readings = rows.count { it.sessionId == s.id }) }
+    override suspend fun carSensorsAmong(carId: Long, ids: List<String>) = rows.filter { carOf[it.sessionId] == carId && it.sensorId in ids }.map { it.sensorId }.distinct()
     override suspend fun sessionStarts(carId: Long) = sessions.filter { carOf[it.id] == carId }.sortedBy { it.startedAtMs }.map { SessionStartRow(it.id, it.startedAtMs, it.endedAtMs) }
     override suspend fun session(carId: Long, sessionId: Long) = sessions.firstOrNull { it.id == sessionId && carOf[it.id] == carId }
     override suspend fun sessionAggregates(sessionId: Long) = rows.filter { it.sessionId == sessionId }.groupBy { it.sensorId }.toSortedMap().mapNotNull { (id, l) -> agg(id, l) }
@@ -106,14 +107,15 @@ class AnalyticsRepositoryTest {
         assertEquals(Severity.WARNING, stored.single { it.finding.ruleId == "dtc-air-sensors" }.finding.severity)
         val done = repo.state.value as AnalysisState.Done
         assertEquals(2, done.sessions)
-        assertTrue(logs.single(), logs.single().startsWith("recompute car=1 sessions=2 cached=0"))
+        val recomputeLog = logs.single { it.startsWith("recompute") }
+        assertTrue(recomputeLog, recomputeLog.startsWith("recompute car=1 sessions=2 cached=0"))
 
         // recomputing replaces rather than duplicates
         repo.recompute(1)
         assertEquals(stored.size, repo.findings(1).size)
         assertEquals(stored.map { it.finding }, repo.findings(1).map { it.finding })
         // finished sessions are not read from the DB a second time
-        assertTrue(logs.last(), logs.last().contains("cached=2 points=0"))
+        assertTrue(logs.last { it.startsWith("recompute") }, logs.last { it.startsWith("recompute") }.contains("cached=2 points=0"))
     }
 
     @Test

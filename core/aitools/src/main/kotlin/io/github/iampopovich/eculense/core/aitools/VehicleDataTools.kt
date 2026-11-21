@@ -349,7 +349,7 @@ internal class SessionStatsTool(ctx: ToolContext) : VehicleTool<SessionArgs>(
     override suspend fun answer(args: SessionArgs, carId: Long): JsonObject {
         val report = ctx.analytics.sessionReport(carId, args.sessionId) ?: return Compact.noData("no such session")
         val zone = ctx.zone()
-        val findings = report.findings.map { f -> findingJson(f.ruleId, f.severity, FindingEnglish.title(f), FindingEnglish.evidence(f)) }
+        val findings = report.findings.map { f -> findingJson(f.ruleId, f.severity, FindingEnglish.title(f), FindingEnglish.evidence(f), f.norms) }
         val events = ctx.eventsJson(report.session.id, report.session.startedAtMs)
         return Compact.fit(
             report.sensors.sortedByDescending { it.sensorId in SENSOR_NAMES },
@@ -405,11 +405,32 @@ internal class SensorSummaryTool(ctx: ToolContext) : VehicleTool<SensorArgs>(
     }
 }
 
-internal fun findingJson(ruleId: String, severity: Severity, title: String, evidence: Map<String, String>) = buildJsonObject {
+internal fun findingJson(
+    ruleId: String, severity: Severity, title: String, evidence: Map<String, String>,
+    norms: List<io.github.iampopovich.eculense.core.analytics.Norm> = emptyList(),
+) = buildJsonObject {
     put("rule", ruleId)
     put("severity", severity.name.lowercase())
     put("title", title)
-    if (evidence.isNotEmpty()) put("evidence", JsonObject(evidence.mapValues { JsonPrimitive(it.value) }))
+    // the «Compared with» evidence row is replaced by the structured compared_with list
+    val plain = evidence.filterKeys { it != "Compared with" }
+    if (plain.isNotEmpty()) put("evidence", JsonObject(plain.mapValues { JsonPrimitive(it.value) }))
+    if (norms.isNotEmpty()) put("compared_with", JsonArray(norms.map(::normJson)))
+}
+
+/**
+ * R-H: the norm a value was compared with, in English: parameter, band, source and how many sessions it was learned
+ * from — so the model never presents a generic number as the factory spec of this engine.
+ */
+internal fun normJson(n: io.github.iampopovich.eculense.core.analytics.Norm) = buildJsonObject {
+    put("parameter", n.key.name.lowercase())
+    put("value", io.github.iampopovich.eculense.core.analytics.FindingEnglish.render(io.github.iampopovich.eculense.core.analytics.NormText.range(n)))
+    put("source", when (n.source) {
+        io.github.iampopovich.eculense.core.analytics.NormSource.GENERIC -> "generic (not verified for this engine)"
+        io.github.iampopovich.eculense.core.analytics.NormSource.BASELINE -> "own baseline (median+MAD of this car's sessions)"
+        else -> n.source.name.lowercase()
+    })
+    put("sampleCount", n.sampleCount)
 }
 
 internal class FindingsTool(ctx: ToolContext) : VehicleTool<LimitArgs>(
@@ -429,7 +450,7 @@ internal class FindingsTool(ctx: ToolContext) : VehicleTool<LimitArgs>(
         val problems = stored.filter { it.finding.severity.rank >= Severity.INFO.rank }.sortedByDescending { it.finding.severity.rank }.take(args.limit.coerceIn(1, 20))
         return Compact.fit(
             problems,
-            { s -> findingJson(s.finding.ruleId, s.finding.severity, FindingEnglish.title(s.finding), FindingEnglish.evidence(s.finding)) },
+            { s -> findingJson(s.finding.ruleId, s.finding.severity, FindingEnglish.title(s.finding), FindingEnglish.evidence(s.finding), s.finding.norms) },
         ) { items, truncated ->
             buildJsonObject {
                 put("computed_at", Dates.dateTime(stored.maxOf { it.createdAtMs }, zone))

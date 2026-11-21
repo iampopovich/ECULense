@@ -161,7 +161,7 @@ enum class FindingKey(val en: String, val enOne: String? = null) {
     TOTAL_TRIM_OUT_NORM("STFT+LTFT outside the norm: %1\$s — the ECU is near the limit of mixture control."),
     TOTAL_TRIM_OK_NORM("STFT+LTFT within the norm."),
     MAF_NOT_SUPPORTED("The ECU reports no MAF sensor (PID 10 not supported): idle air flow is not judged."),
-    MAF_LEARNING("No general idle-air norm fits this engine (diesel or unknown displacement): the own norm is learned after %1\$d recordings with a warm idle."),
+    MAF_LEARNING("No general idle-air norm fits this engine (diesel or unknown displacement): the own norm is learned from recordings with a warm idle (needed: %1\$d)."),
     MAF_LOW_NORM("Idle air flow, %1\$s g/s, is below the norm. The MAF sensor may be dirty or air may leak in after it."),
     MAF_HIGH_NORM("Idle air flow, %1\$s g/s, is above the norm (high idle speed, load, sensor)."),
     MAF_OK_NORM("Idle air flow, %1\$s g/s, is within the norm."),

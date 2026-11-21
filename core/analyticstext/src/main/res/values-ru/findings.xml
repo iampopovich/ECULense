@@ -169,7 +169,7 @@
     <string name="finding_total_trim_out_norm">STFT+LTFT вне нормы: %1$s — ЭБУ у предела регулирования смеси.</string>
     <string name="finding_total_trim_ok_norm">STFT+LTFT в пределах нормы.</string>
     <string name="finding_maf_not_supported">ЭБУ не сообщает о датчике MAF (PID 10 не поддерживается): расход воздуха на ХХ не оценивается.</string>
-    <string name="finding_maf_learning">Общей нормы воздуха на ХХ для этого мотора нет (дизель или объём неизвестен): своя норма появится после %1$d записей с прогретым ХХ.</string>
+    <string name="finding_maf_learning">Общей нормы воздуха на ХХ для этого мотора нет (дизель или объём неизвестен): своя норма появится по записям с прогретым ХХ (нужно: %1$d).</string>
     <string name="finding_maf_low_norm">Расход воздуха на ХХ, %1$s г/с, ниже нормы. Возможно, загрязнён датчик MAF или подсос воздуха после него.</string>
     <string name="finding_maf_high_norm">Расход воздуха на ХХ, %1$s г/с, выше нормы (высокие обороты ХХ, нагрузка, датчик).</string>
     <string name="finding_maf_ok_norm">Расход воздуха на ХХ, %1$s г/с, в пределах нормы.</string>

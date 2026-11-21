@@ -36,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import io.github.iampopovich.eculense.core.analytics.NormText
+import io.github.iampopovich.eculense.core.analyticstext.AnalyticsText
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -150,6 +152,14 @@ internal fun HealthScreen(
                             listOfNotNull(stringResource(item.status.labelRes()), item.valueText(str), item.note.res()?.let { stringResource(it) }).joinToString(" · "),
                             style = MaterialTheme.typography.bodyMedium, color = statusColor(item.status),
                         )
+                        // R-H: what the value was compared with and where that norm comes from.
+                        item.norm?.let { n ->
+                            val ctx = LocalContext.current
+                            Text(
+                                stringResource(R.string.health_compared_with, AnalyticsText.render(ctx, NormText.comparedWith(n))),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }

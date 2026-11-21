@@ -417,6 +417,33 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun v11GetsTheCarNormsTableKeepingDataAndCascadesWithTheCar() = runTest {
+        helper.createDatabase(dbName, 11).use { db ->
+            db.execSQL("INSERT INTO cars (id, name) VALUES (1, 'Test car')")
+            db.execSQL("INSERT INTO cars (id, name) VALUES (2, 'Second test car')")
+            db.execSQL("INSERT INTO sessions (id, name, startedAtMs, endedAtMs, source, vin, externalId, carId) VALUES (1, 'live', 30, 40, 'LIVE', NULL, NULL, 1)")
+            for (i in 0 until 20) {
+                db.execSQL("INSERT INTO readings (sessionId, sensorId, value, unit, timestampMs) VALUES (1, '01.0C', $i, 'rpm', ${100 + i})")
+            }
+            db.execSQL("INSERT INTO findings (carId, ruleId, severity, title, message, evidenceJson, periodFromMs, periodToMs, createdAtMs) VALUES (1, 'voltage-low', 'OK', 't', 'm', '{}', NULL, NULL, 5)")
+        }
+        helper.runMigrationsAndValidate(dbName, 12, true, MIGRATION_11_12).use { db ->
+            fun count(sql: String) = db.query(sql).use { c -> c.moveToFirst(); c.getInt(0) }
+            assertEquals(2, count("SELECT COUNT(*) FROM cars"))
+            assertEquals(20, count("SELECT COUNT(*) FROM readings"))
+            assertEquals(1, count("SELECT COUNT(*) FROM findings"))
+            assertEquals(0, count("SELECT COUNT(*) FROM car_norms"))
+            db.execSQL("INSERT INTO car_norms (carId, key, source, low, high, center, mad, sampleCount, confidence, updatedAtMs) VALUES (1, 'IDLE_RPM', 'BASELINE', 600, 800, 700, 20, 12, 0.4, 9)")
+            db.execSQL("INSERT INTO car_norms (carId, key, source, low, high, center, mad, sampleCount, confidence, updatedAtMs) VALUES (1, 'IDLE_RPM', 'USER', 650, 750, NULL, NULL, 0, 1, 9)")
+            db.execSQL("INSERT INTO car_norms (carId, key, source, low, high, center, mad, sampleCount, confidence, updatedAtMs) VALUES (2, 'trait.fuel', 'ECU', NULL, NULL, 1, NULL, 0, 1, 9)")
+            assertEquals(3, count("SELECT COUNT(*) FROM car_norms"))
+            db.execSQL("PRAGMA foreign_keys = ON")
+            db.execSQL("DELETE FROM cars WHERE id = 2")
+            assertEquals(2, count("SELECT COUNT(*) FROM car_norms"))
+        }
+    }
+
     /** R2.2: a v7 database with realistic synthetic content goes through every migration to the current version. */
     @Test
     fun v7RealisticDataSurvivesTheWholeChain() = runTest {

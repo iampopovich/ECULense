@@ -5,6 +5,13 @@ import io.github.iampopovich.eculense.core.database.sessionSample
 import android.util.Log
 import io.github.iampopovich.eculense.core.analytics.AnalysisInput
 import io.github.iampopovich.eculense.core.analytics.AnalyticsEngine
+import io.github.iampopovich.eculense.core.analytics.BaselineLearner
+import io.github.iampopovich.eculense.core.analytics.CarNorms
+import io.github.iampopovich.eculense.core.analytics.EngineTraitDetector
+import io.github.iampopovich.eculense.core.analytics.EngineTraits
+import io.github.iampopovich.eculense.core.analytics.Norm
+import io.github.iampopovich.eculense.core.analytics.NormKey
+import io.github.iampopovich.eculense.core.analytics.NormSource
 import io.github.iampopovich.eculense.core.analytics.DtcEvent
 import io.github.iampopovich.eculense.core.analytics.DtcRule
 import io.github.iampopovich.eculense.core.analytics.Evidence
@@ -49,6 +56,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.double
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
@@ -58,7 +66,8 @@ import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 import java.time.ZoneId
 
-data class StoredFinding(val id: Long, val carId: Long, val finding: Finding, val createdAtMs: Long)
+/** [stale] = stored by an older payload version (no norms): regenerated once through the typed path. */
+data class StoredFinding(val id: Long, val carId: Long, val finding: Finding, val createdAtMs: Long, val stale: Boolean = false)
 
 /** Recompute state — shared by the «Analysis» screen and the post-import recompute. */
 sealed interface AnalysisState {
@@ -118,6 +127,8 @@ internal class RoomAnalyticsRepository(
     private val log: (String) -> Unit = { msg -> runCatching { Log.i(TAG, msg) } },
     /** B10: stalls and marks stored with the car's recordings. */
     private val tripEvents: suspend (carId: Long) -> List<TripEventFact> = { emptyList() },
+    /** R-H: per-car norms; null = generic fallbacks only (tests). */
+    private val carNorms: CarNormsRepository? = null,
 ) : AnalyticsRepository {
     private val _state = MutableStateFlow<AnalysisState>(AnalysisState.Idle)
     override val state: StateFlow<AnalysisState> = _state.asStateFlow()
@@ -136,7 +147,7 @@ internal class RoomAnalyticsRepository(
     /** A finding opened by id (notification, link) whose row holds pre-localization text: regenerated, found again by rule. */
     override suspend fun finding(id: Long): StoredFinding? {
         val f = findingDao.byId(id)?.toModel() ?: return null
-        if (!f.finding.isLegacyText) return f
+        if (!f.finding.isLegacyText && !f.stale) return f
         return withoutLegacy(f.carId, listOf(f)).firstOrNull { it.finding.ruleId == f.finding.ruleId } ?: f
     }
 
@@ -150,7 +161,7 @@ internal class RoomAnalyticsRepository(
      * rule produced nothing new is kept as it is ([recomputeLocked]), so no finding is lost.
      */
     private suspend fun withoutLegacy(carId: Long, list: List<StoredFinding>): List<StoredFinding> {
-        if (list.none { it.finding.isLegacyText } || !regenerated.add(carId)) return list
+        if (list.none { it.finding.isLegacyText || it.stale } || !regenerated.add(carId)) return list
         try {
             recompute(carId)
         } catch (e: CancellationException) {
@@ -175,8 +186,25 @@ internal class RoomAnalyticsRepository(
                 _state.value = AnalysisState.Running(i + 1, sessions.size)
                 digest
             }
-            val input = AnalysisInput(cars.cars().firstOrNull { it.id == carId }, digests, dtcEvents(carId), clock(), zone(), runCatching { tripEvents(carId) }.getOrDefault(emptyList()))
-            val findings = withContext(compute) { AnalyticsEngine.evaluate(input) }
+            val car = cars.cars().firstOrNull { it.id == carId }
+            val dtc = dtcEvents(carId)
+            val nowMs = clock()
+            val stored = carNorms?.norms(carId) ?: CarNorms(car = car)
+            // Traits the car's own recordings show (O2 type, MAF) fill gaps the ECU has not answered yet.
+            val recorded = EngineTraitDetector.fromRecordedSensors(dao.carSensorsAmong(carId, EngineTraits.TRAIT_SENSORS).toSet(), nowMs)
+                .relabel(NormSource.BASELINE)
+            val norms0 = stored.copy(traits = stored.traits.orElse(recorded))
+            val input = AnalysisInput(car, digests, dtc, nowMs, zone(), runCatching { tripEvents(carId) }.getOrDefault(emptyList()), norms0)
+            // R-H: evaluate with the stored norms, learn the own baseline (verified findings freeze it), evaluate again.
+            val first = withContext(compute) { AnalyticsEngine.evaluate(input) }
+            val learned = BaselineLearner.learn(digests, first, dtc, norms0, nowMs)
+            carNorms?.let { r ->
+                r.saveBaselines(carId, learned)
+                r.saveTraits(carId, recorded)
+            }
+            val norms1 = norms0.copy(stored = norms0.stored.filter { it.source != NormSource.BASELINE } + learned)
+            val findings = withContext(compute) { AnalyticsEngine.evaluate(input.copy(norms = norms1)) }
+            log("norms car=$carId learned=${learned.joinToString { "${it.key}:${it.sampleCount}" }}")
             val now = clock()
             val fresh = findings.map { it.toEntity(carId, now) }
             // Legacy rows of rules that produced nothing this time are kept (with their stored text) rather than lost.
@@ -231,7 +259,8 @@ internal class RoomAnalyticsRepository(
         }
         val car = cars.cars().firstOrNull { it.id == carId }
         val rules = AnalyticsEngine.RULES.filter { it != DtcRule }
-        val findings = AnalyticsEngine.evaluate(AnalysisInput(car, listOf(digest), emptyList(), clock(), zone()), rules)
+        val norms = carNorms?.norms(carId) ?: CarNorms(car = car)
+        val findings = AnalyticsEngine.evaluate(AnalysisInput(car, listOf(digest), emptyList(), clock(), zone(), norms = norms), rules)
             .filter { it.severity.rank >= Severity.INFO.rank }
         return SessionReport(row.copy(readings = aggregates.sumOf { it.count }).toModel(), sensors, findings)
     }
@@ -273,7 +302,8 @@ internal class RoomAnalyticsRepository(
  * findings are derived data, recomputed from recordings.
  */
 internal object FindingJson {
-    private const val VERSION = 2
+    /** v3 (R-H) adds «norms»: the per-car norms a finding was compared with. */
+    const val VERSION = 3
 
     fun encode(f: Finding): String = buildJsonObject {
         put("v", VERSION)
@@ -281,10 +311,28 @@ internal object FindingJson {
         put("message", JsonArray(f.message.map(::text)))
         put("evidence", JsonArray(f.evidence.map { e -> buildJsonObject { put("label", text(e.label)); put("value", text(e.value)) } }))
         put("sessions", JsonArray(f.sessionIds.map { JsonPrimitive(it) }))
+        if (f.norms.isNotEmpty()) put("norms", JsonArray(f.norms.map(::norm)))
     }.toString()
 
+    private fun norm(n: Norm): JsonObject = buildJsonObject {
+        put("k", n.key.name); put("s", n.source.name); put("n", n.sampleCount)
+        n.low?.let { put("lo", it) }; n.high?.let { put("hi", it) }; n.center?.let { put("c", it) }; n.mad?.let { put("mad", it) }
+    }
+
+    private fun norm(e: JsonElement): Norm? = runCatching {
+        val o = e.jsonObject
+        fun d(name: String) = o[name]?.jsonPrimitive?.doubleOrNull
+        Norm(
+            NormKey.valueOf(o.getValue("k").jsonPrimitive.content), d("lo"), d("hi"), NormSource.valueOf(o.getValue("s").jsonPrimitive.content),
+            center = d("c"), mad = d("mad"), sampleCount = o["n"]?.jsonPrimitive?.intOrNull ?: 0,
+        )
+    }.getOrNull()
+
     /** Typed parts of a stored finding; null title means "use the text columns" (v1 row or unknown key). */
-    data class Decoded(val title: FindingText?, val message: List<FindingText>?, val evidence: List<Evidence>, val sessions: List<Long>)
+    data class Decoded(
+        val title: FindingText?, val message: List<FindingText>?, val evidence: List<Evidence>, val sessions: List<Long>,
+        val norms: List<Norm> = emptyList(), val version: Int = VERSION,
+    )
 
     fun decode(json: String): Decoded = runCatching {
         val o = Json.parseToJsonElement(json).jsonObject
@@ -297,6 +345,8 @@ internal object FindingJson {
                     message = o.getValue("message").jsonArray.map(::text),
                     evidence = o["evidence"]?.jsonArray?.map { e -> Evidence(text(e.jsonObject.getValue("label")), text(e.jsonObject.getValue("value"))) }.orEmpty(),
                     sessions = sessions,
+                    norms = o["norms"]?.jsonArray?.mapNotNull(::norm).orEmpty(),
+                    version = v,
                 )
             }.getOrElse { Decoded(null, null, emptyList(), sessions) }
         } else {
@@ -304,7 +354,7 @@ internal object FindingJson {
                 val eo = e.jsonObject
                 Evidence(FindingText.raw(eo.getValue("label").jsonPrimitive.content), FindingText.raw(eo.getValue("value").jsonPrimitive.content))
             }.orEmpty()
-            Decoded(null, null, evidence, sessions)
+            Decoded(null, null, evidence, sessions, version = v)
         }
     }.getOrDefault(Decoded(null, null, emptyList(), emptyList()))
 
@@ -359,7 +409,8 @@ internal fun FindingEntity.toModel(): StoredFinding {
     val message = d.message ?: listOf(FindingText.raw(message))
     return StoredFinding(
         id, carId,
-        Finding(ruleId, runCatching { Severity.valueOf(severity) }.getOrDefault(Severity.INFO), title, message, d.evidence, d.sessions, periodFromMs, periodToMs),
+        Finding(ruleId, runCatching { Severity.valueOf(severity) }.getOrDefault(Severity.INFO), title, message, d.evidence, d.sessions, periodFromMs, periodToMs, d.norms),
         createdAtMs,
+        stale = d.title != null && d.version < FindingJson.VERSION,
     )
 }

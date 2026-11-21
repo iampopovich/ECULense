@@ -113,7 +113,7 @@ val dataModule = module {
     }
     single<AnalyticsRepository> {
         val events = get<io.github.iampopovich.eculense.core.database.EventDao>()
-        RoomAnalyticsRepository(get(), get(), get(), get(), tripEvents = { carId -> events.forCar(carId, 0, Long.MAX_VALUE).mapNotNull { it.toModel()?.toFact() } })
+        RoomAnalyticsRepository(get(), get(), get(), get(), tripEvents = { carId -> events.forCar(carId, 0, Long.MAX_VALUE).mapNotNull { it.toModel()?.toFact() } }, carNorms = get())
     }
     single<TripEventRepository> { RoomTripEventRepository(get()) }
     single(createdAtStart = true) {
@@ -128,7 +128,13 @@ val dataModule = module {
     single {
         val cars = get<CarRepository>()
         val maintenance = get<MaintenanceRepository>()
-        HealthCheckRunner(get(), get(), get(), activeCarId = { cars.activeCarId() }, odometerKm = { maintenance.estimate(it)?.km?.toLong() })
+        val norms = get<CarNormsRepository>()
+        HealthCheckRunner(get(), get(), get(), activeCarId = { cars.activeCarId() }, odometerKm = { maintenance.estimate(it)?.km?.toLong() }, carNorms = { norms.norms(it) })
+    }
+    single<CarNormsRepository> { RoomCarNormsRepository(get(), get()) }
+    single(createdAtStart = true) {
+        val cars = get<CarRepository>()
+        EngineTraitsRecorder(get(), get(), activeCarId = { cars.activeCarId() }, repository = get(), scope = get(AppScope), logger = logger()).also { it.start() }
     }
     single<AlertPrefs> { DataStoreAlertPrefs(PreferenceDataStoreFactory.create { androidContext().preferencesDataStoreFile("alerts") }) }
     single(createdAtStart = true) {

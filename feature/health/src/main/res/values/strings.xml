@@ -72,4 +72,7 @@
     <string name="health_monitor_complete">complete</string>
     <string name="health_monitor_incomplete">incomplete</string>
     <string name="health_ai_prompt">Explain my quick health check from %1$s: verdict %2$s. Items: %3$s. Codes: %4$s. What should I do first?</string>
+    <string name="health_note_diesel">not judged on a diesel</string>
+    <string name="health_note_wideband">wideband O2 sensor: swing check does not apply</string>
+    <string name="health_compared_with">Compared with: %1$s</string>
 </resources>

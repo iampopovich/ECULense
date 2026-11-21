@@ -72,4 +72,7 @@
     <string name="health_monitor_complete">готов</string>
     <string name="health_monitor_incomplete">не готов</string>
     <string name="health_ai_prompt">Объясни мою проверку за минуту от %1$s: итог — %2$s. Пункты: %3$s. Коды: %4$s. С чего начать?</string>
+    <string name="health_note_diesel">для дизеля не оценивается</string>
+    <string name="health_note_wideband">широкополосный лямбда-зонд: проверка размаха неприменима</string>
+    <string name="health_compared_with">Сравнение с: %1$s</string>
 </resources>

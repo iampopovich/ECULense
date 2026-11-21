@@ -188,7 +188,16 @@ data class EngineTraits(
         fuel ?: other.fuel, o2 ?: other.o2, forcedInduction ?: other.forcedInduction, obdStandard ?: other.obdStandard, hasMaf ?: other.hasMaf,
     )
 
+    /** The same facts with another source (traits derived from recordings are the car's own data, not an ECU answer). */
+    fun relabel(source: NormSource) = EngineTraits(
+        fuel?.copy(source = source), o2?.copy(source = source), forcedInduction?.copy(source = source),
+        obdStandard?.copy(source = source), hasMaf?.copy(source = source),
+    )
+
     companion object {
+        /** Sensor ids whose presence in recordings tells a trait (O2 type, MAF, boost PID). */
+        val TRAIT_SENSORS: List<String> = ((0x14..0x1B) + (0x24..0x2B) + (0x34..0x3B) + listOf(0x10, 0x70)).map { "01.%02X".format(it) }
+
         fun fuelOf(t: FuelType): FuelKind = when (t) {
             FuelType.PETROL -> FuelKind.PETROL
             FuelType.DIESEL -> FuelKind.DIESEL

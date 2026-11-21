@@ -1,6 +1,11 @@
 package io.github.iampopovich.eculense.core.data
 
+import io.github.iampopovich.eculense.core.analytics.CarNorms
+import io.github.iampopovich.eculense.core.analytics.EngineTraits
 import io.github.iampopovich.eculense.core.analytics.HealthCheck
+import io.github.iampopovich.eculense.core.analytics.Norm
+import io.github.iampopovich.eculense.core.analytics.NormKey
+import io.github.iampopovich.eculense.core.analytics.NormSource
 import io.github.iampopovich.eculense.core.analytics.HealthInput
 import io.github.iampopovich.eculense.core.analytics.HealthItem
 import io.github.iampopovich.eculense.core.analytics.HealthItemId
@@ -50,17 +55,29 @@ interface HealthRepository {
     suspend fun save(record: HealthCheckRecord): Long
 }
 
-/** Text forms of the health check columns: items "ID=STATUS|value|NOTE;...", codes "P0133:STORED;...". */
+/**
+ * Text forms of the health check columns: items "ID=STATUS|value|NOTE|norm;...", codes "P0133:STORED;...".
+ * norm (R-H) = "KEY~low~high~SOURCE~sessions" (empty when the item was not compared with a norm; older rows lack it).
+ */
 object HealthCodec {
     fun encodeItems(items: List<HealthItem>): String =
-        items.joinToString(";") { "${it.id.name}=${it.status.name}|${it.value ?: ""}|${it.note.name}" }
+        items.joinToString(";") { "${it.id.name}=${it.status.name}|${it.value ?: ""}|${it.note.name}|${it.norm?.let(::encodeNorm).orEmpty()}" }
+
+    private fun encodeNorm(n: Norm) = listOf(n.key.name, n.low?.toString().orEmpty(), n.high?.toString().orEmpty(), n.source.name, n.sampleCount.toString()).joinToString("~")
+
+    private fun decodeNorm(text: String?): Norm? {
+        val p = text?.split('~')?.takeIf { it.size == 5 } ?: return null
+        val key = NormKey.entries.firstOrNull { it.name == p[0] } ?: return null
+        val source = NormSource.entries.firstOrNull { it.name == p[3] } ?: return null
+        return Norm(key, p[1].toDoubleOrNull(), p[2].toDoubleOrNull(), source, sampleCount = p[4].toIntOrNull() ?: 0)
+    }
 
     fun decodeItems(text: String): List<HealthItem> = text.split(';').mapNotNull { part ->
         val (id, rest) = part.split('=', limit = 2).takeIf { it.size == 2 } ?: return@mapNotNull null
         val f = rest.split('|')
         val itemId = HealthItemId.entries.firstOrNull { it.name == id } ?: return@mapNotNull null
         val status = HealthStatus.entries.firstOrNull { it.name == f.getOrNull(0) } ?: return@mapNotNull null
-        HealthItem(itemId, status, f.getOrNull(1)?.toDoubleOrNull(), HealthNote.entries.firstOrNull { it.name == f.getOrNull(2) } ?: HealthNote.NONE)
+        HealthItem(itemId, status, f.getOrNull(1)?.toDoubleOrNull(), HealthNote.entries.firstOrNull { it.name == f.getOrNull(2) } ?: HealthNote.NONE, decodeNorm(f.getOrNull(3)))
     }
 
     fun encodeDtcs(dtcs: List<Dtc>): String = dtcs.joinToString(";") { "${it.code}:${it.kind.name}" }
@@ -125,6 +142,8 @@ class HealthCheckRunner internal constructor(
     private val odometerKm: suspend (carId: Long) -> Long?,
     private val clock: () -> Long = System::currentTimeMillis,
     private val liveMs: Long = Thresholds.HEALTH_LIVE_MS,
+    /** R-H: the stored norms of a real car (null = generic only). */
+    private val carNorms: suspend (carId: Long) -> CarNorms? = { null },
 ) {
     private val _progress = MutableStateFlow<HealthProgress>(HealthProgress.Idle)
     val progress: StateFlow<HealthProgress> = _progress.asStateFlow()
@@ -145,6 +164,12 @@ class HealthCheckRunner internal constructor(
                 Snapshot(stored, pending, permanent, s.isCanBus, readiness, counters, frame)
             } ?: return HealthProgress.NotConnected.also { _progress.value = it }
             val samples = live(connected.supportedPids)
+            val store = gate.allowed()
+            val car = if (store) activeCarId() else null
+            // Traits from this ECU first (a demo car is judged by its own traits), the car's learned/user norms only for a real link.
+            val liveTraits = runCatching { controller.detectTraits(connected.supportedPids, clock()) }.getOrDefault(EngineTraits())
+            val norms = car?.let { runCatching { carNorms(it) }.getOrNull() }?.let { it.copy(traits = liveTraits.orElse(it.traits)) }
+                ?: CarNorms(traits = liveTraits)
             val clear = snapshot.counters?.takeIf { !it.isEmpty }?.let { UsedCarCheck.evaluate(it, snapshot.readiness) }
             val result = HealthCheck.evaluate(
                 HealthInput(
@@ -154,10 +179,9 @@ class HealthCheckRunner internal constructor(
                     incompleteMonitors = snapshot.readiness?.incompleteCount, lowClearCounters = clear?.lowCounters,
                     samples = samples,
                 ),
+                norms,
             )
             // A simulated link is shown, not kept, and never tied to the real active car (no name, mileage or findings).
-            val store = gate.allowed()
-            val car = if (store) activeCarId() else null
             val record = HealthCheckRecord(
                 id = 0, carId = car, takenAtMs = clock(), result = result,
                 dtcs = listOfNotNull(snapshot.stored, snapshot.pending, snapshot.permanent).flatten().distinct(),
