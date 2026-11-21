@@ -64,6 +64,10 @@ data class TripEventFact(val sessionId: Long, val atMs: Long, val type: TripEven
 interface AnalyticsRule {
     /** All ruleIds the rule can return (for «no data» and links). */
     val ids: List<String>
+
+    /** R-E: judges a combustion engine (idle, mixture, warm-up, thermostat, stalls): skipped for electric cars. */
+    val iceOnly: Boolean get() = false
+
     fun evaluate(input: AnalysisInput): List<Finding>
 }
 
@@ -72,8 +76,14 @@ object AnalyticsEngine {
         CoolantOverheatRule, CoolantPlateauRule, VoltageRule, FuelTrimRule, MafIdleRule, IdleRpmRule, DtcRule, MilDistanceRule, WarmupTrendRule, StallRule,
     )
 
+    /** R-E: an electric car (profile fuel or traits) gets no combustion-engine rules. */
+    fun applicable(input: AnalysisInput, rules: List<AnalyticsRule> = RULES): List<AnalyticsRule> {
+        val electric = input.traits.isElectric || input.car?.fuelType == io.github.iampopovich.eculense.core.model.FuelType.ELECTRIC
+        return if (electric) rules.filterNot { it.iceOnly } else rules
+    }
+
     fun evaluate(input: AnalysisInput, rules: List<AnalyticsRule> = RULES): List<Finding> =
-        rules.flatMap { it.evaluate(input) }.map(::withNorms).sortedByDescending { it.severity.rank }
+        applicable(input, rules).flatMap { it.evaluate(input) }.map(::withNorms).sortedByDescending { it.severity.rank }
 
     /**
      * R-H: every finding compared with norms shows them («compared with …» evidence). Compared only with GENERIC norms:
@@ -252,6 +262,7 @@ object VoltageRule : AnalyticsRule {
  * Not judged on a diesel (lean, unthrottled: petrol trim norms do not apply).
  */
 object FuelTrimRule : AnalyticsRule {
+    override val iceOnly = true
     private const val LONG = "fuel-trim-long"
     private const val TOTAL = "fuel-trim-total"
     private const val ASYM = "fuel-trim-bank-asymmetry"
@@ -356,6 +367,7 @@ object FuelTrimRule : AnalyticsRule {
  * the generic 0.9–1.3 g/s per litre of a petrol engine. No MAF sensor (ECU) or a diesel without a baseline: no data.
  */
 object MafIdleRule : AnalyticsRule {
+    override val iceOnly = true
     private const val ID = "maf-idle"
     private val TITLE = t(K.TITLE_MAF_IDLE)
     override val ids = listOf(ID)
@@ -393,6 +405,7 @@ object MafIdleRule : AnalyticsRule {
 
 /** R-H: warm idle speed (recent sessions' medians) against [NormKey.IDLE_RPM]; low = stall risk (WARNING), high = INFO. */
 object IdleRpmRule : AnalyticsRule {
+    override val iceOnly = true
     private const val ID = "idle-rpm"
     private val TITLE = t(K.TITLE_IDLE_RPM)
     override val ids = listOf(ID)
@@ -421,6 +434,7 @@ object IdleRpmRule : AnalyticsRule {
  * thermostat from an 82 °C one. Overheating itself is the class-2 [CoolantOverheatRule].
  */
 object CoolantPlateauRule : AnalyticsRule {
+    override val iceOnly = true
     private const val ID = "coolant-plateau"
     private val TITLE = t(K.TITLE_COOLANT_PLATEAU)
     override val ids = listOf(ID)
@@ -472,6 +486,7 @@ object MilDistanceRule : AnalyticsRule {
 
 /** B10: engine stalls found live (rpm → 0 with the ECU answering). 1 = info, 2+ = warning, 4+ = critical. */
 object StallRule : AnalyticsRule {
+    override val iceOnly = true
     private const val ID = "engine-stalls"
     private val TITLE = t(K.TITLE_STALLS)
     override val ids = listOf(ID)
@@ -503,6 +518,7 @@ object StallRule : AnalyticsRule {
 
 /** Warm-up time to 80 °C from a cold start: trend between early and late trips. */
 object WarmupTrendRule : AnalyticsRule {
+    override val iceOnly = true
     private const val ID = "warmup-trend"
     private val TITLE = t(K.TITLE_WARMUP)
     override val ids = listOf(ID)

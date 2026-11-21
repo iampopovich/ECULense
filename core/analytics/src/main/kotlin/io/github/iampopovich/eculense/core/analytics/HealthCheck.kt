@@ -37,6 +37,8 @@ enum class HealthNote {
     NOT_APPLICABLE_DIESEL,
     /** R-H: wideband upstream O2 sensor — the 0.1–0.9 V swing check does not apply. */
     WIDEBAND_O2,
+    /** R-E: electric car — combustion-engine items (trims, O2, idle) do not apply. */
+    NOT_APPLICABLE_EV,
 }
 
 /** [norm] = the per-car norm the value was compared with (R-H), shown as «compared with» and sent to the AI. */
@@ -101,9 +103,14 @@ object HealthCheck {
             trims(s, running, warm, norms),
             o2(s[O2], running, warm, norms),
             idle(rpm, running, warm, moving, norms),
-        )
+        ).map { item ->
+            // R-E: an electric car has no mixture, O2 sensor or idle speed to judge.
+            if (norms.traits.isElectric && item.id in ICE_ITEMS) HealthItem(item.id, HealthStatus.NOT_SUPPORTED, note = HealthNote.NOT_APPLICABLE_EV) else item
+        }
         return HealthResult(verdict(items), items)
     }
+
+    private val ICE_ITEMS = setOf(HealthItemId.FUEL_TRIMS, HealthItemId.O2_SENSOR, HealthItemId.IDLE)
 
     fun verdict(items: List<HealthItem>): HealthStatus {
         val worst = items.maxOfOrNull { it.status.rank } ?: return HealthStatus.NOT_SUPPORTED

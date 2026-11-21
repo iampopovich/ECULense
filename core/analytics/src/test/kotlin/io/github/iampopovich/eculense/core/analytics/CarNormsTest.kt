@@ -119,6 +119,32 @@ class CarNormsTest {
     }
 
     @Test
+    fun `an electric car gets no combustion-engine rules, fallbacks or health items`() {
+        val car = CarProfile(name = "Test car", fuelType = FuelType.ELECTRIC)
+        val norms = CarNorms(car = car, traits = EngineTraits().withProfile(car))
+        assertTrue(norms.traits.isElectric)
+        val sessions = (1L..6L).map { digest(it).copy(warmIdleMaf = agg(20, 5.5), warmTrims = mapOf(LTFT1 to agg(20, 14.0), STFT1 to agg(20, 13.0))) }
+        val input = input(sessions, norms)
+        val ruleIds = AnalyticsEngine.applicable(input).flatMap { it.ids }
+        listOf("coolant-plateau", "fuel-trim-long", "maf-idle", "idle-rpm", "warmup-trend", "engine-stalls").forEach { assertTrue(it, it !in ruleIds) }
+        val f = AnalyticsEngine.evaluate(input)
+        assertTrue(f.none { it.ruleId.startsWith("fuel-trim") || it.ruleId == "maf-idle" || it.ruleId == "idle-rpm" })
+        NormKey.entries.filter { it.iceOnly }.forEach { assertNull(it.name, GenericNorms.of(it, car, norms.traits)) }
+        assertNotNull(GenericNorms.of(NormKey.CHARGING_IDLE_V, car, norms.traits)) // the 12 V system is still judged
+        val h = HealthCheck.evaluate(
+            HealthInput(emptyList(), emptyList(), null, true, false, 5, 0, false,
+                mapOf(SensorIds.RPM to List(5) { 0.0 }, LTFT1 to List(5) { 14.0 }, STFT1 to List(5) { 13.0 }, HealthCheck.O2 to List(5) { 0.45 })),
+            norms,
+        )
+        listOf(HealthItemId.FUEL_TRIMS, HealthItemId.O2_SENSOR, HealthItemId.IDLE).forEach {
+            assertEquals(HealthNote.NOT_APPLICABLE_EV, h.items.first { i -> i.id == it }.note)
+        }
+        // A petrol car keeps every rule.
+        val petrol = CarNorms(car = car.copy(fuelType = FuelType.PETROL), traits = EngineTraits())
+        assertEquals(AnalyticsEngine.RULES.size, AnalyticsEngine.applicable(input(sessions, petrol)).size)
+    }
+
+    @Test
     fun `diesel learns its own idle air flow and then judges it`() {
         val car = CarProfile(name = "Test car", fuelType = FuelType.DIESEL, engineVolumeL = 2.0)
         val traits = EngineTraits().withProfile(car)

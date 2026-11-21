@@ -53,6 +53,7 @@ internal fun HealthNote.res(): Int? = when (this) {
     HealthNote.CLEARED_RECENTLY -> R.string.health_note_cleared
     HealthNote.NOT_APPLICABLE_DIESEL -> R.string.health_note_diesel
     HealthNote.WIDEBAND_O2 -> R.string.health_note_wideband
+    HealthNote.NOT_APPLICABLE_EV -> R.string.health_note_ev
 }
 
 /** «3», «2 incomplete», «92 °C», «14.1 V», «+4.5 %», «swing 0.70 V», «760 rpm»; null when there is no number. */

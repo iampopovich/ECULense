@@ -133,7 +133,16 @@ enum class NormKey(val unit: NormUnit, val system: NormSystem, val minDelta: Dou
     WARMUP_MIN(NormUnit.MINUTES, NormSystem.COOLING, 0.30, relative = true),
     /** Harsh accel/brake threshold, linked from the accelerometer calibration (StyleThresholds / AccelCalibration). */
     HARSH_ACCEL(NormUnit.G, NormSystem.DRIVING, 0.0, learnable = false),
+    ;
+
+    /**
+     * R-E: the norm describes a combustion engine (coolant/thermostat, idle, air flow, mixture, O2): it does not apply
+     * to a battery-electric car (no thermostat plateau, idle speed, MAF, trims or O2 sensors; SAE J1979 PID 51 code 8).
+     */
+    val iceOnly: Boolean get() = system in ICE_SYSTEMS
 }
+
+private val ICE_SYSTEMS = setOf(NormSystem.COOLING, NormSystem.IDLE, NormSystem.AIR, NormSystem.FUEL_TRIM, NormSystem.O2)
 
 /**
  * The norm of one parameter for one car: allowed band [low]..[high] (either side may be open), [center] = baseline
@@ -176,6 +185,9 @@ data class EngineTraits(
 ) {
     val isDiesel: Boolean get() = fuel?.value == FuelKind.DIESEL
     val isWideband: Boolean get() = o2?.value == O2Kind.WIDEBAND
+
+    /** R-E: battery-electric (profile fuel «electric», PID 51 code 8/15, or an EV signalset seen on the link). */
+    val isElectric: Boolean get() = fuel?.value == FuelKind.ELECTRIC
 
     /** Profile fuel (USER) wins over the ECU, ECU over nothing. */
     fun withProfile(car: CarProfile?): EngineTraits {
@@ -283,6 +295,8 @@ object GenericNorms {
     fun of(key: NormKey, car: CarProfile?, traits: EngineTraits): Norm? {
         fun g(low: Double?, high: Double?) = Norm(key, low, high, NormSource.GENERIC)
         val diesel = traits.isDiesel || car?.fuelType == FuelType.DIESEL
+        // R-E: no combustion-engine fallback for an electric car (the rules using them are switched off as well).
+        if (key.iceOnly && (traits.isElectric || car?.fuelType == FuelType.ELECTRIC)) return null
         return when (key) {
             NormKey.COOLANT_PLATEAU -> g(Thresholds.WARM_COOLANT_C, Thresholds.OVERHEAT_WARN_C)
             NormKey.IDLE_RPM -> g(Thresholds.HEALTH_IDLE_MIN_RPM, Thresholds.IDLE_MAX_RPM)
