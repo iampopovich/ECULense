@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.iampopovich.eculense.core.model.CarProfile
 import io.github.iampopovich.eculense.core.model.UnitsSettings
 import io.github.iampopovich.eculense.core.navigation.CarEditDestination
+import io.github.iampopovich.eculense.core.navigation.CarNormsDestination
 import io.github.iampopovich.eculense.core.navigation.LocalNavigator
 import io.github.iampopovich.eculense.core.ui.CarNames
 import io.github.iampopovich.eculense.core.ui.R as CoreUiR
@@ -53,6 +54,7 @@ internal fun CarRoute(viewModel: CarViewModel = koinViewModel()) {
         onAdd = { navigator.navigate(CarEditDestination(0)) },
         onSelect = viewModel::setActive,
         onUnits = viewModel::setUnits,
+        onNorms = { navigator.navigate(CarNormsDestination) },
     )
 }
 
@@ -64,6 +66,7 @@ internal fun CarScreen(
     onSelect: (Long) -> Unit,
     onUnits: (UnitsSettings) -> Unit,
     modifier: Modifier = Modifier,
+    onNorms: () -> Unit = {},
 ) {
     LazyColumn(
         modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -72,6 +75,8 @@ internal fun CarScreen(
         item { Text(stringResource(R.string.car_hub_title), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp)) }
         if (state.loading) return@LazyColumn
         state.active?.let { car -> item { ActiveCarCard(car, onEdit = { onEdit(car.id) }) } }
+        // R-H: the active car's engine norms (own baseline, user overrides, generic fallbacks), on its own row.
+        if (state.active != null) item { OutlinedButton(onClick = onNorms, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.car_norms_open)) } }
         item { SectionTitle(stringResource(R.string.car_section_cars)) }
         items(state.cars, key = { it.id }) { car ->
             CarRow(car, selected = car.id == state.active?.id, onSelect = { onSelect(car.id) }, onEdit = { onEdit(car.id) })

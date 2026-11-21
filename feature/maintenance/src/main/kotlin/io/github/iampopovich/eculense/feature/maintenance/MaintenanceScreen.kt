@@ -109,6 +109,8 @@ internal fun MaintenanceScreen(state: MaintenanceUiState, zone: ZoneId, actions:
             if (state.loading) return@LazyColumn
             item { OdometerCard(state, zone) { dialog = Dialog.Odometer } }
             item { Text(stringResource(R.string.maint_items), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp)) }
+            // R-H: the template is generic; the owner's manual has this car's intervals.
+            item { Text(stringResource(R.string.maint_template_generic_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             if (state.items.isEmpty()) item { Secondary(stringResource(R.string.maint_empty)) }
             items(state.items, key = { it.item.id }) { d ->
                 ItemCard(d, zone, onDone = { dialog = Dialog.Done(d) }, onEdit = { dialog = Dialog.Edit(d.item) })

@@ -124,4 +124,55 @@
     <string name="car_spec_economy_value">%1$s L/100 km</string>
     <string name="car_obd_compat_note">The car may predate mandatory OBD-II: some data may be unavailable.</string>
     <string name="car_obd_compat_late">OBD-II/EOBD became mandatory later in Russia and neighbouring countries, so older cars may not support it.</string>
+    <string name="car_norms_open">Engine norms of this car</string>
+    <string name="car_norms_title">Car norms</string>
+    <string name="car_norms_no_car">No active car.</string>
+    <string name="car_norms_intro">Every engine is different: findings compare with this car’s own baseline from its warm recordings, with your values, or — until enough recordings exist — with a general norm marked as not verified.</string>
+    <string name="car_norms_traits">What the ECU and the profile say</string>
+    <string name="car_norms_trait_line" translatable="false">%1$s: %2$s</string>
+    <string name="car_norms_trait_value" translatable="false">%1$s (%2$s)</string>
+    <string name="car_norms_trait_unknown">not known yet</string>
+    <string name="car_norms_trait_fuel">Fuel</string>
+    <string name="car_norms_trait_o2">Oxygen sensor</string>
+    <string name="car_norms_trait_boost">Turbo / supercharger</string>
+    <string name="car_norms_trait_maf">MAF sensor</string>
+    <string name="car_norms_trait_obd">OBD standard (PID 1C)</string>
+    <string name="car_norms_fuel_petrol">petrol</string>
+    <string name="car_norms_fuel_diesel">diesel</string>
+    <string name="car_norms_fuel_gas">gas</string>
+    <string name="car_norms_fuel_electric">electric</string>
+    <string name="car_norms_fuel_hybrid">hybrid</string>
+    <string name="car_norms_fuel_other">other</string>
+    <string name="car_norms_o2_wide">wideband</string>
+    <string name="car_norms_o2_narrow">narrowband</string>
+    <string name="car_norms_yes">yes</string>
+    <string name="car_norms_no">no</string>
+    <string name="car_norms_unknown_no">not reported</string>
+    <string name="car_norms_src_user">Yours</string>
+    <string name="car_norms_src_reference">Reference</string>
+    <string name="car_norms_src_baseline">Own baseline</string>
+    <string name="car_norms_src_ecu">ECU</string>
+    <string name="car_norms_src_generic">General</string>
+    <string name="car_norms_not_learned">Not learned yet: the own baseline needs at least 5 warm recordings.</string>
+    <string name="car_norms_none">No norm for this engine</string>
+    <string name="car_norms_learning">Learning, recordings: %1$d of %2$d</string>
+    <string name="car_norms_learned_line">Recordings: %1$d · confidence %2$d %%</string>
+    <string name="car_norms_in_use">In use: %1$s</string>
+    <string name="car_norms_learned_value">Learned: %1$s</string>
+    <string name="car_norms_harsh_hint">Set by the accelerometer calibration on the trip screen.</string>
+    <string name="car_norms_edit_hint">Your own band, for example from the workshop manual. Leave a side empty if it has no limit.</string>
+    <string name="car_norms_low">Lower limit</string>
+    <string name="car_norms_high">Upper limit</string>
+    <string name="car_norms_err_number">Enter a number</string>
+    <string name="car_norms_err_empty">Enter at least one limit</string>
+    <string name="car_norms_err_range">Outside the plausible range for this parameter</string>
+    <string name="car_norms_err_order">The lower limit is above the upper one</string>
+    <string name="car_norms_save">Save my norm</string>
+    <string name="car_norms_reset_learned">Reset to the learned norm</string>
+    <string name="car_norms_reset_generic">Reset to the general norm</string>
+    <string name="car_norms_maintenance_hint">Service intervals in Maintenance are a general template: enter the intervals from your owner’s manual (tap an item to edit it).</string>
+    <plurals name="car_norms_learned">
+        <item quantity="one">Learned from %1$d recording</item>
+        <item quantity="other">Learned from %1$d recordings</item>
+    </plurals>
 </resources>

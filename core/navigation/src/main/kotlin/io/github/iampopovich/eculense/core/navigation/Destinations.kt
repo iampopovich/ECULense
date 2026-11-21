@@ -33,6 +33,8 @@ interface FullScreenDestination
 /** carId = 0 — new car. */
 @Serializable data class CarEditDestination(val carId: Long = 0) : NavKey
 @Serializable data object AnalysisDestination : NavKey
+/** R-H: engine norms of the active car. */
+@Serializable data object CarNormsDestination : NavKey
 @Serializable data class FindingDestination(val findingId: Long) : NavKey
 @Serializable data object DataPacksDestination : NavKey
 @Serializable data object AboutDestination : NavKey
