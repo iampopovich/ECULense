@@ -44,6 +44,8 @@ val appModules: List<Module> = listOf(
     module { single { AppBuild(BuildConfig.VERSION_NAME, BuildConfig.FLAVOR) } },
     // Current app language (BCP-47) for AI prompts: the answer language follows the in-app language.
     appLanguageModule,
+    // Logcat implementation of the injectable AppLogger (R3.1).
+    appLoggerModule,
     obdModule(includeEmulator = BuildConfig.DEBUG),
     bluetoothModule,
     usbModule,

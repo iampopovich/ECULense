@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.io.IOException
 
 sealed interface ConnectionState {
     data object Disconnected : ConnectionState
@@ -310,7 +309,10 @@ class ObdConnectionManager internal constructor(
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: IOException) {
+        } catch (e: Exception) {
+            // IOException (link lost) and adapter errors alike (ObdException: BUS INIT ERROR, parser failures from
+            // ATRV/0100, also while waiting for the engine): reopen the link. Nothing may escape into the app scope.
+            traffic?.note("stall check failed: ${ObdError.of(e).technicalMessage}")
             reconnect(endpoint, ObdError.of(e))
         }
     }
