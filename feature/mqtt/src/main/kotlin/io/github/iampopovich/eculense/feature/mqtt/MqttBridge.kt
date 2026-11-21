@@ -5,6 +5,7 @@ import io.github.iampopovich.eculense.core.data.DashboardSelection
 import io.github.iampopovich.eculense.core.data.ExtendedSignal
 import io.github.iampopovich.eculense.core.model.AppLogger
 import io.github.iampopovich.eculense.core.model.CarProfile
+import io.github.iampopovich.eculense.core.mqtt.ConnectResult
 import io.github.iampopovich.eculense.core.mqtt.HaDiscovery
 import io.github.iampopovich.eculense.core.mqtt.MqttConfig
 import io.github.iampopovich.eculense.core.mqtt.MqttMessage
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -59,6 +61,10 @@ sealed interface BridgeStatus {
  * Published: retained discovery config (one HA device per install + car), retained availability «online»/«offline»
  * (Last Will) and every [MqttSettings.periodSec] a state JSON with the chosen values in stored metric units. Never VIN,
  * GPS, adapter MAC/name or the car's nickname: the HA device name is make + model + year.
+ *
+ * Switching publishing OFF in the app (enabled true → false) removes the HA device: a one-shot link sends the empty
+ * retained discovery config(s) and the retained «offline» status if the broker is reachable, then disconnects — with
+ * or without an adapter session (the broker part of the settings is still stored).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MqttBridge(
@@ -89,19 +95,42 @@ class MqttBridge(
 
     private var running = false
 
+    /**
+     * The user switched publishing off: the settings that were on ([was], broker still stored) and a sequence number
+     * so the removal runs once per switch-off, not again when the car or another setting changes while off.
+     */
+    private data class SwitchOff(val was: MqttSettings, val seq: Int)
+
+    private data class Edge(val now: MqttSettings, val off: SwitchOff?)
+
+    private val edges: Flow<Edge> = settings.settings.runningFold<MqttSettings, Edge?>(null) { last, s ->
+        val prev = last?.now
+        val turnedOff = prev != null && prev.enabled && !s.enabled && prev.host.isNotBlank()
+        Edge(s, if (turnedOff) SwitchOff(prev, (last?.off?.seq ?: 0) + 1) else last?.off)
+    }.filterNotNull()
+
+    private var removedSeq = 0
+
+    private data class Idle(val status: BridgeStatus, val off: SwitchOff?)
+
     fun start() {
         scope.launch {
-            combine(settings.settings, link.map { it.alive to it.simulated }.distinctUntilChanged(), activeCar) { s, (alive, simulated), car ->
+            combine(edges, link.map { it.alive to it.simulated }.distinctUntilChanged(), activeCar) { e, (alive, simulated), car ->
+                val s = e.now
                 when {
-                    !s.enabled || s.host.isBlank() -> BridgeStatus.Off to null
-                    !alive -> BridgeStatus.WaitingForAdapter to null
-                    simulated -> BridgeStatus.SimulatedLink to null
+                    !s.enabled || s.host.isBlank() -> Idle(BridgeStatus.Off, e.off?.takeIf { !s.enabled }) to null
+                    !alive -> Idle(BridgeStatus.WaitingForAdapter, null) to null
+                    simulated -> Idle(BridgeStatus.SimulatedLink, null) to null
                     else -> null to Plan(s, car)
                 }
             }.distinctUntilChanged().collectLatest { (idle, plan) ->
                 if (plan == null) {
                     shutDown()
-                    _status.value = idle ?: BridgeStatus.Off
+                    _status.value = idle?.status ?: BridgeStatus.Off
+                    idle?.off?.takeIf { it.seq > removedSeq }?.let { off ->
+                        removedSeq = off.seq
+                        removeDevice(off.was)
+                    }
                 } else {
                     try {
                         publish(plan)
@@ -123,6 +152,40 @@ class MqttBridge(
     }
 
     @Volatile private var lastPrefix: String? = null
+
+    /** Node ids announced by this process (the active car can change while publishing is on). */
+    private val announced = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
+
+    /**
+     * Switch-off: one short link to the broker of the settings that were on — empty retained discovery config for the
+     * active car's node and every node announced since the app started (HA removes the device), then the retained
+     * «offline» status, then DISCONNECT. One attempt; an unreachable broker only gets a log line (nothing is queued).
+     */
+    private suspend fun removeDevice(was: MqttSettings) {
+        val install = settings.installId()
+        val car = activeCar.first()
+        val nodes = (listOf(HaDiscovery.nodeId(install, car?.id)) + announced.toList()).distinct()
+        val prefix = HaDiscovery.cleanPrefix(was.prefix)
+        val user = was.username.trim().ifEmpty { null }
+        val config = MqttConfig(
+            host = was.host.trim(),
+            port = was.port,
+            tls = was.tls,
+            // Own client id: never kicks a link that is still closing with the main id.
+            clientId = "eculense${install}r",
+            username = user,
+            password = if (user != null) settings.password() else null,
+            keepAliveSec = 30,
+            will = null,
+        )
+        val result = publisher.sendOnce(config, nodes.map { HaDiscovery.removalMessage(it) } + HaDiscovery.offlineMessage(prefix))
+        if (result == ConnectResult.Accepted) {
+            announced.clear()
+            logger.info(TAG, "mqtt: switched off, Home Assistant device removed (${nodes.size} node(s))")
+        } else {
+            logger.info(TAG, "mqtt: switched off, device not removed: broker ${result::class.simpleName}")
+        }
+    }
 
     internal data class Selection(val pids: List<Pid>, val extended: List<ExtendedSignal>)
 
@@ -187,6 +250,7 @@ class MqttBridge(
         publisher.start(config) { listOf(HaDiscovery.onlineMessage(prefix), discovery(current)) }
         running = true
         lastPrefix = prefix
+        announced += node
         launch { publisher.state.collect { _status.value = BridgeStatus.Active(it) } }
         val stateTopic = HaDiscovery.stateTopic(prefix, node)
         ticks(s.periodSec * 1_000L).collect {

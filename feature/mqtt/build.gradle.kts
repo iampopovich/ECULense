@@ -12,4 +12,5 @@ dependencies {
     implementation(project(":core:secrets"))
     implementation(libs.androidx.datastore.preferences)
     testImplementation(testFixtures(project(":core:obd")))
+    testImplementation(testFixtures(project(":core:mqtt")))
 }

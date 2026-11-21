@@ -1,5 +1,6 @@
 plugins {
     id("ecu.jvm.library")
+    `java-test-fixtures`
 }
 
 // Own publish-only MQTT 3.1.1 client (CONNECT/CONNACK, PUBLISH QoS 0/1 + PUBACK, PINGREQ/PINGRESP, DISCONNECT, LWT,

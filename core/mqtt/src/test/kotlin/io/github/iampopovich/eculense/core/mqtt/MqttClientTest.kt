@@ -163,4 +163,29 @@ class MqttClientTest {
         assertEquals("offline", broker.retained["eculense/status"])
         assertEquals(MqttState.Idle, client.state.value)
     }
+
+    @Test
+    fun `sendOnce publishes the removal and offline as QoS 1 retained, waits for each PUBACK, then DISCONNECT`() = runBlocking {
+        broker.retained["homeassistant/device/n/config"] = "{}"
+        val result = client.sendOnce(config(), listOf(HaDiscovery.removalMessage("n"), HaDiscovery.offlineMessage("eculense")))
+        assertEquals(ConnectResult.Accepted, result)
+        assertTrue(broker.await { broker.disconnects.get() == 1 })
+        assertFalse(broker.retained.containsKey("homeassistant/device/n/config"))
+        assertEquals("offline", broker.retained["eculense/status"])
+        assertEquals(listOf(1, 2), broker.publishes.map { it.packetId })
+        assertEquals(MqttState.Idle, client.state.value) // the long-running link is not touched
+    }
+
+    @Test
+    fun `sendOnce reports a missing PUBACK, a refusal and a closed port without retrying`() = runBlocking {
+        broker.ackQos1 = false
+        val noAck = client.sendOnce(config(ackTimeoutMs = 300), listOf(HaDiscovery.removalMessage("n")))
+        assertTrue(noAck.toString(), noAck is ConnectResult.Unreachable)
+        assertEquals(1, broker.publishes.size)
+        broker.connackBytes = byteArrayOf(0x20, 0x02, 0x00, 0x05)
+        assertTrue(client.sendOnce(config(), listOf(HaDiscovery.removalMessage("n"))).badCredentials)
+        val closedPort = ServerSocket(0).use { it.localPort }
+        assertTrue(client.sendOnce(config(port = closedPort), emptyList()) is ConnectResult.Unreachable)
+        assertEquals(2, broker.accepted.get())
+    }
 }

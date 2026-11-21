@@ -132,6 +132,13 @@ interface MqttPublisher {
 
     /** One-shot CONNECT → CONNACK → DISCONNECT for «Check connection». */
     suspend fun probe(config: MqttConfig): ConnectResult
+
+    /**
+     * One-shot link outside [start]: CONNECT, [messages] in order (QoS 1 waits for its PUBACK), DISCONNECT. Used when
+     * publishing is switched off to remove the Home Assistant device (empty retained config) and leave «offline».
+     * [ConnectResult.Accepted] = every message was sent (and acknowledged for QoS 1); one attempt, no retries.
+     */
+    suspend fun sendOnce(config: MqttConfig, messages: List<MqttMessage>): ConnectResult
 }
 
 /**
@@ -197,6 +204,42 @@ class MqttClient(
             runCatching { it.close() }
         }
         result
+    }
+
+    override suspend fun sendOnce(config: MqttConfig, messages: List<MqttMessage>): ConnectResult = withContext(io) {
+        val (result, socket) = open(config)
+        if (socket == null) return@withContext result
+        try {
+            socket.soTimeout = config.ackTimeoutMs.coerceIn(1L, Int.MAX_VALUE.toLong()).toInt()
+            val out = socket.getOutputStream()
+            val input = socket.getInputStream()
+            var id = 0
+            for (m in messages) {
+                if (m.qos == MqttQos.AT_MOST_ONCE) {
+                    out.write(MqttCodec.publish(m))
+                    out.flush()
+                    continue
+                }
+                id++
+                out.write(MqttCodec.publish(m, id))
+                out.flush()
+                while (true) {
+                    val p = MqttCodec.readPacket(input)
+                    if (p.type == MqttCodec.PUBACK && MqttCodec.parsePuback(p) == id) break
+                }
+            }
+            out.write(MqttCodec.DISCONNECT_PACKET)
+            out.flush()
+            ConnectResult.Accepted
+        } catch (_: SocketTimeoutException) {
+            ConnectResult.Unreachable("no PUBACK within ${config.ackTimeoutMs} ms")
+        } catch (e: MqttProtocolException) {
+            ConnectResult.Protocol(e.message ?: "malformed packet")
+        } catch (e: IOException) {
+            ConnectResult.Unreachable(e.message ?: e::class.java.simpleName)
+        } finally {
+            runCatching { socket.close() }
+        }
     }
 
     private suspend fun run(config: MqttConfig, birth: () -> List<MqttMessage>) {

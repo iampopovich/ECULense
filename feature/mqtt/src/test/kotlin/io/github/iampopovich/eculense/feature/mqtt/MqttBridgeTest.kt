@@ -38,6 +38,12 @@ private class FakePublisher : MqttPublisher {
     override fun publish(message: MqttMessage) { published += message }
     override suspend fun stop(final: MqttMessage?) { stops += final; state.value = MqttState.Idle }
     override suspend fun probe(config: MqttConfig): ConnectResult = ConnectResult.Accepted
+    val once = mutableListOf<Pair<MqttConfig, List<MqttMessage>>>()
+    var onceResult: ConnectResult = ConnectResult.Accepted
+    override suspend fun sendOnce(config: MqttConfig, messages: List<MqttMessage>): ConnectResult {
+        once += config to messages
+        return onceResult
+    }
     fun allPayloads(): List<String> = (starts.flatMap { it.second } + published + stops.filterNotNull()).map { it.payload.decodeToString() }
 }
 
@@ -142,5 +148,64 @@ class MqttBridgeTest {
         runCurrent()
         assertEquals(2, r.publisher.stops.size)
         assertEquals(BridgeStatus.Off, r.bridge.status.value)
+    }
+
+    @Test
+    fun `switching off removes the HA device with an empty retained config and leaves offline`() = runTest(UnconfinedTestDispatcher()) {
+        val r = rig(real)
+        runCurrent()
+        r.settings.update { it.copy(enabled = false) }
+        runCurrent()
+        assertEquals("offline", r.publisher.stops.single()!!.payload.decodeToString()) // the running session first
+        val (config, messages) = r.publisher.once.single()
+        assertEquals("192.168.1.20", config.host)
+        assertEquals("eculensea1b2c3d4e5f6r", config.clientId) // own id, not the main one
+        assertEquals("ha", config.username)
+        assertEquals("test-pass", config.password)
+        assertNull(config.will)
+        assertEquals(listOf("homeassistant/device/eculense_a1b2c3d4e5f6_c3/config", "eculense/status"), messages.map { it.topic })
+        assertEquals(0, messages[0].payload.size)
+        assertTrue(messages.all { it.retain })
+        assertEquals("offline", messages[1].payload.decodeToString())
+        assertEquals(BridgeStatus.Off, r.bridge.status.value)
+
+        // later edits while off (and the same switch-off seen again) do not repeat the removal
+        r.settings.update { it.copy(periodSec = 30) }
+        r.controller.stateFlow.value = ConnectionState.Disconnected
+        runCurrent()
+        assertEquals(1, r.publisher.once.size)
+    }
+
+    @Test
+    fun `switching off without an adapter still removes the device, unreachable broker is only logged`() = runTest(UnconfinedTestDispatcher()) {
+        val r = rig(ConnectionState.Disconnected)
+        runCurrent()
+        assertTrue(r.publisher.starts.isEmpty())
+        r.publisher.onceResult = ConnectResult.Unreachable("test")
+        r.settings.update { it.copy(enabled = false) }
+        runCurrent()
+        assertTrue(r.publisher.stops.isEmpty()) // nothing was running
+        assertEquals("homeassistant/device/eculense_a1b2c3d4e5f6_c3/config", r.publisher.once.single().second.first().topic)
+        assertEquals(BridgeStatus.Off, r.bridge.status.value)
+        // on again and off again = a second removal
+        r.settings.update { it.copy(enabled = true) }
+        runCurrent()
+        r.settings.update { it.copy(enabled = false) }
+        runCurrent()
+        assertEquals(2, r.publisher.once.size)
+    }
+
+    @Test
+    fun `off from the start or a blank host never contacts the broker`() = runTest(UnconfinedTestDispatcher()) {
+        val off = rig(real, s = enabled.copy(enabled = false))
+        runCurrent()
+        off.settings.update { it.copy(host = "192.168.1.21") }
+        runCurrent()
+        assertTrue(off.publisher.once.isEmpty())
+        val blank = rig(real, s = enabled.copy(host = ""))
+        runCurrent()
+        blank.settings.update { it.copy(enabled = false) }
+        runCurrent()
+        assertTrue(blank.publisher.once.isEmpty())
     }
 }
