@@ -1,4 +1,4 @@
-package io.github.iampopovich.eculense.core.ai
+package io.github.iampopovich.eculense.core.secrets
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals

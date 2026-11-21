@@ -8,6 +8,8 @@ plugins {
 dependencies {
     // AppLanguage: the answer language is read from the current app locale on every question.
     implementation(project(":core:model"))
+    // Keystore cipher for API keys (shared module; the AI package re-exports it as typealiases).
+    api(project(":core:secrets"))
     implementation(libs.koog.agents)
     // Provider clients from koog-spring-boot-starter: OpenRouter, Google, DeepSeek, Mistral, Ollama
     // (OpenAI and Anthropic come with koog-agents).

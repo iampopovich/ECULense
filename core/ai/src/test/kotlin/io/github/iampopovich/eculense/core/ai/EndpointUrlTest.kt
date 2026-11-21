@@ -1,5 +1,6 @@
 package io.github.iampopovich.eculense.core.ai
 
+import io.github.iampopovich.eculense.core.model.LocalNetwork
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
